@@ -78,9 +78,10 @@ Add at **module level** (not inside the hook — avoids closure/lifecycle issues
 ```typescript
 /** Debounce delay for file-watcher-triggered directory refreshes (ms).
  *  Intentionally distinct from DELAYS.debounce (generic UI debounce) because
- *  this value is tuned to the dual-watcher pipeline: TauriProvider fires at ~0ms,
- *  file watcher fires after 75ms batch + throttle. 150ms coalesces both into
- *  a single listDirectory call while keeping perceived latency under 200ms. */
+ *  this value is tuned to the batched file watcher pipeline: events arrive
+ *  after 75ms batch + VS Code coalescing + 200ms throttle. 150ms coalesces
+ *  the throttled worker's per-event posts into a single listDirectory call
+ *  while keeping total perceived latency reasonable (~275ms). */
 const FILE_TREE_REFRESH_DEBOUNCE_MS = 150;
 ```
 
@@ -102,9 +103,15 @@ function clearScheduledDirectoryRefreshes(timers: RefreshTimers): void {
  *  Only the lookup key is lowercased — the real dirPath is preserved
  *  for listDirectory and setTreeChildren calls. */
 function timerKey(dirPath: string): string {
-  // macOS is case-insensitive; Linux is case-sensitive.
+  // macOS and Windows are case-insensitive; Linux is case-sensitive.
   // Uses existing isMac() from @/lib/utils (navigator.userAgent-based).
-  return isMac() ? dirPath.toLowerCase() : dirPath;
+  return isCaseInsensitiveFS() ? dirPath.toLowerCase() : dirPath;
+}
+
+function isCaseInsensitiveFS(): boolean {
+  if (isMac()) return true;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('win');
 }
 
 function scheduleDirectoryRefresh(timers: RefreshTimers, dirPath: string): void {
@@ -303,7 +310,7 @@ Existing exclusion/mapping tests must still pass with the new import path.
 3. **Skips collapsed directory** — `refreshDirectory` returns early if the target directory is no longer expanded or the root
 4. **Delete regression** — `file:changed` with `change_type: 'deleted'` still removes the child directly (no debounce involved)
 5. **Collapsed folder cache invalidation** — `refreshDirectory` on a collapsed-but-cached folder deletes `treeNodes[dirPath]` so next expand triggers fresh fetch
-6. **Case-variant path coalescing** — `scheduleDirectoryRefresh` with `/Workspace/Src` and `/workspace/src` on macOS produces one timer, not two
+6. **Case-variant path coalescing** — `scheduleDirectoryRefresh` with `/Workspace/Src` and `/workspace/src` on macOS/Windows produces one timer, not two (via `isCaseInsensitiveFS()`)
 7. **Instance isolation** — two `useFileTree` mounts maintain independent timer maps; unmounting one doesn't cancel the other's pending refreshes
 
 ## Codebase precedent
@@ -315,25 +322,27 @@ The module-level debounce + lifecycle cleanup pattern is already established in 
 
 ## Why 150ms debounce
 
-- TauriProvider posts `file:changed` immediately (~0ms)
-- File watcher module posts after 75ms batch + throttle
-- 150ms coalesces both into a single `listDirectory` call
-- Still feels instant to the user (~200ms total with Tauri roundtrip)
+- After watcher consolidation (Step 8), only the batched file watcher pipeline remains
+- File watcher posts after 75ms batch → VS Code coalescing → 200ms throttle
+- 150ms debounce coalesces the throttled worker's per-event posts into a single `listDirectory` call
+- Total latency: ~275ms (75ms batch + 200ms throttle - overlap + 150ms debounce) — still feels instant to the user
 
 ## Edge cases handled
 
-| Edge case                                       | How handled                                                                                                          |
-| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Workspace switch during async fetch             | Stale guard: `rootPath` captured before `listDirectory`, verified after                                              |
-| Parent deleted/renamed during debounce          | `listDirectory` will fail → caught by try/catch, logged as warning                                                   |
-| Folder collapsed during debounce                | Re-check visibility before `listDirectory` call; invalidate cache so next expand re-fetches                          |
-| Rapid burst of creates in same dir              | 150ms per-path debounce coalesces into one fetch                                                                     |
-| Duplicate events (TauriProvider + file watcher) | Same debounce absorbs second event                                                                                   |
-| `rootPath` not yet initialized (startup race)   | `if (!rootAtStart) return` guard                                                                                     |
-| HMR during development                          | `import.meta.hot.dispose` clears all timers                                                                          |
-| Component unmount                               | useEffect cleanup clears all timers                                                                                  |
-| Case-variant paths on macOS/Windows             | `timerKey()` uses `isMac()` from `@/lib/utils` to normalize to lowercase on macOS; real path preserved for API calls |
-| Multiple `useFileTree` consumers                | `refreshTimersRef` scoped per hook instance via `useRef`; `activeTimerRefs` Set tracks all instances for HMR cleanup |
+| Edge case                                     | How handled                                                                                                                                                                                                                                                                                                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Workspace switch during async fetch           | Stale guard: `rootPath` captured before `listDirectory`, verified after                                                                                                                                                                                                                                                                               |
+| Parent deleted/renamed during debounce        | `listDirectory` will fail → caught by try/catch, logged as warning                                                                                                                                                                                                                                                                                    |
+| Folder collapsed during debounce              | Re-check visibility before `listDirectory` call; invalidate cache so next expand re-fetches                                                                                                                                                                                                                                                           |
+| Rapid burst of creates in same dir            | 150ms per-path debounce coalesces into one fetch                                                                                                                                                                                                                                                                                                      |
+| `rootPath` not yet initialized (startup race) | `if (!rootAtStart) return` guard                                                                                                                                                                                                                                                                                                                      |
+| HMR during development                        | `import.meta.hot.dispose` clears all timers                                                                                                                                                                                                                                                                                                           |
+| Component unmount                             | useEffect cleanup clears all timers                                                                                                                                                                                                                                                                                                                   |
+| Case-variant paths on macOS/Windows           | `timerKey()` uses `isCaseInsensitiveFS()` to normalize to lowercase on macOS AND Windows; real path preserved for API calls                                                                                                                                                                                                                           |
+| Multiple `useFileTree` consumers              | `refreshTimersRef` scoped per hook instance via `useRef`; `activeTimerRefs` Set tracks all instances for HMR cleanup                                                                                                                                                                                                                                  |
+| Watcher init after consolidation              | `initFileWatcher()` is called from `file-handlers.ts:101` (workspace load) and `useWorktreeFileTreeSync` (workspace switch) — both paths survive TauriProvider removal                                                                                                                                                                                |
+| File-tree hooks never mounted                 | If the user never opens the file explorer, `initFileWatcher()` never fires and no watcher starts. Acceptable: refresh is meaningless without a visible tree. Documented here so future callers don't assume watcher is always running.                                                                                                                |
+| Windows drive-root parent paths               | `getParentPath('C:/foo.txt')` returns `'C:'` (no trailing `/`). `normalizePathForComparison` recognizes `C:/` but not `C:` as a drive root — may cause `isPathEqualOrWithin` to fail. Pre-existing in `path-utils.ts`; this plan relies on those helpers but does not modify them. Confirm with a manual test on Windows if Windows support is added. |
 
 ### 7. Add debug counters for refresh lifecycle
 
@@ -399,12 +408,16 @@ Replace inline `navigator.platform` fallback in `timerKey()` with the existing `
 ```typescript
 import { isMac } from '@/lib/utils';
 
+function isCaseInsensitiveFS(): boolean {
+  if (isMac()) return true;
+  const ua = navigator.userAgent.toLowerCase();
+  return ua.includes('win');
+}
+
 function timerKey(dirPath: string): string {
   // macOS and Windows are case-insensitive; Linux is case-sensitive.
   // isMac() uses navigator.userAgent — always available in webview context.
-  // Treat non-Mac as case-sensitive (Linux). Windows is not a target platform
-  // for Tauri/Orbit, but if added, a dedicated isWindows() check can be introduced.
-  return isMac() ? dirPath.toLowerCase() : dirPath;
+  return isCaseInsensitiveFS() ? dirPath.toLowerCase() : dirPath;
 }
 ```
 
@@ -413,7 +426,7 @@ This also removes the `globalThis.process?.platform` dependency, addressing the 
 ## Verification
 
 1. `bunx tauri dev` — open a folder
-2. In Finder, create a file in that folder → should appear in explorer within ~200ms
+2. In Finder, create a file in that folder → should appear in explorer within ~300ms
 3. Create a file in an expanded subfolder → subfolder should refresh
 4. Create 5 files rapidly → only 1 `listDirectory` call (check debug logs)
 5. Delete a file in Finder → should still disappear immediately (regression check)
