@@ -15,7 +15,7 @@ import type { GitBranch as GitBranchInfo } from '@/lib/api';
 import type { WorktreeUIState } from '@/stores/ui/ui-store';
 import type { FC } from 'react';
 
-import { BranchPickerContent } from '@/components/git/branch-picker';
+import { BranchPickerContent, CreateBranchDialog } from '@/components/git/branch-picker';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -61,10 +61,15 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   const [branches, setBranches] = useState<GitBranchInfo[]>([]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [branchPopoverOpen, setBranchPopoverOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [suggestedName, setSuggestedName] = useState('');
 
-  // When source control is open, use the simpler Select; otherwise show the full popover
+  // When source control is visible (tab selected AND panel open), use the simpler Select;
+  // otherwise show the full popover. Both conditions are needed because closing the panel
+  // keeps activityTab as 'source' even though the source control UI is no longer visible.
   const activityTab = useUIStore((s) => s.activityTab);
-  const isSourceControlOpen = activityTab === 'source';
+  const reviewPanelOpen = useUIStore((s) => s.reviewPanelOpen);
+  const isSourceControlOpen = activityTab === 'source' && reviewPanelOpen;
 
   // For the active worktree, read branch from GitStore so source-control checkouts
   // are reflected immediately (GitStore is updated by useSourceControl, UIStore.worktrees is not)
@@ -185,6 +190,11 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
     },
     [worktree.path, isCheckingOut, branchName]
   );
+
+  const handleRequestCreate = useCallback((name: string): void => {
+    setSuggestedName(name);
+    setCreateDialogOpen(true);
+  }, []);
 
   // Create a new branch from HEAD and check it out
   const handleCreateAndCheckout = useCallback(
@@ -385,7 +395,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
                 onCheckout={(branch) => {
                   void handleBranchCheckout(branch);
                 }}
-                onCreateAndCheckout={handleCreateAndCheckout}
+                onRequestCreate={handleRequestCreate}
                 onClose={() => {
                   setBranchPopoverOpen(false);
                 }}
@@ -398,34 +408,43 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
   );
 
   return (
-    <div className="relative mx-1.5">
-      {/* Non-main worktrees get a right-click context menu for remove action */}
-      {!worktree.isMain ? (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
-          <ContextMenuContent className="w-44 rounded-xl p-1.5">
-            <ContextMenuItem
-              className="rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10"
-              onSelect={handleRemove}
-            >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              <span className="text-[13px]">Remove worktree</span>
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
-      ) : (
-        rowContent
-      )}
+    <>
+      <div className="relative mx-1.5">
+        {/* Non-main worktrees get a right-click context menu for remove action */}
+        {!worktree.isMain ? (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
+            <ContextMenuContent className="w-44 rounded-xl p-1.5">
+              <ContextMenuItem
+                className="rounded-lg text-destructive focus:text-destructive focus:bg-destructive/10"
+                onSelect={handleRemove}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                <span className="text-[13px]">Remove worktree</span>
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ) : (
+          rowContent
+        )}
 
-      {/* Locked indicator */}
-      {worktree.locked !== null && (
-        <div
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-amber-500 font-medium uppercase tracking-wide"
-          title={`Locked: ${worktree.locked}`}
-        >
-          Locked
-        </div>
-      )}
-    </div>
+        {/* Locked indicator */}
+        {worktree.locked !== null && (
+          <div
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-amber-500 font-medium uppercase tracking-wide"
+            title={`Locked: ${worktree.locked}`}
+          >
+            Locked
+          </div>
+        )}
+      </div>
+
+      <CreateBranchDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSubmit={handleCreateAndCheckout}
+        suggestedName={suggestedName}
+      />
+    </>
   );
 };
