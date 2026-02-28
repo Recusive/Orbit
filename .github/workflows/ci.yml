@@ -82,7 +82,7 @@ jobs:
       - name: Upload build
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         continue-on-error: true
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-agent-${{ github.sha }}
           path: dist/
@@ -157,7 +157,7 @@ jobs:
       - name: Upload build
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         continue-on-error: true
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: dist-canvas-${{ github.sha }}
           path: dist/canvas/
@@ -450,7 +450,7 @@ jobs:
   #     # Upload DMG artifact
   #     # Note: tauri build outputs to ./target/ (project root), not ./src-tauri/target/
   #     - name: Upload DMG
-  #       uses: actions/upload-artifact@v6
+  #       uses: actions/upload-artifact@v7
   #       with:
   #         name: Orbit-macOS-arm64-${{ github.sha }}
   #         path: target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
