@@ -2,7 +2,7 @@
 
 ## Overview
 
-A filesystem-based document vault where the filesystem is the source of truth. Users can create, view, and edit any file type stored in `{project_root}/.0rbit/Vault/`. No registry, no UUIDs—just files and folders.
+A filesystem-based document vault where the filesystem is the source of truth. Users can create, view, and edit any file type stored in `{project_root}/.orbit/Vault/`. No registry, no UUIDs—just files and folders.
 
 ## Architecture Principles
 
@@ -19,7 +19,7 @@ A filesystem-based document vault where the filesystem is the source of truth. U
 
 ```
 {project_root}/
-└── .0rbit/
+└── .orbit/
     └── Vault/
         ├── notes/
         │   ├── project-ideas.md
@@ -195,7 +195,7 @@ pub fn resolve_vault_path(
     // Validate filename components
     validate_path_components(&cleaned)?;
 
-    let vault_root = Path::new(workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(workspace_path).join(".orbit").join("Vault");
 
     // For new files, we need to handle non-existent paths
     let target = vault_root.join(&cleaned);
@@ -358,13 +358,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 #[tauri::command]
 pub async fn vault_check_initialized(workspace_path: String) -> Result<bool, String> {
-    let vault_path = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_path = Path::new(&workspace_path).join(".orbit").join("Vault");
     Ok(vault_path.exists() && vault_path.is_dir())
 }
 
 #[tauri::command]
 pub async fn vault_initialize(workspace_path: String) -> Result<(), String> {
-    let vault_path = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_path = Path::new(&workspace_path).join(".orbit").join("Vault");
     fs::create_dir_all(&vault_path)
         .map_err(|e| format!("Failed to create vault directory: {}", e))?;
 
@@ -462,7 +462,7 @@ fn collect_entries(
 
 /// Helper: Create a VaultEntry from a path
 fn create_vault_entry(path: &Path, workspace_path: &str) -> Result<VaultEntry, String> {
-    let vault_root = Path::new(workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(workspace_path).join(".orbit").join("Vault");
     let metadata = fs::metadata(path)
         .map_err(|e| format!("Failed to read metadata: {}", e))?;
 
@@ -523,7 +523,7 @@ pub async fn vault_list(
 
 #[tauri::command]
 pub async fn vault_stats(workspace_path: String) -> Result<VaultStats, String> {
-    let vault_path = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_path = Path::new(&workspace_path).join(".orbit").join("Vault");
 
     if !vault_path.exists() {
         return Err("Vault not initialized".to_string());
@@ -688,7 +688,7 @@ pub async fn vault_write(
         .unwrap_or(0);
 
     // Get relative path for result
-    let vault_root = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(&workspace_path).join(".orbit").join("Vault");
     let result_path = path.strip_prefix(&vault_root)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|_| relative_path);
@@ -735,7 +735,7 @@ pub async fn vault_rename(
     let metadata = fs::metadata(&dest)
         .map_err(|e| format!("Failed to read metadata: {}", e))?;
 
-    let vault_root = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(&workspace_path).join(".orbit").join("Vault");
     let result_path = dest.strip_prefix(&vault_root)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or(new_path);
@@ -780,7 +780,7 @@ pub async fn vault_move(
     let metadata = fs::metadata(&dest)
         .map_err(|e| format!("Failed to read metadata: {}", e))?;
 
-    let vault_root = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(&workspace_path).join(".orbit").join("Vault");
     let result_path = dest.strip_prefix(&vault_root)
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_default();
@@ -908,7 +908,7 @@ pub async fn vault_get_asset_url(
 pub async fn vault_get_context_config(
     workspace_path: String,
 ) -> Result<VaultContextConfig, String> {
-    let config_path = Path::new(&workspace_path).join(".0rbit").join("vault-context.json");
+    let config_path = Path::new(&workspace_path).join(".orbit").join("vault-context.json");
 
     if !config_path.exists() {
         return Ok(VaultContextConfig {
@@ -929,7 +929,7 @@ pub async fn vault_set_context_config(
     workspace_path: String,
     config: VaultContextConfig,
 ) -> Result<(), String> {
-    let config_path = Path::new(&workspace_path).join(".0rbit").join("vault-context.json");
+    let config_path = Path::new(&workspace_path).join(".orbit").join("vault-context.json");
 
     let content = serde_json::to_string_pretty(&config)
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
@@ -945,7 +945,7 @@ pub async fn vault_get_context_files(
     workspace_path: String,
 ) -> Result<Vec<VaultEntry>, String> {
     let config = vault_get_context_config(workspace_path.clone()).await?;
-    let vault_root = Path::new(&workspace_path).join(".0rbit").join("Vault");
+    let vault_root = Path::new(&workspace_path).join(".orbit").join("Vault");
 
     let mut entries = Vec::new();
 
@@ -2676,7 +2676,7 @@ const EmptyState: FC<EmptyStateProps> = ({ currentPath }) => (
 
 #### Basic Operations
 
-- [ ] Open Vault → verify `.0rbit/Vault/` created
+- [ ] Open Vault → verify `.orbit/Vault/` created
 - [ ] Create file → verify saved with correct name
 - [ ] Create file with existing name → verify `-1` suffix
 - [ ] Create subdirectory → navigate into it

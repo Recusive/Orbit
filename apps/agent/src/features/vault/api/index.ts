@@ -1,0 +1,15 @@
+export {
+  vaultCheckInitialized,
+  vaultCreateDirectory,
+  vaultDelete,
+  vaultDiscoverProjectDocs,
+  vaultGetContextConfig,
+  vaultInitialize,
+  vaultList,
+  vaultMove,
+  vaultRead,
+  vaultReadProjectDoc,
+  vaultRename,
+  vaultSetContextConfig,
+  vaultWrite,
+} from './vault-api';

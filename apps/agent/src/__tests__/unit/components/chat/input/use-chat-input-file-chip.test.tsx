@@ -70,7 +70,7 @@ describe('useChatInput pending file chips', () => {
     act(() => {
       usePendingContextStore
         .getState()
-        .enqueue({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
+        .enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
     });
 
     await waitFor(() => {
@@ -99,7 +99,7 @@ describe('useChatInput pending file chips', () => {
     act(() => {
       usePendingContextStore
         .getState()
-        .enqueue({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
+        .enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
     });
 
     await waitFor(() => {
@@ -120,7 +120,7 @@ describe('useChatInput pending file chips', () => {
       (result.current.inputRef as { current: HTMLDivElement | null }).current = input;
       usePendingContextStore
         .getState()
-        .enqueue({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
+        .enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
     });
 
     await waitFor(() => {
@@ -135,8 +135,8 @@ describe('useChatInput pending file chips', () => {
 
     act(() => {
       const store = usePendingContextStore.getState();
-      store.enqueue({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
-      store.enqueue({ path: '/repo/src', name: 'src', isDirectory: true });
+      store.enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
+      store.enqueueFileChip({ path: '/repo/src', name: 'src', isDirectory: true });
     });
 
     await waitFor(() => {

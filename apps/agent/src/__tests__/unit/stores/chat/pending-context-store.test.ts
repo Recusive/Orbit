@@ -1,65 +1,114 @@
-import { ADD_FILE_CHIP_EVENT, dispatchAddFileChip } from '@/lib/events/chat-context-events';
-import { enqueueFileChip, usePendingContextStore } from '@/stores/chat/pending-context-store';
+import {
+  ADD_CONTEXT_CHIP_EVENT,
+  ADD_FILE_CHIP_EVENT,
+  dispatchAddContextChip,
+  dispatchAddFileChip,
+} from '@/lib/events/chat-context-events';
+import {
+  enqueueContext,
+  enqueueFileChip,
+  usePendingContextStore,
+} from '@/stores/chat/pending-context-store';
 
-const FILE_A = { path: '/repo/a.ts', name: 'a.ts', isDirectory: false };
-const FILE_B = { path: '/repo/src', name: 'src', isDirectory: true };
+const FILE_ITEM = {
+  id: 'file-1',
+  type: 'file' as const,
+  path: '/repo/a.ts',
+  name: 'a.ts',
+};
+
+const FILE_DETAIL = { path: '/repo/a.ts', name: 'a.ts', isDirectory: false };
+const FOLDER_DETAIL = { path: '/repo/src', name: 'src', isDirectory: true };
 
 describe('pending-context-store', () => {
   beforeEach(() => {
     usePendingContextStore.setState({ pending: [] });
   });
 
-  it('enqueue adds an item to the pending array', () => {
-    usePendingContextStore.getState().enqueue(FILE_A);
-
-    expect(usePendingContextStore.getState().pending).toEqual([FILE_A]);
+  it('enqueueContext adds an item to the pending queue', () => {
+    usePendingContextStore.getState().enqueueContext(FILE_ITEM);
+    expect(usePendingContextStore.getState().pending).toEqual([FILE_ITEM]);
   });
 
-  it('enqueueFileChip adds an item via non-hook entrypoint', () => {
-    enqueueFileChip(FILE_A);
-
-    expect(usePendingContextStore.getState().pending).toEqual([FILE_A]);
+  it('enqueueFileChip converts and adds a file item', () => {
+    enqueueFileChip(FILE_DETAIL);
+    expect(usePendingContextStore.getState().pending).toEqual([
+      {
+        type: 'file',
+        path: '/repo/a.ts',
+        name: 'a.ts',
+        id: expect.any(String),
+      },
+    ]);
   });
 
-  it('enqueue deduplicates by path', () => {
+  it('enqueueContext deduplicates by type/path/name', () => {
     const store = usePendingContextStore.getState();
-    store.enqueue(FILE_A);
-    store.enqueue({ ...FILE_A, name: 'renamed.ts' });
-
-    expect(usePendingContextStore.getState().pending).toEqual([FILE_A]);
+    store.enqueueContext(FILE_ITEM);
+    store.enqueueContext({ ...FILE_ITEM, id: 'file-2' });
+    expect(usePendingContextStore.getState().pending).toEqual([FILE_ITEM]);
   });
 
-  it('drain returns all items and clears the queue', () => {
+  it('drainContext returns all items and clears the queue', () => {
     const store = usePendingContextStore.getState();
-    store.enqueue(FILE_A);
-    store.enqueue(FILE_B);
+    store.enqueueFileChip(FILE_DETAIL);
+    store.enqueueFileChip(FOLDER_DETAIL);
 
-    const drained = store.drain();
-
-    expect(drained).toEqual([FILE_A, FILE_B]);
+    const drained = store.drainContext();
+    expect(drained).toEqual([
+      {
+        type: 'file',
+        path: '/repo/a.ts',
+        name: 'a.ts',
+        id: expect.any(String),
+      },
+      {
+        type: 'folder',
+        path: '/repo/src',
+        name: 'src',
+        id: expect.any(String),
+      },
+    ]);
     expect(usePendingContextStore.getState().pending).toEqual([]);
   });
 
-  it('drain returns an empty array when queue is empty', () => {
-    const drained = usePendingContextStore.getState().drain();
-
-    expect(drained).toEqual([]);
-    expect(usePendingContextStore.getState().pending).toEqual([]);
+  it('enqueueContext helper pushes items from non-hook code', () => {
+    enqueueContext(FILE_ITEM);
+    expect(usePendingContextStore.getState().pending).toEqual([FILE_ITEM]);
   });
 
-  it('module-level listener enqueues valid addFileChip events', () => {
-    dispatchAddFileChip(FILE_A);
-
-    expect(usePendingContextStore.getState().pending).toEqual([FILE_A]);
+  it('module listener enqueues valid addFileChip events', () => {
+    dispatchAddFileChip(FILE_DETAIL);
+    expect(usePendingContextStore.getState().pending).toEqual([
+      {
+        type: 'file',
+        path: '/repo/a.ts',
+        name: 'a.ts',
+        id: expect.any(String),
+      },
+    ]);
   });
 
-  it('module-level listener ignores invalid addFileChip events', () => {
+  it('module listener enqueues valid addContextChip events', () => {
+    dispatchAddContextChip(FILE_ITEM);
+    expect(usePendingContextStore.getState().pending).toEqual([FILE_ITEM]);
+  });
+
+  it('module listener ignores invalid addFileChip payloads', () => {
     window.dispatchEvent(
       new CustomEvent(ADD_FILE_CHIP_EVENT, {
-        detail: { path: 123, name: 'x', isDirectory: false },
+        detail: { path: 1, name: 'x', isDirectory: false },
       })
     );
+    expect(usePendingContextStore.getState().pending).toEqual([]);
+  });
 
+  it('module listener ignores invalid addContextChip payloads', () => {
+    window.dispatchEvent(
+      new CustomEvent(ADD_CONTEXT_CHIP_EVENT, {
+        detail: { foo: 'bar' },
+      })
+    );
     expect(usePendingContextStore.getState().pending).toEqual([]);
   });
 });

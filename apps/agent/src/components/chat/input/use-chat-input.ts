@@ -102,57 +102,37 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     };
   }, []);
 
-  // Listen for addSkillChip event — adds a skill as a context chip and focuses input
+  // Drain pending context chips from the store (survives ChatInput unmount).
+  // Runs immediately on mount and whenever new chips are queued while mounted.
   useEffect(() => {
-    const handleAddSkill = (e: Event): void => {
-      const name = (e as CustomEvent<{ name: string }>).detail.name;
-      if (!name) return;
+    const drainAndAttach = (): void => {
+      const items = usePendingContextStore.getState().drainContext();
+      if (items.length === 0) return;
+
       setAttachedContext((prev) => {
-        if (prev.some((item) => item.type === 'skill' && item.name === name)) return prev;
-        return [...prev, { id: crypto.randomUUID(), type: 'skill', name, path: name }];
+        const nextItems = items.filter((item) => {
+          return !prev.some((existing) => {
+            return (
+              existing.type === item.type &&
+              existing.path === item.path &&
+              (existing.name === item.name || existing.type === 'skill')
+            );
+          });
+        });
+        return nextItems.length > 0 ? [...prev, ...nextItems] : prev;
       });
       inputRef.current?.focus();
     };
-    window.addEventListener('addSkillChip', handleAddSkill);
-    return () => {
-      window.removeEventListener('addSkillChip', handleAddSkill);
-    };
-  }, []);
 
-  // Drain pending file chips from the store (survives ChatInput unmount).
-  // Runs on mount and whenever new items are enqueued while mounted.
-  const pendingChips = usePendingContextStore((state) => state.pending);
-  const drainPendingChips = usePendingContextStore((state) => state.drain);
+    drainAndAttach();
 
-  useEffect(() => {
-    if (pendingChips.length === 0) return;
-    const items = drainPendingChips();
-    if (items.length === 0) return;
-
-    setAttachedContext((prev) => {
-      let next = prev;
-      for (const detail of items) {
-        if (
-          next.some(
-            (item) => (item.type === 'file' || item.type === 'folder') && item.path === detail.path
-          )
-        ) {
-          continue;
-        }
-        next = [
-          ...next,
-          {
-            id: crypto.randomUUID(),
-            type: detail.isDirectory ? 'folder' : 'file',
-            name: detail.name,
-            path: detail.path,
-          },
-        ];
-      }
-      return next;
+    const unsubscribe = usePendingContextStore.subscribe((state) => {
+      if (state.pending.length === 0) return;
+      drainAndAttach();
     });
-    inputRef.current?.focus();
-  }, [pendingChips, drainPendingChips]);
+
+    return unsubscribe;
+  }, []);
 
   // Reset stopping guard when agent stops running
   useEffect(() => {

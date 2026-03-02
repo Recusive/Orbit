@@ -433,6 +433,13 @@ export const KEYBOARD_SHORTCUTS: Record<string, KeyboardShortcutDef> = {
     description: 'Toggle terminal',
     event: 'toggleTerminal',
   },
+  toggleVault: {
+    key: 'v',
+    cmd: true,
+    shift: true,
+    description: 'Toggle vault',
+    event: 'toggleVault',
+  },
   openSourceControl: {
     key: 'g',
     cmd: false,

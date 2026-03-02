@@ -273,6 +273,7 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
 
   // Get the directory path (the result.path is relative, e.g., "src/components/Button.tsx")
   const dirPath = result.path.split('/').slice(0, -1).join('/');
+  const isVaultDoc = result.path === '.orbit/Vault' || result.path.startsWith('.orbit/Vault/');
 
   return (
     <div
@@ -292,9 +293,16 @@ const FileItem: FC<FileItemProps> = ({ result, isSelected, isFirst, isLast, onSe
         <span className="truncate text-base font-medium">
           {highlightMatches(result.name, result.matchIndices)}
         </span>
-        {dirPath ? (
-          <span className="truncate text-sm text-muted-foreground/60">{dirPath}</span>
-        ) : null}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {dirPath ? (
+            <span className="truncate text-sm text-muted-foreground/60">{dirPath}</span>
+          ) : null}
+          {isVaultDoc ? (
+            <span className="shrink-0 rounded-full border border-lg-separator px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              Vault
+            </span>
+          ) : null}
+        </div>
       </div>
     </div>
   );

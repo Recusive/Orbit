@@ -1,0 +1,27 @@
+export {
+  ContentEncodingSchema,
+  DocSourceSchema,
+  ProjectDocEntrySchema,
+  ProjectDocSourceSchema,
+  VaultContentSchema,
+  VaultContextConfigSchema,
+  VaultEntrySchema,
+  VaultListResultSchema,
+  VaultSearchResultSchema,
+  VaultStatsSchema,
+  WriteResultSchema,
+} from './vault-types';
+export type {
+  ContentEncoding,
+  DocSource,
+  ProjectDocEntry,
+  ProjectDocSource,
+  UnifiedDoc,
+  VaultContent,
+  VaultContextConfig,
+  VaultEntry,
+  VaultListResult,
+  VaultSearchResult,
+  VaultStats,
+  WriteResult,
+} from './vault-types';

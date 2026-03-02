@@ -17,6 +17,10 @@ export default defineConfig({
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
     __APP_VERSION__: JSON.stringify(pkg.version),
+    // Milkdown Crepe uses Vue internally for its UI widgets (toolbar, slash menu, etc.)
+    __VUE_OPTIONS_API__: JSON.stringify(false),
+    __VUE_PROD_DEVTOOLS__: JSON.stringify(false),
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: JSON.stringify(false),
   },
   plugins: [
     // React DevTools must be FIRST to inject script before React initializes

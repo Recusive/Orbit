@@ -5,6 +5,7 @@ pub mod browser;
 pub mod canvas;
 pub mod common;
 pub mod editor;
+pub mod vault;
 
 // Re-export for backwards compatibility
 pub use agent::*;

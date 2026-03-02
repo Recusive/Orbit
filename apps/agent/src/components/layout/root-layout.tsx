@@ -67,6 +67,12 @@ export const RootLayout: FC = () => {
     openSettings();
   }, [openSettings]);
 
+  const handleToggleVault = useCallback((): void => {
+    const { workspacePath } = useUIStore.getState();
+    if (!workspacePath) return;
+    useUIStore.getState().toggleVault();
+  }, []);
+
   // Handle find in workspace - opens Quick Open for now.
   // NOTE: Quick Open serves as workspace search until a dedicated search panel is built.
   const handleFindInWorkspace = useCallback((): void => {
@@ -117,6 +123,7 @@ export const RootLayout: FC = () => {
     window.addEventListener('toggleActivityPanel', toggleReviewPanel);
     window.addEventListener('toggleFileBrowser', handleToggleFileBrowser);
     window.addEventListener('toggleTerminal', handleToggleTerminal);
+    window.addEventListener('toggleVault', handleToggleVault);
     window.addEventListener('openSourceControl', openSourceControl);
     window.addEventListener('findInWorkspace', handleFindInWorkspace);
     window.addEventListener('openSettings', handleOpenSettings);
@@ -128,6 +135,7 @@ export const RootLayout: FC = () => {
       window.removeEventListener('toggleActivityPanel', toggleReviewPanel);
       window.removeEventListener('toggleFileBrowser', handleToggleFileBrowser);
       window.removeEventListener('toggleTerminal', handleToggleTerminal);
+      window.removeEventListener('toggleVault', handleToggleVault);
       window.removeEventListener('openSourceControl', openSourceControl);
       window.removeEventListener('findInWorkspace', handleFindInWorkspace);
       window.removeEventListener('openSettings', handleOpenSettings);
@@ -139,6 +147,7 @@ export const RootLayout: FC = () => {
     toggleReviewPanel,
     handleToggleFileBrowser,
     handleToggleTerminal,
+    handleToggleVault,
     openSourceControl,
     handleFindInWorkspace,
     handleOpenSettings,
