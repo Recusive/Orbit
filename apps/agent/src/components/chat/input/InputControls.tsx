@@ -91,9 +91,9 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
             </button>
           </TooltipTrigger>
-          <TooltipContent className="flex items-center gap-1.5 rounded-[9px] py-1 dark:bg-[var(--background)]">
+          <TooltipContent className="flex items-center gap-1.5">
             <span className="leading-none">Input mode</span>
-            <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-white/20 bg-white/10 text-inherit">
+            <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
               <span className="text-[13px] leading-none">⇧</span> Tab
             </Kbd>
           </TooltipContent>

@@ -10,11 +10,11 @@
  * Answers come from `toolInput.answers` (merged at approval time by
  * `mergeToolInputAnswers`) with `toolOutput` JSON as fallback.
  */
-import { CheckCircle2, ChevronRight, MessageCircleQuestion, XCircle } from 'lucide-react';
+import { ChevronRight, MessageCircleQuestion, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -150,85 +150,45 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line — gradient to green/red like other tool widgets */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div
-                    className={cn('w-[2px] rounded-full h-full', !isComplete && 'bg-lg-separator')}
-                    style={
-                      isComplete
-                        ? {
-                            background: isFailed
-                              ? 'linear-gradient(to bottom, var(--lg-separator) 60%, color-mix(in oklch, #ef4444 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, var(--lg-separator) 60%, color-mix(in oklch, #22c55e 50%, transparent) 100%)',
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
+            {/* Content */}
+            <div className="min-w-0 my-1.5 rounded-xl bg-lg-control overflow-hidden">
+              {pairs.map((pair, idx) => (
+                <div key={pair.question}>
+                  <div className="px-3 py-2">
+                    {/* Question text */}
+                    <div className="text-sm text-foreground leading-snug">{pair.question}</div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl bg-lg-control overflow-hidden">
-                  {pairs.map((pair, idx) => (
-                    <div key={pair.question}>
-                      <div className="px-3 py-2">
-                        {/* Question text */}
-                        <div className="text-sm text-foreground leading-snug">{pair.question}</div>
-
-                        {/* Answer */}
-                        {isComplete ? (
-                          <div className="mt-1.5">
-                            {isFailed ? (
-                              <span className="inline-flex items-center gap-1 text-xs text-destructive/70 font-medium">
-                                <XCircle className="h-3 w-3" />
-                                Rejected
-                              </span>
-                            ) : pair.answer ? (
-                              <span className="inline-block bg-lg-separator text-foreground text-xs font-medium px-2 py-0.5 rounded-md">
-                                {pair.answer}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground italic">
-                                No answer
-                              </span>
-                            )}
-                          </div>
-                        ) : null}
+                    {/* Answer */}
+                    {isComplete ? (
+                      <div className="mt-1.5">
+                        {isFailed ? (
+                          <span className="inline-flex items-center gap-1 text-xs text-destructive/70 font-medium">
+                            <XCircle className="h-3 w-3" />
+                            Rejected
+                          </span>
+                        ) : pair.answer ? (
+                          <span className="inline-block bg-lg-separator text-foreground text-xs font-medium px-2 py-0.5 rounded-md">
+                            {pair.answer}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">No answer</span>
+                        )}
                       </div>
-
-                      {/* Separator between questions */}
-                      {idx < pairs.length - 1 ? (
-                        <div className="h-px bg-lg-separator mx-3" />
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Bottom status indicator */}
-              {isComplete ? (
-                <div className="flex flex-row items-center py-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Rejected' : 'Answered'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+                    ) : null}
                   </div>
+
+                  {/* Separator between questions */}
+                  {idx < pairs.length - 1 ? <div className="h-px bg-lg-separator mx-3" /> : null}
                 </div>
-              )}
+              ))}
             </div>
           </motion.div>
         ) : null}

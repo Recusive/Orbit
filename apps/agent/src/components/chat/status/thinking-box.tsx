@@ -1,8 +1,8 @@
-import { ChevronRight, CircleCheck } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useMemo, useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from '../tools/shared';
 
 import type { FC, ReactNode } from 'react';
 
@@ -144,40 +144,21 @@ export const ThinkingBox: FC<ThinkingBoxProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div className="w-[2px] h-full rounded-full bg-foreground/20" />
-                </div>
-
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
-                  <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
-                    <div className="text-sm text-muted-foreground/90 dark:text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
-                      {tokenizedThinking ?? thinking}
-                    </div>
-                  </div>
+            {/* Content box */}
+            <div className="min-w-0 my-1.5 rounded-xl border border-lg-separator bg-card overflow-hidden">
+              <div className="px-3 py-2 max-h-[500px] overflow-y-auto">
+                <div className="text-sm text-muted-foreground/90 dark:text-muted-foreground/60 leading-[1.7] whitespace-pre-wrap font-mono tracking-tighter">
+                  {tokenizedThinking ?? thinking}
                 </div>
               </div>
-
-              {/* Completed status */}
-              {!isStreaming ? (
-                <div className="flex flex-row items-center py-1">
-                  <CircleCheck className="h-4 w-4 shrink-0 text-foreground" />
-                  <span className="ml-2.5 text-xs text-muted-foreground/90">Completed</span>
-                </div>
-              ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-px h-full bg-border/20" />
-                  </div>
-                </div>
-              )}
             </div>
           </motion.div>
         ) : null}

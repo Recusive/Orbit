@@ -1,8 +1,8 @@
-import { CheckCircle2, ChevronRight, File, Loader2, Search, XCircle } from 'lucide-react';
+import { ChevronRight, File, Loader2, Search } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -174,228 +174,189 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div
-                    className={cn(
-                      'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-foreground/20'
-                    )}
-                    style={
-                      success !== undefined
-                        ? {
-                            background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
-                          }
-                        : undefined
-                    }
-                  />
+            {/* Content box */}
+            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+              {/* Pattern & filters */}
+              <div className="px-3 py-2">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                  pattern
                 </div>
-
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
-                  {/* Pattern & filters */}
-                  <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
-                      pattern
+                <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
+                  {pattern}
+                </code>
+                {path ? (
+                  <>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                      in
                     </div>
-                    <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
-                      {pattern}
-                    </code>
-                    {path ? (
-                      <>
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
-                          in
-                        </div>
-                        <span className="text-sm text-lg-text-secondary font-mono truncate block">
-                          {path}
-                        </span>
-                      </>
-                    ) : null}
-                    {glob ? (
-                      <>
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
-                          glob
-                        </div>
-                        <code className="text-sm text-lg-text-secondary font-mono">{glob}</code>
-                      </>
-                    ) : null}
-                    {fileType ? (
-                      <>
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
-                          type
-                        </div>
-                        <span className="text-sm text-lg-text-secondary font-mono">{fileType}</span>
-                      </>
-                    ) : null}
-                  </div>
-
-                  {/* Results */}
-                  <div className="h-px bg-border/20 mx-3" />
-                  <div className="px-3 py-2">
-                    {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
-                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                        <span>Searching for matches...</span>
-                      </div>
-                    ) : matches.length > 0 ? (
-                      <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
-                        {isContentMode
-                          ? Object.entries(groupedMatches).map(
-                              ([filePath, fileMatches], index, arr) => (
-                                <div key={filePath} className="relative mb-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      onOpenFile?.(filePath);
-                                    }}
-                                    className="w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
-                                  >
-                                    {/* Vertical connecting line */}
-                                    {index < arr.length - 1 ? (
-                                      <div
-                                        className="absolute left-[7px] top-[20px] w-px bg-border/50"
-                                        style={{ height: 'calc(100% - 4px)' }}
-                                      />
-                                    ) : null}
-                                    <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                      <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
-                                    </div>
-                                    <span className="font-mono text-foreground shrink-0">
-                                      {getFileName(filePath)}
-                                    </span>
-                                    <span
-                                      className="text-lg-text-secondary/60 truncate text-right flex-1"
-                                      title={filePath}
-                                    >
-                                      {filePath}
-                                    </span>
-                                  </button>
-                                  <div className="ml-5 mt-1 space-y-0.5">
-                                    {fileMatches.slice(0, 10).map((match, idx) => (
-                                      <button
-                                        key={`${filePath}-${String(match.lineNumber ?? idx)}`}
-                                        type="button"
-                                        onClick={() => {
-                                          onOpenFile?.(filePath, match.lineNumber);
-                                        }}
-                                        className="w-full flex items-center gap-2 text-xs py-0.5 hover:bg-lg-control rounded-md px-1 -mx-1 transition-colors overflow-hidden cursor-pointer text-left"
-                                      >
-                                        <span className="text-lg-text-secondary/60 shrink-0 w-8 text-right font-mono">
-                                          {match.lineNumber}:
-                                        </span>
-                                        <code className="truncate font-mono text-xs rounded bg-lg-control px-1 text-lg-text-secondary">
-                                          {match.content}
-                                        </code>
-                                      </button>
-                                    ))}
-                                    {fileMatches.length > 10 ? (
-                                      <div className="text-xs text-lg-text-secondary/60 italic pl-8">
-                                        ...and {String(fileMatches.length - 10)} more matches
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              )
-                            )
-                          : outputMode === 'count'
-                            ? matches.map((match, index) => (
-                                <button
-                                  key={`${match.filePath}-${String(index)}`}
-                                  type="button"
-                                  onClick={() => {
-                                    onOpenFile?.(match.filePath);
-                                  }}
-                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
-                                >
-                                  {/* Vertical connecting line */}
-                                  {index < matches.length - 1 ? (
-                                    <div
-                                      className="absolute left-[7px] top-[18px] w-px bg-border/50"
-                                      style={{ height: 'calc(100% + 4px)' }}
-                                    />
-                                  ) : null}
-                                  <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                    <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
-                                  </div>
-                                  <span className="font-mono text-foreground shrink-0">
-                                    {getFileName(match.filePath)}
-                                  </span>
-                                  <span className="text-lg-text-secondary/60 font-mono shrink-0">
-                                    ({match.count} {match.count === 1 ? 'match' : 'matches'})
-                                  </span>
-                                  <span
-                                    className="text-lg-text-secondary/60 truncate text-right flex-1"
-                                    title={match.filePath}
-                                  >
-                                    {match.filePath}
-                                  </span>
-                                </button>
-                              ))
-                            : matches.map((match, index) => (
-                                <button
-                                  key={`${match.filePath}-${String(index)}`}
-                                  type="button"
-                                  onClick={() => {
-                                    onOpenFile?.(match.filePath);
-                                  }}
-                                  className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
-                                >
-                                  {/* Vertical connecting line */}
-                                  {index < matches.length - 1 ? (
-                                    <div
-                                      className="absolute left-[7px] top-[18px] w-px bg-border/50"
-                                      style={{ height: 'calc(100% + 4px)' }}
-                                    />
-                                  ) : null}
-                                  <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
-                                    <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
-                                  </div>
-                                  <span className="font-mono text-foreground shrink-0">
-                                    {getFileName(match.filePath)}
-                                  </span>
-                                  <span
-                                    className="text-lg-text-secondary/60 truncate text-right flex-1"
-                                    title={match.filePath}
-                                  >
-                                    {match.filePath}
-                                  </span>
-                                </button>
-                              ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">No matches found</div>
-                    )}
-                  </div>
-                </div>
+                    <span className="text-sm text-lg-text-secondary font-mono truncate block">
+                      {path}
+                    </span>
+                  </>
+                ) : null}
+                {glob ? (
+                  <>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                      glob
+                    </div>
+                    <code className="text-sm text-lg-text-secondary font-mono">{glob}</code>
+                  </>
+                ) : null}
+                {fileType ? (
+                  <>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                      type
+                    </div>
+                    <span className="text-sm text-lg-text-secondary font-mono">{fileType}</span>
+                  </>
+                ) : null}
               </div>
 
-              {/* Bottom status indicator */}
-              {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center py-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Failed' : 'Completed'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+              {/* Results */}
+              <div className="h-px bg-border/20 mx-3" />
+              <div className="px-3 py-2">
+                {isRunning ? (
+                  <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Searching for matches...</span>
                   </div>
-                </div>
-              )}
+                ) : matches.length > 0 ? (
+                  <div className="relative max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
+                    {isContentMode
+                      ? Object.entries(groupedMatches).map(
+                          ([filePath, fileMatches], index, arr) => (
+                            <div key={filePath} className="relative mb-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  onOpenFile?.(filePath);
+                                }}
+                                className="w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                              >
+                                {/* Vertical connecting line */}
+                                {index < arr.length - 1 ? (
+                                  <div
+                                    className="absolute left-[7px] top-[20px] w-px bg-border/50"
+                                    style={{ height: 'calc(100% - 4px)' }}
+                                  />
+                                ) : null}
+                                <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                                  <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
+                                </div>
+                                <span className="font-mono text-foreground shrink-0">
+                                  {getFileName(filePath)}
+                                </span>
+                                <span
+                                  className="text-lg-text-secondary/60 truncate text-right flex-1"
+                                  title={filePath}
+                                >
+                                  {filePath}
+                                </span>
+                              </button>
+                              <div className="ml-5 mt-1 space-y-0.5">
+                                {fileMatches.slice(0, 10).map((match, idx) => (
+                                  <button
+                                    key={`${filePath}-${String(match.lineNumber ?? idx)}`}
+                                    type="button"
+                                    onClick={() => {
+                                      onOpenFile?.(filePath, match.lineNumber);
+                                    }}
+                                    className="w-full flex items-center gap-2 text-xs py-0.5 hover:bg-lg-control rounded-md px-1 -mx-1 transition-colors overflow-hidden cursor-pointer text-left"
+                                  >
+                                    <span className="text-lg-text-secondary/60 shrink-0 w-8 text-right font-mono">
+                                      {match.lineNumber}:
+                                    </span>
+                                    <code className="truncate font-mono text-xs rounded bg-lg-control px-1 text-lg-text-secondary">
+                                      {match.content}
+                                    </code>
+                                  </button>
+                                ))}
+                                {fileMatches.length > 10 ? (
+                                  <div className="text-xs text-lg-text-secondary/60 italic pl-8">
+                                    ...and {String(fileMatches.length - 10)} more matches
+                                  </div>
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        )
+                      : outputMode === 'count'
+                        ? matches.map((match, index) => (
+                            <button
+                              key={`${match.filePath}-${String(index)}`}
+                              type="button"
+                              onClick={() => {
+                                onOpenFile?.(match.filePath);
+                              }}
+                              className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                            >
+                              {/* Vertical connecting line */}
+                              {index < matches.length - 1 ? (
+                                <div
+                                  className="absolute left-[7px] top-[18px] w-px bg-border/50"
+                                  style={{ height: 'calc(100% + 4px)' }}
+                                />
+                              ) : null}
+                              <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                                <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
+                              </div>
+                              <span className="font-mono text-foreground shrink-0">
+                                {getFileName(match.filePath)}
+                              </span>
+                              <span className="text-lg-text-secondary/60 font-mono shrink-0">
+                                ({match.count} {match.count === 1 ? 'match' : 'matches'})
+                              </span>
+                              <span
+                                className="text-lg-text-secondary/60 truncate text-right flex-1"
+                                title={match.filePath}
+                              >
+                                {match.filePath}
+                              </span>
+                            </button>
+                          ))
+                        : matches.map((match, index) => (
+                            <button
+                              key={`${match.filePath}-${String(index)}`}
+                              type="button"
+                              onClick={() => {
+                                onOpenFile?.(match.filePath);
+                              }}
+                              className="relative w-full flex items-center gap-2 text-xs py-1 hover:bg-lg-control rounded-md px-2 -mx-2 transition-colors overflow-hidden cursor-pointer text-left"
+                            >
+                              {/* Vertical connecting line */}
+                              {index < matches.length - 1 ? (
+                                <div
+                                  className="absolute left-[7px] top-[18px] w-px bg-border/50"
+                                  style={{ height: 'calc(100% + 4px)' }}
+                                />
+                              ) : null}
+                              <div className="relative z-10 w-3.5 h-3.5 flex items-center justify-center shrink-0">
+                                <File className="h-3.5 w-3.5 text-lg-text-secondary/60" />
+                              </div>
+                              <span className="font-mono text-foreground shrink-0">
+                                {getFileName(match.filePath)}
+                              </span>
+                              <span
+                                className="text-lg-text-secondary/60 truncate text-right flex-1"
+                                title={match.filePath}
+                              >
+                                {match.filePath}
+                              </span>
+                            </button>
+                          ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground italic">No matches found</div>
+                )}
+              </div>
             </div>
           </motion.div>
         ) : null}

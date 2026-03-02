@@ -36,7 +36,7 @@ import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 import { getParentPath, getPathName, joinPath } from '@/lib/utils/path-utils';
 import { enqueueFileChip } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
-import { selectFileStatus, useGitStore } from '@/stores/git/git-store';
+import { selectDirectoryStatus, selectFileStatus, useGitStore } from '@/stores/git/git-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('FileExplorer');
@@ -64,6 +64,8 @@ const ROW_HEIGHT = 24;
 
 /** Overscan - render extra rows above/below viewport for smooth scrolling */
 const OVERSCAN = 10;
+
+const selectNull = (): null => null;
 
 // ═══════════════════════════════════════════════════════════════
 // Git Status Indicator
@@ -444,8 +446,10 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
     // Context menu open state — keeps hover bg while menu is visible
     const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
 
-    // Git status for this file (uses full path for matching)
-    const gitStatus = useGitStore(selectFileStatus(path));
+    // Conditionally subscribe to file or directory git status.
+    const gitStatus = useGitStore(node.isDirectory ? selectNull : selectFileStatus(path));
+    const dirGitStatus = useGitStore(node.isDirectory ? selectDirectoryStatus(path) : selectNull);
+    const effectiveGitStatus = node.isDirectory ? dirGitStatus : gitStatus;
 
     const handleClick = useCallback((): void => {
       if (isRenaming) return;
@@ -697,16 +701,28 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           <span
             className={cn(
               'truncate text-left flex-1',
-              gitStatus && GIT_STATUS_STYLES[gitStatus].fileColor
+              effectiveGitStatus && GIT_STATUS_STYLES[effectiveGitStatus].fileColor
             )}
           >
             {node.name}
           </span>
         )}
 
-        {/* Git status badge */}
-        {gitStatus && !node.isDirectory && !isRenaming ? (
-          <GitStatusBadge status={gitStatus} />
+        {/* Git status indicator */}
+        {effectiveGitStatus && !isRenaming ? (
+          node.isDirectory ? (
+            <span
+              className={cn(
+                'text-[9px] leading-none shrink-0 w-4 text-center mr-2',
+                GIT_STATUS_STYLES[effectiveGitStatus].color
+              )}
+              title={`Contains ${GIT_STATUS_STYLES[effectiveGitStatus].title.toLowerCase()} files`}
+            >
+              {'●'}
+            </span>
+          ) : (
+            <GitStatusBadge status={effectiveGitStatus} />
+          )
         ) : null}
 
         {/* Error retry button */}

@@ -14,6 +14,7 @@ export {
   selectModifiedCount,
   selectUntrackedCount,
   selectFileStatus,
+  selectDirectoryStatus,
   useGitBranch,
   useGitAhead,
   useGitBehind,

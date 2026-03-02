@@ -1,10 +1,11 @@
-import { CheckCircle2, ChevronRight, Loader2, Terminal, XCircle } from 'lucide-react';
+import { ChevronRight, Loader2, Terminal } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
 import {
   getShiki,
-  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
   useIsDarkMode,
 } from './shared';
@@ -169,120 +170,78 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              {/* Content node with vertical line from header icon */}
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line aligned under header icon */}
-                <div className="w-4 flex justify-center shrink-0">
+            {/* Content box */}
+            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+              {/* Command section */}
+              <div className="px-3 py-2">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                  command
+                </div>
+                {highlightedCommand ? (
                   <div
-                    className={cn(
-                      'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-foreground/20'
-                    )}
-                    style={
-                      success !== undefined
-                        ? {
-                            background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
-                          }
-                        : undefined
-                    }
+                    className="bg-lg-control rounded-lg px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
+                    dangerouslySetInnerHTML={{ __html: highlightedCommand }}
                   />
-                </div>
-
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
-                  {/* Command section */}
-                  <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
-                      command
-                    </div>
-                    {highlightedCommand ? (
-                      <div
-                        className="bg-lg-control rounded-lg px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
-                        dangerouslySetInnerHTML={{ __html: highlightedCommand }}
-                      />
-                    ) : (
-                      <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
-                        {command}
-                      </code>
-                    )}
-                  </div>
-
-                  {/* Description section */}
-                  {description ? (
-                    <>
-                      <div className="h-px bg-border/20 mx-3" />
-                      <div className="px-3 py-2">
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
-                          description
-                        </div>
-                        <div className="text-sm text-lg-text-secondary">{description}</div>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {/* Output section */}
-                  <div className="h-px bg-border/20 mx-3" />
-                  <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
-                      output
-                    </div>
-                    {isRunning && !output ? (
-                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
-                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                        <span>Running command...</span>
-                      </div>
-                    ) : output ? (
-                      <div className="bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
-                        {highlightedOutput ? (
-                          /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
-                          <div
-                            className="[&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_code]:bg-transparent! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word"
-                            dangerouslySetInnerHTML={{ __html: highlightedOutput }}
-                          />
-                        ) : (
-                          <pre className="whitespace-pre-wrap wrap-break-word m-0">
-                            {displayOutput}
-                          </pre>
-                        )}
-                        {hasMoreLines ? (
-                          <div className="mt-1.5 text-muted-foreground text-xs">
-                            {String(outputLines.length)} lines total
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">No output</div>
-                    )}
-                  </div>
-                </div>
+                ) : (
+                  <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
+                    {command}
+                  </code>
+                )}
               </div>
 
-              {/* Bottom status indicator */}
-              {!isRunning ? (
-                <div className="flex flex-row items-center py-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Failed' : 'Completed'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+              {/* Description section */}
+              {description ? (
+                <>
+                  <div className="h-px bg-border/20 mx-3" />
+                  <div className="px-3 py-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
+                      description
+                    </div>
+                    <div className="text-sm text-lg-text-secondary">{description}</div>
                   </div>
+                </>
+              ) : null}
+
+              {/* Output section */}
+              <div className="h-px bg-border/20 mx-3" />
+              <div className="px-3 py-2">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                  output
                 </div>
-              )}
+                {isRunning && !output ? (
+                  <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Running command...</span>
+                  </div>
+                ) : output ? (
+                  <div className="bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                    {highlightedOutput ? (
+                      /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
+                      <div
+                        className="[&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_code]:bg-transparent! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word"
+                        dangerouslySetInnerHTML={{ __html: highlightedOutput }}
+                      />
+                    ) : (
+                      <pre className="whitespace-pre-wrap wrap-break-word m-0">{displayOutput}</pre>
+                    )}
+                    {hasMoreLines ? (
+                      <div className="mt-1.5 text-muted-foreground text-xs">
+                        {String(outputLines.length)} lines total
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground italic">No output</div>
+                )}
+              </div>
             </div>
           </motion.div>
         ) : null}

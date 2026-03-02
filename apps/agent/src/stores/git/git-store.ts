@@ -5,6 +5,8 @@ import { immer } from 'zustand/middleware/immer';
 
 import type { BranchDiffStats, FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
 
+import { toRelativePath } from '@/lib/utils/path-utils';
+
 const logger = createLogger('GitStore');
 
 // Re-export types for convenience
@@ -84,6 +86,96 @@ function listSignature(entries: readonly StatusEntry[]): string {
     })
     .sort()
     .join('\x01');
+}
+
+const STATUS_PRIORITY: Record<FileStatus, number> = {
+  conflicted: 8,
+  modified: 7,
+  added: 6,
+  deleted: 5,
+  renamed: 4,
+  typechange: 3,
+  copied: 2,
+  untracked: 1,
+};
+
+function pickHigherStatus(current: FileStatus | null, next: FileStatus): FileStatus {
+  if (current === null) return next;
+  return STATUS_PRIORITY[next] > STATUS_PRIORITY[current] ? next : current;
+}
+
+function normalizeEntryPath(entryPath: string, repoPath: string): string {
+  let normalized = entryPath.replace(/\\/g, '/');
+  if (normalized.startsWith('./')) {
+    normalized = normalized.slice(2);
+  }
+
+  if (/^[A-Za-z]:[\\/]/.test(repoPath)) {
+    return normalized.toLowerCase();
+  }
+
+  return normalized;
+}
+
+function parentDir(relativePath: string): string | null {
+  if (relativePath === '') return null;
+
+  const lastSlash = relativePath.lastIndexOf('/');
+  return lastSlash === -1 ? '' : relativePath.slice(0, lastSlash);
+}
+
+interface StatusMaps {
+  fileMap: Map<string, FileStatus>;
+  dirMap: Map<string, FileStatus>;
+}
+
+function buildStatusMaps(status: GitStatus, repoPath: string): StatusMaps {
+  const fileMap = new Map<string, FileStatus>();
+  const dirMap = new Map<string, FileStatus>();
+
+  const allEntries = [
+    ...status.staged,
+    ...status.modified,
+    ...status.untracked,
+    ...status.conflicted,
+  ];
+
+  for (const entry of allEntries) {
+    const key = normalizeEntryPath(entry.path, repoPath);
+
+    const existingFile = fileMap.get(key);
+    fileMap.set(key, pickHigherStatus(existingFile ?? null, entry.status));
+
+    let dir = parentDir(key);
+    while (dir !== null) {
+      const existingDir = dirMap.get(dir);
+      if (
+        existingDir !== undefined &&
+        STATUS_PRIORITY[existingDir] >= STATUS_PRIORITY[entry.status]
+      ) {
+        break;
+      }
+
+      dirMap.set(dir, pickHigherStatus(existingDir ?? null, entry.status));
+      dir = parentDir(dir);
+    }
+  }
+
+  return { fileMap, dirMap };
+}
+
+let cachedStatus: GitStatus | null = null;
+let cachedRepoPath: string | null = null;
+let cachedMaps: StatusMaps | null = null;
+
+function getStatusMaps(status: GitStatus, repoPath: string): StatusMaps {
+  if (cachedMaps === null || status !== cachedStatus || repoPath !== cachedRepoPath) {
+    cachedMaps = buildStatusMaps(status, repoPath);
+    cachedStatus = status;
+    cachedRepoPath = repoPath;
+  }
+
+  return cachedMaps;
 }
 
 // ============================================
@@ -245,24 +337,31 @@ export const selectUntrackedCount = (state: GitStore): number =>
  * Usage: useGitStore(selectFileStatus('/path/to/file'))
  */
 export const selectFileStatus =
-  (path: string) =>
+  (absolutePath: string) =>
   (state: GitStore): FileStatus | null => {
-    if (!state.status) return null;
+    if (!state.status || !state.repoPath) return null;
 
-    const allEntries = [
-      ...state.status.staged,
-      ...state.status.modified,
-      ...state.status.untracked,
-      ...state.status.conflicted,
-    ];
+    const maps = getStatusMaps(state.status, state.repoPath);
+    const relativePath = toRelativePath(absolutePath, state.repoPath);
+    if (relativePath === null) return null;
 
-    // Try exact match first
-    const exactMatch = allEntries.find((e) => e.path === path);
-    if (exactMatch) return exactMatch.status;
+    return maps.fileMap.get(relativePath) ?? null;
+  };
 
-    // Fall back to suffix match (for when path includes repo root)
-    const suffixMatch = allEntries.find((e) => path.endsWith(e.path) || e.path.endsWith(path));
-    return suffixMatch?.status ?? null;
+/**
+ * Create a selector for a specific directory's propagated git status.
+ * Usage: useGitStore(selectDirectoryStatus('/path/to/folder'))
+ */
+export const selectDirectoryStatus =
+  (absolutePath: string) =>
+  (state: GitStore): FileStatus | null => {
+    if (!state.status || !state.repoPath) return null;
+
+    const maps = getStatusMaps(state.status, state.repoPath);
+    const relativePath = toRelativePath(absolutePath, state.repoPath);
+    if (relativePath === null) return null;
+
+    return maps.dirMap.get(relativePath) ?? null;
   };
 
 // ============================================

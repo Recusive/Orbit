@@ -1,11 +1,11 @@
 /**
  * Shared animation constants for tool card widgets.
  *
- * Easing: ease-out-quart — recommended for enter/exit transitions
- * (user-initiated interactions like clicking to expand a card).
- * Duration: 200ms — standard UI range per animation guidelines.
- * All paired elements (height + opacity) share the same curve and
- * duration to satisfy the "paired elements rule".
+ * Inline disclosure animation (collapsible height reveal).
+ *
+ * Enter: critically-damped spring on height for snap-open feel.
+ *        Opacity leads at 100ms so content appears as the container opens.
+ * Exit:  smooth ease-out-quart (200ms) — gentle collapse without snapping.
  *
  * @see /.claude/skills/web-animation-design for easing reference
  */
@@ -13,20 +13,27 @@
 import type { Transition } from 'motion/react';
 
 /**
- * ease-out-quart as cubic-bezier array for Framer Motion.
- * CSS equivalent: cubic-bezier(0.165, 0.84, 0.44, 1)
+ * ease-out-expo as cubic-bezier array for Framer Motion.
+ * CSS equivalent: cubic-bezier(0.19, 1, 0.22, 1)
  */
-const EASE_OUT_QUART: [number, number, number, number] = [0.165, 0.84, 0.44, 1];
+const EASE_OUT_EXPO: [number, number, number, number] = [0.19, 1, 0.22, 1];
 
 /**
- * Expand/collapse transition for tool card content (AnimatePresence).
- *
- * height + opacity are paired — same easing and duration so the
- * container reveal and content fade feel like a single cohesive motion.
+ * ease-out-quart — gentler deceleration than expo, avoids the harsh snap.
+ * CSS equivalent: cubic-bezier(0.25, 1, 0.5, 1)
  */
-export const TOOL_EXPAND_TRANSITION: Transition = {
+const EASE_OUT_QUART: [number, number, number, number] = [0.25, 1, 0.5, 1];
+
+/** Snap-open enter transition — spring height + fast opacity fade-in. */
+export const TOOL_EXPAND_ENTER: Transition = {
+  height: { type: 'spring', duration: 0.3, bounce: 0 },
+  opacity: { duration: 0.1, ease: EASE_OUT_EXPO },
+};
+
+/** Smooth collapse exit transition — gentle ease-out-quart so it doesn't snap. */
+export const TOOL_EXPAND_EXIT: Transition = {
   height: { duration: 0.2, ease: EASE_OUT_QUART },
-  opacity: { duration: 0.2, ease: EASE_OUT_QUART },
+  opacity: { duration: 0.15, ease: EASE_OUT_QUART },
 };
 
 /** Instant transition for users who prefer reduced motion. */

@@ -35,7 +35,7 @@ interface ActionButtonProps {
 
 const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onClick, children }) => {
   const iconButtonClasses =
-    'h-6 w-6 flex items-center justify-center rounded-md bg-transparent text-muted-foreground/70 transition-[background-color,color,transform] duration-150 hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08] active:scale-95 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+    'h-6 w-6 flex items-center justify-center rounded-[9px] bg-transparent text-muted-foreground/70 transition-[background-color,color] duration-150 hover:bg-lg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
 
   return (
     <Tooltip>
@@ -49,7 +49,7 @@ const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onCli
           {children}
         </button>
       </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={4}>
+      <TooltipContent side="top" sideOffset={4}>
         {label}
       </TooltipContent>
     </Tooltip>
@@ -107,7 +107,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
           label={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
           className={
             rewindDisabled
-              ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground/70 hover:scale-100'
+              ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground/70'
               : undefined
           }
           disabled={rewindDisabled}
