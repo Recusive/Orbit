@@ -134,7 +134,7 @@ function NoteSection({
         <div
           role="group"
           tabIndex={0}
-          className="group flex items-center gap-1.5 h-8 w-full rounded-[9px] overflow-hidden hover:bg-lg-sidebar-hover cursor-default text-foreground"
+          className="group flex items-center gap-1.5 h-8 w-full rounded-[9px] overflow-hidden hover:bg-lg-sidebar-hover cursor-default text-foreground select-none"
           onClick={onToggle}
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {

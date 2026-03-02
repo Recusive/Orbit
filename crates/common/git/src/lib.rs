@@ -150,6 +150,15 @@ pub struct WorktreeAddOptions {
     pub commit_ish: Option<String>,
 }
 
+/// Result information for worktree removal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeRemoveResult {
+    /// If branch deletion was requested but failed, contains a cleaned error message.
+    /// `None` when branch deletion was not requested or succeeded.
+    pub branch_delete_failed: Option<String>,
+}
+
 // ============================================
 // Repository Operations
 // ============================================
@@ -1480,13 +1489,12 @@ pub async fn worktree_add(
 /// - The worktree doesn't exist
 /// - The worktree is locked (and force=false)
 /// - The worktree has uncommitted changes (and force=false)
-/// - Branch deletion fails (if delete_branch=true)
 pub async fn worktree_remove(
     repo_path: &Path,
     worktree_path: &Path,
     force: bool,
     delete_branch: bool,
-) -> Result<()> {
+) -> Result<WorktreeRemoveResult> {
     info!(
         ?repo_path,
         ?worktree_path,
@@ -1557,31 +1565,62 @@ pub async fn worktree_remove(
     // Prune stale worktree entries to ensure clean state.
     // This removes any orphaned metadata in .git/worktrees/ that might
     // prevent creating a new worktree with the same name.
-    worktree_prune(repo_path).await?;
-
-    // Delete the branch if requested
-    if let Some(branch_name) = branch_to_delete {
-        info!(?branch_name, "Deleting associated branch");
-        // Use -D (force delete) to delete even if branch has unmerged changes
-        // The user explicitly opted in to delete, so we honor that
-        let branch_output = Command::new("git")
-            .args(["branch", "-D", &branch_name])
-            .current_dir(repo_path)
-            .output()
-            .await
-            .map_err(|e| Error::Git(format!("Failed to run git branch -D: {e}")))?;
-
-        if !branch_output.status.success() {
-            let stderr = String::from_utf8_lossy(&branch_output.stderr);
-            // Log warning but don't fail - worktree was already removed
-            error!(?branch_name, stderr = %stderr.trim(), "Failed to delete branch (worktree removed successfully)");
-        } else {
-            info!(?branch_name, "Branch deleted");
-        }
+    if let Err(err) = worktree_prune(repo_path).await {
+        error!(
+            ?repo_path,
+            error = %err,
+            "Worktree prune failed after removal; continuing"
+        );
     }
 
+    let branch_delete_failed = match branch_to_delete {
+        Some(branch_name) => delete_branch_after_worktree_remove(repo_path, &branch_name).await?,
+        None => None,
+    };
+
     info!(?worktree_path, "Worktree removed");
-    Ok(())
+    Ok(WorktreeRemoveResult {
+        branch_delete_failed,
+    })
+}
+
+/// Delete a branch after a successful worktree removal.
+///
+/// Uses `git branch -D` (force delete) since the user explicitly opted in.
+/// Returns `Some(message)` if deletion failed, `None` on success.
+async fn delete_branch_after_worktree_remove(
+    repo_path: &Path,
+    branch_name: &str,
+) -> Result<Option<String>> {
+    info!(?branch_name, "Deleting associated branch");
+
+    let branch_output = Command::new("git")
+        .args(["branch", "-D", branch_name])
+        .current_dir(repo_path)
+        .output()
+        .await
+        .map_err(|e| Error::Git(format!("Failed to run git branch -D: {e}")))?;
+
+    if !branch_output.status.success() {
+        let stderr = String::from_utf8_lossy(&branch_output.stderr);
+        let cleaned_error = stderr.trim().trim_start_matches("error: ").trim();
+        let message = if cleaned_error.is_empty() {
+            "Failed to delete branch.".to_owned()
+        } else {
+            cleaned_error.to_owned()
+        };
+
+        error!(
+            ?branch_name,
+            stderr = %stderr.trim(),
+            cleaned_error = %message,
+            "Failed to delete branch (worktree removed successfully)"
+        );
+        return Ok(Some(message));
+    }
+
+    info!(?branch_name, "Branch deleted");
+    Ok(None)
 }
 
 /// Prune stale worktree information.

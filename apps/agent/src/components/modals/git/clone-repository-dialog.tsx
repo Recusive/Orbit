@@ -1,19 +1,16 @@
 import { createLogger } from '@orbit/common/lib';
-import { AlertCircle, Folder, GitBranch, Loader2 } from 'lucide-react';
+import { AlertCircle, Folder, GitBranch, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogClose,
+  DialogContentGlass,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
   addRecentProject,
   conversationList,
@@ -265,94 +262,136 @@ export const CloneRepositoryDialog: FC<CloneRepositoryDialogProps> = ({ open, on
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Clone Repository</DialogTitle>
-          <DialogDescription>
-            Clone a git repository from a URL to your local machine.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
+        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+          <X className="h-3.5 w-3.5" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
 
-        <div className="grid gap-4 py-4">
+        <div
+          className="relative flex flex-col items-center"
+          style={{ padding: '20px 16px 16px', gap: 16 }}
+        >
+          {/* Icon */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
+              <GitBranch className="h-7 w-7 text-foreground" aria-hidden="true" />
+            </div>
+          </div>
+
+          {/* Title + Description */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
+          >
+            <DialogTitle className="liquid-glass-title w-full">Clone repository</DialogTitle>
+            <DialogDescription className="liquid-glass-desc w-full">
+              Clone a git repository from a URL to your local machine.
+            </DialogDescription>
+          </div>
+
           {/* Repository URL input */}
-          <div className="grid gap-2">
-            <label htmlFor="repo-url" className="text-sm font-medium">
-              Repository URL
-            </label>
+          <div className="w-full" style={{ padding: '0 6px' }}>
             <div className="relative">
-              <GitBranch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <GitBranch
+                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+                aria-hidden="true"
+              />
+              <input
                 id="repo-url"
-                placeholder="https://github.com/user/repo.git"
+                autoFocus
                 value={repoUrl}
                 onChange={(e) => {
                   setRepoUrl(e.target.value);
                   setError(null);
                 }}
                 onKeyDown={handleKeyDown}
-                className="pl-9"
-                autoFocus
+                placeholder="https://github.com/user/repo.git"
+                className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
+                style={{ paddingLeft: 36 }}
+                aria-label="Repository URL"
+                disabled={isCloning}
               />
             </div>
           </div>
 
-          {/* Target path with browse button */}
-          <div className="grid gap-2">
-            <label htmlFor="target-path" className="text-sm font-medium">
-              Clone to
-            </label>
-            <div className="flex gap-2">
+          {/* Clone target path + Browse */}
+          <div className="w-full" style={{ padding: '0 6px' }}>
+            <div className="flex items-center" style={{ gap: 8 }}>
               <div className="relative flex-1">
-                <Folder className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
+                <Folder
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+                  aria-hidden="true"
+                />
+                <input
                   id="target-path"
-                  placeholder="/path/to/clone/directory"
                   value={targetPath}
                   onChange={(e) => {
                     setTargetPath(e.target.value);
                     setError(null);
                   }}
                   onKeyDown={handleKeyDown}
-                  className="pl-9"
+                  placeholder="/path/to/clone/directory"
+                  className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
+                  style={{ paddingLeft: 36 }}
+                  aria-label="Clone destination"
+                  disabled={isCloning}
                 />
               </div>
-              <Button variant="outline" onClick={() => void handleBrowse()} disabled={isCloning}>
+              <button
+                type="button"
+                className="liquid-glass-btn liquid-glass-btn-secondary cursor-pointer transition-transform duration-75 active:scale-[0.97] shrink-0 px-4"
+                onClick={() => {
+                  void handleBrowse();
+                }}
+                disabled={isCloning}
+              >
                 Browse
-              </Button>
+              </button>
             </div>
+            {error !== null ? (
+              <div className="mt-1.5 flex items-start gap-1.5">
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive"
+                  aria-hidden="true"
+                />
+                <p className="text-[12px] text-destructive">{error}</p>
+              </div>
+            ) : null}
           </div>
 
-          {/* Error message */}
-          {error !== null && (
-            <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+          {/* Buttons */}
+          <div className="flex w-full items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+              disabled={isCloning}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] flex items-center justify-center gap-2"
+              onClick={() => {
+                void handleClone();
+              }}
+              disabled={!isValid || isCloning}
+            >
+              {isCloning ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Cloning...
+                </>
+              ) : (
+                'Clone'
+              )}
+            </button>
+          </div>
         </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-            }}
-            disabled={isCloning}
-          >
-            Cancel
-          </Button>
-          <Button onClick={() => void handleClone()} disabled={!isValid || isCloning}>
-            {isCloning ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Cloning...
-              </>
-            ) : (
-              'Clone'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

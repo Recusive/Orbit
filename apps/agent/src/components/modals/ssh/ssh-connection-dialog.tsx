@@ -4,16 +4,13 @@ import { useCallback, useEffect, useState } from 'react';
 
 import type { FC, KeyboardEvent } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogClose,
+  DialogContentGlass,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 import {
   addSshHost,
   conversationList,
@@ -215,44 +212,77 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
-        <DialogHeader>
-          <DialogTitle>Connect to SSH Host</DialogTitle>
-          <DialogDescription>Enter an SSH host to open a terminal connection.</DialogDescription>
-        </DialogHeader>
+      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
+        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+          <X className="h-3.5 w-3.5" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
 
-        <div className="grid gap-4 py-4">
+        <div
+          className="relative flex flex-col items-center"
+          style={{ padding: '20px 16px 16px', gap: 16 }}
+        >
+          {/* Icon */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
+              <Terminal className="h-7 w-7 text-foreground" aria-hidden="true" />
+            </div>
+          </div>
+
+          {/* Title + Description */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
+          >
+            <DialogTitle className="liquid-glass-title w-full">Connect to SSH host</DialogTitle>
+            <DialogDescription className="liquid-glass-desc w-full">
+              Enter an SSH host to open a terminal connection.
+            </DialogDescription>
+          </div>
+
           {/* SSH Host input */}
-          <div className="grid gap-2">
-            <label htmlFor="ssh-host" className="text-sm font-medium">
-              SSH Host
-            </label>
+          <div className="w-full" style={{ padding: '0 6px' }}>
             <div className="relative">
-              <Terminal className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
+              <Terminal
+                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+                aria-hidden="true"
+              />
+              <input
                 id="ssh-host"
-                placeholder="user@hostname or hostname:port"
+                autoFocus
                 value={sshHost}
                 onChange={(e) => {
                   setSshHost(e.target.value);
                   setError(null);
                 }}
                 onKeyDown={handleKeyDown}
-                className="pl-9"
-                autoFocus
+                placeholder="user@hostname or hostname:port"
+                className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
+                style={{ paddingLeft: 36 }}
+                aria-label="SSH host"
+                disabled={isConnecting}
               />
             </div>
+            {error !== null ? (
+              <div className="mt-1.5 flex items-start gap-1.5">
+                <AlertCircle
+                  className="h-3.5 w-3.5 shrink-0 mt-0.5 text-destructive"
+                  aria-hidden="true"
+                />
+                <p className="text-[12px] text-destructive">{error}</p>
+              </div>
+            ) : null}
           </div>
 
           {/* Recent hosts list */}
-          {recentHosts.length > 0 && (
-            <div className="grid gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Recent Hosts</label>
-              <div className="flex flex-col gap-1 max-h-[150px] overflow-y-auto">
+          {recentHosts.length > 0 ? (
+            <div className="w-full" style={{ padding: '0 6px' }}>
+              <p className="text-[12px] text-muted-foreground font-medium mb-1.5">Recent Hosts</p>
+              <div className="flex flex-col gap-0.5 max-h-[120px] overflow-y-auto">
                 {recentHosts.map((host) => (
                   <div
                     key={host}
-                    className="flex items-center gap-2 px-3 py-2 rounded-md hover:bg-lg-control-hover cursor-pointer group"
+                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-[7px] hover:bg-lg-control-hover cursor-pointer group"
                     onClick={() => {
                       handleSelectRecentHost(host);
                     }}
@@ -264,12 +294,14 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
                     tabIndex={0}
                     role="button"
                   >
-                    <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
+                    <Terminal
+                      className="h-3.5 w-3.5 text-muted-foreground shrink-0"
+                      aria-hidden="true"
+                    />
                     <span className="flex-1 text-sm truncate">{host}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    <button
+                      type="button"
+                      className="h-5 w-5 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-60 hover:opacity-100 transition-opacity duration-150"
                       onClick={(e) => {
                         e.stopPropagation();
                         void handleRemoveHost(host);
@@ -277,44 +309,45 @@ export const SSHConnectionDialog: FC<SSHConnectionDialogProps> = ({ open, onOpen
                     >
                       <X className="h-3 w-3" />
                       <span className="sr-only">Remove</span>
-                    </Button>
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
-          )}
+          ) : null}
 
-          {/* Error message */}
-          {error !== null && (
-            <div className="flex items-start gap-2 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <span>{error}</span>
-            </div>
-          )}
+          {/* Buttons */}
+          <div className="flex w-full items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+              disabled={isConnecting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] flex items-center justify-center gap-2"
+              onClick={() => {
+                void handleConnect();
+              }}
+              disabled={!isValid || isConnecting}
+            >
+              {isConnecting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Connecting...
+                </>
+              ) : (
+                'Connect'
+              )}
+            </button>
+          </div>
         </div>
-
-        <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-            }}
-            disabled={isConnecting}
-          >
-            Cancel
-          </Button>
-          <Button onClick={() => void handleConnect()} disabled={!isValid || isConnecting}>
-            {isConnecting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting...
-              </>
-            ) : (
-              'Connect'
-            )}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

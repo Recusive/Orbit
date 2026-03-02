@@ -13,6 +13,7 @@ use std::path::Path;
 use orbit_core::{Error, GitBranch, GitCommit, GitStatus, Result};
 use orbit_git::{
     BlameLine, BranchDiffStats, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo,
+    WorktreeRemoveResult,
 };
 use tokio::task::spawn_blocking;
 
@@ -289,7 +290,7 @@ pub async fn git_worktree_remove(
     worktree_path: String,
     force: bool,
     delete_branch: bool,
-) -> Result<()> {
+) -> Result<WorktreeRemoveResult> {
     orbit_git::worktree_remove(
         Path::new(&repo_path),
         Path::new(&worktree_path),
