@@ -46,10 +46,14 @@ function getHomeDir(): string {
 }
 
 /**
- * Get the storage directory path
+ * Get the storage directory path.
+ *
+ * When `homeDirOverride` is set (test mode), environment variables like
+ * `XDG_CONFIG_HOME` and `APPDATA` are ignored so each test gets an isolated
+ * storage directory under its own tmpHome. Without this, tests on Linux CI
+ * share a single storage dir and leak repair flags / session data.
  */
 function getStorageDir(): string {
-  // Use standard app data location
   const homeDir = getHomeDir();
   const platform = process.platform;
 
@@ -58,10 +62,16 @@ function getStorageDir(): string {
   }
 
   if (platform === 'win32') {
+    if (homeDirOverride !== null) {
+      return path.join(homeDir, 'AppData', 'Roaming', 'Orbit');
+    }
     return path.join(process.env.APPDATA ?? path.join(homeDir, 'AppData', 'Roaming'), 'Orbit');
   }
 
   // Linux and other Unix-like systems
+  if (homeDirOverride !== null) {
+    return path.join(homeDir, '.config', 'orbit');
+  }
   return path.join(process.env.XDG_CONFIG_HOME ?? path.join(homeDir, '.config'), 'orbit');
 }
 

@@ -25,7 +25,7 @@ export const FeedbackSettings: FC = () => {
           onClick={() => {
             openUrl(BUG_REPORT_URL);
           }}
-          className="w-full rounded-[14px] border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 text-left cursor-pointer"
+          className="w-full rounded-[12px] bg-lg-control p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <svg
@@ -56,7 +56,7 @@ export const FeedbackSettings: FC = () => {
           onClick={() => {
             openUrl(FEATURE_REQUEST_URL);
           }}
-          className="w-full rounded-[14px] border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 text-left cursor-pointer"
+          className="w-full rounded-[12px] bg-lg-control p-4 hover:bg-lg-control-hover transition-[background-color] duration-150 text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-muted-foreground/90" />

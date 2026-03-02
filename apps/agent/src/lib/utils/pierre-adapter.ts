@@ -20,9 +20,9 @@ import type { ThemeRegistration } from 'shiki';
 
 // Sidebar-matched background colors (from globals.css gray scale)
 const DARK_BG = '#232323'; // --gray-3 (dark sidebar)
-const LIGHT_BG = '#e5e5e5'; // --gray-2 (light sidebar)
+const LIGHT_BG = '#f2f2f2'; // matches bg-sidebar/50 (--gray-a2 at 50% on white)
 const DARK_SEPARATOR = '#313131'; // --gray-5 (two steps up from dark sidebar)
-const LIGHT_SEPARATOR = '#d2d2d2'; // --gray-3 (one step up from light sidebar)
+const LIGHT_SEPARATOR = '#e2e2e2'; // proportional separator for lighter bg
 
 /** Custom dark theme: pierre-dark with sidebar-matched background */
 registerCustomTheme('orbit-dark', async (): Promise<ThemeRegistration> => {
