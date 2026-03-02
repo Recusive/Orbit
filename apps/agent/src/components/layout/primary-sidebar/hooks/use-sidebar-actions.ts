@@ -2,7 +2,7 @@
  * useSidebarActions - All sidebar action handlers
  */
 import { createLogger } from '@orbit/common/lib';
-import { startTransition, useCallback, useEffect, useState } from 'react';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { WorktreeInfo } from '@/lib/api';
@@ -117,6 +117,7 @@ export const useSidebarActions = ({
   // Worktree delete dialog state
   const [worktreeDeleteDialogOpen, setWorktreeDeleteDialogOpen] = useState(false);
   const [worktreeToDelete, setWorktreeToDelete] = useState<WorktreeInfo | null>(null);
+  const isRemovingWorktreeRef = useRef(false);
 
   // Load worktrees when repo root/workspace context changes.
   // NOTE: Do not include activeWorktreePath — that would reset isExpanded on every selection.
@@ -310,32 +311,58 @@ export const useSidebarActions = ({
     setWorktreeDeleteDialogOpen(true);
   }, []);
 
-  // Remove worktree (called from dialog confirmation)
+  /**
+   * Remove worktree (called from dialog confirmation).
+   *
+   * [warning] TESTED: This function is covered by integration tests.
+   *     If you modify this, run: bun test apps/agent/src/__tests__/integration/hooks/primary-sidebar/use-sidebar-actions.test.tsx
+   *     Test file: apps/agent/src/__tests__/integration/hooks/primary-sidebar/use-sidebar-actions.test.tsx
+   */
   const handleRemoveWorktree = useCallback(
     async (deleteBranch: boolean): Promise<void> => {
+      if (isRemovingWorktreeRef.current) {
+        return;
+      }
+
       const repoRoot = useUIStore.getState().repoRootPath;
       const removePath = repoRoot ?? workspacePath;
-      if (!removePath || !worktreeToDelete) return;
+      if (!removePath || !worktreeToDelete) {
+        return;
+      }
+
+      const deletingWorktree = worktreeToDelete;
+      isRemovingWorktreeRef.current = true;
 
       try {
-        // Note: deleteBranch option not yet supported by backend
-        await gitWorktreeRemove(removePath, worktreeToDelete.path, false);
-        removeWorktree(worktreeToDelete.path);
+        const result = await gitWorktreeRemove(
+          removePath,
+          deletingWorktree.path,
+          false,
+          deleteBranch
+        );
+
+        removeWorktree(deletingWorktree.path);
         useChatStore.getState().clearActiveSession();
         logger.info('Removed worktree', {
-          path: worktreeToDelete.path,
-          deletedBranch: deleteBranch ? worktreeToDelete.branch : null,
+          path: deletingWorktree.path,
+          deletedBranch: deleteBranch ? deletingWorktree.branch : null,
         });
         setWorktreeDeleteDialogOpen(false);
         setWorktreeToDelete(null);
-        toast.success(
-          deleteBranch && worktreeToDelete.branch !== null
-            ? `Worktree and branch "${worktreeToDelete.branch}" deleted`
-            : 'Worktree deleted'
-        );
+        if (result.branchDeleteFailed !== null) {
+          toast.warning('Worktree deleted, but branch removal failed', {
+            description: result.branchDeleteFailed,
+          });
+        } else if (deleteBranch && deletingWorktree.branch !== null) {
+          toast.success(`Worktree and branch "${deletingWorktree.branch}" deleted`);
+        } else {
+          toast.success('Worktree deleted');
+        }
       } catch (err) {
         logger.error('Failed to remove worktree', err);
         toast.error('Failed to remove worktree');
+      } finally {
+        isRemovingWorktreeRef.current = false;
       }
     },
     [workspacePath, worktreeToDelete, removeWorktree]

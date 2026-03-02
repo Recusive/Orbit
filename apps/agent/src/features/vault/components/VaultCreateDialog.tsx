@@ -1,17 +1,16 @@
+import { IconNoteText } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconNoteText';
+import { X } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { Button } from '@/components/ui/button';
 import {
   Dialog,
-  DialogContent,
+  DialogClose,
+  DialogContentGlass,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
 
 type CreateMode = 'file' | 'folder';
 
@@ -101,62 +100,111 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        <DialogHeader>
-          <DialogTitle>Create New {mode === 'file' ? 'Document' : 'Folder'}</DialogTitle>
-          <DialogDescription>
-            {currentPath.length > 0 ? `In: ${currentPath}/` : 'In vault root'}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
+        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+          <X className="h-3.5 w-3.5" />
+          <span className="sr-only">Close</span>
+        </DialogClose>
 
-        <div className="flex gap-2 py-1">
-          <Button
-            variant={mode === 'file' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setMode('file');
-            }}
+        <div
+          className="relative flex flex-col items-center"
+          style={{ padding: '20px 16px 16px', gap: 16 }}
+        >
+          {/* Icon */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
+              <IconNoteText className="h-7 w-7 text-foreground" />
+            </div>
+          </div>
+
+          {/* Title + Description */}
+          <div
+            className="flex w-full flex-col items-start"
+            style={{ padding: '0 6px 2px', gap: 10 }}
           >
-            Document
-          </Button>
-          <Button
-            variant={mode === 'folder' ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => {
-              setMode('folder');
-            }}
-          >
-            Folder
-          </Button>
+            <DialogTitle className="liquid-glass-title w-full">
+              Create new {mode === 'file' ? 'document' : 'folder'}
+            </DialogTitle>
+            <DialogDescription className="liquid-glass-desc w-full">
+              {currentPath.length > 0
+                ? `New ${mode === 'file' ? 'document' : 'folder'} will be created in ${currentPath}/`
+                : `New ${mode === 'file' ? 'document' : 'folder'} will be created in the vault root.`}
+            </DialogDescription>
+          </div>
+
+          {/* Mode toggle */}
+          <div className="flex w-full items-center" style={{ padding: '0 6px', gap: 8 }}>
+            <button
+              type="button"
+              className={`liquid-glass-btn flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] ${
+                mode === 'file' ? 'liquid-glass-btn-secondary' : ''
+              }`}
+              onClick={() => {
+                setMode('file');
+              }}
+            >
+              Document
+            </button>
+            <button
+              type="button"
+              className={`liquid-glass-btn flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] ${
+                mode === 'folder' ? 'liquid-glass-btn-secondary' : ''
+              }`}
+              onClick={() => {
+                setMode('folder');
+              }}
+            >
+              Folder
+            </button>
+          </div>
+
+          {/* Name input */}
+          <div className="w-full" style={{ padding: '0 6px' }}>
+            <div className="relative">
+              <IconNoteText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+              <input
+                autoFocus
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setError('');
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={mode === 'file' ? 'my-notes.md' : 'folder-name'}
+                className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
+                style={{ paddingLeft: 36 }}
+                aria-label={mode === 'file' ? 'Document name' : 'Folder name'}
+                disabled={isCreating}
+              />
+            </div>
+            {error.length > 0 ? (
+              <p className="mt-1.5 text-[12px] text-destructive">{error}</p>
+            ) : null}
+          </div>
+
+          {/* Buttons */}
+          <div className="flex w-full items-center" style={{ gap: 8 }}>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={onClose}
+              disabled={isCreating}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => {
+                void handleCreate();
+              }}
+              disabled={isCreating || name.trim().length === 0}
+            >
+              {isCreating ? 'Creating...' : 'Create'}
+            </button>
+          </div>
         </div>
-
-        <Input
-          placeholder={mode === 'file' ? 'my-notes.md' : 'folder-name'}
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            setError('');
-          }}
-          onKeyDown={handleKeyDown}
-          autoFocus
-          disabled={isCreating}
-        />
-
-        {error.length > 0 ? <p className="text-xs text-destructive">{error}</p> : null}
-
-        <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={onClose} disabled={isCreating}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => void handleCreate()}
-            disabled={isCreating || name.trim().length === 0}
-          >
-            {isCreating ? 'Creating...' : 'Create'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

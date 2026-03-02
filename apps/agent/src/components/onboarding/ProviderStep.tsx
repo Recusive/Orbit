@@ -6,8 +6,6 @@ import type { AuthMethod, ProviderStatus } from '@/stores/onboarding/provider-st
 import type { FC } from 'react';
 
 import { OrbitLogo } from '@/components/icons/orbit-logo';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useProviderStore } from '@/stores/onboarding/provider-store';
 
@@ -213,159 +211,157 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
     <div
       className={cn(
         'flex flex-col items-center justify-center h-full w-full',
-        'min-w-[420px] mx-auto p-12 gap-6 box-border',
-        'bg-background',
+        'mx-auto box-border bg-background',
         className
       )}
     >
-      {/* Logo/Branding - consistent with WelcomeStep */}
-      <div className="flex items-center gap-4 w-full max-w-[380px]">
-        <div className="flex items-center justify-center w-14 h-14 rounded-lg bg-foreground/8">
-          <OrbitLogo size={40} className="text-foreground" />
+      <div className="relative flex flex-col items-center w-full max-w-[360px]" style={{ gap: 16 }}>
+        {/* Icon */}
+        <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+          <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
+            <OrbitLogo size={40} className="text-foreground" />
+          </div>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-2xl font-semibold text-foreground tracking-tight">Orbit</span>
-          <span className="text-sm text-muted-foreground">Connect Provider</span>
-        </div>
-      </div>
 
-      {/* Checking / Authenticating spinner */}
-      {detection.phase === 'checking' || detection.phase === 'authenticating' ? (
-        <div
-          className={cn(
-            'flex flex-col items-center justify-center gap-3 p-6 w-full max-w-[380px]',
-            'rounded-lg border border-border bg-lg-control'
-          )}
-        >
-          <Loader2 className="h-6 w-6 animate-spin text-foreground/50" />
-          <span className="text-sm text-muted-foreground">
-            {detection.phase === 'authenticating'
-              ? 'Authenticating with Claude...'
-              : 'Detecting Claude Code...'}
-          </span>
-          {detection.phase === 'authenticating' ? (
-            <span className="text-xs text-muted-foreground/70 text-center">
-              If a browser window opens, please complete the login
-            </span>
-          ) : null}
+        {/* Title + Description */}
+        <div className="flex w-full flex-col items-start" style={{ padding: '0 6px 2px', gap: 10 }}>
+          <h1 className="liquid-glass-title w-full">Connect provider</h1>
+          <p className="liquid-glass-desc w-full">
+            {detection.phase === 'checking'
+              ? 'Detecting Claude Code credentials...'
+              : detection.phase === 'authenticating'
+                ? 'Authenticating with Claude...'
+                : detection.phase === 'valid'
+                  ? 'Claude Code credentials detected. Ready to use your existing setup.'
+                  : 'No Claude Code credentials found. Enter your Anthropic API key below or retry authentication.'}
+          </p>
         </div>
-      ) : detection.phase === 'valid' ? (
-        /* Valid keychain credentials found */
-        <div
-          className={cn(
-            'flex flex-col gap-4 p-5 w-full max-w-[380px]',
-            'rounded-lg border border-border bg-lg-control'
-          )}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500/10">
-              <Check className="h-4 w-4 text-green-500" />
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium text-foreground">Claude Code Detected</span>
-              <span className="text-xs text-muted-foreground">
-                Ready to use your existing setup
+
+        {/* Checking / Authenticating spinner */}
+        {detection.phase === 'checking' || detection.phase === 'authenticating' ? (
+          <div className="flex w-full flex-col items-center" style={{ padding: '0 6px', gap: 12 }}>
+            <Loader2 className="h-6 w-6 animate-spin text-foreground/50" aria-hidden="true" />
+            {detection.phase === 'authenticating' ? (
+              <span className="text-xs text-muted-foreground/70 text-center">
+                If a browser window opens, please complete the login
               </span>
+            ) : null}
+          </div>
+        ) : detection.phase === 'valid' ? (
+          /* Valid keychain credentials found */
+          <>
+            <div className="flex w-full items-center" style={{ padding: '0 6px', gap: 10 }}>
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500/10">
+                <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
+              </div>
+              <span className="text-sm font-medium text-foreground">Claude Code Detected</span>
             </div>
-          </div>
-          <Button
-            onClick={handleUseKeychain}
-            className={cn(
-              'w-full h-10 text-sm font-medium',
-              'bg-foreground text-background hover:bg-foreground/90'
-            )}
-          >
-            Continue with Claude Code
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
-      ) : (
-        /* No credentials or auth failed — show manual entry */
-        <div className="flex flex-col gap-4 w-full max-w-[380px]">
-          {/* Status message */}
-          <div
-            className={cn(
-              'flex items-center gap-3 px-4 py-3',
-              'rounded-lg border border-border bg-lg-control'
-            )}
-          >
-            <Terminal className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-sm text-muted-foreground">
-              {detection.error ??
-                'No Claude Code credentials found. Enter your Anthropic API key below or retry authentication.'}
-            </span>
-          </div>
 
-          {/* Retry auth button */}
-          <Button
-            variant="outline"
-            onClick={handleRetryAuth}
-            className="w-full h-10 text-sm font-medium"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Retry Authentication
-          </Button>
+            <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+              <button
+                type="button"
+                className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] flex items-center justify-center gap-2"
+                onClick={handleUseKeychain}
+              >
+                Continue with Claude Code
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </>
+        ) : (
+          /* No credentials or auth failed — show manual entry */
+          <>
+            {/* Error detail — only when there's a technical error */}
+            {detection.error !== null ? (
+              <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+                <div className="flex w-full items-center gap-3 rounded-[9px] px-3 py-2.5 liquid-glass-textarea">
+                  <Terminal className="h-4 w-4 text-muted-foreground shrink-0" aria-hidden="true" />
+                  <span className="text-sm text-muted-foreground font-mono">{detection.error}</span>
+                </div>
+              </div>
+            ) : null}
 
-          {/* Manual API Key Entry */}
-          <div className="flex flex-col gap-4 p-5 rounded-lg border border-border">
-            <div className="flex items-center gap-2">
-              <Key className="h-4 w-4 text-muted-foreground" />
+            {/* Retry auth button */}
+            <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+              <button
+                type="button"
+                className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] flex items-center justify-center gap-2"
+                onClick={handleRetryAuth}
+              >
+                <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                Retry Authentication
+              </button>
+            </div>
+
+            {/* API Key section title */}
+            <div className="flex w-full items-center" style={{ padding: '0 6px', gap: 8 }}>
+              <Key className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
               <span className="text-sm font-medium text-foreground">Anthropic API Key</span>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <Input
-                type="password"
-                placeholder="sk-ant-..."
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  setValidationError(null);
-                }}
-                className={cn(
-                  'h-10',
-                  validationError !== null && 'border-destructive focus-visible:ring-destructive'
-                )}
-              />
+            {/* API Key input */}
+            <div className="w-full" style={{ padding: '0 6px' }}>
+              <div className="relative">
+                <Key
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+                  aria-hidden="true"
+                />
+                <input
+                  autoFocus
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => {
+                    setApiKey(e.target.value);
+                    setValidationError(null);
+                  }}
+                  placeholder="sk-ant-..."
+                  className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
+                  style={{ paddingLeft: 36 }}
+                  aria-label="Anthropic API key"
+                />
+              </div>
               {validationError !== null ? (
-                <span className="text-xs text-destructive">{validationError}</span>
+                <p className="mt-1.5 text-[12px] text-destructive">{validationError}</p>
               ) : null}
-              <span className="text-xs text-muted-foreground">
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
                 Get your key from{' '}
                 <a
                   href="https://console.anthropic.com/settings/keys"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground hover:text-foreground hover:underline"
+                  className="text-foreground hover:underline"
                 >
                   console.anthropic.com
                 </a>
-              </span>
+              </p>
             </div>
 
-            <Button
-              onClick={handleValidateApiKey}
-              disabled={isValidating || apiKey.trim().length === 0}
-              className={cn(
-                'w-full h-10 text-sm font-medium',
-                'bg-foreground text-background hover:bg-foreground/90'
-              )}
-            >
-              {isValidating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                <>
-                  Continue
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </>
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+            {/* Continue button */}
+            <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+              <button
+                type="button"
+                className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] flex items-center justify-center gap-2"
+                onClick={() => {
+                  void handleValidateApiKey();
+                }}
+                disabled={isValidating || apiKey.trim().length === 0}
+              >
+                {isValidating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                    Validating...
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </>
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };

@@ -31,7 +31,27 @@ import { useUIStore } from '@/stores/ui/ui-store';
 /**
  * Mock postMessage function to capture Tauri messages.
  */
-const mockPostMessage = vi.fn();
+const {
+  mockConversationDelete,
+  mockConversationUpdateTitle,
+  mockGitWorktreeList,
+  mockGitWorktreeRemove,
+  mockPostMessage,
+  mockToastError,
+  mockToastInfo,
+  mockToastSuccess,
+  mockToastWarning,
+} = vi.hoisted(() => ({
+  mockConversationDelete: vi.fn().mockResolvedValue(undefined),
+  mockConversationUpdateTitle: vi.fn().mockResolvedValue(undefined),
+  mockGitWorktreeList: vi.fn().mockResolvedValue([]),
+  mockGitWorktreeRemove: vi.fn().mockResolvedValue({ branchDeleteFailed: null }),
+  mockPostMessage: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastInfo: vi.fn(),
+  mockToastSuccess: vi.fn(),
+  mockToastWarning: vi.fn(),
+}));
 
 /**
  * Mock useTauri hook to intercept postMessage calls.
@@ -48,10 +68,19 @@ vi.mock('@/hooks/agent/use-tauri', () => ({
  * Mock API functions for backend calls.
  */
 vi.mock('@/lib/api', () => ({
-  conversationDelete: vi.fn().mockResolvedValue(undefined),
-  conversationUpdateTitle: vi.fn().mockResolvedValue(undefined),
-  gitWorktreeList: vi.fn().mockResolvedValue([]),
-  gitWorktreeRemove: vi.fn().mockResolvedValue(undefined),
+  conversationDelete: mockConversationDelete,
+  conversationUpdateTitle: mockConversationUpdateTitle,
+  gitWorktreeList: mockGitWorktreeList,
+  gitWorktreeRemove: mockGitWorktreeRemove,
+}));
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: mockToastError,
+    info: mockToastInfo,
+    success: mockToastSuccess,
+    warning: mockToastWarning,
+  },
 }));
 
 // =============================================================================
@@ -88,6 +117,29 @@ function createDefaultHookProps(overrides: Partial<HookProps> = {}): HookProps {
     activeConversationId: null,
     workspacePath: '/test/workspace',
     activeWorktreePath: null,
+    ...overrides,
+  };
+}
+
+interface MockWorktree {
+  path: string;
+  head: string;
+  shortHead: string;
+  branch: string | null;
+  isMain: boolean;
+  isDetached: boolean;
+  locked: string | null;
+}
+
+function createMockWorktree(overrides: Partial<MockWorktree> = {}): MockWorktree {
+  return {
+    path: '/test/worktree-feature',
+    head: 'abc123def4567890',
+    shortHead: 'abc123d',
+    branch: 'feature/x',
+    isMain: false,
+    isDetached: false,
+    locked: null,
     ...overrides,
   };
 }
@@ -475,6 +527,152 @@ describe('useSidebarActions', () => {
       });
 
       expect(useUIStore.getState().createWorktreeDialogOpen).toBe(true);
+    });
+  });
+
+  // =============================================================================
+  // Integration Tests: handleRemoveWorktree
+  // =============================================================================
+
+  describe('handleRemoveWorktree', () => {
+    it('passes deleteBranch=true to gitWorktreeRemove', async () => {
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree();
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveWorktree(true);
+      });
+
+      expect(mockGitWorktreeRemove).toHaveBeenCalledWith(
+        '/test/workspace',
+        worktree.path,
+        false,
+        true
+      );
+    });
+
+    it('passes deleteBranch=false to gitWorktreeRemove', async () => {
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree();
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveWorktree(false);
+      });
+
+      expect(mockGitWorktreeRemove).toHaveBeenCalledWith(
+        '/test/workspace',
+        worktree.path,
+        false,
+        false
+      );
+    });
+
+    it('handles null branch with deleteBranch=true gracefully', async () => {
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree({ branch: null });
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveWorktree(true);
+      });
+
+      expect(mockGitWorktreeRemove).toHaveBeenCalledWith(
+        '/test/workspace',
+        worktree.path,
+        false,
+        true
+      );
+      expect(mockToastSuccess).toHaveBeenCalledWith('Worktree deleted');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith(
+        expect.stringContaining('Worktree and branch')
+      );
+    });
+
+    it('prevents duplicate calls on rapid double-click', async () => {
+      let resolveRemove: ((value: { branchDeleteFailed: string | null }) => void) | undefined;
+
+      mockGitWorktreeRemove.mockImplementationOnce(
+        () =>
+          new Promise<{ branchDeleteFailed: string | null }>((resolve) => {
+            resolveRemove = resolve;
+          })
+      );
+
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree();
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      let firstRemoval: Promise<void> = Promise.resolve();
+      let secondRemoval: Promise<void> = Promise.resolve();
+      act(() => {
+        firstRemoval = result.current.handleRemoveWorktree(false);
+        secondRemoval = result.current.handleRemoveWorktree(false);
+      });
+
+      expect(mockGitWorktreeRemove).toHaveBeenCalledTimes(1);
+
+      resolveRemove?.({ branchDeleteFailed: null });
+
+      await act(async () => {
+        await Promise.all([firstRemoval, secondRemoval]);
+      });
+    });
+
+    it('shows error toast when backend remove fails and keeps dialog state', async () => {
+      const error = new Error('worktree does not exist');
+      mockGitWorktreeRemove.mockRejectedValueOnce(error);
+
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree();
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveWorktree(false);
+      });
+
+      expect(mockToastError).toHaveBeenCalledWith('Failed to remove worktree');
+      expect(result.current.worktreeDeleteDialogOpen).toBe(true);
+      expect(result.current.worktreeToDelete).toEqual(worktree);
+    });
+
+    it('shows warning toast when branch deletion fails', async () => {
+      const failureMessage = 'Branch "feature/x" is checked out elsewhere';
+      mockGitWorktreeRemove.mockResolvedValueOnce({
+        branchDeleteFailed: failureMessage,
+      });
+
+      const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
+      const worktree = createMockWorktree();
+
+      act(() => {
+        result.current.handleOpenDeleteWorktreeDialog(worktree);
+      });
+
+      await act(async () => {
+        await result.current.handleRemoveWorktree(true);
+      });
+
+      expect(mockToastWarning).toHaveBeenCalledWith('Worktree deleted, but branch removal failed', {
+        description: failureMessage,
+      });
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Worktree and branch "feature/x" deleted');
     });
   });
 

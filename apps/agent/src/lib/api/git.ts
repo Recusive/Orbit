@@ -136,6 +136,12 @@ export interface WorktreeAddOptions {
   commitIsh?: string;
 }
 
+/** Result details for worktree removal. */
+export interface WorktreeRemoveResult {
+  /** Error message when branch deletion was requested but failed. */
+  branchDeleteFailed: string | null;
+}
+
 // ============================================
 // Git Operations
 // ============================================
@@ -291,19 +297,22 @@ export async function gitWorktreeAdd(
 /**
  * Remove a worktree.
  *
- * NOTE: The `deleteBranch` option was intentionally removed in the file-store refactor.
- * Branch deletion after worktree removal is now handled manually if needed, following
- * Git's recommendation to keep branches for history. This simplifies the API and avoids
- * accidental branch loss.
- *
  * @param repoPath - Path to the main repository
  * @param worktreePath - Path to the worktree to remove
  * @param force - Force removal even if worktree has uncommitted changes
+ * @param deleteBranch - Also delete the associated branch
+ * @returns Branch-deletion warning details when worktree removal succeeds
  */
 export async function gitWorktreeRemove(
   repoPath: string,
   worktreePath: string,
-  force?: boolean
-): Promise<void> {
-  return invoke('git_worktree_remove', { repoPath, worktreePath, force: force ?? false });
+  force: boolean,
+  deleteBranch: boolean
+): Promise<WorktreeRemoveResult> {
+  return invoke<WorktreeRemoveResult>('git_worktree_remove', {
+    repoPath,
+    worktreePath,
+    force,
+    deleteBranch,
+  });
 }

@@ -91,22 +91,50 @@ const RootErrorFallback: Sentry.FallbackRender = (props) => {
     props.error instanceof Error ? props.error.message : 'An unexpected error occurred';
 
   return (
-    <div className="h-screen w-screen flex items-center justify-center bg-neutral-900 text-white">
-      <div className="text-center space-y-4 max-w-md p-6">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
-        <p className="text-neutral-400 text-sm">{errorMessage}</p>
-        <div className="flex gap-2 justify-center">
+    <div className="h-screen w-screen flex items-center justify-center bg-background">
+      <div className="relative flex flex-col items-center w-full max-w-[360px]" style={{ gap: 16 }}>
+        {/* Icon */}
+        <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
+          <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-destructive/10">
+            <svg
+              className="h-7 w-7 text-destructive"
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3" />
+              <path d="M12 9v4" />
+              <path d="M12 17h.01" />
+            </svg>
+          </div>
+        </div>
+
+        {/* Title + Description */}
+        <div className="flex w-full flex-col items-start" style={{ padding: '0 6px 2px', gap: 10 }}>
+          <h1 className="liquid-glass-title w-full">Something went wrong</h1>
+          <p className="liquid-glass-desc w-full">{errorMessage}</p>
+        </div>
+
+        {/* Buttons */}
+        <div className="flex w-full items-center" style={{ gap: 8 }}>
           <button
             type="button"
+            className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
             onClick={handleReset}
-            className="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 rounded text-sm"
           >
             Try Again
           </button>
           <button
             type="button"
+            className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
             onClick={handleReload}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded text-sm"
           >
             Reload App
           </button>
