@@ -237,7 +237,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           error: message,
         });
         toast.error('Create branch failed', { description: displayMessage });
-        throw new Error(displayMessage);
+        throw new Error(displayMessage, { cause: err });
       } finally {
         setIsCheckingOut(false);
       }

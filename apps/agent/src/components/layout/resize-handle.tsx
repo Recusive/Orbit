@@ -129,7 +129,7 @@ export const ResizeHandle: FC<ResizeHandleProps> = ({
       const currentValue = target === 'review' ? reviewPanelWidth : bottomPanelHeight;
       const setValue = target === 'review' ? setReviewPanelWidth : setBottomPanelHeight;
 
-      let newValue = currentValue;
+      let newValue: number;
 
       if (direction === 'vertical') {
         // Vertical handle: Left/Right arrows resize

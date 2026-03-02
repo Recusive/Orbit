@@ -47,7 +47,7 @@ export const RightResizeHandle: FC = () => {
       if (isCollapsed) return;
 
       const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
-      let newWidth = canvasRightSidebarWidth;
+      let newWidth: number;
 
       // Inverted: ArrowLeft expands, ArrowRight collapses
       if (e.key === 'ArrowLeft') {

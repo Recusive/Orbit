@@ -78,7 +78,7 @@ export const SidebarResizeHandle: FC = () => {
       if (isCollapsed) return; // Can't resize when collapsed
 
       const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
-      let newWidth = leftSidebarWidth;
+      let newWidth: number;
 
       if (e.key === 'ArrowLeft') {
         newWidth = Math.max(PANEL_SIZES.sidebar.minUsable, leftSidebarWidth - step);

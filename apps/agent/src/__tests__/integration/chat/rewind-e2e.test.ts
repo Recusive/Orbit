@@ -444,7 +444,7 @@ describe('Single Rewind E2E', () => {
       'assistant',
       'Let me explain...',
       displayedMessages,
-      ts++
+      ts
     );
     displayedMessages.push(asst4);
     expect(asst4.parentUuid).toBe('user-4'); // Normal chain continuation
@@ -491,7 +491,7 @@ describe('Single Rewind E2E', () => {
     expect(result.forkPointSet?.messageId).toBe('u1');
 
     // New message after rewind branches from user1
-    const user3 = createMessage(SESSION_ID, 'u3', 'user', 'Try again', result.resultMessages, ts++);
+    const user3 = createMessage(SESSION_ID, 'u3', 'user', 'Try again', result.resultMessages, ts);
     expect(user3.parentUuid).toBe('u1');
   });
 
@@ -850,7 +850,7 @@ describe('Multi-Rewind E2E', () => {
     // KEY: u5 forks from sdk-a1 again (third branch from the same point)
     expect(u5.parentUuid).toBe('sdk-a1');
 
-    const a5 = createMessage(SESSION_A, 'a5', 'assistant', 'OK third try', displayed2, ts++);
+    const a5 = createMessage(SESSION_A, 'a5', 'assistant', 'OK third try', displayed2, ts);
     displayed2.push(a5);
 
     // ============================================================
@@ -946,7 +946,7 @@ describe('Multi-Rewind E2E', () => {
 
     const r2 = processConversationRewound(rewind2Event);
     const b2 = [...r2.resultMessages];
-    const u5 = createMessage(SESSION_ID, 'u5', 'user', 'Branch from a1', b2, ts++);
+    const u5 = createMessage(SESSION_ID, 'u5', 'user', 'Branch from a1', b2, ts);
     b2.push(u5);
     expect(u5.parentUuid).toBe('a1');
 

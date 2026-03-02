@@ -219,7 +219,7 @@ describe('Full Rewind Flow Integration', () => {
         'assistant',
         'Let me explain the concept...',
         messages,
-        timestamp++
+        timestamp
       );
       messages.push(resp3);
 
@@ -358,7 +358,7 @@ describe('Full Rewind Flow Integration', () => {
         'assistant',
         'Reply 4',
         messages,
-        timestamp++
+        timestamp
       );
       messages.push(resp4);
 
@@ -404,7 +404,7 @@ describe('Full Rewind Flow Integration', () => {
         'assistant',
         'Reply 2',
         messages,
-        timestamp++
+        timestamp
       );
       messages.push(resp2);
       expect(resp2.parentUuid).toBe('msg-2'); // Normal, not from fork point
@@ -420,7 +420,7 @@ describe('Full Rewind Flow Integration', () => {
       );
 
       // No fork point set - should use last message
-      const msg2 = createMessage(SESSION_ID, 'msg-2', 'user', 'Second', messages, timestamp++);
+      const msg2 = createMessage(SESSION_ID, 'msg-2', 'user', 'Second', messages, timestamp);
       messages.push(msg2);
 
       expect(msg2.parentUuid).toBe('resp-1');
@@ -465,7 +465,7 @@ describe('Full Rewind Flow Integration', () => {
         createMessage(SESSION_ID, 'msg-4', 'user', 'Branch msg', messages, timestamp++)
       );
       messages.push(
-        createMessage(SESSION_ID, 'resp-4', 'assistant', 'Branch resp', messages, timestamp++)
+        createMessage(SESSION_ID, 'resp-4', 'assistant', 'Branch resp', messages, timestamp)
       );
 
       // Active chain should be: msg1 -> resp1 -> msg2 -> resp2 -> msg4 -> resp4

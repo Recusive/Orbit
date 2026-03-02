@@ -47,7 +47,7 @@ export const LeftResizeHandle: FC = () => {
       if (isCollapsed) return;
 
       const step = e.shiftKey ? KEYBOARD_STEP_LARGE : KEYBOARD_STEP;
-      let newWidth = leftSidebarWidth;
+      let newWidth: number;
 
       if (e.key === 'ArrowLeft') {
         newWidth = Math.max(PANEL_SIZES.sidebar.minUsable, leftSidebarWidth - step);

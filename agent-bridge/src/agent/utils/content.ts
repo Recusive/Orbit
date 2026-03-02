@@ -80,7 +80,7 @@ export function buildContentBlocks(
       });
     } else if (attachment.type === 'text') {
       // Text content with metadata
-      let textContent = '';
+      let textContent: string;
 
       if (
         attachment.filePath !== undefined &&

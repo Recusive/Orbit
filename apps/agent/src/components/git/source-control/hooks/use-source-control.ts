@@ -530,7 +530,7 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
 
         const display = toUserGitError(err);
         toast.error('Create branch failed', { description: display });
-        throw new Error(display);
+        throw new Error(display, { cause: err });
       } finally {
         setIsCheckingOut(false);
         operationInProgress.current = false;
