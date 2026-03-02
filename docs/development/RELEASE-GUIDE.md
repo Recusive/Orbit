@@ -323,6 +323,7 @@ git push origin vX.Y.Z
 | v0.0.2  | Feb 2026 | Added `createUpdaterArtifacts`. Failed: corrupted signing key, then wrong password. Never released successfully. |
 | v0.0.3  | Feb 2026 | First successful end-to-end release. New signing key with password `build`.                                      |
 | v0.0.4  | Feb 2026 | Auto-update test. Verified v0.0.3 → v0.0.4 update works end-to-end.                                              |
+| v0.0.5  | Mar 2026 | Dependency bumps (lucide-react, @anthropic-ai/sdk, ESLint 10, Sentry, upload-artifact v7).                       |
 
 ---
 

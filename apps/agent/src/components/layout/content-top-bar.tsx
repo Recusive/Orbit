@@ -499,7 +499,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             onClick={toggleReviewPanel}
             aria-label={reviewPanelOpen ? 'Hide Activity Panel' : 'Show Activity Panel'}
             className={cn(
-              'h-6 w-6 flex items-center justify-center rounded-md',
+              'h-6 w-6 flex items-center justify-center rounded-[9px]',
               'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               reviewPanelOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'
@@ -519,7 +519,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             onClick={handleToggleTerminal}
             aria-label={bottomPanelOpen ? 'Hide Terminal' : 'Show Terminal'}
             className={cn(
-              'h-6 w-6 flex items-center justify-center rounded-md',
+              'h-6 w-6 flex items-center justify-center rounded-[9px]',
               'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               bottomPanelOpen && !terminalCollapsed
@@ -541,7 +541,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
             onClick={toggleRightSidebar}
             aria-label={rightSidebarOpen ? 'Hide Actions Bar' : 'Show Actions Bar'}
             className={cn(
-              'h-6 w-6 flex items-center justify-center rounded-md',
+              'h-6 w-6 flex items-center justify-center rounded-[9px]',
               'hover:bg-lg-control-hover active:scale-[0.98]',
               'transition-[color,background-color,transform] duration-150',
               rightSidebarOpen ? 'text-foreground' : 'text-sidebar-foreground hover:text-foreground'

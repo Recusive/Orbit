@@ -352,7 +352,7 @@ export const PrimarySidebar: FC = () => {
         <button
           onClick={toggleLeftSidebar}
           aria-label="Collapse sidebar"
-          className="relative h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
+          className="relative h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground before:absolute before:content-[''] before:inset-[-8px]"
         >
           <SFSymbol
             name="sidebar.left"
@@ -367,7 +367,7 @@ export const PrimarySidebar: FC = () => {
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
             onClick={() => {
               if (vaultOpen) {
                 useUIStore.getState().setVaultOpen(false);
@@ -383,7 +383,7 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+            className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
           >
             <SFSymbol
               name="arrow.right"
