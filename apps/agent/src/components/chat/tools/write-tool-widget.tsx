@@ -1,13 +1,14 @@
 import { IconAgenticCoding } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconAgenticCoding';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
-import { AlertCircle, CheckCircle2, ChevronRight, Loader2, XCircle } from 'lucide-react';
+import { AlertCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   DiffStat,
-  TOOL_EXPAND_TRANSITION,
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
   useIsDarkMode,
 } from './shared';
@@ -193,80 +194,36 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: single continuous vertical connector line */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div
-                    className={cn(
-                      'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-success/40'
-                    )}
-                    style={
-                      success !== undefined
-                        ? {
-                            background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent), color-mix(in oklch, #22c55e 50%, transparent))'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-success) 40%, transparent), color-mix(in oklch, #ef4444 50%, transparent))',
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-
-                {/* Content column — Pierre diff */}
-                <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
-                  <div className="my-1.5 overflow-hidden rounded-lg">
-                    {preloaded ? (
-                      <PierreFileDiff
-                        fileDiff={preloaded.fileDiff}
-                        prerenderedHTML={preloaded.prerenderedHTML}
-                        style={PIERRE_DIFF_STYLE as React.CSSProperties}
-                        options={pierreOptions}
-                      />
-                    ) : preloadError ? (
-                      <div className="px-3 py-2 text-xs text-destructive/90 flex items-center gap-2">
-                        <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                        <span className="flex-1">{preloadError}</span>
-                        <button
-                          type="button"
-                          onClick={handleRetry}
-                          className="text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
-                        >
-                          Retry
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="px-3 py-2 text-xs text-muted-foreground/60">
-                        Loading diff...
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom status indicator */}
-              {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center py-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Failed' : 'Completed'}
-                  </span>
+            <div className="my-1.5 overflow-hidden rounded-lg">
+              {preloaded ? (
+                <PierreFileDiff
+                  fileDiff={preloaded.fileDiff}
+                  prerenderedHTML={preloaded.prerenderedHTML}
+                  style={PIERRE_DIFF_STYLE as React.CSSProperties}
+                  options={pierreOptions}
+                />
+              ) : preloadError ? (
+                <div className="px-3 py-2 text-xs text-destructive/90 flex items-center gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  <span className="flex-1">{preloadError}</span>
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+                  >
+                    Retry
+                  </button>
                 </div>
               ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-[2px] rounded-full h-full bg-border/20" />
-                  </div>
-                </div>
+                <div className="px-3 py-2 text-xs text-muted-foreground/60">Loading diff...</div>
               )}
             </div>
           </motion.div>

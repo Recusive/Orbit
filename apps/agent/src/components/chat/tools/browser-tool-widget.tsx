@@ -1,5 +1,4 @@
 import {
-  CheckCircle2,
   ChevronRight,
   Globe,
   Loader2,
@@ -8,12 +7,11 @@ import {
   Navigation,
   ScrollText,
   Type,
-  XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC, ReactNode } from 'react';
 
@@ -219,79 +217,34 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              {/* Connector line: header icon → step icon */}
-              <div className="flex flex-row mb-1">
-                <div className="w-4 flex justify-center shrink-0">
-                  <div className="w-[2px] rounded-full h-3 bg-violet-500/30" />
-                </div>
-              </div>
-
-              {/* Step row: action icon + label */}
-              <div className="flex flex-row items-center">
-                {stepIcon}
-                <span className="ml-2.5 text-xs text-lg-text-secondary min-w-0 truncate">
-                  {stepLabel.text}
-                  {stepLabel.linkUrl ? (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenUrl?.(stepLabel.linkUrl ?? '');
-                      }}
-                      className="inline-flex items-center justify-center rounded-full border border-transparent bg-border/50 text-secondary-foreground hover:bg-border/70 transition-[color,box-shadow] overflow-hidden gap-1 px-2 py-0.5 font-normal text-xs ml-1"
-                    >
-                      {stepLabel.linkText ?? stepLabel.linkUrl}
-                    </button>
-                  ) : null}
-                </span>
-                {isRunning ? (
-                  <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-lg-text-secondary/60 shrink-0" />
+            {/* Step row: action icon + label */}
+            <div className="flex items-center py-1">
+              {stepIcon}
+              <span className="ml-2 text-xs text-lg-text-secondary min-w-0 truncate">
+                {stepLabel.text}
+                {stepLabel.linkUrl ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenUrl?.(stepLabel.linkUrl ?? '');
+                    }}
+                    className="inline-flex items-center justify-center rounded-full border border-transparent bg-border/50 text-secondary-foreground hover:bg-border/70 transition-[color,box-shadow] overflow-hidden gap-1 px-2 py-0.5 font-normal text-xs ml-1"
+                  >
+                    {stepLabel.linkText ?? stepLabel.linkUrl}
+                  </button>
                 ) : null}
-              </div>
-
-              {/* Connector line: step icon → status icon (gap via my-1) */}
-              <div className="flex flex-row my-1">
-                <div className="w-4 flex justify-center shrink-0">
-                  <div
-                    className={cn(
-                      'w-[2px] rounded-full h-3',
-                      success === undefined && 'bg-violet-500/20'
-                    )}
-                    style={
-                      success !== undefined
-                        ? {
-                            background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, #8b5cf6 30%, transparent), color-mix(in oklch, #22c55e 50%, transparent))'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, #8b5cf6 30%, transparent), color-mix(in oklch, #ef4444 50%, transparent))',
-                          }
-                        : undefined
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Bottom status row */}
-              {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center pb-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Failed' : 'Completed'}
-                  </span>
-                </div>
-              ) : isRunning ? (
-                <div className="flex flex-row items-center pb-1">
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-violet-500/60" />
-                  <span className="ml-2.5 text-xs text-muted-foreground">Working…</span>
-                </div>
+              </span>
+              {isRunning ? (
+                <Loader2 className="ml-1.5 h-2.5 w-2.5 animate-spin text-lg-text-secondary/60 shrink-0" />
               ) : null}
             </div>
           </motion.div>

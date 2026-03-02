@@ -11,6 +11,7 @@ import {
   selectAhead,
   selectBehind,
   selectBranch,
+  selectDirectoryStatus,
   selectFileStatus,
   selectHasConflicts,
   selectIsClean,
@@ -450,7 +451,7 @@ describe('git-store', () => {
         expect(selector(useGitStore.getState())).toBeNull();
       });
 
-      it('should find file by exact path', () => {
+      it('should return null when no repoPath', () => {
         const { setStatus } = useGitStore.getState();
         setStatus(
           createGitStatus({
@@ -458,28 +459,194 @@ describe('git-store', () => {
           })
         );
 
-        const selector = selectFileStatus('src/file.ts');
-        expect(selector(useGitStore.getState())).toBe('modified');
+        const selector = selectFileStatus('/repo/src/file.ts');
+        expect(selector(useGitStore.getState())).toBeNull();
       });
 
-      it('should find file by suffix match', () => {
-        const { setStatus } = useGitStore.getState();
+      it('should find file by exact path', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
         setStatus(
           createGitStatus({
-            staged: [createStatusEntry('file.ts', 'added')],
+            modified: [createStatusEntry('src/file.ts', 'modified')],
           })
         );
 
-        const selector = selectFileStatus('/repo/root/file.ts');
-        expect(selector(useGitStore.getState())).toBe('added');
+        const selector = selectFileStatus('/repo/src/file.ts');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should use priority when file appears in multiple categories', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            staged: [createStatusEntry('src/file.ts', 'added')],
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectFileStatus('/repo/src/file.ts');
+        expect(selector(useGitStore.getState())).toBe('modified');
       });
 
       it('should return null for non-existent file', () => {
-        const { setStatus } = useGitStore.getState();
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
         setStatus(createGitStatus());
 
-        const selector = selectFileStatus('nonexistent.ts');
+        const selector = selectFileStatus('/repo/nonexistent.ts');
         expect(selector(useGitStore.getState())).toBeNull();
+      });
+    });
+
+    describe('selectDirectoryStatus', () => {
+      it('should return null when no status', () => {
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+
+      it('should return null when no repoPath', () => {
+        const { setStatus } = useGitStore.getState();
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+
+      it('should return status for directory with changed child', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should resolve directory priority across children', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/a.ts', 'modified')],
+            untracked: [createStatusEntry('src/new.ts', 'untracked')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should use higher priority for multi-category file contributions', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            staged: [createStatusEntry('src/file.ts', 'added')],
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should propagate status to all ancestor directories', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            conflicted: [createStatusEntry('a/b/c/deep.ts', 'conflicted')],
+          })
+        );
+
+        expect(selectDirectoryStatus('/repo/a/b/c')(useGitStore.getState())).toBe('conflicted');
+        expect(selectDirectoryStatus('/repo/a/b')(useGitStore.getState())).toBe('conflicted');
+        expect(selectDirectoryStatus('/repo/a')(useGitStore.getState())).toBe('conflicted');
+      });
+
+      it('should compute repo root status from nested and root files', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            untracked: [createStatusEntry('README.md', 'untracked')],
+            modified: [createStatusEntry('src/app.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo');
+        expect(selector(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should return null for path outside repo', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/outside/src');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+
+      it('should reject sibling paths that only share prefix', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo-copy/src');
+        expect(selector(useGitStore.getState())).toBeNull();
+      });
+
+      it('should update when status changes', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            untracked: [createStatusEntry('src/file.ts', 'untracked')],
+          })
+        );
+        expect(selectDirectoryStatus('/repo/src')(useGitStore.getState())).toBe('untracked');
+
+        setStatus(
+          createGitStatus({
+            modified: [createStatusEntry('src/file.ts', 'modified')],
+          })
+        );
+        expect(selectDirectoryStatus('/repo/src')(useGitStore.getState())).toBe('modified');
+      });
+
+      it('should handle many lower-priority descendants under conflicted parent', () => {
+        const { setRepoPath, setStatus } = useGitStore.getState();
+        setRepoPath('/repo');
+        setStatus(
+          createGitStatus({
+            conflicted: [createStatusEntry('src/conflict.ts', 'conflicted')],
+            untracked: [
+              createStatusEntry('src/one.ts', 'untracked'),
+              createStatusEntry('src/two.ts', 'untracked'),
+              createStatusEntry('src/three.ts', 'untracked'),
+            ],
+          })
+        );
+
+        const selector = selectDirectoryStatus('/repo/src');
+        expect(selector(useGitStore.getState())).toBe('conflicted');
       });
     });
   });

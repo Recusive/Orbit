@@ -11,7 +11,7 @@ import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -126,47 +126,35 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div className="w-[2px] rounded-full h-full bg-mode-plan/30" />
-                </div>
-
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
-                  <div className="overflow-auto max-h-[400px]">
-                    <div className="p-3">
-                      {content.trim() ? (
-                        <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
-                          <Streamdown
-                            remarkPlugins={REMARK_PLUGINS}
-                            rehypePlugins={REHYPE_PLUGINS}
-                            controls={CONTROLS_CONFIG}
-                            linkSafety={LINK_SAFETY_DISABLED}
-                            mode="static"
-                          >
-                            {content}
-                          </Streamdown>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground italic">
-                          Plan content is empty
-                        </div>
-                      )}
+            {/* Content box */}
+            <div className="min-w-0 my-1.5 rounded-xl border border-mode-plan/20 bg-mode-plan/5 overflow-hidden">
+              <div className="overflow-auto max-h-[400px]">
+                <div className="p-3">
+                  {content.trim() ? (
+                    <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
+                      <Streamdown
+                        remarkPlugins={REMARK_PLUGINS}
+                        rehypePlugins={REHYPE_PLUGINS}
+                        controls={CONTROLS_CONFIG}
+                        linkSafety={LINK_SAFETY_DISABLED}
+                        mode="static"
+                      >
+                        {content}
+                      </Streamdown>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom connector stub */}
-              <div className="flex flex-row h-1">
-                <div className="w-4 flex justify-center">
-                  <div className="w-[2px] rounded-full h-full bg-mode-plan/15" />
+                  ) : (
+                    <div className="text-sm text-muted-foreground italic">
+                      Plan content is empty
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -1,8 +1,8 @@
-import { CheckCircle2, ChevronRight, File, Folder, Loader2, Search, XCircle } from 'lucide-react';
+import { ChevronRight, File, Folder, Loader2, Search } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
-import { TOOL_EXPAND_TRANSITION, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
 
 import type { FC } from 'react';
 
@@ -110,113 +110,74 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
           <motion.div
             initial={shouldReduceMotion ? false : { height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
-            exit={shouldReduceMotion ? { opacity: 0 } : { height: 0, opacity: 0 }}
-            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_TRANSITION}
+            exit={
+              shouldReduceMotion
+                ? { opacity: 0 }
+                : { height: 0, opacity: 0, transition: TOOL_EXPAND_EXIT }
+            }
+            transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="flex flex-col">
-              <div className="flex flex-row">
-                {/* Gutter: vertical connector line */}
-                <div className="w-4 flex justify-center shrink-0">
-                  <div
-                    className={cn(
-                      'w-[2px] rounded-full h-full',
-                      success === undefined && 'bg-foreground/20'
-                    )}
-                    style={
-                      success !== undefined
-                        ? {
-                            background: success
-                              ? 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #22c55e 50%, transparent) 100%)'
-                              : 'linear-gradient(to bottom, color-mix(in oklch, var(--color-foreground) 20%, transparent) 70%, color-mix(in oklch, #ef4444 50%, transparent) 100%)',
-                          }
-                        : undefined
-                    }
-                  />
+            {/* Content box */}
+            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+              {/* Pattern & Path */}
+              <div className="px-3 py-2">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                  pattern
                 </div>
-
-                {/* Content box */}
-                <div className="flex-1 min-w-0 ml-2.5 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
-                  {/* Pattern & Path */}
-                  <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
-                      pattern
+                <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground">
+                  {pattern}
+                </code>
+                {path ? (
+                  <>
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                      in
                     </div>
-                    <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground">
-                      {pattern}
-                    </code>
-                    {path ? (
-                      <>
-                        <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
-                          in
-                        </div>
-                        <span className="text-sm text-lg-text-secondary font-mono">{path}</span>
-                      </>
-                    ) : null}
-                  </div>
-
-                  {/* Results */}
-                  <div className="h-px bg-border/20 mx-3" />
-                  <div className="px-3 py-2">
-                    {isRunning ? (
-                      <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
-                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
-                        <span>Searching for files...</span>
-                      </div>
-                    ) : files.length > 0 ? (
-                      <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
-                        {files.map((file, index) => (
-                          <button
-                            key={`${file}-${String(index)}`}
-                            type="button"
-                            onClick={() => {
-                              onOpenFile?.(file);
-                            }}
-                            className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-lg-control rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
-                          >
-                            {file.endsWith('/') ? (
-                              <Folder className="h-3 w-3 text-muted-foreground shrink-0" />
-                            ) : (
-                              <File className="h-3 w-3 text-muted-foreground shrink-0" />
-                            )}
-                            <span className="font-mono text-foreground shrink-0">
-                              {getFileName(file)}
-                            </span>
-                            <span
-                              className="text-muted-foreground truncate text-right flex-1"
-                              title={file}
-                            >
-                              {file}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground italic">No files found</div>
-                    )}
-                  </div>
-                </div>
+                    <span className="text-sm text-lg-text-secondary font-mono">{path}</span>
+                  </>
+                ) : null}
               </div>
 
-              {/* Bottom status indicator */}
-              {!isRunning && success !== undefined ? (
-                <div className="flex flex-row items-center py-1">
-                  {isFailed ? (
-                    <XCircle className="h-4 w-4 shrink-0 text-red-500/80" />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4 shrink-0 text-green-500/80" />
-                  )}
-                  <span className="ml-2.5 text-xs text-lg-text-secondary">
-                    {isFailed ? 'Failed' : 'Completed'}
-                  </span>
-                </div>
-              ) : (
-                <div className="flex flex-row h-1">
-                  <div className="w-4 flex justify-center">
-                    <div className="w-[2px] rounded-full h-full bg-border/20" />
+              {/* Results */}
+              <div className="h-px bg-border/20 mx-3" />
+              <div className="px-3 py-2">
+                {isRunning ? (
+                  <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
+                    <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                    <span>Searching for files...</span>
                   </div>
-                </div>
-              )}
+                ) : files.length > 0 ? (
+                  <div className="space-y-0.5 max-h-[200px] overflow-y-auto overflow-x-hidden bg-lg-control rounded-lg p-2">
+                    {files.map((file, index) => (
+                      <button
+                        key={`${file}-${String(index)}`}
+                        type="button"
+                        onClick={() => {
+                          onOpenFile?.(file);
+                        }}
+                        className="w-full flex items-center gap-1.5 text-sm py-0.5 hover:bg-lg-control rounded px-1.5 -mx-1.5 transition-colors overflow-hidden cursor-pointer text-left"
+                      >
+                        {file.endsWith('/') ? (
+                          <Folder className="h-3 w-3 text-muted-foreground shrink-0" />
+                        ) : (
+                          <File className="h-3 w-3 text-muted-foreground shrink-0" />
+                        )}
+                        <span className="font-mono text-foreground shrink-0">
+                          {getFileName(file)}
+                        </span>
+                        <span
+                          className="text-muted-foreground truncate text-right flex-1"
+                          title={file}
+                        >
+                          {file}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground italic">No files found</div>
+                )}
+              </div>
             </div>
           </motion.div>
         ) : null}
