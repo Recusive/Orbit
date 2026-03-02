@@ -122,6 +122,10 @@ beforeEach(() => {
   mockGitUnstage.mockResolvedValue(undefined);
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('toUserGitError', () => {
   it('normalizes duplicate-branch errors', () => {
     expect(toUserGitError("Git error: reference 'refs/heads/foo' already exists")).toBe(
@@ -258,5 +262,139 @@ describe('useSourceControl handleCreateAndCheckout', () => {
     expect(mockGitCreateBranch).toHaveBeenCalledWith('/repo', 'feature/first');
     expect(mockGitCheckout).toHaveBeenCalledTimes(1);
     expect(result.current.isCheckingOut).toBe(false);
+  });
+});
+
+describe('useSourceControl diff fetching behavior', () => {
+  it('debounces status tick diff fetches to a single call', async () => {
+    vi.useFakeTimers();
+    renderHook(() => useSourceControl(true));
+
+    act(() => {
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 1 }));
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 2 }));
+    });
+
+    expect(mockGitStagedDiff).not.toHaveBeenCalled();
+    expect(mockGitDiffStructured).not.toHaveBeenCalled();
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+  });
+
+  it('deduplicates inflight fetches and drains one trailing refetch', async () => {
+    vi.useFakeTimers();
+    const firstStaged = createDeferred<[]>();
+    const firstUnstaged = createDeferred<[]>();
+    let stagedCalls = 0;
+    let unstagedCalls = 0;
+
+    mockGitStagedDiff.mockImplementation(async () => {
+      stagedCalls += 1;
+      if (stagedCalls === 1) {
+        return firstStaged.promise;
+      }
+      return [];
+    });
+    mockGitDiffStructured.mockImplementation(async () => {
+      unstagedCalls += 1;
+      if (unstagedCalls === 1) {
+        return firstUnstaged.promise;
+      }
+      return [];
+    });
+
+    renderHook(() => useSourceControl(true));
+
+    act(() => {
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 1 }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 2 }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    // Still inflight, so second fetch should be queued instead of starting now.
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      firstStaged.resolve([]);
+      firstUnstaged.resolve([]);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(2);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not fetch diffs when the source control tab is hidden', async () => {
+    vi.useFakeTimers();
+    renderHook(() => useSourceControl(false));
+
+    act(() => {
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 1 }));
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).not.toHaveBeenCalled();
+    expect(mockGitDiffStructured).not.toHaveBeenCalled();
+  });
+
+  it('fetches immediately on visibility transition from hidden to visible', async () => {
+    vi.useFakeTimers();
+    const { rerender } = renderHook(
+      ({ isVisible }: { isVisible: boolean }) => useSourceControl(isVisible),
+      {
+        initialProps: { isVisible: false },
+      }
+    );
+
+    act(() => {
+      useGitStore.getState().setStatus(createMockStatus({ ahead: 1 }));
+    });
+
+    await act(async () => {
+      rerender({ isVisible: true });
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs a single fetch on first visible mount (mount guard prevents double call)', async () => {
+    vi.useFakeTimers();
+    useGitStore.getState().setStatus(createMockStatus({ ahead: 1 }));
+
+    renderHook(() => useSourceControl(true));
+
+    await act(async () => {
+      vi.advanceTimersByTime(300);
+      await Promise.resolve();
+    });
+
+    expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
+    expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
   });
 });

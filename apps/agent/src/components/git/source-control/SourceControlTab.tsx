@@ -7,7 +7,7 @@
  * To change status colors or labels, update GIT_STATUS_STYLES in constants.ts.
  */
 import { AlertCircle, CloudDownload, GitBranch, Loader2, RefreshCw } from 'lucide-react';
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 
 import { BranchSelector } from './components/BranchSelector';
 import { ChangesList } from './components/ChangesList';
@@ -24,8 +24,19 @@ import type { SourceControlTabProps } from './types';
 import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 
-export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = '' }) => {
+export const SourceControlTab: React.FC<SourceControlTabProps> = ({
+  className = '',
+  isVisible = true,
+}) => {
   const smoothScrollRef = useSmoothScroll(0.08);
+  const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null);
+  const mergedScrollRef = useCallback(
+    (node: HTMLDivElement | null): void => {
+      setScrollParent(node);
+      smoothScrollRef(node);
+    },
+    [smoothScrollRef]
+  );
 
   const {
     // Status
@@ -80,7 +91,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
     // Operations
     operationError,
     refresh,
-  } = useSourceControl();
+  } = useSourceControl(isVisible);
 
   // Loading state
   if (isLoading && !status) {
@@ -168,7 +179,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
       </div>
 
       {/* Scrollable content */}
-      <div ref={smoothScrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
+      <div ref={mergedScrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
         {/* Operation Error Banner */}
         {operationError ? <OperationError message={operationError} /> : null}
 
@@ -200,6 +211,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({ className = 
 
         {/* Changes List */}
         <ChangesList
+          scrollParent={scrollParent}
           stagedFiles={stagedFiles}
           unstagedFiles={unstagedFiles}
           stagedDiffs={stagedDiffs}

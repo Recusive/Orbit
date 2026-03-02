@@ -4,7 +4,7 @@
  * Uses Pierre's <FileDiff> for rendering with full old/new file content,
  * enabling expandable "N unmodified lines" separators.
  *
- * Header layout: status badge → filename → label → DiffStat → actions → chevron
+ * Header layout: file icon → filename + status letter → path → DiffStat → actions → chevron
  */
 import { parseDiffFromFile } from '@pierre/diffs';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
@@ -12,13 +12,14 @@ import { preloadFileDiff } from '@pierre/diffs/ssr';
 import { AlertCircle, ChevronDown, Minus, Plus, X } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-import type { DisplayFileStatus, FileItem } from '../types';
+import type { FileItem } from '../types';
 import type { FileDiff } from '@/lib/api';
 import type { FileContents, FileDiffMetadata } from '@pierre/diffs/react';
 import type { FC } from 'react';
 
 import { DiffStat, useIsDarkMode } from '@/components/chat/tools/shared';
-import { readFile } from '@/lib/api/files';
+import { FileIcon } from '@/components/files';
+import { readFile, readFileBytes } from '@/lib/api/files';
 import { gitFileAtRef } from '@/lib/api/git';
 import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
 import {
@@ -39,21 +40,12 @@ interface DiffFileCardProps {
   readonly isLoading: boolean;
   readonly onAction: (path: string) => Promise<void>;
   readonly onDiscard?: ((path: string) => void) | undefined;
+  readonly schedulePrefetch: (start: () => Promise<void>) => () => void;
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Map display status to the colored badge background used in the header icon */
-const STATUS_BADGE_BG: Record<DisplayFileStatus, string> = {
-  added: 'bg-green-500/10 group-hover/card:bg-green-500/15',
-  modified: 'bg-yellow-500/10 group-hover/card:bg-yellow-500/15',
-  deleted: 'bg-red-500/10 group-hover/card:bg-red-500/15',
-  renamed: 'bg-blue-500/10 group-hover/card:bg-blue-500/15',
-  untracked: 'bg-gray-400/10 group-hover/card:bg-gray-400/15',
-  conflicted: 'bg-orange-500/10 group-hover/card:bg-orange-500/15',
-};
 
 /** Extract filename from path */
 function getFileName(path: string): string {
@@ -80,6 +72,34 @@ function countChanges(diff: FileDiff): { additions: number; deletions: number } 
   return { additions, deletions };
 }
 
+/** Count additions and deletions in a Pierre diff metadata object */
+function countPierreChanges(fileDiff: FileDiffMetadata): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+  for (const hunk of fileDiff.hunks) {
+    additions += hunk.additionLines;
+    deletions += hunk.deletionLines;
+  }
+  return { additions, deletions };
+}
+
+/** Heuristic binary detection for raw bytes. */
+function isLikelyBinaryBytes(bytes: readonly number[]): boolean {
+  if (bytes.length === 0) return false;
+
+  const sample = bytes.slice(0, 8192);
+  let suspicious = 0;
+
+  for (const byte of sample) {
+    if (byte === 0) return true;
+    if (byte < 7 || (byte > 14 && byte < 32) || byte === 127) {
+      suspicious++;
+    }
+  }
+
+  return suspicious / sample.length > 0.3;
+}
+
 // ---------------------------------------------------------------------------
 // DiffFileCard
 // ---------------------------------------------------------------------------
@@ -91,6 +111,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   isLoading,
   onAction,
   onDiscard,
+  schedulePrefetch,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   // Keep content mounted during the collapse animation, unmount after transition ends
@@ -102,29 +123,56 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   const fileDir = getFileDirectory(file.path);
   const hasDiff = diff !== undefined && diff.hunks.length > 0;
   const isBinary = diff?.isBinary === true;
-  const canExpand = hasDiff || isBinary;
-
-  const { additions, deletions } = useMemo(
-    () => (diff ? countChanges(diff) : { additions: 0, deletions: 0 }),
-    [diff]
-  );
 
   // Prefetch file content, parse diff, AND preload Shiki highlighting on hover.
   // By the time the user clicks, the fully-highlighted HTML is ready — expand is instant.
   interface PreloadedDiff {
     fileDiff: FileDiffMetadata;
     prerenderedHTML: string;
+    additions: number;
+    deletions: number;
+  }
+  interface BaseDiffData {
+    fileDiff: FileDiffMetadata;
+    additions: number;
+    deletions: number;
   }
 
   const [preloaded, setPreloaded] = useState<PreloadedDiff | null>(null);
+  const [isFallbackBinary, setIsFallbackBinary] = useState(false);
+  const [prefetchedCounts, setPrefetchedCounts] = useState<{
+    additions: number;
+    deletions: number;
+  } | null>(null);
   const [preloadError, setPreloadError] = useState<string | null>(null);
   const prefetchRef = useRef<{ promise: Promise<PreloadedDiff | null>; key: string } | null>(null);
+  const baseDiffRef = useRef<{ promise: Promise<BaseDiffData | null>; key: string } | null>(null);
+  const cancelScheduledRef = useRef<(() => void) | null>(null);
 
-  /** Build a cache key from the inputs that affect the fetched content. */
-  const prefetchKey = `${file.path}:${isStaged ? 'staged' : 'unstaged'}`;
+  const showBinary = isBinary || isFallbackBinary;
+  const canExpand = hasDiff || showBinary || diff === undefined;
+
+  const { additions, deletions } = useMemo(() => {
+    if (diff) return countChanges(diff);
+    if (preloaded) return { additions: preloaded.additions, deletions: preloaded.deletions };
+    return prefetchedCounts ?? { additions: 0, deletions: 0 };
+  }, [diff, preloaded, prefetchedCounts]);
+
+  const hasVisibleStat = !showBinary && (additions > 0 || deletions > 0);
 
   /** Pierre options used for both preload and live rendering */
   const themeType: 'dark' | 'light' = isDarkMode ? 'dark' : 'light';
+
+  const diffKey = useMemo(() => {
+    if (!diff) return 'missing';
+    const hunkSignature = diff.hunks
+      .map((hunk) => `${hunk.header}:${hunk.lines.length.toString()}`)
+      .join('|');
+    return `${diff.path}:${diff.oldPath ?? ''}:${diff.isBinary ? '1' : '0'}:${hunkSignature}`;
+  }, [diff]);
+
+  /** Build a cache key from the inputs that affect fetched content and backend diff state. */
+  const prefetchKey = `${file.path}:${isStaged ? 'staged' : 'unstaged'}:${themeType}:${diffKey}`;
   const pierreOptions = useMemo(
     () => ({
       theme: PIERRE_THEME,
@@ -139,33 +187,88 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     [themeType]
   );
 
+  /** Fetch file content and compute diff metadata/counts. */
+  const fetchBaseDiff = (): Promise<BaseDiffData | null> => {
+    if (baseDiffRef.current?.key === prefetchKey) return baseDiffRef.current.promise;
+    if (showBinary || !repoPath) return Promise.resolve(null);
+
+    const absolutePath = `${repoPath}/${file.path}`;
+    const oldPath = file.oldPath ?? file.path;
+    const oldRef = isStaged ? 'HEAD' : 'INDEX';
+
+    const loadNewContent = async (): Promise<{ content: string; binary: boolean }> => {
+      if (isStaged) {
+        const content = await gitFileAtRef(repoPath, file.path, 'INDEX').catch(() => '');
+        const bytes = await readFileBytes(absolutePath).catch(() => null);
+        if (bytes && isLikelyBinaryBytes(bytes)) {
+          return { content: '', binary: true };
+        }
+        return { content, binary: false };
+      }
+
+      try {
+        const content = await readFile(absolutePath);
+        if (content.includes('\u0000')) {
+          return { content: '', binary: true };
+        }
+        return { content, binary: false };
+      } catch {
+        const bytes = await readFileBytes(absolutePath).catch(() => null);
+        if (bytes && isLikelyBinaryBytes(bytes)) {
+          return { content: '', binary: true };
+        }
+        return { content: '', binary: false };
+      }
+    };
+
+    const promise = Promise.all([
+      gitFileAtRef(repoPath, oldPath, oldRef).catch(() => ''),
+      loadNewContent(),
+    ])
+      .then(([oldContent, newFile]): BaseDiffData | null => {
+        if (newFile.binary) {
+          setIsFallbackBinary(true);
+          return null;
+        }
+
+        setIsFallbackBinary(false);
+        const oldFile: FileContents = { name: file.path, contents: oldContent };
+        const newFileContent: FileContents = { name: file.path, contents: newFile.content };
+        const fileDiff = parseDiffFromFile(oldFile, newFileContent);
+        const counts = countPierreChanges(fileDiff);
+        return {
+          fileDiff,
+          additions: counts.additions,
+          deletions: counts.deletions,
+        };
+      })
+      .catch(() => null);
+
+    baseDiffRef.current = { promise, key: prefetchKey };
+    return promise;
+  };
+
   /** Fetch file content → parse diff → preload Shiki highlighting. */
   const fetchAndPreload = (): Promise<PreloadedDiff | null> => {
     if (prefetchRef.current?.key === prefetchKey) return prefetchRef.current.promise;
-    if (!diff || diff.isBinary) return Promise.resolve(null);
+    if (showBinary) return Promise.resolve(null);
     if (!repoPath) {
       setPreloadError('Repository path unavailable for this diff.');
       return Promise.resolve(null);
     }
 
-    const absolutePath = `${repoPath}/${file.path}`;
-    const oldRef = isStaged ? 'HEAD' : 'INDEX';
     setPreloadError(null);
-
-    const promise = Promise.all([
-      gitFileAtRef(repoPath, file.path, oldRef).catch(() => ''),
-      isStaged
-        ? gitFileAtRef(repoPath, file.path, 'INDEX').catch(() => '')
-        : readFile(absolutePath).catch(() => ''),
-    ])
-      .then(async ([oldContent, newContent]): Promise<PreloadedDiff | null> => {
-        const oldFile: FileContents = { name: file.path, contents: oldContent };
-        const newFile: FileContents = { name: file.path, contents: newContent };
-        const fileDiff = parseDiffFromFile(oldFile, newFile);
-
+    const promise = fetchBaseDiff()
+      .then(async (base): Promise<PreloadedDiff | null> => {
+        if (!base) return null;
         // Preload Shiki highlighting — this is the expensive work
-        const result = await preloadFileDiff({ fileDiff, options: pierreOptions });
-        return { fileDiff: result.fileDiff, prerenderedHTML: result.prerenderedHTML };
+        const result = await preloadFileDiff({ fileDiff: base.fileDiff, options: pierreOptions });
+        return {
+          fileDiff: result.fileDiff,
+          prerenderedHTML: result.prerenderedHTML,
+          additions: base.additions,
+          deletions: base.deletions,
+        };
       })
       .catch(() => {
         setPreloadError('Failed to load diff preview.');
@@ -178,7 +281,19 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
 
   /** Start prefetching + preloading on hover — data is ready by the time user clicks. */
   const handleMouseEnter = (): void => {
-    if (canExpand && !isExpanded) void fetchAndPreload();
+    if (!canExpand || isExpanded) return;
+    cancelScheduledRef.current?.();
+    cancelScheduledRef.current = schedulePrefetch(async () => {
+      const result = await fetchAndPreload();
+      if (result) {
+        setPrefetchedCounts({ additions: result.additions, deletions: result.deletions });
+      }
+    });
+  };
+
+  const handleMouseLeave = (): void => {
+    cancelScheduledRef.current?.();
+    cancelScheduledRef.current = null;
   };
 
   // When expanded, resolve prefetched data (or trigger fetch if hover was skipped).
@@ -193,7 +308,12 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
 
     let cancelled = false;
     void fetchAndPreload().then((result) => {
-      if (!cancelled) setPreloaded(result);
+      if (!cancelled) {
+        setPreloaded(result);
+        if (result) {
+          setPrefetchedCounts({ additions: result.additions, deletions: result.deletions });
+        }
+      }
     });
 
     return (): void => {
@@ -202,10 +322,43 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchAndPreload is stable via ref
   }, [isExpanded, prefetchKey]);
 
+  // Populate header diff stats for cards missing bulk diff, without requiring hover.
+  useEffect(() => {
+    if (diff || prefetchedCounts || showBinary || !repoPath) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void fetchBaseDiff().then((base) => {
+        if (cancelled || !base) return;
+        setPrefetchedCounts({ additions: base.additions, deletions: base.deletions });
+      });
+    }, 220);
+    return (): void => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchBaseDiff is keyed by prefetchKey
+  }, [diff, prefetchedCounts, showBinary, repoPath, prefetchKey]);
+
+  useEffect(() => {
+    setPrefetchedCounts(null);
+    setIsFallbackBinary(false);
+    baseDiffRef.current = null;
+    prefetchRef.current = null;
+  }, [prefetchKey]);
+
+  useEffect(() => {
+    return (): void => {
+      cancelScheduledRef.current?.();
+      cancelScheduledRef.current = null;
+    };
+  }, []);
+
   const style = GIT_STATUS_STYLES[file.displayStatus];
 
   const handleToggle = (): void => {
     if (!canExpand) return;
+    cancelScheduledRef.current?.();
+    cancelScheduledRef.current = null;
     setIsExpanded((prev) => {
       if (!prev) {
         setIsMounted(true); // Mount immediately on expand
@@ -243,6 +396,9 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     prefetchRef.current = null;
     void fetchAndPreload().then((result) => {
       setPreloaded(result);
+      if (result) {
+        setPrefetchedCounts({ additions: result.additions, deletions: result.deletions });
+      }
     });
   };
 
@@ -252,6 +408,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
       <div
         onClick={handleToggle}
         onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         onKeyDown={(e): void => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
@@ -263,33 +420,25 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         aria-label={isExpanded ? `Collapse diff for ${fileName}` : `Expand diff for ${fileName}`}
         aria-expanded={isExpanded}
         className={cn(
-          'group/card flex items-center gap-2 py-1.5 px-2.5',
+          'group/card flex items-center gap-2 py-1.5 px-2.5 select-none',
           'w-full text-left bg-sidebar/50 dark:bg-sidebar',
           'hover:bg-lg-control-hover',
           canExpand ? 'cursor-pointer' : 'cursor-default'
         )}
       >
-        {/* Status badge */}
-        <div
-          className={cn(
-            'w-[22px] h-[22px] rounded-md flex items-center justify-center shrink-0',
-            STATUS_BADGE_BG[file.displayStatus]
-          )}
-        >
-          <span className={cn('text-[11px] font-bold leading-none', style.color)}>
-            {style.label}
-          </span>
-        </div>
+        {/* File icon */}
+        <FileIcon fileName={fileName} className="h-[18px] w-[18px] shrink-0" />
 
-        {/* File name, path, and diff stat */}
+        {/* File name, status letter, path, and diff stat */}
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          <span className="text-sm font-medium truncate text-foreground/90">{fileName}</span>
+          <span className={cn('text-sm font-medium truncate', style.fileColor)}>{fileName}</span>
+          <span className={cn('text-[11px] font-bold shrink-0', style.color)}>{style.label}</span>
           {fileDir ? (
             <span className="text-[11px] text-muted-foreground/50 truncate shrink-2">
               {fileDir}
             </span>
           ) : null}
-          {hasDiff ? (
+          {hasVisibleStat ? (
             <div className="shrink-0">
               <DiffStat additions={additions} deletions={deletions} />
             </div>
@@ -341,7 +490,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
       >
         <div className="overflow-hidden min-h-0">
           {isMounted ? (
-            isBinary ? (
+            showBinary ? (
               <div className="px-3 py-2 text-xs text-muted-foreground/60 italic">
                 Binary file — diff not available
               </div>

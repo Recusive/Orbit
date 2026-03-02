@@ -564,14 +564,19 @@ export const GIT_STATUS_STYLES = {
   added: { label: 'A', color: 'text-green-500', fileColor: 'text-green-500', title: 'Added' },
   modified: {
     label: 'M',
-    color: 'text-yellow-500',
-    fileColor: 'text-yellow-500',
+    color: 'text-[#c18533] dark:text-[#f0b367]',
+    fileColor: 'text-[#c18533] dark:text-[#f0b367]',
     title: 'Modified',
   },
   deleted: { label: 'D', color: 'text-red-500', fileColor: 'text-red-500', title: 'Deleted' },
   renamed: { label: 'R', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Renamed' },
   copied: { label: 'C', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Copied' },
-  untracked: { label: 'U', color: 'text-blue-400', fileColor: 'text-blue-400', title: 'Untracked' },
+  untracked: {
+    label: 'U',
+    color: 'text-[#0d87ff] dark:text-[#99ceff]',
+    fileColor: 'text-[#0d87ff] dark:text-[#99ceff]',
+    title: 'Untracked',
+  },
   conflicted: {
     label: '!',
     color: 'text-orange-500',

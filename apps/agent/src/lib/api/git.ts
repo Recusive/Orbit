@@ -168,8 +168,11 @@ export async function gitDiff(repoPath: string, file?: string): Promise<string> 
   return invoke<string>('git_diff', { repoPath, file });
 }
 
-export async function gitDiffStructured(repoPath: string): Promise<FileDiff[]> {
-  return invoke<FileDiff[]>('git_diff_structured', { repoPath });
+export async function gitDiffStructured(
+  repoPath: string,
+  includeUntracked = true
+): Promise<FileDiff[]> {
+  return invoke<FileDiff[]>('git_diff_structured', { repoPath, includeUntracked });
 }
 
 export async function gitStagedDiff(repoPath: string): Promise<FileDiff[]> {
