@@ -57,7 +57,7 @@ interface AgentCardProps {
 }
 
 const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
-  <div className="rounded-lg border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150">
+  <div className="rounded-[9px] bg-lg-control p-4 hover:bg-lg-control-hover transition-[background-color] duration-150">
     <div className="flex items-start justify-between gap-3">
       <div className="flex items-start gap-3 min-w-0 flex-1">
         <div className="h-8 w-8 rounded-lg bg-lg-control flex items-center justify-center shrink-0">
@@ -87,14 +87,15 @@ const AgentCard: FC<AgentCardProps> = ({ agent, onEdit, onDelete }) => (
           )}
         </div>
       </div>
-      <div className="flex items-center gap-1 shrink-0">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+      <div className="flex items-center shrink-0 border border-lg-separator/50 rounded-[7px] overflow-hidden">
+        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none" onClick={onEdit}>
           <Edit2 className="h-3.5 w-3.5" />
         </Button>
+        <div className="w-px h-4 bg-lg-separator/50" />
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 text-destructive hover:text-destructive"
+          className="h-7 w-7 rounded-none text-destructive hover:text-destructive"
           onClick={onDelete}
         >
           <Trash2 className="h-3.5 w-3.5" />
@@ -604,7 +605,6 @@ export const SubagentsSettings: FC = () => {
         {/* Create button */}
         <Button
           variant="outline"
-          size="sm"
           className="w-full justify-start gap-2"
           onClick={handleCreateAgent}
         >
@@ -638,12 +638,12 @@ export const SubagentsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-lg-control border border-lg-separator text-sm text-muted-foreground/90">
-        <p className="font-medium mb-1.5 text-foreground/80">How Subagents Work</p>
-        <ul className="list-disc list-inside space-y-0.5">
+      <div className="mt-6 p-3 rounded-[12px] bg-lg-control text-sm text-muted-foreground/70">
+        <p className="font-medium mb-1 text-foreground/70">How Subagents Work</p>
+        <ul className="list-disc list-inside space-y-0.5 text-[12px]">
           <li>
             Subagents are stored in{' '}
-            <code className="bg-lg-control px-1 py-0.5 rounded-md">.claude/agents/</code>
+            <code className="bg-lg-control-hover px-1 rounded-md">.claude/agents/</code>
           </li>
           <li>Claude automatically invokes them based on the description</li>
           <li>You can explicitly request them: &quot;Use the code-reviewer agent&quot;</li>

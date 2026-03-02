@@ -264,7 +264,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group/card flex items-center gap-2 py-1.5 px-2.5',
-          'w-full text-left bg-sidebar',
+          'w-full text-left bg-sidebar/50 dark:bg-sidebar',
           'hover:bg-lg-control-hover',
           canExpand ? 'cursor-pointer' : 'cursor-default'
         )}

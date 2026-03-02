@@ -7,7 +7,7 @@ export const NavItem: FC<NavItemProps> = ({ icon, label, isActive, onClick }) =>
   <button
     onClick={onClick}
     className={cn(
-      'flex w-full items-center gap-2 px-2.5 py-2 text-base rounded-lg active:scale-[0.98] transition-transform duration-75',
+      'flex w-full items-center gap-2 px-2.5 py-2 text-base rounded-[9px] active:scale-[0.98] transition-transform duration-75',
       isActive
         ? 'bg-lg-sidebar-selected text-foreground'
         : 'text-lg-text-secondary hover:bg-lg-sidebar-hover hover:text-foreground'

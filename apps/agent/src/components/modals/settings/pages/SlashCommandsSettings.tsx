@@ -81,7 +81,7 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
   const scopeConfig = SCOPE_CONFIG[command.scope];
 
   return (
-    <div className="rounded-lg border border-lg-separator p-4 hover:bg-lg-control-hover transition-[background-color] duration-150">
+    <div className="rounded-[9px] bg-lg-control p-4 hover:bg-lg-control-hover transition-[background-color] duration-150">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0 flex-1">
           <div className="h-8 w-8 rounded-lg bg-lg-control flex items-center justify-center shrink-0">
@@ -123,14 +123,15 @@ const CommandCard: FC<CommandCardProps> = ({ command, onEdit, onDelete }) => {
           </div>
         </div>
         {!isReadonly && (
-          <div className="flex items-center gap-1 shrink-0">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit}>
+          <div className="flex items-center shrink-0 border border-lg-separator/50 rounded-[7px] overflow-hidden">
+            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-none" onClick={onEdit}>
               <Edit2 className="h-3.5 w-3.5" />
             </Button>
+            <div className="w-px h-4 bg-lg-separator/50" />
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-destructive hover:text-destructive"
+              className="h-7 w-7 rounded-none text-destructive hover:text-destructive"
               onClick={onDelete}
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -731,7 +732,6 @@ export const SlashCommandsSettings: FC = () => {
         {/* Create button */}
         <Button
           variant="outline"
-          size="sm"
           className="w-full justify-start gap-2"
           onClick={handleCreateCommand}
         >
@@ -851,27 +851,27 @@ export const SlashCommandsSettings: FC = () => {
       </div>
 
       {/* Info section */}
-      <div className="mt-6 p-3.5 rounded-lg bg-lg-control border border-lg-separator text-sm text-muted-foreground/90">
-        <p className="font-medium mb-1.5 text-foreground/80">How Slash Commands Work</p>
-        <ul className="list-disc list-inside space-y-0.5">
+      <div className="mt-6 p-3 rounded-[12px] bg-lg-control text-sm text-muted-foreground/70">
+        <p className="font-medium mb-1 text-foreground/70">How Slash Commands Work</p>
+        <ul className="list-disc list-inside space-y-0.5 text-[12px]">
           <li>
             Project commands are stored in{' '}
-            <code className="bg-lg-control px-1 py-0.5 rounded-md">.claude/commands/</code>
+            <code className="bg-lg-control-hover px-1 rounded-md">.claude/commands/</code>
           </li>
           <li>
             Personal commands are stored in{' '}
-            <code className="bg-lg-control px-1 py-0.5 rounded-md">~/.claude/commands/</code>
+            <code className="bg-lg-control-hover px-1 rounded-md">~/.claude/commands/</code>
           </li>
           <li>
-            Type <code className="bg-lg-control px-1 py-0.5 rounded-md">/command-name</code> in chat
+            Type <code className="bg-lg-control-hover px-1 rounded-md">/command-name</code> in chat
             to run
           </li>
           <li>
-            Use <code className="bg-lg-control px-1 py-0.5 rounded-md">$ARGUMENTS</code> to pass
-            user input
+            Use <code className="bg-lg-control-hover px-1 rounded-md">$ARGUMENTS</code> to pass user
+            input
           </li>
           <li>
-            Use <code className="bg-lg-control px-1 py-0.5 rounded-md">@filename</code> to include
+            Use <code className="bg-lg-control-hover px-1 rounded-md">@filename</code> to include
             file contents
           </li>
         </ul>

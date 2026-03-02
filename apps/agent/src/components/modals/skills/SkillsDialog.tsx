@@ -340,13 +340,11 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
             <ul className="list-disc list-inside space-y-0.5 text-[12px]">
               <li>
                 Project skills live in{' '}
-                <code className="bg-lg-control-hover px-1 py-0.5 rounded-md">.claude/skills/</code>
+                <code className="bg-lg-control-hover px-1 rounded-md">.claude/skills/</code>
               </li>
               <li>
                 Personal skills live in{' '}
-                <code className="bg-lg-control-hover px-1 py-0.5 rounded-md">
-                  ~/.claude/skills/
-                </code>
+                <code className="bg-lg-control-hover px-1 rounded-md">~/.claude/skills/</code>
               </li>
               <li>Each skill is a SKILL.md file with YAML frontmatter</li>
               <li>Skills are automatically loaded when matched by triggers</li>
