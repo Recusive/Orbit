@@ -124,10 +124,10 @@ const SkillsSkeleton: FC = () => (
   <div className="flex flex-col gap-1">
     {[1, 2, 3, 4, 5, 6].map((i) => (
       <div key={i} className="flex items-center gap-3.5 px-3.5 py-2.5">
-        <div className="h-10 w-10 rounded-[12px] bg-[var(--lg-control-bg)] animate-pulse shrink-0" />
+        <div className="h-10 w-10 rounded-[12px] bg-lg-control animate-pulse shrink-0" />
         <div className="flex flex-col gap-1.5 flex-1">
-          <div className="h-3.5 w-36 rounded-md bg-[var(--lg-control-bg)] animate-pulse" />
-          <div className="h-2.5 w-16 rounded-md bg-[var(--lg-control-bg)] animate-pulse" />
+          <div className="h-3.5 w-36 rounded-md bg-lg-control animate-pulse" />
+          <div className="h-2.5 w-16 rounded-md bg-lg-control animate-pulse" />
         </div>
       </div>
     ))}
@@ -245,10 +245,10 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               spellCheck={false}
               autoComplete="off"
               className={cn(
-                'w-full h-9 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-9 text-sm',
+                'w-full h-9 rounded-[9px] bg-(--lg-alert-secondary-bg) pl-9 pr-9 text-sm',
                 'placeholder:text-muted-foreground/40 outline-none',
                 'transition-[background-color] duration-150',
-                'focus:bg-[var(--lg-control-bg)]'
+                'focus:bg-lg-control'
               )}
             />
             <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
@@ -267,7 +267,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
         <div className="flex-1 min-h-0">
           <div
             ref={smoothScrollRef}
-            className="h-full overflow-auto overscroll-y-contain p-4 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
+            className="h-full overflow-auto overscroll-y-contain p-4 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] mask-[linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
           >
             {isLoading ? (
               <SkillsSkeleton />
@@ -281,19 +281,14 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
             ) : !hasSkills ? (
               /* Empty state — no skills at all */
               <div className="flex flex-col items-center justify-center h-full text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--lg-control-bg)] mb-5">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-lg-control mb-5">
                   <Zap className="h-7 w-7 text-muted-foreground/40" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-medium text-foreground/80 mb-1">No skills found</p>
                 <p className="text-[13px] text-muted-foreground/50">
                   Add skills to{' '}
-                  <code className="bg-[var(--lg-control-bg)] px-1 py-0.5 rounded-md">
-                    .claude/skills/
-                  </code>{' '}
-                  or{' '}
-                  <code className="bg-[var(--lg-control-bg)] px-1 py-0.5 rounded-md">
-                    ~/.claude/skills/
-                  </code>
+                  <code className="bg-lg-control px-1 py-0.5 rounded-md">.claude/skills/</code> or{' '}
+                  <code className="bg-lg-control px-1 py-0.5 rounded-md">~/.claude/skills/</code>
                 </p>
               </div>
             ) : !hasResults && isSearching ? (
@@ -340,18 +335,16 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
         {/* Footer hint */}
         <div className="shrink-0 px-4 pb-3">
-          <div className="p-3 rounded-[12px] bg-[var(--lg-control-bg)] text-sm text-muted-foreground/70">
+          <div className="p-3 rounded-[12px] bg-lg-control text-sm text-muted-foreground/70">
             <p className="font-medium mb-1 text-foreground/70">How Skills Work</p>
             <ul className="list-disc list-inside space-y-0.5 text-[12px]">
               <li>
                 Project skills live in{' '}
-                <code className="bg-[var(--lg-control-bg-hover)] px-1 py-0.5 rounded-md">
-                  .claude/skills/
-                </code>
+                <code className="bg-lg-control-hover px-1 py-0.5 rounded-md">.claude/skills/</code>
               </li>
               <li>
                 Personal skills live in{' '}
-                <code className="bg-[var(--lg-control-bg-hover)] px-1 py-0.5 rounded-md">
+                <code className="bg-lg-control-hover px-1 py-0.5 rounded-md">
                   ~/.claude/skills/
                 </code>
               </li>
