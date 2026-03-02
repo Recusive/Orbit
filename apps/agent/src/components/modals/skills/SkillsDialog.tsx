@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useSmoothScroll } from '@/hooks/ui';
+import { dispatchAddContextChip } from '@/lib/events/chat-context-events';
 import { cn } from '@/lib/utils';
 
 // ═══════════════════════════════════════════════════════════════
@@ -208,7 +209,12 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
   // Clicking a skill adds it as a context chip above the input and closes the dialog
   const handleSkillSelect = useCallback(
     (skill: SkillDefinition) => (): void => {
-      window.dispatchEvent(new CustomEvent('addSkillChip', { detail: { name: skill.name } }));
+      dispatchAddContextChip({
+        id: crypto.randomUUID(),
+        type: 'skill',
+        name: skill.name,
+        path: skill.name,
+      });
       onOpenChange(false);
     },
     [onOpenChange]

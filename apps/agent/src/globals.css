@@ -154,6 +154,15 @@
   --color-lg-destructive-bg: var(--lg-destructive-bg);
 }
 
+/* Lock the viewport — prevent ProseMirror's scrollIntoView() from calling
+   window.scrollBy() when it walks up to document.body. The app is a
+   full-viewport SPA; page-level scrolling is never wanted. */
+html,
+body {
+  overflow: hidden;
+  height: 100%;
+}
+
 :root {
   /* Force light color scheme for native form controls (number spinners, scrollbars) */
   color-scheme: light;
@@ -722,12 +731,25 @@ html.dark [data-streamdown='code-block-container'] {
   word-break: break-word !important;
 }
 
-/* Line numbers — match code text size, Radix step 9 for 3:1 contrast */
-[data-streamdown='code-block-body'] code span::before {
-  font-size: 0.75rem !important; /* 12px — same as code text */
+/* Line spans — CM6-style gutter layout.
+   Block + padding-left creates the content column.
+   ::before is absolutely positioned in the padding area (gutter). */
+[data-streamdown='code-block-body'] code > span {
+  position: relative !important;
+  padding-left: 1.75rem !important;
+  min-height: 1lh !important;
+}
+
+/* Line numbers — fixed gutter, absolutely positioned.
+   Wrapped text never flows under line numbers. */
+[data-streamdown='code-block-body'] code > span::before {
+  position: absolute !important;
+  left: 0 !important;
+  width: 1.25rem !important;
+  text-align: right !important;
+  margin-right: 0 !important;
+  font-size: 0.75rem !important;
   color: var(--gray-9) !important;
-  margin-right: 0.625rem !important;
-  width: 1rem !important;
 }
 
 /* ============================================
@@ -1129,6 +1151,418 @@ html.dark .chat-markdown code:not(pre code) {
   margin-top: 0.875rem;
 }
 
+/* Vault Milkdown Crepe editor overrides */
+.vault-editor-shell .milkdown {
+  --crepe-color-background: transparent;
+  --crepe-color-surface: var(--card);
+  --crepe-color-on-background: var(--foreground);
+  --crepe-color-on-surface: var(--foreground);
+  --crepe-color-on-surface-variant: var(--muted-foreground);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--primary);
+  --crepe-color-hover: var(--muted);
+  --crepe-color-selected: var(--muted);
+  --crepe-font-default: inherit;
+  --crepe-font-code: 'Geist Mono Variable', monospace;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.vault-editor-shell .milkdown .ProseMirror {
+  padding: 8px 16px 8px 70px;
+  overflow-x: auto;
+}
+
+.vault-editor-shell .milkdown h1 {
+  font-size: 1.25rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.vault-editor-shell .milkdown h2 {
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.vault-editor-shell .milkdown h3 {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.vault-editor-shell .milkdown h4,
+.vault-editor-shell .milkdown h5,
+.vault-editor-shell .milkdown h6 {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  font-weight: 600;
+}
+
+.vault-editor-shell .milkdown code:not(pre code) {
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.08rem 0.35rem;
+  font-size: 0.75rem;
+  font-family: 'Geist Mono Variable', monospace;
+}
+
+html.dark .vault-editor-shell .milkdown code:not(pre code) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.vault-editor-shell .milkdown pre {
+  border-radius: 0.75rem;
+  background: var(--chat-area);
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+  overflow-x: auto;
+}
+
+.vault-editor-shell .milkdown pre code {
+  font-size: 0.75rem;
+  line-height: 1.65;
+  font-family: 'Geist Mono Variable', monospace;
+}
+
+/* ─── Tables → Streamdown visual parity ─────────────────────────
+   Milkdown tables restyled to match the chat's Streamdown tables
+   (rounded frame, muted header, divided rows, clean typography).
+   Milkdown wraps tables in .table-wrapper; the table itself uses
+   border-collapse for clean text selection (no gaps between cells). */
+
+.vault-editor-shell .milkdown .table-wrapper {
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  margin: 0.75rem 0;
+}
+
+.vault-editor-shell .milkdown table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  table-layout: auto;
+  font-size: 0.875rem;
+}
+
+/* Header row — muted background, semibold */
+.vault-editor-shell .milkdown th {
+  white-space: nowrap;
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--gray-a3);
+}
+
+/* Body rows — subtle striping via even-row bg, divided */
+.vault-editor-shell .milkdown td {
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+  font-size: 0.875rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.vault-editor-shell .milkdown tr:nth-child(even) td {
+  background: var(--gray-a2);
+}
+
+/* Remove paragraph margins inside cells (Milkdown wraps cell content in <p>) */
+.vault-editor-shell .milkdown th p,
+.vault-editor-shell .milkdown td p {
+  margin: 0;
+}
+
+/* Milkdown Crepe slash menu — compact item overrides.
+   [data-show] attribute bumps specificity above Crepe's (0-2-0 → 0-2-1).
+   Only overrides: background, z-index, item sizing, and menu-groups max-height.
+   Container padding, overflow, and layout are left to Crepe's block-edit.css. */
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] {
+  z-index: 50;
+  border-radius: 8px;
+  background: var(--card);
+  animation: slash-menu-in 150ms ease-out;
+}
+
+@keyframes slash-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Tab bar: compact sizing, stretch to fill width */
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .tab-group {
+  padding: 6px 8px 0;
+}
+
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .tab-group ul {
+  padding: 4px 0;
+  gap: 0;
+}
+
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .tab-group ul li {
+  flex: 1;
+  text-align: center;
+  padding: 3px 4px;
+  font-size: 11px;
+  line-height: 16px;
+  border-radius: 4px;
+}
+
+/* Scroll area: shrink from Crepe's 420px; overflow:auto is already set by Crepe */
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .menu-groups {
+  max-height: 150px;
+  scroll-behavior: auto;
+}
+
+/* Section headers */
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .menu-groups .menu-group h6 {
+  font-size: 10px;
+  line-height: 14px;
+  padding: 6px 10px 2px;
+}
+
+/* Item rows: tighter padding, smaller icons + text */
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .menu-groups .menu-group li {
+  gap: 8px;
+  padding: 4px 10px;
+}
+
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .menu-groups .menu-group li svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vault-editor-shell .milkdown .milkdown-slash-menu[data-show='true'] .menu-groups .menu-group li > span {
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+
+/* ─── Code block → Streamdown visual parity ─────────────────────
+   Milkdown Crepe code blocks restyled to match the chat's
+   Streamdown code blocks (Claude.ai-inspired: hairline border,
+   transparent header, hover-reveal copy, 12px mono code).
+   Language picker dropdown is preserved for interactive switching. */
+
+/* Container — rounded frame with hairline border.
+   overflow: visible so the language picker dropdown isn't clipped. */
+.vault-editor-shell .milkdown .milkdown-code-block {
+  padding: 0;
+  margin: 0.75rem 0;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: var(--chat-area);
+  overflow: visible;
+}
+
+html.dark .vault-editor-shell .milkdown .milkdown-code-block {
+  border-color: rgba(255, 255, 255, 0.05);
+  background: oklch(23% 0 0);
+}
+
+/* Selected ring — use app primary instead of Crepe's */
+.vault-editor-shell .milkdown .milkdown-code-block.selected {
+  outline-color: var(--primary);
+}
+
+/* ── Header bar (tools) ── */
+.vault-editor-shell .milkdown .milkdown-code-block .tools {
+  position: relative;
+  padding: 0.5rem 0.5rem 0;
+}
+
+/* Language button — always visible, subtle mono label.
+   Selector includes `.tools` to beat Crepe's specificity
+   (.milkdown .milkdown-code-block .tools .language-button). */
+.vault-editor-shell .milkdown .milkdown-code-block .tools .language-button {
+  opacity: 1;
+  background: transparent;
+  padding: 0 4px;
+  margin-bottom: 0;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
+  color: var(--gray-11);
+  text-transform: lowercase;
+  gap: 2px;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .language-button:hover {
+  background: transparent;
+  color: var(--foreground);
+}
+
+/* Shrink the expand chevron */
+.vault-editor-shell .milkdown .milkdown-code-block .tools .language-button .expand-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .language-button .expand-icon svg {
+  width: 10px;
+  height: 10px;
+  color: var(--gray-9);
+}
+
+/* ── Copy / action buttons — icon-only, hover reveal, glass ──
+   Selector includes `.tools` to beat Crepe's specificity
+   (.milkdown .milkdown-code-block .tools .tools-button-group button)
+   since Crepe's component CSS loads after globals.css in Vite. */
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button {
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
+  padding: 0;
+  gap: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 9px;
+  background: transparent;
+  opacity: 0;
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    opacity 300ms cubic-bezier(0.165, 0.85, 0.45, 1),
+    background-color 150ms ease,
+    transform 80ms ease;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:first-child,
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:last-child {
+  border-radius: 9px;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  fill: var(--muted-foreground);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block:hover .tools .tools-button-group button {
+  opacity: 1;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:hover {
+  background: var(--gray-a3);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:hover svg {
+  fill: var(--foreground);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:active {
+  transform: scale(0.95);
+}
+
+/* ── CodeMirror editor — transparent bg, 12px code ── */
+.vault-editor-shell .milkdown .milkdown-code-block .cm-editor {
+  background: transparent;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .cm-gutters {
+  background: transparent;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .codemirror-host {
+  padding: 0 0.5rem 0.75rem;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .cm-content {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+/* Active line — neutral tint instead of CodeMirror's blue */
+.vault-editor-shell .milkdown .milkdown-code-block .cm-activeLine,
+.vault-editor-shell .milkdown .milkdown-code-block .cm-activeLineGutter {
+  background: var(--gray-a2);
+}
+
+/* Line numbers — Radix step 9, same size as code text */
+.vault-editor-shell .milkdown .milkdown-code-block .cm-lineNumbers .cm-gutterElement {
+  font-size: 0.75rem;
+  color: var(--gray-9);
+}
+
+/* ── Language picker dropdown — app color system ── */
+
+/* Dropdown container — match app popover style */
+.vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  width: 220px;
+  padding-top: 8px;
+}
+
+html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Search box — app border/focus colors */
+.vault-editor-shell .milkdown .milkdown-code-block .search-box {
+  outline: 1px solid var(--border);
+  margin: 0 8px 6px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  gap: 6px;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .search-box:has(input:focus) {
+  outline: 2px solid var(--primary);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .search-box input {
+  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--foreground);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .search-box input::placeholder {
+  color: var(--gray-9);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .search-box .clear-icon svg {
+  color: var(--gray-9);
+  fill: var(--gray-9);
+}
+
+/* List — cap height, app scrollbar */
+.vault-editor-shell .milkdown .milkdown-code-block .language-list {
+  height: 240px;
+}
+
+/* List items — compact, app typography */
+.vault-editor-shell .milkdown .milkdown-code-block .language-list-item {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  padding: 4px 12px;
+  color: var(--foreground);
+  font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .language-list-item:hover {
+  background: var(--gray-a3);
+}
+
+.vault-editor-shell .milkdown .milkdown-code-block .language-list-item[aria-selected='true'] {
+  background: var(--gray-a3);
+  color: var(--primary);
+}
 
 /** Disable CSS transitions during resize drag — applied via classList, removed on mouseup.
  *  Uses !important to override React-managed inline transition styles. */

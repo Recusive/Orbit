@@ -3,7 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 import { FileContextMenu } from '@/components/files/file-context-menu';
-import { isAddFileChipDetail } from '@/lib/events/chat-context-events';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 
 vi.mock('@/components/ui/context-menu', () => ({
@@ -53,14 +52,15 @@ describe('FileContextMenu Add to Chat', () => {
 
     expect(usePendingContextStore.getState().pending).toEqual([
       {
+        id: expect.any(String),
+        type: 'file',
         path: '/repo/src/app.ts',
         name: 'app.ts',
-        isDirectory: false,
       },
     ]);
   });
 
-  it('enqueued payload passes isAddFileChipDetail guard', () => {
+  it('enqueues folder chips with folder context type', () => {
     render(
       <FileContextMenu path="/repo/src" isDirectory={true} onRename={vi.fn()} onDelete={vi.fn()}>
         <div>row</div>
@@ -71,10 +71,10 @@ describe('FileContextMenu Add to Chat', () => {
 
     const detail = usePendingContextStore.getState().pending[0];
     expect(detail).toEqual({
+      id: expect.any(String),
+      type: 'folder',
       path: '/repo/src',
       name: 'src',
-      isDirectory: true,
     });
-    expect(isAddFileChipDetail(detail)).toBe(true);
   });
 });

@@ -1,3 +1,9 @@
+import type { ContextItem } from '@/types/agent/context';
+
+import { ContextItemSchema } from '@/types/agent/context';
+
+/** Custom event name for adding a generic context chip */
+export const ADD_CONTEXT_CHIP_EVENT = 'addContextChip';
 /** Custom event name for adding a file/folder context chip */
 export const ADD_FILE_CHIP_EVENT = 'addFileChip';
 
@@ -14,6 +20,16 @@ export interface AddFileChipDetail {
   name: string;
   /** Whether this is a directory (determines ContextItem.type) */
   isDirectory: boolean;
+}
+
+/** Runtime type guard for generic context chip payloads */
+export function isContextItemDetail(value: unknown): value is ContextItem {
+  return ContextItemSchema.safeParse(value).success;
+}
+
+/** Dispatch an addContextChip event */
+export function dispatchAddContextChip(item: ContextItem): void {
+  window.dispatchEvent(new CustomEvent<ContextItem>(ADD_CONTEXT_CHIP_EVENT, { detail: item }));
 }
 
 let currentOrbitDragDetail: AddFileChipDetail | null = null;

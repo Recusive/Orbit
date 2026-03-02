@@ -32,6 +32,7 @@ use commands::common::{
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
+use commands::vault as vault_cmd;
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
 use tauri::Manager as _;
@@ -428,6 +429,25 @@ pub fn run() {
             canvas_persist::canvas_write_file,
             // Canvas transform commands
             canvas_transform::canvas_persist_styles,
+            // Vault commands
+            vault_cmd::operations::vault_check_initialized,
+            vault_cmd::operations::vault_initialize,
+            vault_cmd::operations::vault_list,
+            vault_cmd::operations::vault_read,
+            vault_cmd::operations::vault_write,
+            vault_cmd::operations::vault_create_directory,
+            vault_cmd::operations::vault_rename,
+            vault_cmd::operations::vault_move,
+            vault_cmd::operations::vault_delete,
+            vault_cmd::operations::vault_exists,
+            vault_cmd::operations::vault_get_metadata,
+            vault_cmd::operations::vault_stats,
+            vault_cmd::operations::vault_get_context_config,
+            vault_cmd::operations::vault_set_context_config,
+            vault_cmd::operations::vault_get_context_files,
+            vault_cmd::discovery::vault_discover_project_docs,
+            vault_cmd::discovery::vault_read_project_doc,
+            vault_cmd::operations::vault_search_all_docs,
             // File commands
             files::read_file,
             files::read_file_bytes,

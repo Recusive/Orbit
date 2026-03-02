@@ -80,11 +80,12 @@ Use this to find the right file. Read the file directly — no links needed.
 - `AUDIT-REPORT-2026-01-07.md` — Pre-production code audit
 - `codebase-health.json` — Automated health metrics
 
-## reference/ (5 files)
+## reference/ (6 files)
 
 - `Agent SDK reference - TypeScript.md` — Claude Agent SDK reference
 - `CLAUDE-CODE-REWIND-SYSTEM.md` — Claude Code CLI rewind system (binary analysis, JSONL format, tree model, checkpointing)
 - `codex-cli-guide.md` — OpenAI Codex CLI usage guide
+- `PENCIL-CANVAS-ARCHITECTURE.md` — Pencil design editor architecture (dual-canvas rendering, scene graph, AI streaming generation via MCP)
 - `System-Prompt.xml` — System prompt template
 - `canvas-rebuild-prompt.md` — Canvas rebuild prompt context
 

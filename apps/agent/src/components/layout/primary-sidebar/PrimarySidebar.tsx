@@ -17,6 +17,7 @@ import {
   FlaskConical,
   FolderOpen,
   GitBranch,
+  Plus,
   Search,
   Settings2,
   Terminal,
@@ -28,6 +29,7 @@ import { ConversationList } from './components/ConversationList';
 import { PowersSection } from './components/PowersSection';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
+import { VaultNoteList } from './components/VaultNoteList';
 import { TriStateSwitch } from './components/tri-state-switch';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
@@ -35,6 +37,7 @@ import type { EditorSidebarTab, SidebarTab } from './types';
 import type { ProjectsDialogProps } from '@/components/modals/projects';
 import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
+import type { UnifiedDoc } from '@/features/vault/types';
 import type { FC } from 'react';
 
 import { FileExplorer } from '@/components/files';
@@ -50,6 +53,10 @@ import { SFSymbol } from '@/components/shared';
 import { Kbd } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { VaultCreateDialog } from '@/features/vault/components/VaultCreateDialog';
+import { VaultDeleteDialog } from '@/features/vault/components/VaultDeleteDialog';
+import { useVaultInitialization } from '@/features/vault/hooks';
+import { useVaultStore } from '@/features/vault/stores';
 import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
@@ -59,6 +66,7 @@ import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import {
   useUIStore,
+  useVaultOpen,
   useWorkspaceName,
   useWorkspacePath,
   useWorkspaceConversations,
@@ -138,6 +146,14 @@ export const PrimarySidebar: FC = () => {
   const activeWorktreePath = useActiveWorktreePath();
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
 
+  // Vault mode
+  const vaultOpen = useVaultOpen();
+  useVaultInitialization();
+  const currentPath = useVaultStore((s) => s.currentPath);
+  const createVaultFile = useVaultStore((s) => s.createVaultFile);
+  const createVaultDirectory = useVaultStore((s) => s.createVaultDirectory);
+  const deleteVaultEntry = useVaultStore((s) => s.deleteVaultEntry);
+
   const updateStatus = useUpdateStore((s) => s.status);
   const updateDismissed = useUpdateStore((s) => s.toastDismissed);
 
@@ -159,6 +175,11 @@ export const PrimarySidebar: FC = () => {
     };
   }, []);
   const [skillsDialogOpen, setSkillsDialogOpen] = useState(false);
+
+  // Vault dialog state
+  const [vaultCreateDialogOpen, setVaultCreateDialogOpen] = useState(false);
+  const [vaultDeleteDialogOpen, setVaultDeleteDialogOpen] = useState(false);
+  const [vaultDocToDelete, setVaultDocToDelete] = useState<UnifiedDoc | null>(null);
 
   const {
     deleteDialogOpen,
@@ -256,11 +277,18 @@ export const PrimarySidebar: FC = () => {
             fallback={<SidebarToggleIcon expanded={true} />}
           />
         </button>
-        {/* Back / Forward navigation */}
+        {/* Back / Forward navigation
+            TODO: Wire up full navigation history stack (session switches, tab changes, etc.).
+            Currently only the vault→sessions transition is handled. */}
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
             className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+            onClick={() => {
+              if (vaultOpen) {
+                useUIStore.getState().setVaultOpen(false);
+              }
+            }}
           >
             <SFSymbol
               name="arrow.left"
@@ -312,8 +340,8 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : null}
 
-      {/* Tab heading + toggle (workspace mode only) */}
-      {!isWelcome ? (
+      {/* Tab heading + toggle (workspace mode only, hidden in vault mode) */}
+      {!isWelcome && !vaultOpen ? (
         isEditorMode ? (
           /* Editor mode: Explorer / Source Control / Sessions toggle */
           <div className="flex items-center justify-between px-3 py-1 shrink-0">
@@ -370,6 +398,13 @@ export const PrimarySidebar: FC = () => {
             </Tooltip>
           </div>
         )
+      ) : vaultOpen ? (
+        /* Vault mode: "Notes" heading */
+        <div className="flex items-center px-3 py-1 shrink-0">
+          <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+            Notes
+          </span>
+        </div>
       ) : null}
 
       {/* Main Actions — hidden in editor mode (sidebar shows explorer/git tabs instead) */}
@@ -393,6 +428,18 @@ export const PrimarySidebar: FC = () => {
             label="SSH"
             onClick={() => {
               setSshDialogOpen(true);
+            }}
+          />
+        </div>
+      ) : vaultOpen ? (
+        /* Vault mode actions */
+        <div className="flex flex-col shrink-0 gap-1 py-1.5">
+          <SidebarItem
+            icon={Plus}
+            label="New Note"
+            large
+            onClick={() => {
+              setVaultCreateDialogOpen(true);
             }}
           />
         </div>
@@ -424,8 +471,9 @@ export const PrimarySidebar: FC = () => {
           <SidebarItem
             icon={IconSearchlinesSparkle}
             label="Vault"
-            badge="Coming soon"
             onClick={() => {
+              const { workspacePath } = useUIStore.getState();
+              if (!workspacePath) return;
               useUIStore.getState().toggleVault();
             }}
           />
@@ -446,7 +494,17 @@ export const PrimarySidebar: FC = () => {
           WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
         }}
       >
-        {isWelcome ? (
+        {vaultOpen ? (
+          <VaultNoteList
+            onRequestCreate={() => {
+              setVaultCreateDialogOpen(true);
+            }}
+            onRequestDelete={(doc) => {
+              setVaultDocToDelete(doc);
+              setVaultDeleteDialogOpen(true);
+            }}
+          />
+        ) : isWelcome ? (
           <>
             {/* Recent Projects heading */}
             <div className="flex items-center px-3 py-1 shrink-0">
@@ -676,6 +734,37 @@ export const PrimarySidebar: FC = () => {
 
       {/* SSH Connection Dialog (welcome mode) */}
       <SSHConnectionDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
+
+      {/* Vault Create Dialog */}
+      <VaultCreateDialog
+        open={vaultCreateDialogOpen}
+        currentPath={currentPath}
+        onClose={() => {
+          setVaultCreateDialogOpen(false);
+        }}
+        onCreateFile={async (relativePath, initialContent) => {
+          if (!workspacePath) return;
+          await createVaultFile(workspacePath, relativePath, initialContent);
+        }}
+        onCreateFolder={async (relativePath) => {
+          if (!workspacePath) return;
+          await createVaultDirectory(workspacePath, relativePath);
+        }}
+      />
+
+      {/* Vault Delete Dialog */}
+      <VaultDeleteDialog
+        open={vaultDeleteDialogOpen}
+        doc={vaultDocToDelete}
+        onClose={() => {
+          setVaultDeleteDialogOpen(false);
+          setVaultDocToDelete(null);
+        }}
+        onConfirmDelete={async (relativePath) => {
+          if (!workspacePath) return;
+          await deleteVaultEntry(workspacePath, relativePath);
+        }}
+      />
     </aside>
   );
 };

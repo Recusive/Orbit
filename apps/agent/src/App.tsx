@@ -56,6 +56,7 @@ import {
   useTerminalCollapsed,
   useTerminalPosition,
   useUIStore,
+  useVaultOpen,
 } from '@/stores/ui/ui-store';
 import {
   selectEnableLaunchAnimation,
@@ -364,7 +365,14 @@ const App: FC = () => {
 
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
+  const vaultOpen = useVaultOpen();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
+
+  // Demo mode — must be available before sidebar width calculation
+  const searchParams = new URLSearchParams(window.location.search);
+  const isDemo = searchParams.get('demo') === 'true';
+  const demoView = searchParams.get('view') ?? '';
+  const isWelcome = !hasWorkspace && !isDemo;
 
   // Sidebar state — now global (shared across all modes)
   const leftSidebarWidth = useLeftSidebarWidth();
@@ -389,10 +397,17 @@ const App: FC = () => {
   const revealSidebarWidth =
     leftSidebarWidth > SIDEBAR.collapsed ? leftSidebarWidth : lastExpandedSidebarWidth;
 
-  // During phases idle/wallpaper/ascii → sidebar forced to 0 (collapsed)
+  // Should the sidebar be hidden for the launch animation?
+  // Covers both active animation phases AND the pre-animation first frame
+  // (before useEffect calls startSequence(), isActive is still false).
+  // Without this, the sidebar renders at full width for one frame then collapses.
+  const isLaunchHidingSidebar =
+    isWelcome && enableLaunchAnimation && !PREFERS_REDUCED_MOTION && launchPhase !== 'complete';
+
+  // During idle/wallpaper/ascii → sidebar forced to 0 (collapsed)
   // During ui-reveal → sidebar animates to stored width
   // After complete → UIStore's actual value takes over
-  const effectiveSidebarWidth = isLaunchAnimating
+  const effectiveSidebarWidth = isLaunchHidingSidebar
     ? launchPhase === 'ui-reveal'
       ? revealSidebarWidth
       : SIDEBAR.collapsed
@@ -404,11 +419,6 @@ const App: FC = () => {
   // Dia-style layout hooks
   useTrafficLights(sidebarOpen);
   const isFullscreen = useFullscreen();
-
-  // Skip onboarding in demo mode (marketing site iframe with ?demo=true)
-  const searchParams = new URLSearchParams(window.location.search);
-  const isDemo = searchParams.get('demo') === 'true';
-  const demoView = searchParams.get('view') ?? '';
 
   // Apply demo-specific initial state based on the ?view= parameter
   useEffect(() => {
@@ -477,7 +487,6 @@ const App: FC = () => {
   // Activity panel slide wrapper — mirrors the sidebar's margin-slide pattern.
   // When closed, marginRight = -width slides the entire panel off the right edge
   // as one rigid body. Content inside never compresses.
-  const isWelcome = !hasWorkspace && !isDemo;
 
   // ── Launch sequence orchestration ──────────────────────────────────────
 
@@ -816,10 +825,13 @@ const App: FC = () => {
                         />
                       ) : null}
 
-                      {/* Mode content — wrapped in relative container so gradient overlays scroll area */}
-                      <div className="flex-1 min-h-0 overflow-hidden relative z-0">
-                        {/* Gradient fade below header — follows the chat area (skipped in editor mode) */}
-                        {!isWelcome && activeTab !== 'editor' ? (
+                      {/* Mode content — wrapped in relative container so gradient overlays scroll area.
+                          overflow-clip (not overflow-hidden) prevents ProseMirror's scrollIntoView()
+                          from programmatically scrolling this container via scrollTop — overflow:hidden
+                          allows programmatic scrolling even without a scrollbar. */}
+                      <div className="flex-1 min-h-0 overflow-clip relative z-0">
+                        {/* Gradient fade below header — follows the chat area (skipped in editor mode and vault) */}
+                        {!isWelcome && activeTab !== 'editor' && !vaultOpen ? (
                           <div
                             className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
                             style={{

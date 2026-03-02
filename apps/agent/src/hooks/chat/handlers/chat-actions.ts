@@ -9,6 +9,7 @@ import type {
   WebviewMessage,
 } from '@/types/protocol';
 
+import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
 import { applySessionTitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
@@ -62,12 +63,30 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   ): void => {
     if (!text) return;
 
+    const uiState = useUIStore.getState();
+    const { workspacePath, activeWorktreePath, conversations } = uiState;
+
+    const workspacePrefix =
+      workspacePath !== null && workspacePath !== '' ? workspacePath.replace(/\\/g, '/') : null;
+    const autoContextPaths = useVaultStore.getState().contextConfig?.includedPaths ?? [];
+    const validAutoContextPaths =
+      workspacePrefix === null
+        ? []
+        : autoContextPaths.filter((path) => {
+            const normalized = path.replace(/\\/g, '/');
+            return normalized === workspacePrefix || normalized.startsWith(`${workspacePrefix}/`);
+          });
+    const mergedContextFiles = Array.from(
+      new Set([...(contextFiles ?? []), ...validAutoContextPaths])
+    );
+    const hasMergedContextFiles = mergedContextFiles.length > 0;
+
     Sentry.startSpan(
       {
         op: 'ui.action',
         name: 'Send Message',
         attributes: {
-          'message.has_files': contextFiles !== undefined && contextFiles.length > 0,
+          'message.has_files': hasMergedContextFiles,
           'message.has_images': images !== undefined && images.length > 0,
           'message.has_elements': elements !== undefined && elements.length > 0,
           'message.length': text.length,
@@ -86,16 +105,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           useQueuedMessageStore.getState().queueMessage({
             text,
             sessionId,
-            ...(contextFiles ? { contextFiles } : {}),
+            ...(hasMergedContextFiles ? { contextFiles: mergedContextFiles } : {}),
             ...(images ? { images } : {}),
             ...(elements ? { elements } : {}),
             ...(skills ? { skills } : {}),
           });
           return;
         }
-
-        const uiState = useUIStore.getState();
-        const { workspacePath, activeWorktreePath, conversations } = uiState;
 
         // Check if conversation already exists — use ChatStore session as primary authority.
         // The UIStore sidebar list can be stale: conversation:list replaces it with
@@ -109,7 +125,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // we need to create a conversation first via the backend
         if (!sessionId || (messages.length === 0 && !conversationExists)) {
           // Store pending message — will be sent after conversation:created
-          chatStore.setPendingMessage({ text, contextFiles, images, elements, skills });
+          chatStore.setPendingMessage({
+            text,
+            contextFiles: hasMergedContextFiles ? mergedContextFiles : undefined,
+            images,
+            elements,
+            skills,
+          });
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
@@ -162,7 +184,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           role: 'user',
           content: text,
           displayedContent: text,
-          attachedFiles: contextFiles,
+          attachedFiles: hasMergedContextFiles ? mergedContextFiles : undefined,
           attachedImages: images,
           parentUuid,
         };
@@ -186,13 +208,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         );
 
         // Build context object with files, images, and/or elements
-        const hasFiles = contextFiles && contextFiles.length > 0;
+        const hasFiles = hasMergedContextFiles;
         const hasImages = images && images.length > 0;
         const hasElements = elements && elements.length > 0;
         const context =
           hasFiles || hasImages || hasElements
             ? {
-                files: hasFiles ? contextFiles : undefined,
+                files: hasFiles ? mergedContextFiles : undefined,
                 images: hasImages
                   ? images.map((img) => ({
                       name: img.name,

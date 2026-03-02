@@ -3517,6 +3517,7 @@ dependencies = [
  "futures",
  "hashbrown 0.15.5",
  "hostname",
+ "ignore",
  "log",
  "notify",
  "orbit-ai",

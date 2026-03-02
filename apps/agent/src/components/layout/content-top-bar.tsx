@@ -17,6 +17,8 @@ import type { FC } from 'react';
 import { SquareAndPencil } from '@/components/icons';
 import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useVaultContextManager } from '@/features/vault/hooks';
+import { useVaultEditorStore } from '@/features/vault/stores';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { cn } from '@/lib/utils';
 import { CONTENT_CARD, HEIGHTS } from '@/lib/utils/constants';
@@ -27,6 +29,7 @@ import {
   useHasWorkspace,
   useActiveConversationTitle,
   useReviewPanelOpen,
+  useVaultOpen,
 } from '@/stores/ui/ui-store';
 
 /** Evaluated once — reduced-motion preference is static for session lifetime */
@@ -96,6 +99,119 @@ const DiffStatsButton: FC = () => {
   );
 };
 
+/**
+ * Vault Save + Send to Agent buttons — replaces DiffStatsButton when vault is open.
+ * Liquid glass styling sized for the header (26px height, pill shape).
+ */
+const VaultActions: FC = () => {
+  const workspacePath = useUIStore((s) => s.workspacePath);
+  const activeDoc = useVaultEditorStore((s) => s.activeDoc);
+  const activeDocEncoding = useVaultEditorStore((s) => s.activeDocEncoding);
+  const isDocModified = useVaultEditorStore((s) => s.isDocModified);
+  const saveState = useVaultEditorStore((s) => s.saveState);
+  const { sendActiveDocToAgent } = useVaultContextManager();
+
+  const isUtf8Doc = activeDoc !== null && activeDocEncoding === 'utf8';
+  const canSave = Boolean(
+    activeDoc && !activeDoc.isDir && activeDoc.source === 'vault' && isUtf8Doc && isDocModified
+  );
+  const canSend = Boolean(activeDoc && !activeDoc.isDir && isUtf8Doc);
+
+  const handleSave = useCallback((): void => {
+    if (!workspacePath) return;
+    void useVaultEditorStore.getState().saveDocument(workspacePath);
+  }, [workspacePath]);
+
+  const handleReload = useCallback((): void => {
+    if (!workspacePath) return;
+    void useVaultEditorStore.getState().reloadDocument(workspacePath);
+  }, [workspacePath]);
+
+  const handleOverwrite = useCallback((): void => {
+    if (!workspacePath) return;
+    void useVaultEditorStore.getState().saveDocument(workspacePath, true);
+  }, [workspacePath]);
+
+  const handleSendToAgent = useCallback((): void => {
+    void sendActiveDocToAgent();
+  }, [sendActiveDocToAgent]);
+
+  // Inline status label next to buttons
+  const statusLabel =
+    saveState === 'saving'
+      ? 'Saving...'
+      : saveState === 'saved'
+        ? 'Saved'
+        : saveState === 'conflicted'
+          ? 'Conflict'
+          : saveState === 'error'
+            ? 'Error'
+            : null;
+
+  const btnBase =
+    '!h-[22px] !rounded-[9px] px-2.5 py-0 text-[11px] leading-none min-w-0 font-medium cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none';
+
+  return (
+    <div className="flex items-center gap-1.5" data-tauri-drag-region={false}>
+      {statusLabel !== null ? (
+        <span
+          className={cn(
+            'text-[11px] font-medium',
+            saveState === 'conflicted' || saveState === 'error'
+              ? 'text-destructive'
+              : 'text-muted-foreground'
+          )}
+        >
+          {statusLabel}
+        </span>
+      ) : null}
+      {saveState === 'conflicted' ? (
+        <>
+          <button
+            type="button"
+            onClick={handleReload}
+            className={cn(btnBase, 'bg-muted hover:bg-muted/80 text-foreground')}
+          >
+            Reload
+          </button>
+          <button
+            type="button"
+            onClick={handleOverwrite}
+            className={cn(
+              btnBase,
+              'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+            )}
+          >
+            Overwrite
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={!canSave}
+          className={cn(
+            btnBase,
+            saveState === 'error'
+              ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+              : 'bg-muted hover:bg-muted/80 text-foreground'
+          )}
+        >
+          Save
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={handleSendToAgent}
+        disabled={!canSend}
+        className="liquid-glass-btn liquid-glass-btn-primary !h-[22px] !rounded-[9px] !px-2.5 !py-0 !text-[11px] !leading-none !min-w-0 cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none"
+      >
+        Send to Agent
+      </button>
+    </div>
+  );
+};
+
 export interface ContentTopBarProps {
   /** Whether the sidebar is currently open */
   readonly sidebarOpen: boolean;
@@ -113,6 +229,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
   const hasWorkspace = useHasWorkspace();
   const conversationTitle = useActiveConversationTitle();
   const reviewPanelOpen = useReviewPanelOpen();
+  const vaultOpen = useVaultOpen();
 
   const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
 
@@ -368,12 +485,12 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       {/* Right section: Git controls + Panel toggles */}
       {hasWorkspace || isDemo ? (
         <div className="flex items-center pr-1 shrink-0" style={{ gap: '0.3rem' }}>
-          {/* Git controls */}
+          {/* Vault actions (when open) or Git diff stats */}
           <div className="flex items-center gap-2 mr-1" data-tauri-drag-region={false}>
-            <DiffStatsButton />
+            {vaultOpen ? <VaultActions /> : <DiffStatsButton />}
           </div>
 
-          {/* Divider between git controls and panel toggles */}
+          {/* Divider between controls and panel toggles */}
           <div className="w-px h-4 bg-lg-separator shrink-0 mr-0.5" />
 
           {/* Activity Panel Toggle */}
