@@ -22,8 +22,8 @@ const STATUS_CONFIG: Record<
   },
   modified: {
     label: 'M',
-    color: 'text-yellow-400',
-    bg: 'bg-yellow-400/20',
+    color: 'text-[#c18533] dark:text-[#f0b367]',
+    bg: 'bg-[#c18533]/20 dark:bg-[#f0b367]/20',
     title: 'Modified',
   },
   deleted: {
@@ -46,8 +46,8 @@ const STATUS_CONFIG: Record<
   },
   untracked: {
     label: '?',
-    color: 'text-gray-400',
-    bg: 'bg-gray-400/20',
+    color: 'text-[#0d87ff] dark:text-[#99ceff]',
+    bg: 'bg-[#0d87ff]/20 dark:bg-[#99ceff]/20',
     title: 'Untracked',
   },
   conflicted: {

@@ -22,7 +22,7 @@ import {
   Settings2,
   Terminal,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -115,6 +115,90 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
+
+  // Track whether the scrollable area can scroll further down.
+  // The bottom fade mask is only applied when there's more content below,
+  // so the last item is fully visible when scrolled to the bottom.
+  //
+  // Key insight: the outer container may NOT be the one that scrolls —
+  // inner components (FileExplorer, ConversationList) have their own
+  // overflow-y-auto containers. `scroll` events don't bubble, but they
+  // DO propagate during the capture phase, so we listen with `capture: true`
+  // to catch scroll events from any descendant.
+  const [canScrollDown, setCanScrollDown] = useState(false);
+  const fadeCleanupRef = useRef<(() => void) | null>(null);
+
+  const scrollContainerRef = useCallback(
+    (node: HTMLElement | null): void => {
+      if (fadeCleanupRef.current) {
+        fadeCleanupRef.current();
+        fadeCleanupRef.current = null;
+      }
+
+      smoothScrollRef(node);
+
+      if (!node) return;
+
+      let rafId = 0;
+
+      /** Check the actual scrolling element (may be node itself or a descendant). */
+      const checkElement = (el: HTMLElement): void => {
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          const threshold = 4;
+          const hasOverflow = el.scrollHeight > el.clientHeight + threshold;
+          const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - threshold;
+          setCanScrollDown(hasOverflow && !atBottom);
+        });
+      };
+
+      /** Find the first scrollable descendant (or the node itself). */
+      const findScrollable = (): HTMLElement => {
+        const children = node.querySelectorAll<HTMLElement>('*');
+        for (const child of children) {
+          if (
+            child.scrollHeight > child.clientHeight + 4 &&
+            (child.style.overflowY === 'auto' ||
+              child.style.overflowY === 'scroll' ||
+              child.classList.contains('overflow-y-auto'))
+          ) {
+            return child;
+          }
+        }
+        return node;
+      };
+
+      // Capture-phase scroll listener — catches events from inner scroll containers
+      const onScroll = (e: Event): void => {
+        if (e.target instanceof HTMLElement) {
+          checkElement(e.target);
+        }
+      };
+
+      // Initial check + re-check on content changes
+      const runInitialCheck = (): void => {
+        checkElement(findScrollable());
+      };
+
+      runInitialCheck();
+      node.addEventListener('scroll', onScroll, { passive: true, capture: true });
+
+      const ro = new ResizeObserver(runInitialCheck);
+      ro.observe(node);
+
+      // Catch child additions/removals (e.g. folder expansion, tab switch)
+      const mo = new MutationObserver(runInitialCheck);
+      mo.observe(node, { childList: true, subtree: true });
+
+      fadeCleanupRef.current = (): void => {
+        cancelAnimationFrame(rafId);
+        node.removeEventListener('scroll', onScroll, { capture: true });
+        ro.disconnect();
+        mo.disconnect();
+      };
+    },
+    [smoothScrollRef]
+  );
 
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
@@ -485,13 +569,20 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : null}
 
-      {/* Tab Content — mask fades content at bottom edge */}
+      {/* Tab Content — mask fades bottom edge when more content is below */}
       <div
-        ref={smoothScrollRef}
+        ref={scrollContainerRef}
         className="flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
         style={{
-          maskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
-          WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent 100%)',
+          maskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent)',
+          WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 32px), transparent)',
+          maskSize: '100% calc(100% + 32px)',
+          WebkitMaskSize: '100% calc(100% + 32px)',
+          maskRepeat: 'no-repeat',
+          WebkitMaskRepeat: 'no-repeat',
+          maskPosition: canScrollDown ? '0 -32px' : '0 0',
+          WebkitMaskPosition: canScrollDown ? '0 -32px' : '0 0',
+          transition: 'mask-position 200ms ease-out, -webkit-mask-position 200ms ease-out',
         }}
       >
         {vaultOpen ? (

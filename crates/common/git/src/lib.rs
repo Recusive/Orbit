@@ -498,11 +498,16 @@ pub fn commit(path: &Path, message: &str) -> Result<String> {
 ///
 /// # Errors
 /// Returns an error if the diff cannot be retrieved.
-pub fn get_diff(path: &Path) -> Result<Vec<FileDiff>> {
+pub fn get_diff(path: &Path, include_untracked: bool) -> Result<Vec<FileDiff>> {
     let repo = open(path)?;
 
     let mut opts = DiffOptions::new();
-    let _self = opts.include_untracked(true).show_untracked_content(true);
+    if include_untracked {
+        let _self = opts
+            .include_untracked(true)
+            .show_untracked_content(true)
+            .recurse_untracked_dirs(true);
+    }
 
     // Diff between index and workdir (unstaged changes)
     let diff = repo
@@ -626,7 +631,10 @@ pub fn branch_diff_stats(path: &Path, _base_branch: &str) -> Result<BranchDiffSt
     let head_tree = repo.head().and_then(|h| h.peel_to_tree()).ok();
 
     let mut opts = DiffOptions::new();
-    let _self = opts.include_untracked(true).show_untracked_content(true);
+    let _self = opts
+        .include_untracked(true)
+        .show_untracked_content(true)
+        .recurse_untracked_dirs(true);
 
     // Diff HEAD tree → working directory (includes both staged and unstaged)
     let diff = repo
@@ -1778,7 +1786,7 @@ impl GitManager {
         let diffs = if let Some(f) = file {
             vec![get_file_diff(Path::new(repo_path), Path::new(f))?]
         } else {
-            get_diff(Path::new(repo_path))?
+            get_diff(Path::new(repo_path), true)?
         };
 
         // Format as unified diff string
@@ -1836,8 +1844,12 @@ impl GitManager {
     }
 
     /// Get structured diff.
-    pub fn get_diff_structured(&self, repo_path: &str) -> Result<Vec<FileDiff>> {
-        get_diff(Path::new(repo_path))
+    pub fn get_diff_structured(
+        &self,
+        repo_path: &str,
+        include_untracked: bool,
+    ) -> Result<Vec<FileDiff>> {
+        get_diff(Path::new(repo_path), include_untracked)
     }
 }
 

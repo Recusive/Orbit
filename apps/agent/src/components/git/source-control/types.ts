@@ -5,6 +5,7 @@ import type { FileStatus as BackendFileStatus } from '@/lib/api';
 
 export interface SourceControlTabProps {
   className?: string;
+  isVisible?: boolean;
 }
 
 /** UI file status for display purposes */

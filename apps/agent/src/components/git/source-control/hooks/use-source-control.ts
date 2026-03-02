@@ -34,6 +34,7 @@ import {
 import { useGitStore } from '@/stores/git/git-store';
 
 const logger = createLogger('useSourceControl');
+const MAX_EAGER_UNTRACKED = 300;
 
 /** Convert backend status to display status */
 const toDisplayStatus = (backendStatus: BackendFileStatus): DisplayFileStatus => {
@@ -130,7 +131,7 @@ export interface UseSourceControlReturn {
   refresh: () => Promise<void>;
 }
 
-export function useSourceControl(): UseSourceControlReturn {
+export function useSourceControl(isVisible = true): UseSourceControlReturn {
   // Read all git state from the shared GitStore (populated by useGitPolling in RootLayout)
   const status = useGitStore((s) => s.status);
   const repoPath = useGitStore((s) => s.repoPath);
@@ -157,18 +158,41 @@ export function useSourceControl(): UseSourceControlReturn {
 
   // Track ongoing operations to prevent concurrent actions
   const operationInProgress = useRef(false);
+  const inflightRef = useRef<Promise<void> | null>(null);
+  const needsRefetchRef = useRef(false);
 
   /** Fetch structured diffs for both staged and unstaged changes */
   const fetchDiffs = useCallback(async (): Promise<void> => {
     const repo = useGitStore.getState().repoPath;
     if (!repo) return;
-    try {
-      const [staged, unstaged] = await Promise.all([gitStagedDiff(repo), gitDiffStructured(repo)]);
-      setStagedDiffs(staged);
-      setUnstagedDiffs(unstaged);
-    } catch (error: unknown) {
-      logger.debug('Failed to fetch diffs', { error });
+
+    if (inflightRef.current) {
+      // Coalesce repeated triggers while a fetch is running into one trailing refresh.
+      needsRefetchRef.current = true;
+      return inflightRef.current;
     }
+
+    const untrackedCount = useGitStore.getState().status?.untracked.length ?? 0;
+    const includeUntracked = untrackedCount <= MAX_EAGER_UNTRACKED;
+
+    const run = Promise.all([gitStagedDiff(repo), gitDiffStructured(repo, includeUntracked)])
+      .then(([staged, unstaged]) => {
+        setStagedDiffs(staged);
+        setUnstagedDiffs(unstaged);
+      })
+      .catch((error: unknown) => {
+        logger.debug('Failed to fetch diffs', { error });
+      })
+      .finally(() => {
+        inflightRef.current = null;
+        if (needsRefetchRef.current) {
+          needsRefetchRef.current = false;
+          void fetchDiffs();
+        }
+      });
+
+    inflightRef.current = run;
+    return run;
   }, []);
 
   // Fetch branches when status first becomes available (for branch selector)
@@ -180,11 +204,30 @@ export function useSourceControl(): UseSourceControlReturn {
     }
   }, [status, repoPath]);
 
-  // Re-fetch diffs on status updates and background polling ticks.
+  // Re-fetch diffs on status updates and background polling ticks (when visible).
   useEffect(() => {
-    if (!repoPath || !status) return;
-    void fetchDiffs();
-  }, [lastUpdated, repoPath, status, fetchDiffs]);
+    if (!repoPath || !status || !isVisible) return;
+    const timer = window.setTimeout(() => {
+      void fetchDiffs();
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [lastUpdated, repoPath, status, fetchDiffs, isVisible]);
+
+  // Immediate refresh when switching from hidden -> visible.
+  // Skip first mount to avoid duplicate initial fetch with the debounced effect.
+  const prevVisibleRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevVisibleRef.current === null) {
+      prevVisibleRef.current = isVisible;
+      return;
+    }
+    if (isVisible && !prevVisibleRef.current && repoPath && status) {
+      void fetchDiffs();
+    }
+    prevVisibleRef.current = isVisible;
+  }, [isVisible, repoPath, status, fetchDiffs]);
 
   /** Refresh git status by calling the API and writing to the store */
   const refreshStatus = useCallback(async (): Promise<void> => {
@@ -193,8 +236,10 @@ export function useSourceControl(): UseSourceControlReturn {
     const result = await gitStatus(repo);
     useGitStore.getState().setStatus(result);
     // Fire-and-forget: refresh diffs after status is updated
-    void fetchDiffs();
-  }, [fetchDiffs]);
+    if (isVisible) {
+      void fetchDiffs();
+    }
+  }, [fetchDiffs, isVisible]);
 
   /** Refresh branches from the repository */
   const refreshBranches = useCallback(async (): Promise<void> => {

@@ -1,8 +1,9 @@
 import { IconAgenticCoding } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconAgenticCoding';
-import { FileDiff } from '@pierre/diffs/react';
-import { CheckCircle2, ChevronRight, Loader2, XCircle } from 'lucide-react';
+import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
+import { preloadFileDiff } from '@pierre/diffs/ssr';
+import { AlertCircle, CheckCircle2, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   DiffStat,
@@ -11,6 +12,7 @@ import {
   useIsDarkMode,
 } from './shared';
 
+import type { FileDiffMetadata } from '@pierre/diffs/react';
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -41,22 +43,78 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
+  const themeType: 'dark' | 'light' = isDarkMode ? 'dark' : 'light';
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const lineCount = content.split('\n').length;
 
-  // Parse diff only when expanded — avoid work for collapsed widgets
-  // Empty old string → all lines are additions (new file)
-  const fileDiff = useMemo(() => {
-    if (!isExpanded) return null;
-    return editToolToPierreDiff(filePath, '', content);
-  }, [isExpanded, filePath, content]);
+  const pierreOptions = useMemo(
+    () => ({
+      theme: PIERRE_THEME,
+      themeType,
+      diffStyle: 'unified' as const,
+      diffIndicators: 'bars' as const,
+      lineDiffType: 'word' as const,
+      overflow: 'wrap' as const,
+      disableFileHeader: true,
+      unsafeCSS: PIERRE_DIFF_UNSAFE_CSS,
+    }),
+    [themeType]
+  );
+
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const [preloaded, setPreloaded] = useState<{
+    fileDiff: FileDiffMetadata;
+    prerenderedHTML: string;
+  } | null>(null);
+  const [preloadError, setPreloadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isExpanded) {
+      setPreloaded(null);
+      setPreloadError(null);
+      return;
+    }
+
+    let cancelled = false;
+    const diff = editToolToPierreDiff(filePath, '', content);
+    if (!diff) {
+      setPreloaded(null);
+      setPreloadError('Unable to render diff.');
+      return;
+    }
+
+    setPreloaded(null);
+    setPreloadError(null);
+
+    void preloadFileDiff({ fileDiff: diff, options: pierreOptions })
+      .then((result) => {
+        if (!cancelled) {
+          setPreloaded({ fileDiff: result.fileDiff, prerenderedHTML: result.prerenderedHTML });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPreloadError('Failed to load diff preview.');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [content, filePath, isExpanded, pierreOptions, reloadVersion]);
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     onOpenFile?.(filePath);
   };
+
+  const handleRetry = useCallback((e: React.MouseEvent): void => {
+    e.preventDefault();
+    e.stopPropagation();
+    setReloadVersion((v) => v + 1);
+  }, []);
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -163,24 +221,28 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                 {/* Content column — Pierre diff */}
                 <div className="flex-1 min-w-0 ml-2.5 flex flex-col">
                   <div className="my-1.5 overflow-hidden rounded-lg">
-                    {fileDiff ? (
-                      <FileDiff
-                        fileDiff={fileDiff}
+                    {preloaded ? (
+                      <PierreFileDiff
+                        fileDiff={preloaded.fileDiff}
+                        prerenderedHTML={preloaded.prerenderedHTML}
                         style={PIERRE_DIFF_STYLE as React.CSSProperties}
-                        options={{
-                          theme: PIERRE_THEME,
-                          themeType: isDarkMode ? 'dark' : 'light',
-                          diffStyle: 'unified',
-                          diffIndicators: 'bars',
-                          lineDiffType: 'word',
-                          overflow: 'wrap',
-                          disableFileHeader: true,
-                          unsafeCSS: PIERRE_DIFF_UNSAFE_CSS,
-                        }}
+                        options={pierreOptions}
                       />
+                    ) : preloadError ? (
+                      <div className="px-3 py-2 text-xs text-destructive/90 flex items-center gap-2">
+                        <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        <span className="flex-1">{preloadError}</span>
+                        <button
+                          type="button"
+                          onClick={handleRetry}
+                          className="text-xs text-foreground/80 hover:text-foreground underline-offset-2 hover:underline"
+                        >
+                          Retry
+                        </button>
+                      </div>
                     ) : (
                       <div className="px-3 py-2 text-xs text-muted-foreground/60">
-                        Unable to render diff
+                        Loading diff...
                       </div>
                     )}
                   </div>

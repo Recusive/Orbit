@@ -464,6 +464,8 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
     [closeTab, openTabs]
   );
 
+  const isSourceTabVisible = activeTab === 'source';
+
   // Content section - extracted for use in allotment
   const contentSection = (
     <>
@@ -488,7 +490,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
           <BrowserPanel />
         ) : (
           <div ref={smoothScrollRef} className="h-full overflow-y-auto overscroll-y-contain">
-            <SourceControlTab />
+            <SourceControlTab isVisible={isSourceTabVisible} />
           </div>
         )}
       </div>

@@ -6,7 +6,8 @@
  * expandable DiffFileCard showing the inline diff on click.
  */
 import { Check, Minus, Plus } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 
 import { DiffFileCard } from './DiffFileCard';
 
@@ -18,6 +19,7 @@ import { cn } from '@/lib/utils';
 type ActiveTab = 'staged' | 'changes';
 
 interface ChangesListProps {
+  scrollParent: HTMLDivElement | null;
   stagedFiles: FileItem[];
   unstagedFiles: FileItem[];
   stagedDiffs: FileDiff[];
@@ -31,6 +33,7 @@ interface ChangesListProps {
 }
 
 export const ChangesList: React.FC<ChangesListProps> = ({
+  scrollParent,
   stagedFiles,
   unstagedFiles,
   stagedDiffs,
@@ -63,6 +66,48 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   const activeAction = isStaged ? onUnstageFile : onStageFile;
   const activeBulkAction = isStaged ? onUnstageAll : onStageAll;
   const activeDiscard = isStaged ? undefined : onRequestDiscard;
+
+  const latestHoverIdRef = useRef(0);
+  const activeTaskRef = useRef<Promise<void> | null>(null);
+  const pendingStartRef = useRef<(() => Promise<void>) | null>(null);
+
+  const runPrefetch = useCallback((start: () => Promise<void>): void => {
+    if (activeTaskRef.current) {
+      // Latest-wins: keep only the newest task while one is already running.
+      pendingStartRef.current = start;
+      return;
+    }
+
+    const task: Promise<void> = start()
+      .catch(() => undefined)
+      .then(() => undefined)
+      .finally(() => {
+        if (activeTaskRef.current === task) {
+          activeTaskRef.current = null;
+        }
+        const pending = pendingStartRef.current;
+        pendingStartRef.current = null;
+        if (pending) {
+          runPrefetch(pending);
+        }
+      });
+
+    activeTaskRef.current = task;
+  }, []);
+
+  const schedulePrefetch = useCallback(
+    (start: () => Promise<void>): (() => void) => {
+      const hoverId = ++latestHoverIdRef.current;
+      const timer = window.setTimeout(() => {
+        if (hoverId !== latestHoverIdRef.current) return;
+        runPrefetch(start);
+      }, 150);
+      return () => {
+        window.clearTimeout(timer);
+      };
+    },
+    [runPrefetch]
+  );
 
   // Clean state — nothing to show
   if (!hasChanges) {
@@ -151,19 +196,30 @@ export const ChangesList: React.FC<ChangesListProps> = ({
       </div>
 
       {/* File cards for active tab */}
-      <div className="py-1 space-y-1">
+      <div className="py-1">
         {activeFiles.length > 0 ? (
-          activeFiles.map((file) => (
-            <DiffFileCard
-              key={file.path}
-              file={file}
-              diff={activeDiffMap.get(file.path)}
-              isStaged={isStaged}
-              isLoading={isStaging}
-              onAction={activeAction}
-              onDiscard={activeDiscard}
+          scrollParent ? (
+            <Virtuoso
+              customScrollParent={scrollParent}
+              data={activeFiles}
+              overscan={10}
+              itemContent={(_index, file) => (
+                <div className="pb-1">
+                  <DiffFileCard
+                    file={file}
+                    diff={activeDiffMap.get(file.path)}
+                    isStaged={isStaged}
+                    isLoading={isStaging}
+                    onAction={activeAction}
+                    onDiscard={activeDiscard}
+                    schedulePrefetch={schedulePrefetch}
+                  />
+                </div>
+              )}
             />
-          ))
+          ) : (
+            <div className="px-3 py-4 text-xs text-lg-text-secondary">Loading changes...</div>
+          )
         ) : (
           <div className="px-3 py-4 text-center text-xs text-lg-text-secondary">
             {isStaged ? 'No staged changes' : 'No unstaged changes'}
