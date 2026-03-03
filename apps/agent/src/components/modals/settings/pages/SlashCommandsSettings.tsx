@@ -49,7 +49,7 @@ const AVAILABLE_TOOLS = [
 const SCOPE_CONFIG: Record<CommandScope, { label: string; className: string }> = {
   builtin: { label: 'Built-in', className: 'bg-blue-500/10 text-blue-500' },
   default: { label: 'Default', className: 'bg-purple-500/10 text-purple-500' },
-  project: { label: 'Project', className: 'bg-green-500/10 text-green-500' },
+  project: { label: 'Project', className: 'bg-success-muted text-success' },
   personal: { label: 'Personal', className: 'bg-orange-500/10 text-orange-500' },
 };
 
@@ -315,7 +315,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   {/* Name */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                      Command Name <span className="text-red-500/70">*</span>
+                      Command Name <span className="text-destructive/70">*</span>
                     </label>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <span className="text-muted-foreground/90 text-sm font-mono">/</span>
@@ -370,7 +370,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                   {/* Content/Prompt */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                      Command Prompt <span className="text-red-500/70">*</span>
+                      Command Prompt <span className="text-destructive/70">*</span>
                     </label>
                     <Textarea
                       value={content}
@@ -470,7 +470,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
                             'text-sm px-2.5 py-1.5 rounded-full border-0 transition-[background-color,transform] duration-150 active:scale-[0.98]',
                             tools.includes(tool)
                               ? 'bg-[rgba(0,122,255,0.85)] text-white'
-                              : 'bg-[var(--lg-alert-secondary-bg)] text-[var(--lg-alert-secondary-text)] hover:bg-[var(--lg-alert-secondary-bg-hover)]'
+                              : 'bg-control-fill text-control-text hover:bg-control-fill-hover'
                           )}
                         >
                           {tool}

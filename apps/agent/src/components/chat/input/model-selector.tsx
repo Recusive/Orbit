@@ -277,8 +277,9 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
       aria-label="Select model"
       tabIndex={-1}
       onKeyDown={handlePopoverKeyDown}
+      data-side={position.side}
       className={cn(
-        'fixed bg-white/70 dark:bg-lg-control/80 backdrop-blur-sm dark:backdrop-blur-xl border border-white dark:border-white/5 rounded-[10px] overflow-hidden z-50 outline-none dark:shadow-md',
+        'fixed glass-surface rounded-[10px] overflow-hidden z-50 outline-none',
         position.side === 'top' ? 'origin-bottom-left' : 'origin-top-left',
         !isAnimatingOut &&
           cn(
@@ -292,10 +293,6 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         ...(position.bottom !== undefined ? { bottom: position.bottom } : {}),
         ...(position.top !== undefined ? { top: position.top } : {}),
         left: position.left,
-        boxShadow:
-          position.side === 'top'
-            ? '0 -4px 12px -2px rgba(0,0,0,0.1), 0 -8px 24px -4px rgba(0,0,0,0.08)'
-            : '0 4px 12px -2px rgba(0,0,0,0.1), 0 8px 24px -4px rgba(0,0,0,0.08)',
         // Enter uses ease-out (fast arrival, gentle settle)
         // Exit uses ease-in (gentle start, fast departure)
         animationTimingFunction: isAnimatingOut

@@ -5,12 +5,12 @@
  * rendering inside Sonner's `toast.custom()` portal.
  */
 
-import { AlertTriangle, Check, Download } from 'lucide-react';
+import { AlertTriangle, Check, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { FC, ReactNode } from 'react';
 
-import updateBg from '@/assets/update-bg.png';
+import welcomeBg from '@/assets/welcome-bg.png';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -29,12 +29,20 @@ const TOAST_STYLES = `
   flex-direction: column;
   width: 100%;
   max-width: 24rem;
-  border-radius: 0.75rem;
-  border: 3px solid var(--lg-separator);
-  background: var(--card);
+  border-radius: 9px;
+  border: 1px solid var(--border-menu);
+  background: var(--glass-popover-bg);
+  box-shadow: 0 0 20px -4px rgba(0, 0, 0, 0.15), 0 0 8px -2px rgba(0, 0, 0, 0.1);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   overflow: hidden;
-  box-shadow: none;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html.dark .ot-card {
+  box-shadow: 0 0 20px -4px rgba(0, 0, 0, 0.4), 0 0 8px -2px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
 }
 
 .ot-image-wrapper {
@@ -43,7 +51,7 @@ const TOAST_STYLES = `
   width: calc(100% - 12px);
   aspect-ratio: 16 / 9;
   overflow: hidden;
-  border-radius: 0.5rem;
+  border-radius: 6px;
   background: var(--lg-control);
 }
 
@@ -80,7 +88,7 @@ const TOAST_STYLES = `
 .ot-title-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.125rem;
 }
 
 .ot-title-icon {
@@ -91,7 +99,7 @@ const TOAST_STYLES = `
   width: 1.5rem;
   border-radius: 0.375rem;
   background: var(--lg-control);
-  color: var(--foreground);
+  color: var(--primary);
   flex-shrink: 0;
 }
 
@@ -131,14 +139,14 @@ const TOAST_STYLES = `
 
 .ot-progress-fill {
   height: 100%;
-  background: var(--foreground);
+  background: var(--primary);
   border-radius: 9999px;
   transition: width 0.3s ease;
 }
 
 .ot-progress-label {
   font-size: 0.6875rem;
-  font-weight: 500;
+  font-weight: 510;
   font-variant-numeric: tabular-nums;
   color: var(--muted-foreground);
   min-width: 2rem;
@@ -155,30 +163,30 @@ const TOAST_STYLES = `
 
 .ot-btn {
   padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
+  border-radius: 100px;
   border: none;
   font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: var(--lg-font-size);
+  font-weight: 510;
   cursor: pointer;
   transition: opacity 0.15s ease;
   outline: none;
 }
-
-.ot-btn:hover { opacity: 0.8; }
 
 .ot-btn-primary {
   background: var(--primary);
   color: var(--primary-foreground);
 }
 
+.ot-btn-primary:hover { opacity: 0.85; }
+
 .ot-btn-ghost {
-  background: var(--muted);
-  color: var(--muted-foreground);
+  background: var(--lg-alert-secondary-bg);
+  color: var(--lg-alert-secondary-text);
 }
 
 .ot-btn-ghost:hover {
-  background: var(--border);
+  background: var(--lg-alert-secondary-bg-hover);
   opacity: 1;
 }
 `;
@@ -206,7 +214,7 @@ const UpdateCard: FC<UpdateCardProps> = ({
     <style>{TOAST_STYLES}</style>
     <div className="ot-card">
       <div className="ot-image-wrapper">
-        <img className="ot-image" src={updateBg} alt="Update background" draggable={false} />
+        <img className="ot-image" src={welcomeBg} alt="Update background" draggable={false} />
         <div className="ot-overlay-text">{overlayText}</div>
       </div>
       <div className="ot-content">
@@ -258,7 +266,7 @@ export function showUpdateAvailable(
   toast.custom(
     () => (
       <UpdateCard
-        icon={<Download className="h-3.5 w-3.5" />}
+        icon={<Gift className="h-3.5 w-3.5" />}
         title={`Orbit v${version} available`}
         description="A new version is ready to download."
         overlayText={`New Update · v${version}`}
@@ -291,7 +299,7 @@ export function showUpdateDownloading(progress: number): void {
   toast.custom(
     () => (
       <UpdateCard
-        icon={<Download className="h-3.5 w-3.5 animate-pulse" />}
+        icon={<Gift className="h-3.5 w-3.5 animate-pulse" />}
         title={`Downloading update... ${String(progress)}%`}
         description="Please wait while the update is downloaded."
         overlayText={`Downloading · ${String(progress)}%`}

@@ -54,8 +54,8 @@ function buildIndexMap(blocks: readonly BlockChar[]): Map<string, number> {
 }
 
 /** CSS variable references — theme-aware via globals.css */
-const ACCENT_COLOR = 'var(--accent-11)';
-const ACCENT_MID = 'var(--accent-9)';
+const ACCENT_COLOR = 'var(--primary)';
+const ACCENT_MID = 'var(--primary-hover)';
 const BEAM_HOT = 'var(--beam-hot)';
 /** Glow helper: returns rgba() using the theme-aware --beam-glow-rgb variable */
 const glow = (alpha: number): string => `rgba(var(--beam-glow-rgb), ${String(alpha)})`;
@@ -75,7 +75,7 @@ interface BeamAsciiPreProps {
   readonly blurLead?: number | undefined;
   /** Delay before starting the animation in ms (default: 0) */
   readonly delay?: number | undefined;
-  /** Final resting color after beam completes (default: var(--accent-11)) */
+  /** Final resting color after beam completes (default: var(--primary)) */
   readonly settledColor?: string | undefined;
   /** Fires once when the beam animation completes (done transitions to true). */
   readonly onAnimationComplete?: (() => void) | undefined;

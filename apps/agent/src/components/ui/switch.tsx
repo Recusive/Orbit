@@ -19,7 +19,7 @@ const Switch = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SwitchPrimitives.Root
     className={cn(
-      'lg-switch peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-[7px] border-0 p-0.5 isolation-auto transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-foreground/40 dark:data-[state=checked]:bg-white/25 data-[state=unchecked]:bg-black/5 dark:data-[state=unchecked]:bg-white/10',
+      'lg-switch peer relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-[7px] border-0 p-0.5 isolation-auto transition-colors duration-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-[state=checked]:bg-primary data-[state=unchecked]:bg-black/5 dark:data-[state=unchecked]:bg-white/10',
       className
     )}
     {...props}
@@ -33,7 +33,7 @@ const Switch = React.forwardRef<
     {/* OFF indicator: grey circle outline (visible when unchecked) */}
     <i
       aria-hidden="true"
-      className="not-italic absolute right-[5px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full border-[1.5px] border-[#C6C6C6] transition-opacity duration-200 [[data-state=unchecked]>&]:opacity-100 [[data-state=checked]>&]:opacity-0"
+      className="not-italic absolute right-[5px] top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full border-[1.5px] border-orbit-300 transition-opacity duration-200 [[data-state=unchecked]>&]:opacity-100 [[data-state=checked]>&]:opacity-0"
     />
     <SwitchPrimitives.Thumb
       className={cn(

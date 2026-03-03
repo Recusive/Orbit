@@ -49,31 +49,31 @@
   --tracking-wider: 0.06em;
   --tracking-widest: 0.08em;
 
-  /* Radix 12-step scale as Tailwind utilities (e.g., bg-gray-3, text-accent-9) */
-  --color-gray-1: var(--gray-1);
-  --color-gray-2: var(--gray-2);
-  --color-gray-3: var(--gray-3);
-  --color-gray-4: var(--gray-4);
-  --color-gray-5: var(--gray-5);
-  --color-gray-6: var(--gray-6);
-  --color-gray-7: var(--gray-7);
-  --color-gray-8: var(--gray-8);
-  --color-gray-9: var(--gray-9);
-  --color-gray-10: var(--gray-10);
-  --color-gray-11: var(--gray-11);
-  --color-gray-12: var(--gray-12);
-  --color-accent-1: var(--accent-1);
-  --color-accent-2: var(--accent-2);
-  --color-accent-3: var(--accent-3);
-  --color-accent-4: var(--accent-4);
-  --color-accent-5: var(--accent-5);
-  --color-accent-6: var(--accent-6);
-  --color-accent-7: var(--accent-7);
-  --color-accent-8: var(--accent-8);
-  --color-accent-9: var(--accent-9);
-  --color-accent-10: var(--accent-10);
-  --color-accent-11: var(--accent-11);
-  --color-accent-12: var(--accent-12);
+  /* Orbit primitive scale */
+  --color-orbit-background-100: var(--orbit-background-100);
+  --color-orbit-background-200: var(--orbit-background-200);
+  --color-orbit-background-alpha-100: var(--orbit-background-alpha-100);
+  --color-orbit-background-alpha-200: var(--orbit-background-alpha-200);
+  --color-orbit-100: var(--orbit-100);
+  --color-orbit-200: var(--orbit-200);
+  --color-orbit-300: var(--orbit-300);
+  --color-orbit-400: var(--orbit-400);
+  --color-orbit-500: var(--orbit-500);
+  --color-orbit-600: var(--orbit-600);
+  --color-orbit-700: var(--orbit-700);
+  --color-orbit-800: var(--orbit-800);
+  --color-orbit-900: var(--orbit-900);
+  --color-orbit-1000: var(--orbit-1000);
+  --color-orbit-alpha-100: var(--orbit-alpha-100);
+  --color-orbit-alpha-200: var(--orbit-alpha-200);
+  --color-orbit-alpha-300: var(--orbit-alpha-300);
+  --color-orbit-alpha-400: var(--orbit-alpha-400);
+  --color-orbit-alpha-500: var(--orbit-alpha-500);
+  --color-orbit-alpha-600: var(--orbit-alpha-600);
+  --color-orbit-alpha-700: var(--orbit-alpha-700);
+  --color-orbit-alpha-800: var(--orbit-alpha-800);
+  --color-orbit-alpha-900: var(--orbit-alpha-900);
+  --color-orbit-alpha-1000: var(--orbit-alpha-1000);
 
   --color-surface: var(--surface);
   --color-background: var(--background);
@@ -133,6 +133,54 @@
   /* Content card (Dia-style floating layout) */
   --color-base-layer: var(--base-layer);
 
+  /* Surfaces */
+  --color-menu-bg: var(--menu-bg);
+  --color-glass-popover-bg: var(--glass-popover-bg);
+  --color-tool-output-bg: var(--tool-output-bg);
+  --color-user-bubble-bg: var(--user-bubble-bg);
+
+  /* Controls */
+  --color-control-fill: var(--control-fill);
+  --color-control-fill-hover: var(--control-fill-hover);
+  --color-control-text: var(--control-text);
+
+  /* Borders */
+  --color-border-tool: var(--border-tool);
+  --color-border-menu: var(--border-menu);
+
+  /* Interactive */
+  --color-link: var(--link);
+  --color-primary-hover: var(--primary-hover);
+
+  /* Tags */
+  --color-tag-text: var(--tag-text);
+
+  /* Avatars */
+  --color-avatar-project: var(--avatar-project);
+  --color-avatar-user: var(--avatar-user);
+  --color-avatar-system: var(--avatar-system);
+
+  /* Git status */
+  --color-git-added: var(--git-added);
+  --color-git-added-subtle: var(--git-added-subtle);
+  --color-git-modified: var(--git-modified);
+  --color-git-modified-subtle: var(--git-modified-subtle);
+  --color-git-deleted: var(--git-deleted);
+  --color-git-deleted-subtle: var(--git-deleted-subtle);
+  --color-git-untracked: var(--git-untracked);
+  --color-git-untracked-subtle: var(--git-untracked-subtle);
+  --color-git-renamed: var(--git-renamed);
+  --color-git-renamed-subtle: var(--git-renamed-subtle);
+  --color-git-copied: var(--git-copied);
+  --color-git-copied-subtle: var(--git-copied-subtle);
+  --color-git-conflicted: var(--git-conflicted);
+  --color-git-conflicted-subtle: var(--git-conflicted-subtle);
+  --color-git-typechange: var(--git-typechange);
+  --color-git-typechange-subtle: var(--git-typechange-subtle);
+
+  /* Menu shadow */
+  --shadow-menu: var(--orbit-shadow-menu);
+
   /* ── Liquid Glass design tokens as Tailwind utilities ──
      Maps --lg-* CSS custom properties to Tailwind color utilities.
      Usage: bg-lg-control, hover:bg-lg-control-hover, text-lg-text, etc. */
@@ -169,70 +217,32 @@ body {
 
   /* ── Neutral 12-step raw scales (light) ────────────────────────────── */
   /* Gray = structure (borders, text, backgrounds) — neutral, no warm tint */
-  --gray-1: #ebebeb;
-  --gray-2: #e5e5e5;
-  --gray-3: #dbdbdb;
-  --gray-4: #d2d2d2;
-  --gray-5: #cacaca;
-  --gray-6: #c1c1c1;
-  --gray-7: #b5b5b5;
-  --gray-8: #a1a1a1;
-  --gray-9: #737373;
-  --gray-10: #696969;
-  --gray-11: #4c4c4c;
-  --gray-12: #202020;
+  --orbit-background-100: #ebebeb;
+  --orbit-background-200: #e5e5e5;
+  --orbit-100: #dbdbdb;
+  --orbit-200: #d2d2d2;
+  --orbit-300: #cacaca;
+  --orbit-400: #c1c1c1;
+  --orbit-500: #b5b5b5;
+  --orbit-600: #a1a1a1;
+  --orbit-700: #737373;
+  --orbit-800: #696969;
+  --orbit-900: #4c4c4c;
+  --orbit-1000: #202020;
 
-  /* Accent = interaction (buttons, links, selected states, focus rings) */
-  --accent-1: #eceae9;
-  --accent-2: #f0e1dc;
-  --accent-3: #f9d4c6;
-  --accent-4: #ffbea4;
-  --accent-5: #fdb194;
-  --accent-6: #f0a589;
-  --accent-7: #dd9378;
-  --accent-8: #c87f64;
-  --accent-9: #6b4030;
-  --accent-10: #5a3121;
-  --accent-11: #945036;
-  --accent-12: #572e1e;
-
-  /* Gray alpha variants (neutral black over white) */
-  --gray-a1: #00000014;
-  --gray-a2: #0000001a;
-  --gray-a3: #00000024;
-  --gray-a4: #0000002d;
-  --gray-a5: #00000035;
-  --gray-a6: #0000003e;
-  --gray-a7: #0000004a;
-  --gray-a8: #0000005e;
-  --gray-a9: #0000008c;
-  --gray-a10: #00000096;
-  --gray-a11: #000000b3;
-  --gray-a12: #000000df;
-
-  /* Accent alpha variants */
-  --accent-a1: #cadeff30;
-  --accent-a2: #a602480d;
-  --accent-a3: #ffb7a374;
-  --accent-a4: #ffbea4;
-  --accent-a5: #ffa483d1;
-  --accent-a6: #ea3a0166;
-  --accent-a7: #c42f0179;
-  --accent-a8: #a72b0290;
-  --accent-a9: #471301ca;
-  --accent-a10: #411301db;
-  --accent-a11: #772000c3;
-  --accent-a12: #3f1100de;
-
-  /* Scale surface tokens */
-  --accent-contrast: #fff;
-  --accent-surface: #efdfdacc;
-  --accent-indicator: #6b4030;
-  --accent-track: #6b4030;
-  --gray-contrast: #fff;
-  --gray-surface: #ffffffcc;
-  --gray-indicator: #737373;
-  --gray-track: #737373;
+  /* Orbit alpha variants (neutral black over white) */
+  --orbit-background-alpha-100: #00000014;
+  --orbit-background-alpha-200: #0000001a;
+  --orbit-alpha-100: #00000024;
+  --orbit-alpha-200: #0000002d;
+  --orbit-alpha-300: #00000035;
+  --orbit-alpha-400: #0000003e;
+  --orbit-alpha-500: #0000004a;
+  --orbit-alpha-600: #0000005e;
+  --orbit-alpha-700: #0000008c;
+  --orbit-alpha-800: #00000096;
+  --orbit-alpha-900: #000000b3;
+  --orbit-alpha-1000: #000000df;
 
   /* Input modes */
   --mode-plan: oklch(0.65 0.12 140); /* Olive green */
@@ -242,35 +252,89 @@ body {
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
   /* Liquid Glass: Radix alpha scale for semi-transparent surfaces */
   /* NOTE: All gray steps bumped +1 for elevated base (matching dark mode bump) */
-  --surface: var(--gray-a2);
-  --background: var(--gray-2);
-  --foreground: var(--gray-12);
+  --surface: var(--orbit-background-alpha-200);
+  --background: var(--orbit-background-200);
+  --foreground: var(--orbit-1000);
   --card: var(--surface);
-  --card-foreground: var(--gray-12);
-  --popover: var(--gray-a2);
-  --popover-foreground: var(--gray-12);
-  --primary: #007AFF;
-  --primary-foreground: #fff;
-  --secondary: var(--gray-4);
-  --secondary-foreground: var(--gray-12);
-  --muted: var(--gray-4);
-  --muted-foreground: var(--gray-10);
-  --accent: var(--gray-6);
-  --accent-foreground: var(--gray-12);
+  --card-foreground: var(--orbit-1000);
+  --popover: var(--orbit-background-alpha-200);
+  --popover-foreground: var(--orbit-1000);
+  --primary: #3C7CAB;
+  --primary-foreground: #FCFCFC;
+  --primary-hover: #055180;
+  --secondary: var(--orbit-200);
+  --secondary-foreground: var(--orbit-1000);
+  --muted: var(--orbit-200);
+  --muted-foreground: var(--orbit-800);
+  --accent: var(--orbit-400);
+  --accent-foreground: var(--orbit-1000);
   --destructive: var(--lg-destructive);
   --destructive-foreground: #fff;
   --destructive-hover: #dc3d43;
-  --border: var(--gray-7);
+  --border: var(--orbit-500);
   --border-panel: var(--lg-separator);
   --divider: var(--lg-separator);
-  --input: var(--gray-7);
-  --ring: var(--gray-8);
-  --chat-area: var(--gray-a2);
+  --input: var(--orbit-500);
+  --ring: var(--orbit-600);
+  --chat-area: var(--orbit-background-alpha-200);
   --editor-bg: var(--chat-area); /* Match chat area background */
+
+  /* Surfaces */
+  --menu-bg: #f3f3f3;
+  --glass-popover-bg: rgba(255, 255, 255, 0.7);
+  --tool-output-bg: var(--chat-area);
+  --user-bubble-bg: var(--lg-control-bg);
+
+  /* Controls */
+  --control-fill: var(--lg-control-bg);
+  --control-fill-hover: var(--lg-control-bg-hover);
+  --control-text: var(--lg-alert-secondary-text);
+
+  /* Borders */
+  --border-tool: rgba(0, 0, 0, 0.1);
+  --border-menu: rgba(255, 255, 255, 1);
+
+  /* Links / tags */
+  --link: #3C7CAB;
+  --tag-text: #4C4C4C;
+
+  /* Avatars */
+  --avatar-project: var(--orbit-700);
+  --avatar-user: var(--orbit-700);
+  --avatar-system: var(--orbit-700);
+
+  /* Git status */
+  --git-added: #4ade80;
+  --git-added-subtle: rgba(74, 222, 128, 0.2);
+  --git-modified: #c18533;
+  --git-modified-subtle: rgba(193, 133, 51, 0.2);
+  --git-deleted: #f87171;
+  --git-deleted-subtle: rgba(248, 113, 113, 0.2);
+  --git-untracked: #0d87ff;
+  --git-untracked-subtle: rgba(13, 135, 255, 0.2);
+  --git-renamed: #60a5fa;
+  --git-renamed-subtle: rgba(96, 165, 250, 0.2);
+  --git-copied: #c084fc;
+  --git-copied-subtle: rgba(192, 132, 252, 0.2);
+  --git-conflicted: #fb923c;
+  --git-conflicted-subtle: rgba(251, 146, 60, 0.2);
+  --git-typechange: #22d3ee;
+  --git-typechange-subtle: rgba(34, 211, 238, 0.2);
+
+  /* Menu/dropdown shadow — default falls downward */
+  --orbit-shadow-menu:
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 4px 12px -2px rgba(0, 0, 0, 0.1),
+    0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  /* Flipped — shadow rises upward (for popovers opening above trigger) */
+  --orbit-shadow-menu-up:
+    0 0 0 1px rgba(255, 255, 255, 0.9),
+    0 -3px 10px -2px rgba(0, 0, 0, 0.08),
+    0 -6px 18px -4px rgba(0, 0, 0, 0.06);
 
   /* Sidebar */
   --sidebar: var(--surface);
-  --sidebar-foreground: var(--gray-11);
+  --sidebar-foreground: var(--orbit-900);
 
   /* Status colors */
   --success: oklch(0.65 0.18 155);
@@ -290,7 +354,7 @@ body {
      Cursor uses gray-12 for maximum contrast */
   --terminal-bg: var(--chat-area);
   --terminal-fg: oklch(0.85 0.01 75);
-  --terminal-cursor: var(--gray-12);
+  --terminal-cursor: var(--orbit-1000);
 
   /* Chat Layout Width System
      Primary = input box, user message bubbles, content wrapper
@@ -299,8 +363,8 @@ body {
   --chat-width-primary: var(--chat-max-width);
 
   /* Tooltip colors (inverted: dark bg on light theme) */
-  --tooltip-bg: var(--gray-12);
-  --tooltip-text: var(--gray-1);
+  --tooltip-bg: var(--orbit-1000);
+  --tooltip-text: var(--orbit-background-100);
 
   /* Progress bar gradients (context window indicator) */
   --gradient-error: linear-gradient(to right, rgb(239 68 68 / 0.9), rgb(248 113 113 / 0.9));
@@ -311,7 +375,7 @@ body {
   --gradient-success-glow: 0 0 8px rgba(16, 185, 129, 0.3);
 
   /* Content card (Dia-style floating layout) */
-  --base-layer: var(--gray-4);
+  --base-layer: var(--orbit-200);
   --content-card-radius: 10px;
   --content-card-margin: 4px;
   --content-card-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.06), 0 2px 12px -4px rgba(0, 0, 0, 0.08);
@@ -341,69 +405,32 @@ html.dark {
   color-scheme: dark;
 
   /* ── Neutral 12-step raw scales (dark) ───────────────────────────── */
-  --gray-1: #181818;
-  --gray-2: #191919;
-  --gray-3: #232323;
-  --gray-4: #2a2a2a;
-  --gray-5: #313131;
-  --gray-6: #3a3a3a;
-  --gray-7: #484848;
-  --gray-8: #606060;
-  --gray-9: #6d6d6d;
-  --gray-10: #7b7b7b;
-  --gray-11: #b3b3b3;
-  --gray-12: #eeeeee;
+  --orbit-background-100: #181818;
+  --orbit-background-200: #191919;
+  --orbit-100: #232323;
+  --orbit-200: #2a2a2a;
+  --orbit-300: #313131;
+  --orbit-400: #3a3a3a;
+  --orbit-500: #484848;
+  --orbit-600: #606060;
+  --orbit-700: #6d6d6d;
+  --orbit-800: #7b7b7b;
+  --orbit-900: #b3b3b3;
+  --orbit-1000: #eeeeee;
 
-  --accent-1: #151110;
-  --accent-2: #1d1714;
-  --accent-3: #2e1f19;
-  --accent-4: #3e241a;
-  --accent-5: #4c2c20;
-  --accent-6: #5b382a;
-  --accent-7: #704737;
-  --accent-8: #905b46;
-  --accent-9: #7a5040;
-  --accent-10: #6a4232;
-  --accent-11: #e9ad97;
-  --accent-12: #fdddd1;
-
-  /* Gray alpha variants (neutral white over black) */
-  --gray-a1: #ffffff12;
-  --gray-a2: #ffffff19;
-  --gray-a3: #ffffff23;
-  --gray-a4: #ffffff2a;
-  --gray-a5: #ffffff31;
-  --gray-a6: #ffffff3a;
-  --gray-a7: #ffffff48;
-  --gray-a8: #ffffff60;
-  --gray-a9: #ffffff6d;
-  --gray-a10: #ffffff7b;
-  --gray-a11: #ffffffb3;
-  --gray-a12: #ffffffee;
-
-  /* Accent alpha variants (dark) */
-  --accent-a1: #0011b803;
-  --accent-a2: #f6d1ce08;
-  --accent-a3: #f996761b;
-  --accent-a4: #fe80542c;
-  --accent-a5: #fc845b3c;
-  --accent-a6: #fe946c4c;
-  --accent-a7: #fe9d7763;
-  --accent-a8: #ff9e7886;
-  --accent-a9: #fda3826e;
-  --accent-a10: #ff99725c;
-  --accent-a11: #ffbda6e7;
-  --accent-a12: #ffdfd3fd;
-
-  /* Scale surface tokens (dark) */
-  --accent-contrast: #fff;
-  --accent-surface: #241d1a80;
-  --accent-indicator: #7a5040;
-  --accent-track: #7a5040;
-  --gray-contrast: #FFFFFF;
-  --gray-surface: rgba(0, 0, 0, 0.05);
-  --gray-indicator: #6d6d6d;
-  --gray-track: #6d6d6d;
+  /* Orbit alpha variants (neutral white over black) */
+  --orbit-background-alpha-100: #ffffff12;
+  --orbit-background-alpha-200: #ffffff19;
+  --orbit-alpha-100: #ffffff23;
+  --orbit-alpha-200: #ffffff2a;
+  --orbit-alpha-300: #ffffff31;
+  --orbit-alpha-400: #ffffff3a;
+  --orbit-alpha-500: #ffffff48;
+  --orbit-alpha-600: #ffffff60;
+  --orbit-alpha-700: #ffffff6d;
+  --orbit-alpha-800: #ffffff7b;
+  --orbit-alpha-900: #ffffffb3;
+  --orbit-alpha-1000: #ffffffee;
 
   /* Input modes */
   --mode-plan: oklch(0.58 0.1 140);
@@ -413,35 +440,83 @@ html.dark {
   /* Gray-only UI: No accent in product chrome. Accent reserved for logo only. */
   /* Liquid Glass: Radix alpha scale for semi-transparent surfaces */
   /* NOTE: All gray steps bumped +1 vs light mode for warmer dark theme */
-  --surface: var(--gray-a2);
-  --background: var(--gray-3);
-  --foreground: var(--gray-12);
+  --surface: var(--orbit-background-alpha-200);
+  --background: var(--orbit-100);
+  --foreground: var(--orbit-1000);
   --card: var(--surface);
-  --card-foreground: var(--gray-12);
-  --popover: var(--gray-a2);
-  --popover-foreground: var(--gray-12);
-  --primary: #007AFF;
-  --primary-foreground: #fff;
-  --secondary: var(--gray-4);
-  --secondary-foreground: var(--gray-12);
-  --muted: var(--gray-4);
-  --muted-foreground: var(--gray-11);
-  --accent: var(--gray-6);
-  --accent-foreground: var(--gray-12);
+  --card-foreground: var(--orbit-1000);
+  --popover: var(--orbit-background-alpha-200);
+  --popover-foreground: var(--orbit-1000);
+  --primary: #81A1C1;
+  --primary-foreground: #191c22;
+  --primary-hover: #87A6C4;
+  --secondary: var(--orbit-200);
+  --secondary-foreground: var(--orbit-1000);
+  --muted: var(--orbit-200);
+  --muted-foreground: var(--orbit-900);
+  --accent: var(--orbit-400);
+  --accent-foreground: var(--orbit-1000);
   --destructive: var(--lg-destructive);
   --destructive-foreground: #fff;
   --destructive-hover: #ec5d5e;
-  --border: var(--gray-7);
+  --border: var(--orbit-500);
   --border-panel: var(--lg-separator);
   --divider: var(--lg-separator);
-  --input: var(--gray-7);
-  --ring: var(--gray-8);
-  --chat-area: var(--gray-1);
-  --editor-bg: var(--gray-1);
+  --input: var(--orbit-500);
+  --ring: var(--orbit-600);
+  --chat-area: var(--orbit-background-100);
+  --editor-bg: var(--orbit-background-100);
+
+  /* Surfaces */
+  --menu-bg: oklch(23% 0 0);
+  --glass-popover-bg: color-mix(in srgb, var(--lg-control-bg) 80%, transparent);
+  --tool-output-bg: oklch(23% 0 0);
+  --user-bubble-bg: #272727;
+
+  /* Controls */
+  --control-fill: var(--lg-control-bg);
+  --control-fill-hover: var(--lg-control-bg-hover);
+  --control-text: var(--lg-alert-secondary-text);
+
+  /* Borders */
+  --border-tool: rgba(255, 255, 255, 0.05);
+  --border-menu: rgba(255, 255, 255, 0.05);
+
+  /* Links / tags */
+  --link: #81A1C1;
+  --tag-text: #B0B0B0;
+
+  /* Avatars */
+  --avatar-project: var(--orbit-800);
+  --avatar-user: var(--orbit-800);
+  --avatar-system: var(--orbit-800);
+
+  /* Git status */
+  --git-added: #4ade80;
+  --git-added-subtle: rgba(74, 222, 128, 0.2);
+  --git-modified: #f0b367;
+  --git-modified-subtle: rgba(240, 179, 103, 0.2);
+  --git-deleted: #f87171;
+  --git-deleted-subtle: rgba(248, 113, 113, 0.2);
+  --git-untracked: #99ceff;
+  --git-untracked-subtle: rgba(153, 206, 255, 0.2);
+  --git-renamed: #60a5fa;
+  --git-renamed-subtle: rgba(96, 165, 250, 0.2);
+  --git-copied: #c084fc;
+  --git-copied-subtle: rgba(192, 132, 252, 0.2);
+  --git-conflicted: #fb923c;
+  --git-conflicted-subtle: rgba(251, 146, 60, 0.2);
+  --git-typechange: #22d3ee;
+  --git-typechange-subtle: rgba(34, 211, 238, 0.2);
+
+  /* Menu/dropdown shadow — default falls downward */
+  --orbit-shadow-menu: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  /* Flipped — shadow rises upward */
+  --orbit-shadow-menu-up: 0 -3px 5px -1px rgb(0 0 0 / 0.08), 0 -2px 3px -1px rgb(0 0 0 / 0.08);
 
   /* Sidebar */
-  --sidebar: var(--gray-3);
-  --sidebar-foreground: var(--gray-11);
+  --sidebar: var(--orbit-100);
+  --sidebar-foreground: var(--orbit-900);
 
   /* Status colors */
   --success: oklch(0.7 0.18 155);
@@ -458,14 +533,14 @@ html.dark {
      Cursor uses gray-12 for maximum contrast */
   --terminal-bg: var(--chat-area);
   --terminal-fg: oklch(0.85 0.01 75);
-  --terminal-cursor: var(--gray-12);
+  --terminal-cursor: var(--orbit-1000);
 
   /* Tooltip colors (elevated surface on dark theme) */
-  --tooltip-bg: var(--gray-5);
-  --tooltip-text: var(--gray-12);
+  --tooltip-bg: var(--orbit-300);
+  --tooltip-text: var(--orbit-1000);
 
   /* Content card (Dia-style floating layout) — subtle white ring on dark */
-  --base-layer: var(--gray-1);
+  --base-layer: var(--orbit-background-100);
   --content-card-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.06), 0 2px 12px -4px rgba(0, 0, 0, 0.3);
 
   /* Beam ASCII reveal animation — white-hot on dark bg */
@@ -482,26 +557,26 @@ html.dark {
 /* Light mode - Solid (bg=gray-2, panels=gray-2) */
 html.window-mode-solid:root,
 html.window-mode-solid.light {
-  --surface: var(--gray-2);
-  --background: var(--gray-2);
-  --card: var(--gray-2);
-  --popover: var(--gray-2);
+  --surface: var(--orbit-background-200);
+  --background: var(--orbit-background-200);
+  --card: var(--orbit-background-200);
+  --popover: var(--orbit-background-200);
   --chat-area: #ffffff;
   --editor-bg: #ffffff;
-  --sidebar: var(--gray-2);
+  --sidebar: var(--orbit-background-200);
   /* Match native glass defocus fallback (#F0F0F0) from glass_defocus.rs */
   --base-layer: #F0F0F0;
 }
 
 /* Dark mode - Solid (+1 bump) */
 html.window-mode-solid.dark {
-  --surface: var(--gray-2);
-  --background: var(--gray-3);
-  --card: var(--gray-2);
-  --popover: var(--gray-2);
-  --chat-area: var(--gray-1);
-  --editor-bg: var(--gray-1);
-  --sidebar: var(--gray-3);
+  --surface: var(--orbit-background-200);
+  --background: var(--orbit-100);
+  --card: var(--orbit-background-200);
+  --popover: var(--orbit-background-200);
+  --chat-area: var(--orbit-background-100);
+  --editor-bg: var(--orbit-background-100);
+  --sidebar: var(--orbit-100);
   /* Match defocused liquid glass sidebar appearance */
   --base-layer: #222222;
 }
@@ -520,22 +595,22 @@ html.window-mode-liquid-glass.light {
   --surface: #ffffff;
   --background: #ffffff;
   --card: #ffffff;
-  --popover: var(--gray-2);
+  --popover: var(--orbit-background-200);
   --chat-area: #ffffff;
   --editor-bg: #ffffff;
-  --sidebar: var(--gray-2);
+  --sidebar: var(--orbit-background-200);
 }
 
 /* Dark mode - Liquid Glass (sidebar-only glass) */
 html.window-mode-liquid-glass.dark {
   /* Main surfaces — opaque (same values as solid mode) */
-  --surface: var(--gray-2);
-  --background: var(--gray-3);
-  --card: var(--gray-2);
-  --popover: var(--gray-2);
-  --chat-area: var(--gray-1);
-  --editor-bg: var(--gray-1);
-  --sidebar: var(--gray-3);
+  --surface: var(--orbit-background-200);
+  --background: var(--orbit-100);
+  --card: var(--orbit-background-200);
+  --popover: var(--orbit-background-200);
+  --chat-area: var(--orbit-background-100);
+  --editor-bg: var(--orbit-background-100);
+  --sidebar: var(--orbit-100);
 }
 
 /* Base layer — frosted glass over native vibrancy.
@@ -669,7 +744,7 @@ html.dark [data-streamdown='code-block-container'] {
 /* Language label — Radix step 11: canonical secondary text */
 [data-streamdown='code-block-header'] span {
   font-size: 0.6875rem !important; /* 11px */
-  color: var(--gray-11) !important;
+  color: var(--orbit-900) !important;
 }
 
 /* Hide download button */
@@ -710,7 +785,7 @@ html.dark [data-streamdown='code-block-container'] {
 }
 
 [data-streamdown='code-block-copy-button']:hover {
-  background: var(--gray-a3) !important;
+  background: var(--orbit-alpha-100) !important;
   color: var(--foreground) !important;
 }
 
@@ -749,7 +824,7 @@ html.dark [data-streamdown='code-block-container'] {
   text-align: right !important;
   margin-right: 0 !important;
   font-size: 0.75rem !important;
-  color: var(--gray-9) !important;
+  color: var(--orbit-700) !important;
 }
 
 /* ============================================
@@ -911,7 +986,7 @@ html.dark .chat-markdown code:not(pre code) {
 
 /* Links — underline differentiates, not color */
 .chat-markdown a {
-  color: var(--gray-12);
+  color: var(--orbit-1000);
   font-weight: 500;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -919,7 +994,7 @@ html.dark .chat-markdown code:not(pre code) {
 }
 
 .chat-markdown a:hover {
-  color: var(--gray-11);
+  color: var(--orbit-900);
 }
 
 .chat-markdown a:focus {
@@ -955,9 +1030,9 @@ html.dark .chat-markdown code:not(pre code) {
 .insight-block {
   margin: 0.75rem 0;
   padding: 0.5rem 0.75rem 0.625rem;
-  border-left: 2px solid var(--accent-7);
+  border-left: 2px solid var(--primary);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  background: var(--accent-a2);
+  background: color-mix(in oklch, var(--primary) 8%, transparent);
   overflow: hidden;
   overflow-wrap: break-word;
 }
@@ -972,7 +1047,7 @@ html.dark .chat-markdown code:not(pre code) {
 .insight-block .insight-star {
   font-size: 0.625rem;
   line-height: 1;
-  color: var(--accent-9);
+  color: var(--primary);
 }
 
 .insight-block .insight-label {
@@ -980,7 +1055,7 @@ html.dark .chat-markdown code:not(pre code) {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--accent-11);
+  color: var(--primary);
 }
 
 .insight-block .insight-body {
@@ -1256,7 +1331,7 @@ html.dark .vault-editor-shell .milkdown code:not(pre code) {
   font-weight: 600;
   font-size: 0.875rem;
   border-bottom: 1px solid var(--border);
-  background: var(--gray-a3);
+  background: var(--orbit-alpha-100);
 }
 
 /* Body rows — subtle striping via even-row bg, divided */
@@ -1268,7 +1343,7 @@ html.dark .vault-editor-shell .milkdown code:not(pre code) {
 }
 
 .vault-editor-shell .milkdown tr:nth-child(even) td {
-  background: var(--gray-a2);
+  background: var(--orbit-background-alpha-200);
 }
 
 /* Remove paragraph margins inside cells (Milkdown wraps cell content in <p>) */
@@ -1392,7 +1467,7 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block {
   font-size: 0.6875rem;
   font-weight: 500;
   font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
-  color: var(--gray-11);
+  color: var(--orbit-900);
   text-transform: lowercase;
   gap: 2px;
 }
@@ -1411,7 +1486,7 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block {
 .vault-editor-shell .milkdown .milkdown-code-block .tools .language-button .expand-icon svg {
   width: 10px;
   height: 10px;
-  color: var(--gray-9);
+  color: var(--orbit-700);
 }
 
 /* ── Copy / action buttons — icon-only, hover reveal, glass ──
@@ -1454,7 +1529,7 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block {
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:hover {
-  background: var(--gray-a3);
+  background: var(--orbit-alpha-100);
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .tools .tools-button-group button:hover svg {
@@ -1486,13 +1561,13 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block {
 /* Active line — neutral tint instead of CodeMirror's blue */
 .vault-editor-shell .milkdown .milkdown-code-block .cm-activeLine,
 .vault-editor-shell .milkdown .milkdown-code-block .cm-activeLineGutter {
-  background: var(--gray-a2);
+  background: var(--orbit-background-alpha-200);
 }
 
 /* Line numbers — Radix step 9, same size as code text */
 .vault-editor-shell .milkdown .milkdown-code-block .cm-lineNumbers .cm-gutterElement {
   font-size: 0.75rem;
-  color: var(--gray-9);
+  color: var(--orbit-700);
 }
 
 /* ── Language picker dropdown — app color system ── */
@@ -1532,12 +1607,12 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .search-box input::placeholder {
-  color: var(--gray-9);
+  color: var(--orbit-700);
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .search-box .clear-icon svg {
-  color: var(--gray-9);
-  fill: var(--gray-9);
+  color: var(--orbit-700);
+  fill: var(--orbit-700);
 }
 
 /* List — cap height, app scrollbar */
@@ -1556,11 +1631,11 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .language-list-item:hover {
-  background: var(--gray-a3);
+  background: var(--orbit-alpha-100);
 }
 
 .vault-editor-shell .milkdown .milkdown-code-block .language-list-item[aria-selected='true'] {
-  background: var(--gray-a3);
+  background: var(--orbit-alpha-100);
   color: var(--primary);
 }
 
@@ -1881,6 +1956,29 @@ html:not(.dark) .glass-popover::after {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
 }
 
+/* ── Glass Surface ──────────────────────────────────────
+   Token-based glass surface for Radix popovers/hover-cards.
+   Unlike .glass-popover (pseudo-element material), this uses flat
+   properties that don't conflict with Radix animation states. */
+.glass-surface {
+  background: var(--glass-popover-bg);
+  border: 1px solid var(--border-menu);
+  border-radius: 9px;
+  box-shadow: var(--orbit-shadow-menu);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+/* Directional shadow — Radix sets data-side on popover/dropdown/context-menu content */
+.glass-surface[data-side='top'] {
+  box-shadow: var(--orbit-shadow-menu-up);
+}
+
+html.dark .glass-surface {
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+}
+
 /* ── Frosted Input Container ────────────────────────────
    Transparent wrapper that floats above the messages scroll area.
    No backdrop-filter here — the .glass-input box handles its own
@@ -2061,7 +2159,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* Light mode liquid glass - matches frosted glass theme (+1 bump) */
 .liquid-glass {
-  background: color-mix(in srgb, var(--gray-3) 85%, transparent);
+  background: color-mix(in srgb, var(--orbit-100) 85%, transparent);
   backdrop-filter: blur(12px) saturate(1.5);
   -webkit-backdrop-filter: blur(12px) saturate(1.5);
   border: 1px solid var(--border);
@@ -2072,7 +2170,7 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 
 /* Dark mode liquid glass (+1 bump) */
 html.dark .liquid-glass {
-  background: color-mix(in srgb, var(--gray-3) 50%, transparent);
+  background: color-mix(in srgb, var(--orbit-100) 50%, transparent);
   border: 1px solid var(--border);
   box-shadow:
     0 1px 3px oklch(0 0 0 / 25%),
@@ -2095,127 +2193,59 @@ html:not(.window-mode-solid) .glass-float {
 @supports (color: color(display-p3 1 1 1)) {
   @media (color-gamut: p3) {
     :root {
-      /* Accent P3 (light) */
-      --accent-1: oklch(93.7% 0.0026 41.09);
-      --accent-2: oklch(92.1% 0.0176 41.09);
-      --accent-3: oklch(89.7% 0.0454 41.09);
-      --accent-4: oklch(85.9% 0.0881 41.09);
-      --accent-5: oklch(82.6% 0.0985 41.09);
-      --accent-6: oklch(78.8% 0.0985 41.09);
-      --accent-7: oklch(73.2% 0.0985 41.09);
-      --accent-8: oklch(66.7% 0.0985 41.09);
-      --accent-9: oklch(41.9% 0.0657 41.09);
-      --accent-10: oklch(36.1% 0.0657 41.09);
-      --accent-11: oklch(50.7% 0.0985 41.09);
-      --accent-12: oklch(35.1% 0.0657 41.09);
-      --accent-a1: color(display-p3 0.7765 0.8549 1 / 0.154);
-      --accent-a2: color(display-p3 0.4549 0.0118 0.2314 / 0.047);
-      --accent-a3: color(display-p3 0.9529 0.1922 0.0039 / 0.127);
-      --accent-a4: color(display-p3 1 0 0 / 0.167);
-      --accent-a5: color(display-p3 0.9412 0.2588 0.0039 / 0.332);
-      --accent-a6: color(display-p3 0.8078 0.2196 0.0039 / 0.38);
-      --accent-a7: color(display-p3 0.6706 0.1804 0.0039 / 0.455);
-      --accent-a8: color(display-p3 0.5725 0.1529 0 / 0.542);
-      --accent-a9: color(display-p3 0.2392 0.0667 0 / 0.778);
-      --accent-a10: color(display-p3 0.2157 0.0667 0 / 0.843);
-      --accent-a11: color(display-p3 0.4078 0.1176 0 / 0.743);
-      --accent-a12: color(display-p3 0.2118 0.0627 0 / 0.856);
-      --accent-contrast: #fff;
-      --accent-surface: color(display-p3 0.9216 0.8784 0.8588 / 0.8);
-      --accent-indicator: oklch(41.9% 0.0657 41.09);
-      --accent-track: oklch(41.9% 0.0657 41.09);
-
       /* Gray P3 (light) — neutral, chroma = 0 */
-      --gray-1: oklch(93.9% 0 0);
-      --gray-2: oklch(92.3% 0 0);
-      --gray-3: oklch(89.2% 0 0);
-      --gray-4: oklch(86.5% 0 0);
-      --gray-5: oklch(83.8% 0 0);
-      --gray-6: oklch(81% 0 0);
-      --gray-7: oklch(77.4% 0 0);
-      --gray-8: oklch(71% 0 0);
-      --gray-9: oklch(55.7% 0 0);
-      --gray-10: oklch(52.2% 0 0);
-      --gray-11: oklch(41.8% 0 0);
-      --gray-12: oklch(24.3% 0 0);
-      --gray-a1: color(display-p3 0 0 0 / 0.078);
-      --gray-a2: color(display-p3 0 0 0 / 0.102);
-      --gray-a3: color(display-p3 0 0 0 / 0.141);
-      --gray-a4: color(display-p3 0 0 0 / 0.176);
-      --gray-a5: color(display-p3 0 0 0 / 0.208);
-      --gray-a6: color(display-p3 0 0 0 / 0.243);
-      --gray-a7: color(display-p3 0 0 0 / 0.290);
-      --gray-a8: color(display-p3 0 0 0 / 0.369);
-      --gray-a9: color(display-p3 0 0 0 / 0.549);
-      --gray-a10: color(display-p3 0 0 0 / 0.588);
-      --gray-a11: color(display-p3 0 0 0 / 0.702);
-      --gray-a12: color(display-p3 0 0 0 / 0.875);
-      --gray-contrast: #FFFFFF;
-      --gray-surface: color(display-p3 1 1 1 / 80%);
-      --gray-indicator: oklch(55.7% 0 0);
-      --gray-track: oklch(55.7% 0 0);
+      --orbit-background-100: oklch(93.9% 0 0);
+      --orbit-background-200: oklch(92.3% 0 0);
+      --orbit-100: oklch(89.2% 0 0);
+      --orbit-200: oklch(86.5% 0 0);
+      --orbit-300: oklch(83.8% 0 0);
+      --orbit-400: oklch(81% 0 0);
+      --orbit-500: oklch(77.4% 0 0);
+      --orbit-600: oklch(71% 0 0);
+      --orbit-700: oklch(55.7% 0 0);
+      --orbit-800: oklch(52.2% 0 0);
+      --orbit-900: oklch(41.8% 0 0);
+      --orbit-1000: oklch(24.3% 0 0);
+      --orbit-background-alpha-100: color(display-p3 0 0 0 / 0.078);
+      --orbit-background-alpha-200: color(display-p3 0 0 0 / 0.102);
+      --orbit-alpha-100: color(display-p3 0 0 0 / 0.141);
+      --orbit-alpha-200: color(display-p3 0 0 0 / 0.176);
+      --orbit-alpha-300: color(display-p3 0 0 0 / 0.208);
+      --orbit-alpha-400: color(display-p3 0 0 0 / 0.243);
+      --orbit-alpha-500: color(display-p3 0 0 0 / 0.290);
+      --orbit-alpha-600: color(display-p3 0 0 0 / 0.369);
+      --orbit-alpha-700: color(display-p3 0 0 0 / 0.549);
+      --orbit-alpha-800: color(display-p3 0 0 0 / 0.588);
+      --orbit-alpha-900: color(display-p3 0 0 0 / 0.702);
+      --orbit-alpha-1000: color(display-p3 0 0 0 / 0.875);
     }
 
     html.dark {
-      /* Accent P3 (dark) */
-      --accent-1: oklch(18.3% 0.0075 41.64);
-      --accent-2: oklch(21.1% 0.0117 41.64);
-      --accent-3: oklch(25.6% 0.0262 41.64);
-      --accent-4: oklch(29.1% 0.0442 41.64);
-      --accent-5: oklch(32.9% 0.052 41.64);
-      --accent-6: oklch(37.8% 0.0555 41.64);
-      --accent-7: oklch(44.1% 0.0623 41.64);
-      --accent-8: oklch(52.4% 0.0771 41.64);
-      --accent-9: oklch(47.4% 0.0623 41.64);
-      --accent-10: oklch(42.2% 0.0623 41.64);
-      --accent-11: oklch(79.8% 0.0771 41.64);
-      --accent-12: oklch(92.1% 0.0397 41.64);
-      --accent-a1: color(display-p3 0 0.0667 0.9294 / 0.009);
-      --accent-a2: color(display-p3 1 0.8549 0.8392 / 0.03);
-      --accent-a3: color(display-p3 0.9961 0.6627 0.5333 / 0.099);
-      --accent-a4: color(display-p3 0.9961 0.5608 0.4039 / 0.159);
-      --accent-a5: color(display-p3 1 0.5725 0.4157 / 0.218);
-      --accent-a6: color(display-p3 1 0.6471 0.4941 / 0.278);
-      --accent-a7: color(display-p3 1 0.6706 0.5294 / 0.364);
-      --accent-a8: color(display-p3 1 0.6706 0.5333 / 0.492);
-      --accent-a9: color(display-p3 1 0.698 0.5686 / 0.406);
-      --accent-a10: color(display-p3 1 0.6588 0.5098 / 0.338);
-      --accent-a11: color(display-p3 1 0.7804 0.6902 / 0.868);
-      --accent-a12: color(display-p3 0.9961 0.898 0.851 / 0.971);
-      --accent-contrast: #fff;
-      --accent-surface: color(display-p3 0.1333 0.1098 0.1098 / 0.5);
-      --accent-indicator: oklch(47.4% 0.0623 41.64);
-      --accent-track: oklch(47.4% 0.0623 41.64);
-
       /* Gray P3 (dark) — neutral, chroma = 0 */
-      --gray-1: oklch(20.7% 0 0);
-      --gray-2: oklch(21.5% 0 0);
-      --gray-3: oklch(25.4% 0 0);
-      --gray-4: oklch(28.3% 0 0);
-      --gray-5: oklch(31.3% 0 0);
-      --gray-6: oklch(34.9% 0 0);
-      --gray-7: oklch(40.1% 0 0);
-      --gray-8: oklch(49% 0 0);
-      --gray-9: oklch(53.5% 0 0);
-      --gray-10: oklch(58.1% 0 0);
-      --gray-11: oklch(76.7% 0 0);
-      --gray-12: oklch(94.8% 0 0);
-      --gray-a1: color(display-p3 1 1 1 / 0.071);
-      --gray-a2: color(display-p3 1 1 1 / 0.098);
-      --gray-a3: color(display-p3 1 1 1 / 0.137);
-      --gray-a4: color(display-p3 1 1 1 / 0.165);
-      --gray-a5: color(display-p3 1 1 1 / 0.192);
-      --gray-a6: color(display-p3 1 1 1 / 0.227);
-      --gray-a7: color(display-p3 1 1 1 / 0.282);
-      --gray-a8: color(display-p3 1 1 1 / 0.376);
-      --gray-a9: color(display-p3 1 1 1 / 0.427);
-      --gray-a10: color(display-p3 1 1 1 / 0.482);
-      --gray-a11: color(display-p3 1 1 1 / 0.702);
-      --gray-a12: color(display-p3 1 1 1 / 0.933);
-      --gray-contrast: #FFFFFF;
-      --gray-surface: color(display-p3 0 0 0 / 5%);
-      --gray-indicator: oklch(53.5% 0 0);
-      --gray-track: oklch(53.5% 0 0);
+      --orbit-background-100: oklch(20.7% 0 0);
+      --orbit-background-200: oklch(21.5% 0 0);
+      --orbit-100: oklch(25.4% 0 0);
+      --orbit-200: oklch(28.3% 0 0);
+      --orbit-300: oklch(31.3% 0 0);
+      --orbit-400: oklch(34.9% 0 0);
+      --orbit-500: oklch(40.1% 0 0);
+      --orbit-600: oklch(49% 0 0);
+      --orbit-700: oklch(53.5% 0 0);
+      --orbit-800: oklch(58.1% 0 0);
+      --orbit-900: oklch(76.7% 0 0);
+      --orbit-1000: oklch(94.8% 0 0);
+      --orbit-background-alpha-100: color(display-p3 1 1 1 / 0.071);
+      --orbit-background-alpha-200: color(display-p3 1 1 1 / 0.098);
+      --orbit-alpha-100: color(display-p3 1 1 1 / 0.137);
+      --orbit-alpha-200: color(display-p3 1 1 1 / 0.165);
+      --orbit-alpha-300: color(display-p3 1 1 1 / 0.192);
+      --orbit-alpha-400: color(display-p3 1 1 1 / 0.227);
+      --orbit-alpha-500: color(display-p3 1 1 1 / 0.282);
+      --orbit-alpha-600: color(display-p3 1 1 1 / 0.376);
+      --orbit-alpha-700: color(display-p3 1 1 1 / 0.427);
+      --orbit-alpha-800: color(display-p3 1 1 1 / 0.482);
+      --orbit-alpha-900: color(display-p3 1 1 1 / 0.702);
+      --orbit-alpha-1000: color(display-p3 1 1 1 / 0.933);
     }
   }
 }
@@ -2542,6 +2572,10 @@ html.dark .liquid-glass-textarea:focus {
 .liquid-glass-textarea:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.liquid-glass-textarea-icon {
+  padding-left: 36px;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -805,7 +805,7 @@ const App: FC = () => {
                           />
                           {/* Paired Elements Rule: overlay shares same opacity + transition */}
                           <div
-                            className="absolute inset-0 hidden dark:block bg-linear-to-t from-gray-3/80 via-gray-3/55 to-gray-3/35 rounded-[inherit]"
+                            className="absolute inset-0 hidden dark:block bg-linear-to-t from-orbit-100/80 via-orbit-100/55 to-orbit-100/35 rounded-[inherit]"
                             style={{
                               opacity: launchPhase === 'idle' ? 0 : 1,
                               transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,

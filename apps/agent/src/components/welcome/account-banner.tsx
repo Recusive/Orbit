@@ -51,20 +51,20 @@ function formatTimeRemaining(expiresAtMs: number): string {
 
 function dotBgColor(expiresAtMs: number | null, hasCredentials: boolean): string {
   if (!hasCredentials) return 'bg-black/20 dark:bg-white/20';
-  if (expiresAtMs === null) return 'bg-green-400';
+  if (expiresAtMs === null) return 'bg-success';
   const diffMs = expiresAtMs - Date.now();
-  if (diffMs <= 0) return 'bg-red-400';
-  if (diffMs < 5 * 60_000) return 'bg-red-400';
-  if (diffMs < 60 * 60_000) return 'bg-yellow-400';
-  return 'bg-green-400';
+  if (diffMs <= 0) return 'bg-destructive';
+  if (diffMs < 5 * 60_000) return 'bg-destructive';
+  if (diffMs < 60 * 60_000) return 'bg-warning';
+  return 'bg-success';
 }
 
 function timeTextColor(expiresAtMs: number): string {
   const diffMs = expiresAtMs - Date.now();
-  if (diffMs <= 0) return 'text-red-400';
-  if (diffMs < 5 * 60_000) return 'text-red-400';
-  if (diffMs < 60 * 60_000) return 'text-yellow-400';
-  return 'text-green-400';
+  if (diffMs <= 0) return 'text-destructive';
+  if (diffMs < 5 * 60_000) return 'text-destructive';
+  if (diffMs < 60 * 60_000) return 'text-warning';
+  return 'text-success';
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +111,7 @@ function showAccountToast(status: KeychainStatus): string | number {
           <div className="flex items-center justify-center h-8 w-8 rounded-lg shrink-0 bg-black/[0.06] dark:bg-white/10">
             <SiClaude
               className={cn('h-4.5 w-4.5', !isConnected && 'text-black/40 dark:text-white/40')}
-              style={isConnected ? { color: '#d97757' } : undefined}
+              style={isConnected ? { color: 'var(--primary)' } : undefined}
             />
           </div>
 
@@ -131,7 +131,7 @@ function showAccountToast(status: KeychainStatus): string | number {
               e.stopPropagation();
               toast.dismiss(id);
             }}
-            className="flex items-center justify-center h-6 w-6 rounded-full shrink-0 bg-black/[0.04] dark:bg-white/[0.06] text-black/50 dark:text-white/50 hover:bg-red-500/20 dark:hover:bg-red-500/20 hover:text-red-400 dark:hover:text-red-400 active:scale-90 transition-[background-color,color,transform] duration-100"
+            className="flex items-center justify-center h-6 w-6 rounded-full shrink-0 bg-black/[0.04] dark:bg-white/[0.06] text-black/50 dark:text-white/50 hover:bg-destructive/20 hover:text-destructive active:scale-90 transition-[background-color,color,transform] duration-100"
           >
             <X className="h-3.5 w-3.5" />
           </button>

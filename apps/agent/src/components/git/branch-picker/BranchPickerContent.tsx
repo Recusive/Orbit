@@ -96,7 +96,7 @@ export const BranchPickerContent: FC<BranchPickerContentProps> = ({
               }
             }}
             placeholder="Search branches"
-            className="w-full h-7 rounded-[7px] bg-black/10 dark:bg-[var(--lg-alert-secondary-bg)] pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-black/12 dark:focus:bg-[var(--lg-control-bg)]"
+            className="w-full h-7 rounded-[7px] bg-control-fill pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-control-fill-hover"
             aria-label="Search branches"
           />
         </div>

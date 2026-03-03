@@ -155,7 +155,7 @@ const UserMessageBubble: FC<{
               const resolved = ws ? `${ws}/${fileName}` : fileName;
               onOpenFile?.(resolved);
             }}
-            className="inline text-[#0d87ff] dark:text-[#99ceff] hover:underline transition-colors cursor-pointer"
+            className="inline text-link hover:underline transition-colors cursor-pointer"
           >
             {fileName}
           </button>
@@ -187,7 +187,7 @@ const UserMessageBubble: FC<{
   return (
     <div
       className={cn(
-        'w-fit max-w-full rounded-xl bg-lg-control dark:bg-[#272727] px-3.5 pt-2.5',
+        'w-fit max-w-full rounded-xl bg-user-bubble-bg px-3.5 pt-2.5',
         isCollapsed ? 'pb-0' : 'pb-2.5',
         animate === true && 'animate-message-in'
       )}

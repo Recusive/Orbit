@@ -325,8 +325,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
                 'focus-visible:ring-0',
                 '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
                 worktree.isMain
-                  ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
-                  : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
+                  ? 'bg-black/5 text-tag-text dark:bg-white/10'
+                  : 'bg-black/4 text-tag-text/90 dark:bg-white/8'
               )}
               style={{ mixBlendMode: 'plus-darker' }}
               aria-label={`Switch branch (${branchName})`}
@@ -338,7 +338,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
               )}
               <SelectValue>{branchName}</SelectValue>
             </SelectTrigger>
-            <SelectContent className="min-w-0 bg-white/70! dark:bg-lg-control/80! backdrop-blur-sm dark:backdrop-blur-xl border! border-white! dark:border-white/5! shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md [&::before]:hidden [&::after]:hidden">
+            <SelectContent className="min-w-0">
               {branches.map((b) => (
                 <SelectItem
                   key={b.name}
@@ -367,8 +367,8 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
                   'active:scale-[0.97] disabled:opacity-50',
                   '[&>svg:last-child]:h-2.5 [&>svg:last-child]:w-2.5 [&>svg:last-child]:opacity-60',
                   worktree.isMain
-                    ? 'bg-black/5 text-[#4C4C4C] dark:bg-white/10 dark:text-[#B0B0B0]'
-                    : 'bg-black/4 text-[#4C4C4C] dark:bg-white/8 dark:text-[#999]'
+                    ? 'bg-black/5 text-tag-text dark:bg-white/10'
+                    : 'bg-black/4 text-tag-text/90 dark:bg-white/8'
                 )}
                 style={{ mixBlendMode: 'plus-darker' }}
                 aria-label={`Switch branch (${branchName})`}
@@ -384,7 +384,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
             </PopoverTrigger>
             <PopoverContent
               align="start"
-              className="w-[260px] p-0 bg-white/70 dark:bg-lg-control/80 backdrop-blur-sm dark:backdrop-blur-xl border-white dark:border-white/5 rounded-[9px] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md"
+              className="w-[260px] p-0"
               onOpenAutoFocus={(event) => {
                 event.preventDefault();
               }}

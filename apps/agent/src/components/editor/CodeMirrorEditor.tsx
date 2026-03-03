@@ -162,7 +162,7 @@ const darkTheme = EditorView.theme(
       borderLeftColor: 'var(--foreground)',
     },
     '&.cm-focused .cm-selectionBackground, ::selection': {
-      backgroundColor: 'var(--gray-a5)',
+      backgroundColor: 'var(--orbit-alpha-300)',
     },
     '.cm-gutters': {
       backgroundColor: 'var(--editor-bg)', // Match editor background
@@ -173,7 +173,7 @@ const darkTheme = EditorView.theme(
       backgroundColor: 'inherit',
     },
     '.cm-activeLine': {
-      backgroundColor: 'var(--gray-a4)',
+      backgroundColor: 'var(--orbit-alpha-200)',
     },
     // Hover tooltip dark theme
     '.cm-tooltip': {
@@ -217,18 +217,17 @@ const darkTheme = EditorView.theme(
       content: '"●"',
       color: '#fbbf24',
     },
-    // Search panel styling - Soft UI Design
+    // Search panel — uses glass-surface tokens for unified design
     '.cm-panels': {
       backgroundColor: 'transparent',
       border: 'none',
     },
     '.cm-search.cm-panel': {
       position: 'relative',
-      // Use solid background - backdropFilter causes blur in Tauri WebView
-      backgroundColor: 'var(--lg-control)',
-      borderRadius: '12px',
-      border: 'none',
-      boxShadow: '0 8px 32px -8px rgba(0,0,0,0.4), 0 4px 16px -4px rgba(0,0,0,0.2)',
+      backgroundColor: 'var(--glass-popover-bg)',
+      borderRadius: '9px',
+      border: '1px solid var(--border-menu)',
+      boxShadow: 'var(--orbit-shadow-menu)',
       padding: '12px',
       paddingRight: '40px',
       margin: '8px',
@@ -237,64 +236,61 @@ const darkTheme = EditorView.theme(
       alignItems: 'center',
       gap: '8px',
     },
-    // Input fields (+1 bump)
+    // Input fields — liquid-glass-textarea tokens
     '.cm-search.cm-panel input.cm-textfield': {
-      backgroundColor: 'var(--gray-a4)',
-      border: '1px solid var(--gray-a6)',
-      borderRadius: '8px',
+      backgroundColor: 'var(--lg-input-bg)',
+      border: 'none',
+      borderRadius: '9px',
+      boxShadow: 'var(--lg-input-border)',
       color: 'var(--foreground)',
+      caretColor: 'var(--lg-input-cursor)',
       padding: '0 10px',
       fontSize: '12px',
       outline: 'none',
       height: '32px',
       minWidth: '140px',
       boxSizing: 'border-box',
-      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'box-shadow 150ms ease',
     },
     '.cm-search.cm-panel input.cm-textfield:focus': {
-      backgroundColor: 'var(--gray-a5)',
-      borderColor: 'var(--gray-a8)',
-      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.15), 0 0 0 1px var(--gray-a6)',
+      boxShadow: 'var(--lg-input-focus)',
     },
     '.cm-search.cm-panel input.cm-textfield::placeholder': {
-      color: 'var(--gray-a9)',
+      color: 'var(--lg-input-placeholder)',
     },
-    // All buttons base styling - gray monochrome (+1 bump)
+    // Buttons — liquid-glass-btn-secondary tokens
     '.cm-search.cm-panel .cm-button': {
-      backgroundColor: 'var(--gray-a5)',
+      backgroundColor: 'var(--lg-alert-secondary-bg)',
       backgroundImage: 'none',
-      border: '1px solid var(--gray-a6)',
-      borderRadius: '6px',
-      color: 'var(--foreground)',
+      border: 'none',
+      borderRadius: '100px',
+      color: 'var(--lg-alert-secondary-text)',
       padding: '0 10px',
       fontSize: '11px',
-      fontWeight: '500',
+      fontWeight: '510',
       cursor: 'pointer',
       height: '28px',
-      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'background 150ms ease',
       boxShadow: 'none',
     },
     '.cm-search.cm-panel .cm-button:hover': {
-      backgroundColor: 'var(--gray-a6)',
+      backgroundColor: 'var(--lg-alert-secondary-bg-hover)',
       backgroundImage: 'none',
-      borderColor: 'var(--gray-a8)',
-      color: 'var(--foreground)',
-      transform: 'scale(1.02)',
     },
     '.cm-search.cm-panel .cm-button:active': {
-      backgroundColor: 'var(--gray-a7)',
+      backgroundColor: 'var(--lg-alert-secondary-bg-hover)',
       backgroundImage: 'none',
-      transform: 'scale(0.98)',
+      transform: 'scale(0.97)',
     },
-    // Close button - positioned top right (+1 bump)
+    // Close button — destructive hover pattern (dark: white at 8%)
     '.cm-search.cm-panel button[name="close"]': {
       position: 'absolute',
       top: '10px',
       right: '10px',
-      backgroundColor: 'transparent',
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
       border: 'none',
-      borderRadius: '6px',
-      color: 'var(--gray-a9)',
+      borderRadius: '9px',
+      color: 'var(--muted-foreground)',
       fontSize: '16px',
       width: '24px',
       height: '24px',
@@ -303,13 +299,14 @@ const darkTheme = EditorView.theme(
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'all 150ms ease',
       lineHeight: '1',
+      opacity: '0.5',
     },
     '.cm-search.cm-panel button[name="close"]:hover': {
-      backgroundColor: 'var(--gray-a5)',
-      color: 'var(--foreground)',
-      transform: 'scale(1.1)',
+      backgroundColor: 'var(--lg-alert-destructive-bg)',
+      color: 'var(--lg-alert-destructive-text)',
+      opacity: '1',
     },
     '.cm-search.cm-panel button[name="close"]:active': {
       transform: 'scale(0.95)',
@@ -321,25 +318,24 @@ const darkTheme = EditorView.theme(
       gap: '4px',
       height: '24px',
       padding: '0 8px',
-      borderRadius: '12px',
+      borderRadius: '100px',
       fontSize: '10px',
-      fontWeight: '500',
+      fontWeight: '510',
       letterSpacing: '0.02em',
-      color: 'var(--gray-a10)',
+      color: 'var(--muted-foreground)',
       backgroundColor: 'transparent',
-      border: '1px solid transparent',
+      border: 'none',
       cursor: 'pointer',
       userSelect: 'none',
-      transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      transition: 'all 150ms ease',
     },
     '.cm-search.cm-panel label:hover': {
-      backgroundColor: 'var(--gray-a5)',
+      backgroundColor: 'var(--lg-alert-secondary-bg)',
       color: 'var(--foreground)',
     },
     '.cm-search.cm-panel label:has(input:checked)': {
-      backgroundColor: 'oklch(0.55 0.15 250 / 0.15)',
-      color: 'oklch(0.75 0.12 250)',
-      borderColor: 'oklch(0.45 0.10 250 / 0.4)',
+      backgroundColor: 'oklch(0.68 0.18 25 / 0.15)',
+      color: 'var(--primary)',
     },
     // Hide native checkbox inside labels
     '.cm-search.cm-panel label input[type="checkbox"]': {
@@ -348,7 +344,7 @@ const darkTheme = EditorView.theme(
       opacity: '0',
       position: 'absolute',
     },
-    // Hide <br> - use margin on replace input instead
+    // Hide <br> — use margin on replace input instead
     '.cm-search.cm-panel br': {
       display: 'none',
     },
@@ -437,7 +433,7 @@ const lightTheme = EditorView.theme({
     borderLeftColor: 'var(--foreground)',
   },
   '&.cm-focused .cm-selectionBackground, ::selection': {
-    backgroundColor: 'var(--gray-a5)',
+    backgroundColor: 'var(--orbit-alpha-300)',
   },
   '.cm-gutters': {
     backgroundColor: 'var(--editor-bg)', // Match editor background
@@ -448,13 +444,13 @@ const lightTheme = EditorView.theme({
     backgroundColor: 'inherit',
   },
   '.cm-activeLine': {
-    backgroundColor: 'var(--gray-a4)',
+    backgroundColor: 'var(--orbit-alpha-200)',
   },
   // Hover tooltip light theme
   '.cm-tooltip': {
     backgroundColor: 'var(--background)',
     color: 'var(--foreground)',
-    border: '1px solid var(--gray-a5)',
+    border: '1px solid var(--orbit-alpha-300)',
   },
   '.cm-tooltip .cm-lsp-hover': {
     backgroundColor: 'var(--background)',
@@ -493,18 +489,17 @@ const lightTheme = EditorView.theme({
     content: '"●"',
     color: '#d97706',
   },
-  // Search panel styling - Soft UI Design (light mode)
+  // Search panel — uses glass-surface tokens for unified design (light mode)
   '.cm-panels': {
     backgroundColor: 'transparent',
     border: 'none',
   },
   '.cm-search.cm-panel': {
     position: 'relative',
-    // Use solid background - backdropFilter causes blur in Tauri WebView
-    backgroundColor: 'var(--background)',
-    borderRadius: '12px',
-    border: 'none',
-    boxShadow: '0 8px 32px -8px rgba(0,0,0,0.12), 0 4px 16px -4px rgba(0,0,0,0.06)',
+    backgroundColor: 'var(--glass-popover-bg)',
+    borderRadius: '9px',
+    border: '1px solid var(--border-menu)',
+    boxShadow: 'var(--orbit-shadow-menu)',
     padding: '12px',
     paddingRight: '40px',
     margin: '8px',
@@ -513,64 +508,61 @@ const lightTheme = EditorView.theme({
     alignItems: 'center',
     gap: '8px',
   },
-  // Input fields
+  // Input fields — liquid-glass-textarea tokens
   '.cm-search.cm-panel input.cm-textfield': {
-    backgroundColor: 'var(--gray-a3)',
-    border: '1px solid var(--gray-a5)',
-    borderRadius: '8px',
+    backgroundColor: 'var(--lg-input-bg)',
+    border: 'none',
+    borderRadius: '9px',
+    boxShadow: 'var(--lg-input-border)',
     color: 'var(--foreground)',
+    caretColor: 'var(--lg-input-cursor)',
     padding: '0 10px',
     fontSize: '12px',
     outline: 'none',
     height: '32px',
     minWidth: '140px',
     boxSizing: 'border-box',
-    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'box-shadow 150ms ease',
   },
   '.cm-search.cm-panel input.cm-textfield:focus': {
-    backgroundColor: 'var(--gray-contrast)',
-    borderColor: 'var(--gray-a7)',
-    boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05), 0 0 0 1px var(--gray-a5)',
+    boxShadow: 'var(--lg-input-focus)',
   },
   '.cm-search.cm-panel input.cm-textfield::placeholder': {
-    color: 'var(--gray-a9)',
+    color: 'var(--lg-input-placeholder)',
   },
-  // All buttons base styling - gray monochrome (+1 bump)
+  // Buttons — liquid-glass-btn-secondary tokens
   '.cm-search.cm-panel .cm-button': {
-    backgroundColor: 'var(--gray-a4)',
+    backgroundColor: 'var(--lg-alert-secondary-bg)',
     backgroundImage: 'none',
-    border: '1px solid var(--gray-a5)',
-    borderRadius: '6px',
-    color: 'var(--foreground)',
+    border: 'none',
+    borderRadius: '100px',
+    color: 'var(--lg-alert-secondary-text)',
     padding: '0 10px',
     fontSize: '11px',
-    fontWeight: '500',
+    fontWeight: '510',
     cursor: 'pointer',
     height: '28px',
-    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'background 150ms ease',
     boxShadow: 'none',
   },
   '.cm-search.cm-panel .cm-button:hover': {
-    backgroundColor: 'var(--gray-a5)',
+    backgroundColor: 'var(--lg-alert-secondary-bg-hover)',
     backgroundImage: 'none',
-    borderColor: 'var(--gray-a7)',
-    color: 'var(--foreground)',
-    transform: 'scale(1.02)',
   },
   '.cm-search.cm-panel .cm-button:active': {
-    backgroundColor: 'var(--gray-a6)',
+    backgroundColor: 'var(--lg-alert-secondary-bg-hover)',
     backgroundImage: 'none',
-    transform: 'scale(0.98)',
+    transform: 'scale(0.97)',
   },
-  // Close button - positioned top right (+1 bump)
+  // Close button — destructive hover pattern (light: black at 8%)
   '.cm-search.cm-panel button[name="close"]': {
     position: 'absolute',
     top: '10px',
     right: '10px',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.08)',
     border: 'none',
-    borderRadius: '6px',
-    color: 'var(--gray-a9)',
+    borderRadius: '9px',
+    color: 'var(--muted-foreground)',
     fontSize: '16px',
     width: '24px',
     height: '24px',
@@ -579,13 +571,14 @@ const lightTheme = EditorView.theme({
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 150ms ease',
     lineHeight: '1',
+    opacity: '0.5',
   },
   '.cm-search.cm-panel button[name="close"]:hover': {
-    backgroundColor: 'var(--gray-a4)',
-    color: 'var(--foreground)',
-    transform: 'scale(1.1)',
+    backgroundColor: 'var(--lg-alert-destructive-bg)',
+    color: 'var(--lg-alert-destructive-text)',
+    opacity: '1',
   },
   '.cm-search.cm-panel button[name="close"]:active': {
     transform: 'scale(0.95)',
@@ -597,25 +590,24 @@ const lightTheme = EditorView.theme({
     gap: '4px',
     height: '24px',
     padding: '0 8px',
-    borderRadius: '12px',
+    borderRadius: '100px',
     fontSize: '10px',
-    fontWeight: '500',
+    fontWeight: '510',
     letterSpacing: '0.02em',
-    color: 'var(--gray-a10)',
+    color: 'var(--muted-foreground)',
     backgroundColor: 'transparent',
-    border: '1px solid transparent',
+    border: 'none',
     cursor: 'pointer',
     userSelect: 'none',
-    transition: 'all 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+    transition: 'all 150ms ease',
   },
   '.cm-search.cm-panel label:hover': {
-    backgroundColor: 'var(--gray-a4)',
+    backgroundColor: 'var(--lg-alert-secondary-bg)',
     color: 'var(--foreground)',
   },
   '.cm-search.cm-panel label:has(input:checked)': {
-    backgroundColor: 'oklch(0.55 0.15 250 / 0.12)',
-    color: 'oklch(0.45 0.15 250)',
-    borderColor: 'oklch(0.55 0.12 250 / 0.3)',
+    backgroundColor: 'oklch(0.56 0.18 25 / 0.12)',
+    color: 'var(--primary)',
   },
   // Hide native checkbox inside labels
   '.cm-search.cm-panel label input[type="checkbox"]': {
@@ -624,7 +616,7 @@ const lightTheme = EditorView.theme({
     opacity: '0',
     position: 'absolute',
   },
-  // Hide <br> - use margin on replace input instead
+  // Hide <br> — use margin on replace input instead
   '.cm-search.cm-panel br': {
     display: 'none',
   },

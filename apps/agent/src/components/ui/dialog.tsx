@@ -69,7 +69,7 @@ const DialogContentTopCenter = React.forwardRef<
         <DialogPrimitive.Content
           ref={ref}
           className={cn(
-            'relative z-10 grid bg-sidebar border-0 shadow-none rounded-[12px]',
+            'relative z-10 grid glass-surface rounded-[12px]',
             'duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out',
             'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
             'data-[state=closed]:zoom-out-[0.98] data-[state=open]:zoom-in-[0.98]',

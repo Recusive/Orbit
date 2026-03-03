@@ -152,15 +152,13 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
           >
             {totalErrors > 0 ? (
               <>
-                <XCircle className="h-3 w-3 text-red-500" />
+                <XCircle className="h-3 w-3 text-destructive" />
                 <span>{totalErrors}</span>
               </>
             ) : null}
             {totalWarnings > 0 ? (
               <>
-                <AlertTriangle
-                  className={cn('h-3 w-3 text-yellow-500', totalErrors > 0 && 'ml-1')}
-                />
+                <AlertTriangle className={cn('h-3 w-3 text-warning', totalErrors > 0 && 'ml-1')} />
                 <span>{totalWarnings}</span>
               </>
             ) : null}
@@ -170,7 +168,7 @@ export const StatusBar: FC<StatusBarProps> = ({ className }) => {
             title="No problems detected - Click to open Problems"
             onClick={openProblemsPanel}
           >
-            <CheckCircle2 className="h-3 w-3 text-green-500" />
+            <CheckCircle2 className="h-3 w-3 text-success" />
             <span>0</span>
           </StatusItem>
         )}

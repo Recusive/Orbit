@@ -104,7 +104,7 @@ const FEEDBACK_ITEM: NavItemConfig = {
 
 export const SettingsSidebar: FC<SettingsSidebarProps> = ({ activeSection, onSectionChange }) => {
   return (
-    <div className="w-48 border-r border-r-foreground/10 p-2.5 bg-sidebar flex flex-col">
+    <div className="w-48 border-r border-r-foreground/10 p-2.5 flex flex-col">
       <nav className="space-y-1 flex-1">
         {NAV_ITEMS.map((item) => (
           <NavItem

@@ -15,7 +15,7 @@ import type { FC } from 'react';
 import {
   Dialog,
   DialogClose,
-  DialogContent,
+  DialogContentGlass,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -45,8 +45,8 @@ interface SkillRowProps {
 
 // Per-source config: header label, dot color, Facehash color
 const SOURCE_CONFIG: Record<string, { label: string; dot: string; facehash: string }> = {
-  project: { label: 'Project', dot: 'bg-green-500', facehash: 'bg-[#7EB4F0] dark:bg-[#7EB4F0]' },
-  user: { label: 'Personal', dot: 'bg-orange-400', facehash: 'bg-[#e9ad97] dark:bg-[#e9ad97]' },
+  project: { label: 'Project', dot: 'bg-green-500', facehash: 'bg-avatar-project' },
+  user: { label: 'Personal', dot: 'bg-orange-400', facehash: 'bg-avatar-user' },
 };
 
 // Octagon clip-path for skill Facehash icons
@@ -226,7 +226,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:w-[640px] sm:max-w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 [&>button:last-child]:hidden">
+      <DialogContentGlass className="w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
         {/* Header — search bar + close */}
         <div className="flex items-center shrink-0 p-3">
           <div className="relative flex-1">
@@ -245,10 +245,10 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               spellCheck={false}
               autoComplete="off"
               className={cn(
-                'w-full h-9 rounded-[9px] bg-(--lg-alert-secondary-bg) pl-9 pr-9 text-sm',
+                'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
                 'placeholder:text-muted-foreground/40 outline-none',
                 'transition-[background-color] duration-150',
-                'focus:bg-lg-control'
+                'focus:bg-control-fill-hover'
               )}
             />
             <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
@@ -304,8 +304,8 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
                 {grouped.map(({ source, skills: groupSkills }) => {
                   const config = SOURCE_CONFIG[source] ?? {
                     label: source,
-                    dot: 'bg-gray-400',
-                    facehash: 'bg-[#2B5EA7] dark:bg-[#7EB4F0]',
+                    dot: 'bg-orbit-600',
+                    facehash: 'bg-avatar-system',
                   };
                   return (
                     <div key={source}>
@@ -351,7 +351,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
             </ul>
           </div>
         </div>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

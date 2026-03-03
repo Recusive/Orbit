@@ -9,19 +9,29 @@ Orbit is a modern AI-powered code editor built with Tauri 2 (Rust backend) and R
 Frontend:
 
 - React 19 + TypeScript + Vite
+
 - Bun workspaces for monorepo management
+
 - Tailwind CSS v4
+
 - Zustand + Immer for state management
+
 - CodeMirror 6 for code editing
+
 - xterm.js for terminal emulation
+
 - Shiki for code block highlighting
+
 - Zod 4 for runtime validation
 
 Backend:
 
 - Tauri 2 for the desktop app framework
+
 - Rust workspace with multiple crates
+
 - portable-pty for terminal emulation
+
 - Tree-sitter for syntax parsing (planned)
 
 ## Package Manager Policy (Bun Only)
@@ -74,22 +84,31 @@ Tests live under `apps/agent/src/__tests__/` and `apps/canvas/src/*.test.ts`.
 Core:
 
 - `bun install` — install workspace dependencies.
+
 - `bunx tauri dev` — full app (Vite + Tauri + Rust).
+
 - `bun run dev` — frontend only (Vite, port 5176).
+
 - `bun run build` — production build (includes sidecar).
+
 - `bun run preview` — preview production build.
 
 Quality:
 
 - `bun run typecheck` — TypeScript `tsc --noEmit`.
+
 - `bun run lint` / `bun run lint:fix` — ESLint (zero warnings).
+
 - `bun run check` — typecheck + lint + tests.
+
 - `bun run ci` — typecheck + lint + tests + Rust checks.
+
 - `./scripts/lint-all.sh` — comprehensive linting (use `--fix` or `--no-test`).
 
 Rust:
 
 - `cargo build`, `cargo check`, `cargo test`, `cargo clippy`.
+
 - `bun run rust:fmt` / `bun run rust:lint` / `bun run rust:test` (repo shortcuts).
 
 ## Development Workflow
@@ -113,20 +132,27 @@ Hot reload behavior:
 ## Coding Style & Naming Conventions
 
 - TypeScript is strict (`tsconfig.json`) with explicit types and no unuseds.
+
 - ESLint enforces import ordering and separate `import type` blocks (`import-x/order`).
+
 - Use Prettier for formatting (`bun run format`).
+
 - React components use `PascalCase`; hooks use `use-` prefixes; stores live in `apps/agent/src/stores/`.
 
 ## Testing Guidelines
 
 - Unit tests use Vitest APIs and live alongside feature areas.
+
 - Use `bun run check` for the repo baseline; use `bun run rust:test` for Rust.
+
 - Prefer adding tests for store logic and message/handler behavior.
 
 ## Commit & Pull Request Guidelines
 
 - Commit messages follow a Conventional Commits style (e.g., `feat:`, `fix:`).
+
 - No PR template found; include a concise summary and list tests run.
+
 - For UI changes, add screenshots or short clips when behavior is visual.
 
 ## CLAUDE.md (Full)
@@ -142,19 +168,29 @@ Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) a
 ### Frontend
 
 - **React 19** + TypeScript + Vite
+
 - **Bun** workspaces for monorepo management
+
 - **Tailwind CSS v4** for styling
+
 - **Zustand + Immer** for state management
+
 - **CodeMirror 6** for code editing with custom themes
+
 - **xterm.js** for terminal emulation
+
 - **Shiki** for code block highlighting in chat
+
 - **Zod 4** for runtime validation
 
 ### Backend
 
 - **Tauri 2** for desktop app framework
+
 - **Rust** workspace with multiple crates
+
 - **portable-pty** for terminal emulation
+
 - Tree-sitter for syntax parsing (planned)
 
 ### Package Manager Policy
@@ -175,10 +211,10 @@ Orbit is a modern AI-powered code editor built with **Tauri 2** (Rust backend) a
 
 **Rules:**
 
-1. **Never use `npm` or `pnpm`** - Always use `bun`
-2. **Use `bun run`** for all scripts
-3. **Use `bun install`** for installing dependencies
-4. **Run tests with `bun test`**
+1. **Never use** **`npm`** **or** **`pnpm`** - Always use `bun`
+2. **Use** **`bun run`** for all scripts
+3. **Use** **`bun install`** for installing dependencies
+4. **Run tests with** **`bun test`**
 
 ```bash
 # [ok] CORRECT
@@ -345,7 +381,9 @@ Then restart the Tauri app (`Cmd+C` → `bunx tauri dev`).
 **Why manual rebuild?**
 
 - Tauri watches Rust code, not the agent-bridge TypeScript
+
 - The sidecar is a standalone binary (58MB) with embedded Bun runtime
+
 - Located at `target/debug/agent-bridge` in dev mode
 
 **Two build outputs:**
@@ -364,7 +402,9 @@ bunx tauri build
 Creates distributable app in `src-tauri/target/release/bundle/`:
 
 - **macOS**: `.dmg` and `.app`
+
 - **Windows**: `.exe` and `.msi`
+
 - **Linux**: `.AppImage` and `.deb`
 
 ### Frontend-Only Development
@@ -433,10 +473,15 @@ await writeTerminal(id, data);
 The editor (`apps/agent/src/components/editor/CodeMirrorEditor.tsx`) provides:
 
 - Full editing with syntax highlighting
+
 - Custom dark/light themes matching app colors
+
 - Language support: TypeScript, JavaScript, Python, Rust, Go, JSON, HTML, CSS, Markdown
+
 - LSP autocompletion integration
+
 - Cmd-S save functionality
+
 - Theme-aware (syncs with app light/dark mode via MutationObserver)
 
 ### Theme Colors
@@ -469,27 +514,39 @@ All message types in `apps/agent/src/types/protocol.ts` with Zod schemas:
 ### Frontend → Backend (WebviewMessage)
 
 - `message:send` - Send chat message
+
 - `file:read`, `file:write` - File operations
+
 - `terminal:create`, `terminal:write` - Terminal operations
+
 - `agent:stop` - Stop AI generation
 
 ### Backend → Frontend (ExtensionMessage)
 
 - `agent:chunk`, `agent:complete` - AI responses
+
 - `tool:start`, `tool:end` - Tool execution
+
 - `file:content`, `file:tree:response` - File data
+
 - `terminal:output`, `terminal:created` - Terminal data
 
 ## Code Style
 
 ### ESLint Rules (enforced)
 
-- **No `any`** - All unsafe operations are errors
+- **No** **`any`** - All unsafe operations are errors
+
 - **Explicit return types** on functions
+
 - **Consistent type imports** - Use `import type { }` separately
+
 - **Import order** - External → Types → Internal, alphabetized. Use `bun run lint --fix` if unsure
+
 - **No console.log** - Use structured logger (see below)
+
 - **Strict boolean expressions** - No implicit truthy checks
+
 - **Exhaustive switches** - All cases must be handled
 
 ### Structured Logging
@@ -511,20 +568,27 @@ logger.error('Error occurred', new Error('fail')); // Always shown with stack
 **Benefits:**
 
 - **Context prefix** - Easily identify source: `[MyComponent] message`
+
 - **Log levels** - Debug messages hidden in production
+
 - **Structured data** - JSON metadata for log aggregation
+
 - **Error handling** - Proper error serialization with stack traces
 
 ### Tailwind + Dynamic Styles
 
 - **Never use dynamic Tailwind classes** like `` `w-[${value}px]` ``
+
 - Use inline styles for dynamic dimensions: `style={{ width: value }}`
+
 - Static Tailwind classes work normally: `w-px`, `h-[32px]`
 
 ### React Patterns
 
 - Functional components with explicit `FC` type
+
 - Ternary for conditional rendering
+
 - Props interfaces marked `readonly`
 
 ## Module Organization Patterns
@@ -655,27 +719,41 @@ pub use types::{FileStatus, GitStatus};
 ### Completed
 
 - [x] Tauri 2 project setup with Rust workspace
+
 - [x] Monorepo restructure (apps/, crates/common/, commands/)
+
 - [x] CodeMirror 6 editor with custom themes
+
 - [x] File editing with save (Cmd-S)
+
 - [x] Modified indicator on tabs
+
 - [x] Theme switching (light/dark)
+
 - [x] Frontend-backend communication layer
+
 - [x] Terminal with xterm.js
+
 - [x] Git status & operations
+
 - [x] Bun workspace management
+
 - [x] CI/CD with GitHub Actions
 
 ### In Progress
 
 - [ ] Canvas app implementation
+
 - [ ] Editor app implementation
+
 - [ ] Shared packages extraction
 
 ### TODO
 
 - [ ] Tree-sitter syntax highlighting
+
 - [ ] LSP/diagnostics integration
+
 - [ ] Advanced search features
 
 ## Troubleshooting
@@ -687,7 +765,9 @@ pub use types::{FileStatus, GitStatus};
 Common symptoms:
 
 - "Invalid credentials" or "No credentials found" errors
+
 - Data parsing silently returning `null`
+
 - "Unrecognized keys" or "Invalid input: expected X, received Y" in logs
 
 **Root cause:** Schemas using `.strict()` will reject data with extra fields, and type mismatches (e.g., `number` vs `string`) cause validation failures.
@@ -695,12 +775,15 @@ Common symptoms:
 **Where to look:**
 
 - `agent-bridge/src/schemas.ts` - Bridge IPC schemas
+
 - `packages/shared-schemas/` - Shared validation schemas
 
 **Quick fix pattern:**
 
 - For **external data** (APIs, Keychain, SDK responses): Use `.loose()` instead of `.strict()`
+
 - For **type mismatches**: Use `z.union([z.number(), z.string()])` for flexible types
+
 - For **internal data** (your own code): `.strict()` is fine
 
 **Example fix (from KeychainCredentialsSchema):**
@@ -737,7 +820,7 @@ Common symptoms:
 | Conversation Context Format | `apps/agent/src/hooks/use-tauri.ts:formatConversationContext()` | `agent-bridge/src/__tests__/conversation-rewind.test.ts` |
 | Combined Rewind Flow        | `apps/agent/src/hooks/use-tauri.ts:conversation:rewind handler` | `agent-bridge/src/__tests__/combined-rewind.test.ts`     |
 
-**When adding new tests:** Always add the [warning] TESTED comment to the source function/handler being tested.
+**When adding new tests:** Always add the \[warning] TESTED comment to the source function/handler being tested.
 
 ### Mandatory Test Requirements
 
@@ -752,7 +835,7 @@ Common symptoms:
 
 #### What We Test
 
-| [bad] DO NOT                     | [ok] DO                                  |
+| \[bad] DO NOT                    | \[ok] DO                                 |
 | -------------------------------- | ---------------------------------------- |
 | Mock the Claude SDK              | Use REAL Claude API calls                |
 | Test single files in isolation   | Test full module integration             |
@@ -773,19 +856,27 @@ agent-bridge/src/__tests__/
 
 1. **When creating a new file:**
    - Add tests to the relevant E2E test file (e.g., `canvas-e2e.test.ts`)
+
    - Tests must exercise the FULL flow through real systems
+
    - Run the complete test suite to verify integration
-   - Add the [warning] TESTED comment to the source file
+
+   - Add the \[warning] TESTED comment to the source file
 
 2. **When modifying a file that has existing tests:**
    - Find the E2E test file for that module
+
    - **ADD NEW TESTS** that cover your new functionality
+
    - Tests must verify the new code integrates with existing systems
+
    - Do NOT just run existing tests - that defeats the purpose
+
    - Run the FULL test suite to verify nothing broke
 
 3. **When modifying a file without existing tests:**
    - Create E2E tests if the module doesn't have them
+
    - Tests must cover the full integration path
 
 #### Real Integration Test Example
@@ -826,10 +917,15 @@ it('should route simple requests to fast path via real session', async () => {
 #### Test Checklist Before PR
 
 - [ ] Added tests for ALL new functionality
+
 - [ ] Tests use REAL systems (no mocks for core functionality)
+
 - [ ] Tests verify FULL integration flow
+
 - [ ] Tests cover error cases and cleanup
+
 - [ ] Ran complete test suite: `cd agent-bridge && bun test`
+
 - [ ] All tests pass with real API calls
 
 #### Running Tests Locally (IMPORTANT)
@@ -852,6 +948,7 @@ bun test
 Tests use `describe.skipIf(process.env.GITHUB_ACTIONS === 'true')` to:
 
 - **Run locally**: OAuth from Claude Code CLI keychain is available
+
 - **Skip in CI**: GitHub Actions has no OAuth access, tests would fail with "No credentials found"
 
 **If tests fail locally with "No credentials found":**
@@ -953,10 +1050,15 @@ The following CSS properties trigger GPU compositing issues that result in momen
 #### Quick Checklist for Tauri-Compatible CSS
 
 - [ ] No `backdrop-filter: blur()` on interactive elements
+
 - [ ] No `color-mix()` function - use CSS variables or `rgba()` instead
+
 - [ ] No `transition` on elements inside ReactFlow's transformed viewport
+
 - [ ] No `animation` on elements inside ReactFlow's transformed viewport
+
 - [ ] Avoid combining `opacity` transitions with other transforms
+
 - [ ] Test in Tauri app, not just browser (blur won't appear in browser)
 
 **Note:** `contain: layout style paint` and `will-change: transform` do NOT fix the blur issue. The only solution for elements inside ReactFlow's viewport is to completely remove transitions and animations.
@@ -973,9 +1075,9 @@ The following CSS properties trigger GPU compositing issues that result in momen
 
 **Last audited:** January 2025
 
-| Package                     | Severity | CVE           | Status                     | Notes                                           |
-| --------------------------- | -------- | ------------- | -------------------------- | ----------------------------------------------- |
-| `@modelcontextprotocol/sdk` | High     | CVE-2026-0621 | [pending] Waiting upstream | ReDoS in UriTemplate class. No patch available. |
+| Package                     | Severity | CVE           | Status                      | Notes                                           |
+| --------------------------- | -------- | ------------- | --------------------------- | ----------------------------------------------- |
+| `@modelcontextprotocol/sdk` | High     | CVE-2026-0621 | \[pending] Waiting upstream | ReDoS in UriTemplate class. No patch available. |
 
 #### MCP SDK ReDoS (CVE-2026-0621)
 
@@ -1032,12 +1134,15 @@ All color variables are defined in `apps/agent/src/globals.css`:
 
 ### Rules
 
-1. **NEVER define `:root` color variables in canvas globals.css** - They will override agent colors
+1. **NEVER define** **`:root`** **color variables in canvas globals.css** - They will override agent colors
 2. **Canvas uses agent's variables** - e.g., `var(--background)`, `var(--card)`, `var(--primary)`
 3. **Canvas globals.css contains only:**
    - Tailwind `@theme` mappings (pointing to agent's variables)
+
    - ReactFlow style overrides (`.react-flow__*`)
+
    - Scrollbar styling
+
    - Base layout (html, body, #root)
 
 ### Adding New Colors
@@ -1072,7 +1177,9 @@ The Canvas app is embedded within the Agent app as a mode/tab (not a separate Ta
 ### Canvas Libraries
 
 - **@xyflow/react** (ReactFlow) - Node-based canvas
+
 - **@codesandbox/sandpack-react** - Code playground integration
+
 - **Zustand** - State management (`apps/canvas/src/stores/`)
 
 ### Canvas Directory Structure
@@ -1099,10 +1206,16 @@ apps/canvas/src/
 
 - **Migrated from pnpm to Bun** - All package management now uses Bun for faster installs and unified tooling
   - Removed `pnpm-workspace.yaml` - workspaces defined in `package.json`
+
   - Removed `pnpm-lock.yaml` - replaced by `bun.lockb`
+
   - Updated all scripts, CI workflows, and husky hooks to use `bun`
+
   - Added comprehensive `lint-all.sh` script for running all checks
+
 - **Added comprehensive audit** - Aligned all linting, TypeScript, and CI checks across the monorepo
+
 - **Documented module organization patterns** - Barrel pattern for frontend, explicit paths for Rust backend
   - Frontend: Every folder with multiple files gets an `index.ts` barrel
+
   - Backend: Tauri commands use explicit paths, shared crates use selective re-exports

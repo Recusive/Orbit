@@ -183,7 +183,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Pattern & filters */}
               <div className="px-3 py-2">
                 <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">

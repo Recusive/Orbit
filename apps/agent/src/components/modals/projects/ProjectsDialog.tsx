@@ -12,7 +12,7 @@ import type { FC } from 'react';
 import {
   Dialog,
   DialogClose,
-  DialogContent,
+  DialogContentGlass,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -72,7 +72,7 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       name={project.name}
       size={56}
       variant="solid"
-      colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
+      colorClasses={['bg-avatar-project']}
       className="shrink-0 text-white dark:text-black"
       style={{ pointerEvents: 'none', clipPath: FOLDER_CLIP }}
     />
@@ -217,7 +217,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:w-[640px] sm:max-w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 [&>button:last-child]:hidden">
+      <DialogContentGlass className="w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
         {/* Header — search bar + close */}
         <div className="flex items-center shrink-0 p-3">
           {/* Search */}
@@ -237,10 +237,10 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
               spellCheck={false}
               autoComplete="off"
               className={cn(
-                'w-full h-9 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-9 text-sm',
+                'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
                 'placeholder:text-muted-foreground/40 outline-none',
                 'transition-[background-color] duration-150',
-                'focus:bg-[var(--lg-control-bg)]'
+                'focus:bg-control-fill-hover'
               )}
             />
             <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
@@ -270,8 +270,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
               </p>
               <button
                 type="button"
-                className="liquid-glass-btn liquid-glass-btn-primary cursor-pointer transition-transform duration-75 active:scale-[0.97]"
-                style={{ padding: '0 16px' }}
+                className="liquid-glass-btn liquid-glass-btn-primary cursor-pointer px-4 transition-transform duration-75 active:scale-[0.97]"
                 onClick={() => void handleOpenFolder()}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -318,7 +317,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
             </ul>
           </div>
         </div>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

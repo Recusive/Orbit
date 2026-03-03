@@ -37,11 +37,13 @@ Use this to find the right file. Read the file directly — no links needed.
 - `LIQUID-GLASS.md` — Liquid glass visual effect system
 - `tauri-plugins.md` — Tauri 2 plugins reference
 
-## design/ (3 files)
+## design/ (5 files)
 
 - `TYPOGRAPHY.md` — Typography system (VS Code-like)
 - `ICON-THEME-SYSTEM.md` — File and folder icon theme system
 - `flash-prevention-guide.md` — Preventing UI flash on load
+- `GEIST-SYSTEM.md` — Orbit color token architecture (Geist model: 10-step scales, semantic bands, Radix mapping)
+- `COLOR-SYSTEM-REFACTOR.md` — File-by-file color refactor plan (patterns A-J, semantic tokens, verification)
 
 ## development/ (6 files)
 

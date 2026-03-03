@@ -8,7 +8,7 @@ import type { FC, KeyboardEvent } from 'react';
 import {
   Dialog,
   DialogClose,
-  DialogContent,
+  DialogContentGlass,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -196,21 +196,18 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] gap-0 p-0 [&>button:last-child]:hidden">
-        <div className="relative flex flex-col" style={{ padding: '20px 16px 16px', gap: 16 }}>
-          {/* Close button — glass style */}
-          <DialogClose className="absolute right-[16px] top-[16px] z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
+      <DialogContentGlass className="w-[425px] gap-0 overflow-hidden p-0 glass-surface [&>.absolute]:hidden">
+        <div className="relative flex flex-col gap-4 px-4 pb-4 pt-5">
+          {/* Close button */}
+          <DialogClose className="absolute right-4 top-4 z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
             <X className="h-3.5 w-3.5" aria-hidden="true" />
             <span className="sr-only">Close</span>
           </DialogClose>
 
           {/* Icon + Title + Description */}
-          <div className="flex flex-col items-start" style={{ gap: 10 }}>
-            <div
-              className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
-              style={{ filter: 'none' }}
-            >
-              <GitBranch className="h-7 w-7 text-accent-11" aria-hidden="true" />
+          <div className="flex flex-col items-start gap-2.5">
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
+              <GitBranch className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
             <DialogTitle className="liquid-glass-title">Create Worktree</DialogTitle>
             <DialogDescription className="liquid-glass-desc">
@@ -219,7 +216,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
           </div>
 
           {/* Form fields */}
-          <div className="flex flex-col" style={{ gap: 14 }}>
+          <div className="flex flex-col gap-3.5">
             {/* Create new branch toggle */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Create new branch</span>
@@ -342,8 +339,8 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
             )}
           </div>
 
-          {/* Buttons — pill-shaped glass style */}
-          <div className="flex w-full items-center pt-2" style={{ gap: 8 }}>
+          {/* Buttons */}
+          <div className="flex w-full items-center gap-2 pt-2">
             <button
               type="button"
               className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none"
@@ -371,7 +368,7 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
             </button>
           </div>
         </div>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

@@ -54,7 +54,7 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
         ) : null}
 
         {isComplete ? (
-          <span className="flex items-center gap-1 text-xs text-green-500/80">
+          <span className="flex items-center gap-1 text-xs text-success/80">
             <CheckCircle2 className="h-3 w-3 shrink-0" />
             <span>Loaded</span>
           </span>

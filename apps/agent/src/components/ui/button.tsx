@@ -16,9 +16,9 @@ const buttonVariants = cva(
         destructive:
           'bg-lg-destructive-bg text-lg-destructive hover:brightness-90 focus-visible:ring-lg-destructive/20 active:scale-[0.98]',
         outline:
-          'bg-[var(--lg-alert-secondary-bg)] text-[var(--lg-alert-secondary-text)] hover:bg-[var(--lg-alert-secondary-bg-hover)] active:scale-[0.97]',
+          'bg-control-fill text-control-text hover:bg-control-fill-hover active:scale-[0.97]',
         secondary:
-          'bg-[var(--lg-alert-secondary-bg)] text-[var(--lg-alert-secondary-text)] hover:bg-[var(--lg-alert-secondary-bg-hover)] active:scale-[0.97]',
+          'bg-control-fill text-control-text hover:bg-control-fill-hover active:scale-[0.97]',
         ghost: 'hover:bg-lg-control-hover hover:text-foreground active:bg-lg-control',
         link: 'text-foreground underline-offset-4 hover:underline',
       },

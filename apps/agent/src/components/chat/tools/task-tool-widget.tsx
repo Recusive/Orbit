@@ -147,7 +147,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Task details */}
               <div className="px-3 py-2">
                 <div className="flex items-center gap-1.5 mb-1.5">

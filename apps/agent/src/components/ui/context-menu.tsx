@@ -46,7 +46,7 @@ const ContextMenuSubContent = React.forwardRef<
   <ContextMenuPrimitive.SubContent
     ref={ref}
     className={cn(
-      'z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1.5 text-popover-foreground',
+      'z-50 min-w-[8rem] overflow-hidden rounded-xl glass-surface p-1.5 text-popover-foreground',
       // Transform origin from Radix - scales from where it connects to parent menu
       'origin-[--radix-context-menu-content-transform-origin]',
       // Enter animation: subtle scale + fade + directional slide
@@ -78,7 +78,7 @@ const ContextMenuContent = React.forwardRef<
     <ContextMenuPrimitive.Content
       ref={ref}
       className={cn(
-        'z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[#f3f3f3] dark:bg-[oklch(23%_0_0)] border border-white dark:border-white/5 shadow-[0_0_0_1px_rgba(255,255,255,0.9),0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md p-1.5 text-popover-foreground',
+        'z-50 min-w-[8rem] overflow-hidden rounded-xl glass-surface p-1.5 text-popover-foreground',
         // Transform origin from Radix - scales from cursor position
         'origin-[--radix-context-menu-content-transform-origin]',
         // Enter animation: subtle scale + fade + directional slide

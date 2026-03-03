@@ -2,6 +2,7 @@ import type { FileStatus } from '@/lib/api';
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
+import { GIT_STATUS_STYLES } from '@/lib/utils/constants';
 
 interface GitStatusBadgeProps {
   /** The file status to display */
@@ -10,58 +11,15 @@ interface GitStatusBadgeProps {
   className?: string;
 }
 
-const STATUS_CONFIG: Record<
-  FileStatus,
-  { label: string; color: string; bg: string; title: string }
-> = {
-  added: {
-    label: 'A',
-    color: 'text-green-400',
-    bg: 'bg-green-400/20',
-    title: 'Added',
-  },
-  modified: {
-    label: 'M',
-    color: 'text-[#c18533] dark:text-[#f0b367]',
-    bg: 'bg-[#c18533]/20 dark:bg-[#f0b367]/20',
-    title: 'Modified',
-  },
-  deleted: {
-    label: 'D',
-    color: 'text-red-400',
-    bg: 'bg-red-400/20',
-    title: 'Deleted',
-  },
-  renamed: {
-    label: 'R',
-    color: 'text-blue-400',
-    bg: 'bg-blue-400/20',
-    title: 'Renamed',
-  },
-  copied: {
-    label: 'C',
-    color: 'text-purple-400',
-    bg: 'bg-purple-400/20',
-    title: 'Copied',
-  },
-  untracked: {
-    label: '?',
-    color: 'text-[#0d87ff] dark:text-[#99ceff]',
-    bg: 'bg-[#0d87ff]/20 dark:bg-[#99ceff]/20',
-    title: 'Untracked',
-  },
-  conflicted: {
-    label: 'U',
-    color: 'text-orange-400',
-    bg: 'bg-orange-400/20',
-    title: 'Conflicted',
-  },
-  typechange: {
-    label: 'T',
-    color: 'text-cyan-400',
-    bg: 'bg-cyan-400/20',
-    title: 'Type Changed',
-  },
+const STATUS_BACKGROUNDS: Record<FileStatus, string> = {
+  added: 'bg-git-added-subtle',
+  modified: 'bg-git-modified-subtle',
+  deleted: 'bg-git-deleted-subtle',
+  renamed: 'bg-git-renamed-subtle',
+  copied: 'bg-git-copied-subtle',
+  untracked: 'bg-git-untracked-subtle',
+  conflicted: 'bg-git-conflicted-subtle',
+  typechange: 'bg-git-typechange-subtle',
 };
 
 /**
@@ -74,14 +32,14 @@ const STATUS_CONFIG: Record<
  * ```
  */
 export const GitStatusBadge: FC<GitStatusBadgeProps> = ({ status, className }) => {
-  const config = STATUS_CONFIG[status];
+  const config = GIT_STATUS_STYLES[status];
 
   return (
     <span
       className={cn(
         'inline-flex items-center justify-center w-5 h-5 text-xs font-mono font-bold rounded',
         config.color,
-        config.bg,
+        STATUS_BACKGROUNDS[status],
         className
       )}
       title={config.title}

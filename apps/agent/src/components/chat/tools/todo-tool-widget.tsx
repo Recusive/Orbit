@@ -196,7 +196,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               <div className="px-3 py-2">
                 {isRunning && todos.length === 0 ? (
                   <div className="flex items-center gap-1.5 text-sm text-lg-text-secondary">
