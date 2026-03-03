@@ -220,6 +220,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         <Tooltip>
           <TooltipTrigger asChild>
             <button
+              data-demo-send
               onClick={isAgentRunning && isInputEmpty ? handleStop : handleSend}
               disabled={!isAgentRunning && isInputEmpty}
               aria-label={

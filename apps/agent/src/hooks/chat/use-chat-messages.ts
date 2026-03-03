@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
+import type { DemoConfig, DemoRunnerControls, DemoScript } from '@/demo/types';
 import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-stress-test';
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
@@ -63,6 +64,8 @@ declare global {
           runVerifiedReviewCycle1StressTest?: (
             config?: VerifiedReviewCycle1StressTestConfig
           ) => Promise<unknown>;
+          runDemo?: (script: DemoScript, config?: DemoConfig) => Promise<DemoRunnerControls>;
+          runLaunchDemo?: (config?: DemoConfig) => Promise<DemoRunnerControls>;
           simulateUpdate?: (config?: UpdateSimulationConfig) => Promise<void>;
           simulateUpdateQuickCycle?: () => Promise<void>;
           handleSend?: (text: string) => void;
@@ -410,12 +413,38 @@ export function useChatMessages(): UseChatMessagesReturn {
     if (!import.meta.env.DEV) return;
 
     const actions = createChatActions({ postMessage });
-    const existingDebug = window.__orbit_debug ?? {};
-    window.__orbit_debug = {
-      ...existingDebug,
+
+    const debugEntries = {
       handleSend: actions.handleSend,
       handleRewind: actions.handleRewind,
       handleStop: actions.handleStop,
+      runDemo: async (script: DemoScript, config?: DemoConfig) => {
+        const { runDemoScript } = await import('@/demo');
+        return runDemoScript(
+          script,
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
+            handleOpenFile: actions.handleOpenFile,
+            postMessage,
+          },
+          config
+        );
+      },
+      runLaunchDemo: async (config?: DemoConfig) => {
+        const { launchVideoScript } = await import('@/demo/scripts/launch-video');
+        const { runDemoScript } = await import('@/demo');
+        return runDemoScript(
+          launchVideoScript,
+          {
+            handleSend: actions.handleSend,
+            handleStop: actions.handleStop,
+            handleOpenFile: actions.handleOpenFile,
+            postMessage,
+          },
+          config
+        );
+      },
       runRewindStressTest: async (config?: StressTestConfig) => {
         const { runRewindStressTest } = await import('@/stress-tests/rewind-stress-test');
         return runRewindStressTest(
@@ -495,10 +524,28 @@ export function useChatMessages(): UseChatMessagesReturn {
         const { simulateUpdateQuickCycle } = await import('@/stress-tests/update-simulation');
         return simulateUpdateQuickCycle();
       },
+    } satisfies NonNullable<Window['__orbit_debug']>;
+
+    const existingDebug = window.__orbit_debug ?? {};
+    window.__orbit_debug = {
+      ...existingDebug,
+      ...debugEntries,
     };
 
     return (): void => {
-      window.__orbit_debug = undefined;
+      const debug = window.__orbit_debug;
+      if (!debug) return;
+
+      for (const [key, value] of Object.entries(debugEntries)) {
+        const typedKey = key as keyof NonNullable<Window['__orbit_debug']>;
+        if (debug[typedKey] === value) {
+          Reflect.deleteProperty(debug, typedKey);
+        }
+      }
+
+      if (Object.keys(debug).length === 0) {
+        window.__orbit_debug = undefined;
+      }
     };
   }, [postMessage]);
 

@@ -206,6 +206,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
             <div className="relative">
               <div
                 ref={inputRef}
+                data-demo-input
                 className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
                 style={{
                   minHeight: INPUT_SIZES.textareaMinHeight,
