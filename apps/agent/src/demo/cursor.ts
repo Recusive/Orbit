@@ -57,7 +57,8 @@ function injectCursorStyles(): void {
     }
 
     #${CURSOR_ID}.is-clicking {
-      animation: orbit-demo-cursor-click 150ms ease-out;
+      /* Click pulse handled via JS inline transform to avoid
+         CSS animation overriding the translate3d position. */
     }
 
     .orbit-demo-cursor-ripple {
@@ -84,12 +85,6 @@ function injectCursorStyles(): void {
       box-shadow: 0 0 0 6px rgba(99, 102, 241, 0.14);
       animation: orbit-demo-highlight-pulse 900ms ease-out infinite;
       will-change: transform, opacity;
-    }
-
-    @keyframes orbit-demo-cursor-click {
-      0% { transform: scale(1); }
-      50% { transform: scale(0.85); }
-      100% { transform: scale(1); }
     }
 
     @keyframes orbit-demo-ripple {
@@ -311,9 +306,12 @@ export async function clickEffect(
   const state = getOrCreateCursor();
 
   const clickPoint = point ?? { x: state.x, y: state.y };
-  state.element.classList.remove('is-clicking');
-  void state.element.offsetHeight;
-  state.element.classList.add('is-clicking');
+
+  // Click pulse via inline transform — keeps translate3d + scale in the
+  // same property so they can't desync (CSS animations override the
+  // entire transform, causing the cursor to snap to 0,0).
+  const baseTransform = `translate3d(${String(state.x)}px, ${String(state.y)}px, 0)`;
+  state.element.style.transform = `${baseTransform} scale(0.85)`;
 
   const ripple = document.createElement('div');
   ripple.className = 'orbit-demo-cursor-ripple';
@@ -328,9 +326,14 @@ export async function clickEffect(
   ripple.addEventListener('animationend', removeRipple, { once: true });
 
   try {
-    await sleep(durationMs, signal);
+    const halfDuration = Math.round(durationMs / 2);
+    await sleep(halfDuration, signal);
+    // Restore to normal scale
+    setCursorPosition(state.x, state.y);
+    await sleep(halfDuration, signal);
   } finally {
-    state.element.classList.remove('is-clicking');
+    // Ensure transform is clean even if aborted mid-pulse
+    setCursorPosition(state.x, state.y);
     removeRipple();
   }
 }
