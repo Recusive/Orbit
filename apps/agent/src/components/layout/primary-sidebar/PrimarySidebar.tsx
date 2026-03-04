@@ -341,7 +341,7 @@ export const PrimarySidebar: FC = () => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col overflow-hidden"
+      className="h-full flex flex-col overflow-hidden select-none cursor-default"
       style={{ contain: 'layout style' }}
     >
       {/* Header — collapse button next to macOS traffic lights (x:11 + ~54px for 3 buttons) */}
