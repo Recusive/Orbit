@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, Loader2, Search } from 'lucide-react';
+import { ChevronRight, File, Folder, Loader2, Search, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -61,8 +61,7 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon + tool name + count + spinner */}
@@ -75,14 +74,11 @@ export const GlobToolWidget: FC<GlobToolWidgetProps> = ({
             )}
           />
 
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
+          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {!isRunning && !isFailed && fileCount > 0 ? (
             <span className="text-sm text-muted-foreground">

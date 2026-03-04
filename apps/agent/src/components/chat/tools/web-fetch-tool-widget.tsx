@@ -1,4 +1,4 @@
-import { ChevronRight, ExternalLink, Globe, Loader2 } from 'lucide-react';
+import { ChevronRight, ExternalLink, Globe, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -52,8 +52,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon + tool name + spinner */}
@@ -66,14 +65,11 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
             )}
           />
 
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
+          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />

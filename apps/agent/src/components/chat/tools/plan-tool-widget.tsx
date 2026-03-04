@@ -5,7 +5,7 @@
  * Instead of showing raw diff lines like WriteToolWidget, it renders the plan
  * content as formatted markdown for better readability.
  */
-import { ChevronRight, ClipboardList, Loader2 } from 'lucide-react';
+import { ChevronRight, ClipboardList, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -67,9 +67,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         className={cn(
           'group flex items-center py-1.5 text-sm',
           'cursor-pointer w-full text-left rounded-xl',
-          isFailed
-            ? 'border-2 border-dotted border-destructive/40'
-            : 'border-2 border-dotted border-mode-plan/40'
+          !isFailed && 'border-2 border-dotted border-mode-plan/40'
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
@@ -84,7 +82,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-sm font-medium',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-mode-plan'
+              isFailed ? 'text-lg-text-secondary' : 'text-mode-plan'
             )}
           >
             Plan
@@ -93,13 +91,15 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
           <span
             className={cn(
               'text-sm font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
+              'text-lg-text-secondary'
             )}
             onClick={handleFileClick}
             title={filePath}
           >
             {fileName}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {isRunning ? (
             <div className="flex items-center gap-1 text-lg-text-secondary">

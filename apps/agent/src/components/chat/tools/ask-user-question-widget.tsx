@@ -116,8 +116,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon + tool name */}
@@ -133,6 +132,8 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
           <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           <ChevronRight
             className={cn(

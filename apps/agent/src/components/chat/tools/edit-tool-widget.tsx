@@ -1,7 +1,7 @@
 import { IconWrite } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconWrite';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
-import { AlertCircle, ChevronRight, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -135,8 +135,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon, filename, badges, spinner, diff */}
@@ -154,7 +153,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             tabIndex={0}
             className={cn(
               'text-sm font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
+              isFailed ? 'text-lg-text-secondary' : 'text-foreground'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -165,6 +164,8 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
           >
             {fileName}
           </a>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           <span
             className={cn(

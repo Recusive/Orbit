@@ -525,6 +525,36 @@ export function handleMockMessage(message: WebviewMessage): void {
       break;
     }
 
+    case 'skills:list': {
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'skills:list:response',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+            skills: [
+              {
+                name: 'vercel-react-best-practices',
+                description: 'Performance and rendering guidance for React applications',
+                source: 'project',
+                triggers: ['react', 'performance', 'bundle'],
+                filePath: `${MOCK_ROOT}/.claude/skills/vercel-react-best-practices/SKILL.md`,
+              },
+              {
+                name: 'web-animation-best-practices',
+                description: 'Motion principles for accessible and performant UI animation',
+                source: 'user',
+                triggers: ['animation', 'motion', 'transition'],
+                filePath: `${MOCK_ROOT}/.claude/skills/web-animation-best-practices/SKILL.md`,
+              },
+            ],
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
     // All other message types don't need mock responses
     case 'webview:ready':
     case 'message:edit':
@@ -608,7 +638,6 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'commands:delete':
     case 'subagents:generate':
     case 'commands:generate':
-    case 'skills:list':
       break;
   }
 }

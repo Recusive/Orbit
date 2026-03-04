@@ -20,10 +20,7 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
 
   return (
     <div
-      className={cn(
-        'flex items-center gap-2 py-1.5 text-sm rounded-xl',
-        isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
-      )}
+      className={cn('flex items-center gap-2 py-1.5 text-sm rounded-xl', isFailed && 'opacity-60')}
     >
       <div className="flex items-center gap-2 min-w-0">
         {/* Icon */}
@@ -42,7 +39,7 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
         <span
           className={cn(
             'text-sm font-medium truncate',
-            isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
+            isFailed ? 'text-lg-text-secondary' : 'text-foreground'
           )}
         >
           {skillName}

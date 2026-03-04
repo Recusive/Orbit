@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2 } from 'lucide-react';
+import { CheckCircle2, ChevronRight, Circle, ListTodo, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -126,8 +126,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon + tool name + count + spinner + progress */}
@@ -140,14 +139,11 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
             )}
           />
 
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
+          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {!isRunning && !isFailed && totalCount > 0 ? (
             <span className="text-sm text-muted-foreground">

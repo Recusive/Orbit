@@ -1,4 +1,4 @@
-import { ChevronRight, Globe, Loader2, Search } from 'lucide-react';
+import { ChevronRight, Globe, Loader2, Search, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -118,8 +118,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         aria-expanded={isExpanded}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
         {/* Left: icon + tool name + count + spinner */}
@@ -132,14 +131,11 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
             )}
           />
 
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
+          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {!isRunning && !isFailed && resultCount > 0 ? (
             <span className="text-sm text-muted-foreground">

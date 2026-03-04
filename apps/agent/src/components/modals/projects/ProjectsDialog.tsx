@@ -21,6 +21,7 @@ import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils';
+import { setFaceHover } from '@/lib/utils/facehash-utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -38,18 +39,6 @@ interface ProjectTileProps {
 // Folder silhouette clip-path for 56×56 Facehash icons
 const FOLDER_CLIP =
   'path("M6 0H18C20 0 21.5 1 22.5 3L25 9H50C53.3 9 56 11.7 56 15V50C56 53.3 53.3 56 50 56H6C2.7 56 0 53.3 0 50V6C0 2.7 2.7 0 6 0Z")';
-
-const setFaceHover = (e: React.MouseEvent, hovered: boolean): void => {
-  const face = e.currentTarget.querySelector('[data-facehash-face]');
-  if (face instanceof HTMLElement) {
-    if (hovered) {
-      face.dataset['savedTransform'] = face.style.transform;
-      face.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(12px)';
-    } else if (face.dataset['savedTransform']) {
-      face.style.transform = face.dataset['savedTransform'];
-    }
-  }
-};
 
 const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
   <button

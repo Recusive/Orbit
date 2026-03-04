@@ -87,9 +87,25 @@ function parseSkillFile(
 }
 
 /**
+ * Resolve whether a dirent represents a directory, following symlinks.
+ * Dirent.isDirectory() returns false for symlinks even when the target
+ * is a directory. Marketplace skills (bunx skills add) are installed as
+ * symlinks, so we must resolve them via fs.statSync.
+ */
+function isDirectoryEntry(entry: fs.Dirent, entryPath: string): boolean {
+  if (entry.isDirectory()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  try {
+    return fs.statSync(entryPath).isDirectory();
+  } catch {
+    return false; // broken symlink
+  }
+}
+
+/**
  * Scan a single skills directory using dual-pattern matching:
- * 1. Subdirectories containing SKILL.md → parse as skill
- * 2. Root-level *.md files → parse as skill (catches standalone skill files)
+ * 1. Subdirectories (or symlinks to directories) containing SKILL.md → parse as skill
+ * 2. Root-level *.md files (or symlinks to .md files) → parse as skill
  */
 function scanSkillsDirectory(skillsDir: string, source: 'project' | 'user'): SkillDefinition[] {
   if (!fs.existsSync(skillsDir)) {
@@ -102,9 +118,11 @@ function scanSkillsDirectory(skillsDir: string, source: 'project' | 'user'): Ski
     const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
 
     for (const entry of entries) {
-      if (entry.isDirectory()) {
-        // Pattern 1: Subdirectory with SKILL.md
-        const skillFilePath = path.join(skillsDir, entry.name, 'SKILL.md');
+      const entryPath = path.join(skillsDir, entry.name);
+
+      if (isDirectoryEntry(entry, entryPath)) {
+        // Pattern 1: Subdirectory (or symlink to directory) with SKILL.md
+        const skillFilePath = path.join(entryPath, 'SKILL.md');
         if (fs.existsSync(skillFilePath)) {
           try {
             const content = fs.readFileSync(skillFilePath, 'utf-8');
@@ -118,15 +136,14 @@ function scanSkillsDirectory(skillsDir: string, source: 'project' | 'user'): Ski
             logger.warn({ file: skillFilePath, error }, 'Failed to parse skill file');
           }
         }
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
-        // Pattern 2: Root-level .md files
-        const filePath = path.join(skillsDir, entry.name);
+      } else if ((entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith('.md')) {
+        // Pattern 2: Root-level .md files (or symlinks to .md files)
         try {
-          const content = fs.readFileSync(filePath, 'utf-8');
-          const skill = parseSkillFile(content, entry.name, source, filePath);
+          const content = fs.readFileSync(entryPath, 'utf-8');
+          const skill = parseSkillFile(content, entry.name, source, entryPath);
           skills.push(skill);
         } catch (error) {
-          logger.warn({ file: filePath, error }, 'Failed to parse skill file');
+          logger.warn({ file: entryPath, error }, 'Failed to parse skill file');
         }
       }
     }

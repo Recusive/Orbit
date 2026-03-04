@@ -37,3 +37,6 @@ export * from './window';
 
 // Browser operations (embedded Chromium + CDP)
 export * from './browser';
+
+// Marketplace operations
+export * from './marketplace';

@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 
 use agent::SessionManager;
 use commands::agent::lifecycle as agent_cmd;
-use commands::agent::{ai, conversations};
+use commands::agent::{ai, conversations, marketplace};
 use commands::browser::{self, BrowserResultState, BrowserWindowState};
 use commands::canvas::download as canvas_download;
 use commands::canvas::lifecycle as canvas_cmd;
@@ -280,6 +280,7 @@ pub fn run() {
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(PreviewServerState::new())
+        .manage(marketplace::MarketplaceCache::new())
         .manage(file_index_state)
         // Plugins
         .plugin(build_log_plugin().build())
@@ -372,6 +373,9 @@ pub fn run() {
             agent_cmd::agent_delete_agent,
             // Skill definition commands
             agent_cmd::agent_list_skills,
+            marketplace::skills_marketplace_search,
+            marketplace::skills_marketplace_install,
+            marketplace::skills_marketplace_installed,
             // Command definition commands
             agent_cmd::agent_list_commands,
             agent_cmd::agent_get_command,

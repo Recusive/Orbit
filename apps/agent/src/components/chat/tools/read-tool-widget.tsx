@@ -1,4 +1,4 @@
-import { ArrowUpRight, File, Loader2 } from 'lucide-react';
+import { ArrowUpRight, File, Loader2, XCircle } from 'lucide-react';
 
 import type { FC } from 'react';
 
@@ -48,7 +48,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
       className={cn(
         'group w-full flex items-center gap-2 py-1.5 text-left',
         'cursor-pointer rounded-xl',
-        isFailed && 'border-2 border-dotted border-destructive/40 opacity-60'
+        isFailed && 'opacity-60'
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
@@ -64,7 +64,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
         <span
           className={cn(
             'text-sm font-medium truncate',
-            isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
+            isFailed ? 'text-lg-text-secondary' : 'text-foreground'
           )}
         >
           {fileName}
@@ -72,7 +72,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
             <span className="text-lg-text-secondary ml-1 font-mono text-xs">#L1-{lineCount}</span>
           ) : null}
         </span>
-        {isFailed ? <span className="text-sm text-destructive/60">Failed</span> : null}
+        {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
         {isRunning ? (
           <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
