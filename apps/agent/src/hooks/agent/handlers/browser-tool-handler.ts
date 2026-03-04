@@ -11,8 +11,10 @@ import {
   browserEvalAsync,
   browserForward,
   browserHas,
+  browserInfo,
   browserNavigate,
   browserReload,
+  browserScreenshot,
   browserToolResponse,
 } from '@/lib/api/browser';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
@@ -20,7 +22,7 @@ import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('BrowserToolHandler');
-const DEFAULT_OPEN_URL = 'about:blank';
+const DEFAULT_OPEN_URL = 'https://example.com';
 const BROWSER_READY_TIMEOUT_MS = 10000;
 const BROWSER_READY_POLL_MS = 250;
 
@@ -259,14 +261,18 @@ export async function executeBrowserTool(
         }
         const url = urlValidation.url;
 
-        const browserState = useBrowserStore.getState();
-
         useUIStore.getState().openBrowserTab();
         resetBrowserApiCache();
 
-        if (browserState.isActive) {
+        const exists = await browserHas();
+        if (exists) {
           await browserNavigate(url);
         } else {
+          // Clean up stale localStorage state if frontend says active but backend has no browser.
+          if (useBrowserStore.getState().isActive) {
+            useBrowserStore.getState().reset();
+            useBrowserLifecycleStore.getState().reset();
+          }
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
@@ -278,12 +284,18 @@ export async function executeBrowserTool(
           };
         }
 
-        try {
-          await ensureConsoleCapture();
-        } catch (error) {
-          logger.warn('Console capture injection failed', {
-            error: error instanceof Error ? error.message : String(error),
-          });
+        // Skip console capture on about:blank — no page to capture, and
+        // browserEval's orbit-eval:// result channel doesn't fire on about:blank
+        // (causes a 30s timeout). Console logs are lazily injected when
+        // browser_console_logs is called anyway.
+        if (url !== 'about:blank') {
+          try {
+            await ensureConsoleCapture();
+          } catch (error) {
+            logger.warn('Console capture injection failed', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
 
         return { success: true, result: { opened: true, url } };
@@ -301,14 +313,18 @@ export async function executeBrowserTool(
         }
         const url = urlValidation.url;
 
-        const browserState = useBrowserStore.getState();
-
         useUIStore.getState().openBrowserTab();
         resetBrowserApiCache();
 
-        if (browserState.isActive) {
+        const exists = await browserHas();
+        if (exists) {
           await browserNavigate(url);
         } else {
+          // Clean up stale localStorage state if frontend says active but backend has no browser.
+          if (useBrowserStore.getState().isActive) {
+            useBrowserStore.getState().reset();
+            useBrowserLifecycleStore.getState().reset();
+          }
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
@@ -321,12 +337,14 @@ export async function executeBrowserTool(
           };
         }
 
-        try {
-          await ensureConsoleCapture();
-        } catch (error) {
-          logger.warn('Console capture injection failed after navigate', {
-            error: error instanceof Error ? error.message : String(error),
-          });
+        if (url !== 'about:blank') {
+          try {
+            await ensureConsoleCapture();
+          } catch (error) {
+            logger.warn('Console capture injection failed after navigate', {
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
         }
 
         return { success: true, result: { navigated: true, url } };
@@ -416,20 +434,34 @@ export async function executeBrowserTool(
       }
 
       case 'browser_screenshot': {
-        const script = `
+        try {
+          const raw = await browserScreenshot();
+          const result: unknown = JSON.parse(raw);
+          return { success: true, result };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+
+          // Precondition failures should be real errors to tool callers.
+          if (
+            message.includes('No browser exists') ||
+            message.includes('Browser window not found')
+          ) {
+            return { success: false, error: message };
+          }
+
+          // Capture failure fallback: return metadata and keep the tool response successful.
+          const info = await browserInfo().catch(() => null);
           return {
-            url: window.location.href,
-            title: document.title,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            devicePixelRatio: window.devicePixelRatio,
+            success: true,
+            result: {
+              image: null,
+              metadata: {
+                url: info?.url ?? useBrowserStore.getState().navigation.url,
+                error: `Screenshot capture failed: ${message}`,
+              },
+            },
           };
-        `;
-        const raw = await evalScript(script);
-        const info = parseEvalResult(raw);
-        return { success: true, result: info };
+        }
       }
 
       case 'browser_back': {

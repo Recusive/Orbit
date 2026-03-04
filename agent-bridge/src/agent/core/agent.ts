@@ -566,7 +566,7 @@ You have access to embedded browser automation tools via MCP. Use mcp__orbit-bro
 ### Observation
 - **mcp__orbit-browser__browser_get_text**: Get page or element text
 - **mcp__orbit-browser__browser_get_html**: Get page or element HTML
-- **mcp__orbit-browser__browser_screenshot**: Get page info (URL, title, dimensions)
+- **mcp__orbit-browser__browser_screenshot**: Capture viewport image plus page metadata
 - **mcp__orbit-browser__browser_console_logs**: Get console logs
 
 ### JavaScript

@@ -52,8 +52,14 @@
 )]
 
 use std::result::Result as StdResult;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::time::Duration;
+
+use base64::engine::general_purpose::STANDARD as Base64Standard;
+use base64::Engine as _;
+use tokio::task::spawn_blocking;
 
 use hashbrown::HashMap;
 use parking_lot::Mutex;
@@ -223,6 +229,8 @@ pub struct BrowserWindowState {
     hidden: Mutex<bool>,
     /// Last known bounds for restoring after hide.
     last_bounds: Mutex<Option<BrowserBounds>>,
+    /// Whether a screenshot request is currently in-flight.
+    screenshot_in_progress: AtomicBool,
 }
 
 impl BrowserWindowState {
@@ -430,6 +438,7 @@ pub async fn browser_create(
         width,
         height,
     });
+    state.screenshot_in_progress.store(false, Ordering::Release);
 
     log::info!("Created browser child window at ({x}, {y}) size ({width}x{height})");
 
@@ -539,6 +548,7 @@ pub async fn browser_close(
     *state.exists.lock() = false;
     *state.hidden.lock() = false;
     *state.last_bounds.lock() = None;
+    state.screenshot_in_progress.store(false, Ordering::Release);
     log::info!("Closed browser window");
     Ok(())
 }
@@ -615,9 +625,9 @@ pub async fn browser_eval(
     // Wrap script to capture result and send via navigation.
     //
     // SECURITY: The script is JSON-encoded to prevent injection attacks.
-    // Using `new Function(scriptString)()` instead of direct interpolation ensures
-    // that characters like `}})();` or template literal escapes cannot break out
-    // of the wrapper. JSON.parse safely decodes the script before execution.
+    // `new Function(scriptString)()` treats the body as a FunctionBody (so
+    // `return` statements are valid) and prevents injection because the
+    // script is passed as a JSON-encoded string variable, not interpolated.
     //
     // Code review cycle 1, issue #12: Previously used direct format!() interpolation
     // which was vulnerable to script breakout attacks.
@@ -638,7 +648,7 @@ pub async fn browser_eval(
             const __evalId = {eval_id_json};
             const __scriptSource = {script_json};
             try {{
-                const __result = await (async () => {{ return eval(__scriptSource); }})();
+                const __result = await (new Function(__scriptSource))();
                 const __json = JSON.stringify(__result ?? null);
                 if (__json.length > 100000) {{
                     const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 100000)`);
@@ -675,25 +685,110 @@ pub async fn browser_eval(
     }
 }
 
-/// Capture screenshot metadata from the browser.
+/// Capture a screenshot of the embedded browser.
 #[tauri::command]
 pub async fn browser_screenshot(
     app: AppHandle,
     state: State<'_, Arc<BrowserWindowState>>,
-    result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
-    let script = "
-        return {
-            url: window.location.href,
-            title: document.title,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            devicePixelRatio: window.devicePixelRatio
+    if !*state.exists.lock() {
+        return Err("No browser exists".to_owned());
+    }
+
+    if state.screenshot_in_progress.swap(true, Ordering::Acquire) {
+        return Err("Screenshot already in progress".to_owned());
+    }
+
+    let result = {
+        #[cfg(target_os = "macos")]
+        {
+            browser_screenshot_native(&app, &state).await
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            match app.get_webview_window(BROWSER_WINDOW_LABEL) {
+                Some(window) => {
+                    let url = window
+                        .url()
+                        .map_or_else(|_| "unknown".to_owned(), |value| value.to_string());
+                    let size = window
+                        .inner_size()
+                        .ok()
+                        .map(|inner| (f64::from(inner.width), f64::from(inner.height)));
+
+                    Ok(serde_json::json!({
+                        "image": null,
+                        "metadata": {
+                            "url": url,
+                            "width": size.map(|(width, _)| width),
+                            "height": size.map(|(_, height)| height),
+                            "captureMethod": "metadata_fallback"
+                        }
+                    })
+                    .to_string())
+                },
+                None => {
+                    *state.exists.lock() = false;
+                    Err("Browser window not found".to_owned())
+                },
+            }
+        }
+    };
+
+    state.screenshot_in_progress.store(false, Ordering::Release);
+    result
+}
+
+/// macOS-only native screenshot path using `WKWebView.takeSnapshot`.
+#[cfg(target_os = "macos")]
+async fn browser_screenshot_native(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+) -> Result<String> {
+    let (tx, rx) = sync_channel::<StdResult<Vec<u8>, String>>(1);
+    let app_for_main = app.clone();
+
+    app.run_on_main_thread(move || {
+        let Some(window) = app_for_main.get_webview_window(BROWSER_WINDOW_LABEL) else {
+            let _ = tx.send(Err("Browser window not found".to_owned()));
+            return;
         };
-    ";
-    browser_eval(script.to_owned(), app, state, result_state).await
+
+        match window.ns_window() {
+            Ok(ns_window) => {
+                orbit_plugin_decorum::capture_browser_screenshot(ns_window, tx);
+            },
+            Err(e) => {
+                let _ = tx.send(Err(format!("Failed to get NSWindow handle: {e}")));
+            },
+        }
+    })
+    .map_err(|e| format!("Failed to dispatch to main thread: {e}"))?;
+
+    let result = spawn_blocking(move || rx.recv_timeout(Duration::from_secs(10)))
+        .await
+        .map_err(|e| format!("Screenshot task panicked: {e}"))?
+        .map_err(|_timeout| "Screenshot capture timed out after 10 seconds".to_owned())?;
+
+    let bytes = result.map_err(|e| {
+        if e.contains("Browser window not found") {
+            *state.exists.lock() = false;
+        }
+        format!("Screenshot capture failed: {e}")
+    })?;
+
+    let b64 = Base64Standard.encode(&bytes);
+
+    Ok(serde_json::json!({
+        "image": b64,
+        "mimeType": "image/jpeg",
+        "metadata": {
+            "captureMethod": "native_wkwebview",
+            "byteLength": bytes.len()
+        }
+    })
+    .to_string())
 }
 
 /// Open DevTools for the browser.

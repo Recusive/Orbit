@@ -213,21 +213,44 @@ export function createBrowserMcpServer(
 
     tool(
       'browser_screenshot',
-      'Get information about the current page (URL, title, dimensions).',
+      'Take a screenshot of the current page. Returns a JPEG image of the visible viewport plus page metadata.',
       {},
       async () => {
-        logger.debug('Getting browser screenshot info');
+        logger.debug('Taking browser screenshot');
         try {
-          const result = await bridge.sendRequest('browser_screenshot', {});
+          const result = await bridge.sendRequest<{
+            image: string | null;
+            mimeType?: string;
+            metadata: Record<string, unknown>;
+          }>('browser_screenshot', {});
+
+          const content: (
+            | { type: 'text'; text: string }
+            | { type: 'image'; data: string; mimeType: string }
+          )[] = [];
+
+          if (typeof result.image === 'string' && result.image.length > 0) {
+            content.push({
+              type: 'image' as const,
+              data: result.image,
+              mimeType: result.mimeType ?? 'image/jpeg',
+            });
+          }
+
+          content.push({
+            type: 'text' as const,
+            text: safeStringify(result.metadata),
+          });
+
           return {
-            content: [{ type: 'text' as const, text: safeStringify(result) }],
+            content,
           };
         } catch (error: unknown) {
           return {
             content: [
               {
                 type: 'text' as const,
-                text: `Failed to get screenshot info: ${error instanceof Error ? error.message : String(error)}`,
+                text: `Failed: ${error instanceof Error ? error.message : String(error)}`,
               },
             ],
             isError: true,

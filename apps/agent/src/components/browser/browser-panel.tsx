@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { AlertTriangle, Globe, Loader2 } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 
@@ -24,6 +25,7 @@ import { generateUUID } from '@/types/protocol';
 
 /** Minimal left inset to prevent native webview from overlapping the panel border */
 const WEBVIEW_LEFT_INSET = 1;
+const logger = createLogger('BrowserPanel');
 
 export const BrowserPanel: FC = () => {
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -121,9 +123,53 @@ export const BrowserPanel: FC = () => {
 
   // Auto-launch browser when there's a pending URL from AI
   useEffect(() => {
-    if (pendingUrl && !isActive && !isCreating && viewportRef.current) {
+    if (!pendingUrl || isActive || isCreating) return;
+
+    let rafId: number | null = null;
+    let observer: ResizeObserver | null = null;
+    const MAX_RETRIES = 20;
+    let retries = 0;
+    let launched = false;
+
+    const tryLaunch = (): void => {
+      if (launched || !viewportRef.current) return;
+
+      const rect = viewportRef.current.getBoundingClientRect();
+      if (rect.width < 10 || rect.height < 10) {
+        if (retries < MAX_RETRIES) {
+          retries += 1;
+          rafId = requestAnimationFrame(tryLaunch);
+          return;
+        }
+
+        logger.warn(
+          'Browser auto-launch: viewport not ready after RAF retries, waiting for resize'
+        );
+        observer = new ResizeObserver(() => {
+          if (!viewportRef.current || launched) return;
+          const resized = viewportRef.current.getBoundingClientRect();
+          if (resized.width >= 10 && resized.height >= 10) {
+            observer?.disconnect();
+            launched = true;
+            handleLaunchBrowser();
+          }
+        });
+        observer.observe(viewportRef.current);
+        return;
+      }
+
+      launched = true;
       handleLaunchBrowser();
-    }
+    };
+
+    rafId = requestAnimationFrame(tryLaunch);
+
+    return (): void => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+      observer?.disconnect();
+    };
   }, [pendingUrl, isActive, isCreating, handleLaunchBrowser]);
 
   // Tick idle timer every second when browser is running

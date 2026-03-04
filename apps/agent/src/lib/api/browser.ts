@@ -52,22 +52,14 @@ export interface BrowserToolResponsePayload {
   error?: string | undefined;
 }
 
-/** Screenshot/page info response */
+/** Browser screenshot response payload */
 export interface BrowserScreenshotInfo {
-  /** Current URL */
-  url: string;
-  /** Page title */
-  title: string;
-  /** Viewport width */
-  width: number;
-  /** Viewport height */
-  height: number;
-  /** Horizontal scroll position */
-  scrollX: number;
-  /** Vertical scroll position */
-  scrollY: number;
-  /** Device pixel ratio (for retina displays) */
-  devicePixelRatio: number;
+  /** Base64 JPEG data when capture succeeds */
+  image: string | null;
+  /** MIME type for image payload */
+  mimeType?: string;
+  /** Capture metadata (always present) */
+  metadata: Record<string, unknown>;
 }
 
 // ============================================
@@ -177,18 +169,15 @@ export async function browserEvalAsync(script: string, timeoutMs?: number): Prom
 }
 
 /**
- * Capture browser screenshot (page info).
+ * Capture browser screenshot payload.
  *
- * Currently returns page metadata (URL, title, dimensions).
- * Full pixel capture would require html2canvas or native webview API.
- *
- * @returns JSON-serialized page information
+ * Returns JSON with `image` (base64 JPEG or null) and `metadata`.
  *
  * @example
  * ```ts
- * const infoJson = await browserScreenshot();
- * const info: BrowserScreenshotInfo = JSON.parse(infoJson);
- * console.log(`${info.title} (${info.width}x${info.height})`);
+ * const screenshotJson = await browserScreenshot();
+ * const screenshot: BrowserScreenshotInfo = JSON.parse(screenshotJson);
+ * console.log(screenshot.image ? 'got pixels' : 'metadata only');
  * ```
  */
 export async function browserScreenshot(): Promise<string> {
@@ -201,7 +190,7 @@ export async function browserScreenshot(): Promise<string> {
  *
  * Convenience wrapper around `browserScreenshot` that parses the JSON.
  *
- * @returns Parsed page information
+ * @returns Parsed screenshot payload
  */
 export async function browserScreenshotInfo(): Promise<BrowserScreenshotInfo> {
   const json = await browserScreenshot();

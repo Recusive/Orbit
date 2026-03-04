@@ -21,9 +21,14 @@ mod native_dialog;
 #[cfg(target_os = "macos")]
 mod promotion;
 #[cfg(target_os = "macos")]
+mod screenshot;
+#[cfg(target_os = "macos")]
 mod traffic_lights;
 #[cfg(target_os = "macos")]
 mod window_order;
+
+#[cfg(target_os = "macos")]
+pub use screenshot::capture_browser_screenshot;
 
 /// Extensions to [`tauri::WebviewWindow`] for macOS window enhancements.
 pub trait WebviewWindowExt {
