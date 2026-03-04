@@ -40,7 +40,9 @@ describe('Browser MCP screenshot tool', () => {
   function getScreenshotHandler(): RegisteredTool['handler'] {
     const server = createBrowserMcpServer(bridge);
     const internal = server.instance as unknown as McpServerInternal;
-    return internal._registeredTools.browser_screenshot.handler;
+    const tool = internal._registeredTools.browser_screenshot;
+    if (!tool) throw new Error('browser_screenshot tool not registered');
+    return tool.handler;
   }
 
   it('returns image + metadata text blocks when pixel data is available', async () => {
