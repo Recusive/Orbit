@@ -188,8 +188,6 @@
   --color-lg-control-hover: var(--lg-control-bg-hover);
   --color-lg-sidebar-selected: var(--lg-sidebar-selected);
   --color-lg-sidebar-hover: var(--lg-sidebar-hover);
-  --color-lg-btn: var(--lg-btn-bg);
-  --color-lg-btn-hover: var(--lg-btn-bg-hover);
   --color-lg-default-bg: var(--lg-default-bg);
   --color-lg-default-text: var(--lg-default-text);
   --color-lg-separator: var(--lg-separator);
@@ -197,7 +195,6 @@
   --color-lg-input: var(--lg-input-bg);
   --color-lg-text: var(--lg-text-primary);
   --color-lg-text-secondary: var(--lg-text-secondary);
-  --color-lg-text-label: var(--lg-text-label);
   --color-lg-destructive: var(--lg-destructive);
   --color-lg-destructive-bg: var(--lg-destructive-bg);
 }
@@ -638,44 +635,6 @@ html.window-mode-liquid-glass [data-sidebar="primary"] {
 
 html.window-mode-liquid-glass.dark [data-sidebar="primary"] {
   background: transparent;
-}
-
-
-/* ── Glass Input — Liquid Glass mode tint ────────────────
-   Match the sidebar's glass material: same tint overlay approach
-   so input and sidebar feel like the same surface.
-   Figma "Medium" spec adapted for solid-bg context:
-   - ::before becomes the tint layer (matching base-layer treatment)
-   - ::after keeps rim shine but drops shadows (native glass has its own depth)
-   - backdrop-filter still frosts but the tint unifies with sidebar material */
-html.window-mode-liquid-glass .glass-input::before {
-  background: rgba(0, 0, 0, 0.15);
-  background-blend-mode: normal;
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-  backdrop-filter: blur(40px) saturate(1.2);
-}
-
-html.window-mode-liquid-glass .glass-input::after {
-  background: rgba(0, 0, 0, 0.004);
-  border-color: rgba(255, 255, 255, 0.08);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.10),
-    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.15),
-    0 0 0 0.5px rgba(255, 255, 255, 0.06);
-}
-
-/* Light mode liquid glass input */
-html.window-mode-liquid-glass:not(.dark) .glass-input::before {
-  background: rgba(220, 222, 225, 0.30);
-  -webkit-backdrop-filter: blur(40px) saturate(1.2);
-  backdrop-filter: blur(40px) saturate(1.2);
-}
-
-html.window-mode-liquid-glass:not(.dark) .glass-input::after {
-  border: 1px solid #ffffff;
-  background: rgba(255, 255, 255, 0.004);
-  box-shadow:
-    0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
 /* Liquid glass popover */
@@ -1698,9 +1657,6 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
     position: absolute;
   }
 
-  /* Glass input styles moved outside @layer base for cascade priority —
-     see unlayered .glass-input rules after the closing brace. */
-
   /* Cursor blink — CSS-only, no React re-renders */
   @keyframes blink {
     0%,
@@ -1816,87 +1772,9 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
 
 }
 
-/* ── Glass Input ─────────────────────────────────────────
-   Apple Liquid Glass "Large" — multi-layer material.
-   UNLAYERED (outside @layer base) for highest cascade priority.
-
-   Figma layer stack (bottom → top):
-   ┌─ Shape ─────── border-radius mask
-   ├─ Mask ──────── clip region
-   ├─ Blur ──────── backdrop-filter frost + hard-light tint   → ::before
-   ├─ Fill ──────── color-dodge (light) / color-burn (dark)  → ::after
-   └─ Glass Effect  rgba(0,0,0,0.004) micro-overlay          → ::after (combined)
-   Content children sit at z:auto (above both layers). */
-.glass-input {
-  position: relative;
-  border: none;
-  border-radius: 14px;
-  background: transparent;
-  isolation: isolate;
-}
-
-/* ── Blur layer (::before, z:-2) ──────────────────────
-   backdrop-filter frost + hard-light tint.
-   Dark:  rgba(0,0,0,0.1)  — from Apple "Medium" spec
-   Light: rgba(0,0,0,0.08) — from Apple "Large" spec */
-.glass-input::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  border-radius: inherit;
-  background: rgba(0, 0, 0, 0.1);
-  background-blend-mode: hard-light;
-  -webkit-backdrop-filter: blur(40px);
-  backdrop-filter: blur(40px);
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-}
-
-/* ── Fill + Glass Effect layer (::after, z:-1) ────────
-   Combines Apple's Fill (color-dodge/burn tint) with
-   Glass Effect (rgba(0,0,0,0.004) micro-overlay).
-   Also carries the border shine + ambient shadow.
-
-   Dark:  color-burn fill (from Medium spec)
-   Light: color-dodge fill (from Large spec) — produces off-white */
-.glass-input::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border: 0.5px solid rgba(255, 255, 255, 0.10);
-  border-radius: inherit;
-  pointer-events: none;
-  /* Dark mode: Glass Effect only (color-burn Fill produces grey on solid bg) */
-  background: rgba(0, 0, 0, 0.004);
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.12),
-    0 1px 3px rgba(0, 0, 0, 0.18),
-    2px 4px 20px rgba(0, 0, 0, 0.10);
-}
-
-/* ── Light mode overrides ─────────────────────────────
-   On white bg, frost is invisible (blurring white = white).
-   Match iMessage: nearly transparent + thin subtle border. */
-html:not(.dark) .glass-input::before {
-  background: rgba(255, 255, 255, 0.75);
-  -webkit-backdrop-filter: blur(40px);
-  backdrop-filter: blur(40px);
-}
-
-html:not(.dark) .glass-input::after {
-  border-color: rgba(255, 255, 255, 0.90);
-  background: transparent;
-  opacity: 1;
-  box-shadow:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.70),
-    0 1px 3px rgba(0, 0, 0, 0.02);
-}
-
 /* ── Glass Popover ──────────────────────────────────────
-   Mirrors glass-input material for dropdown menus/popovers.
-   Same multi-layer stack: blur (::before) + fill/border (::after). */
+   Multi-layer material for dropdown menus/popovers:
+   blur layer (::before) + fill/border layer (::after). */
 .glass-popover {
   border: none;
   isolation: isolate;
@@ -1981,8 +1859,8 @@ html.dark .glass-surface {
 
 /* ── Frosted Input Container ────────────────────────────
    Transparent wrapper that floats above the messages scroll area.
-   No backdrop-filter here — the .glass-input box handles its own
-   frosting via ::before. This just needs to be see-through so
+   No backdrop-filter here — the input component handles its own
+   frosting. This wrapper just needs to be see-through so
    messages are visible scrolling behind the input.
    The ::after solid strip covers the small gap between the
    input box bottom edge and the status bar. */
@@ -2266,64 +2144,40 @@ html:not(.window-mode-solid) .glass-float {
 
 /* ── Design Tokens (Light) ──────────────────────────── */
 :root {
-  /* Glass material */
-  --lg-blur: 40px;
-  --lg-saturate: 1.4;
-  --lg-tint: rgba(255, 255, 255, 0.55);
-
-  /* Controls — Apple's universal 24px/6px pattern */
-  --lg-control-h: 24px;
-  --lg-control-r: 6px;
+  /* Controls */
   --lg-control-bg: rgba(0, 0, 0, 0.05);
   --lg-control-bg-hover: rgba(0, 0, 0, 0.08);
 
-  /* Typography — SF Pro weight 510 is "Medium" in Apple's scale */
+  /* Typography */
   --lg-text-primary: rgba(0, 0, 0, 0.85);
   --lg-text-secondary: rgba(0, 0, 0, 0.5);
-  --lg-text-label: rgba(0, 0, 0, 0.55);
   --lg-font-weight: 510;
   --lg-font-weight-bold: 700;
   --lg-font-size: 13px;
   --lg-font-size-sm: 11px;
   --lg-line-height: 16px;
   --lg-line-height-sm: 14px;
-  --lg-letter-spacing: -0.02em;
 
   /* Text fields */
   --lg-input-bg: #FFFFFF;
   --lg-input-border: 0px 0px 0px 1px rgba(0, 0, 0, 0.08);
   --lg-input-focus: 0px 0px 0px 3.5px rgba(0, 122, 255, 0.25);
-  --lg-input-focus-thin: 0px 0px 0px 1px rgba(0, 122, 255, 0.15);
   --lg-input-cursor: #0091FF;
   --lg-input-placeholder: rgba(0, 0, 0, 0.35);
-
-  /* Glass border — layered shadows that simulate light refracting through a glass edge.
-     Top inner highlight (light catching rim) + subtle outer ring + soft depth shadow. */
-  --lg-glass-border:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.45),
-    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.06),
-    0 0 0 0.5px rgba(0, 0, 0, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.04);
 
   /* Separators & borders */
   --lg-separator: rgba(0, 0, 0, 0.1);
   --lg-border: rgba(0, 0, 0, 0.08);
 
   /* Accent colors */
-  --lg-accent: #007AFF;
   --lg-destructive: #FF3B30;
   --lg-destructive-bg: rgba(255, 59, 48, 0.15);
 
-  /* Default button (primary action — Save, OK) */
+  /* Default button */
   --lg-default-bg: #000000;
   --lg-default-text: #FFFFFF;
 
-  /* Regular button (secondary actions — Cancel, etc.) */
-  --lg-btn-bg: rgba(0, 0, 0, 0.05);
-  --lg-btn-bg-hover: rgba(0, 0, 0, 0.08);
-  --lg-btn-text: rgba(0, 0, 0, 0.85);
-
-  /* Alert dialog pill buttons (taller, fully rounded) */
+  /* Alert dialog pill buttons */
   --lg-alert-h: 32px;
   --lg-alert-r: 100px;
   --lg-alert-secondary-bg: rgba(0, 0, 0, 0.06);
@@ -2334,69 +2188,35 @@ html:not(.window-mode-solid) .glass-float {
   --lg-alert-destructive-text: #E5484D;
 
   /* Window chrome */
-  --lg-window-shadow: 0px 0px 0px 1px rgba(0, 0, 0, 0.23), 0px 16px 48px rgba(0, 0, 0, 0.35);
   --lg-window-r: 10px;
 
   /* Sidebar item states */
   --lg-sidebar-selected: rgba(0, 0, 0, 0.09);
   --lg-sidebar-hover: rgba(0, 0, 0, 0.07);
-
-  /* Segmented control */
-  --lg-segment-bg: rgba(0, 0, 0, 0.05);
-  --lg-segment-separator: rgba(0, 0, 0, 0.15);
-  --lg-segment-active: rgba(0, 0, 0, 0.85);
-  --lg-segment-inactive: rgba(0, 0, 0, 0.4);
-
-  /* Table */
-  --lg-table-header-border: rgba(0, 0, 0, 0.05);
-  --lg-table-col-border: rgba(0, 0, 0, 0.1);
-  --lg-table-row-h: 20px;
-  --lg-table-header-h: 28px;
-
-  /* Search field (pill shape) */
-  --lg-search-r: 1000px;
-
-  /* Close / disclosure button text */
-  --lg-close-text: rgba(0, 0, 0, 0.4);
 }
 
 /* ── Design Tokens (Dark) ───────────────────────────── */
 html.dark {
-  --lg-tint: rgba(0, 0, 0, 0.15);
-
   --lg-control-bg: rgba(255, 255, 255, 0.07);
   --lg-control-bg-hover: rgba(255, 255, 255, 0.1);
 
   --lg-text-primary: rgba(255, 255, 255, 0.85);
   --lg-text-secondary: rgba(255, 255, 255, 0.55);
-  --lg-text-label: rgba(255, 255, 255, 0.55);
 
   --lg-input-bg: rgba(255, 255, 255, 0.08);
   --lg-input-border: 0px 0px 0px 1px rgba(255, 255, 255, 0.08);
   --lg-input-focus: 0px 0px 0px 3.5px rgba(10, 132, 255, 0.30);
-  --lg-input-focus-thin: 0px 0px 0px 1px rgba(10, 132, 255, 0.18);
   --lg-input-cursor: #0A84FF;
   --lg-input-placeholder: rgba(255, 255, 255, 0.35);
-
-  --lg-glass-border:
-    inset 0 0.5px 0 0 rgba(255, 255, 255, 0.10),
-    inset 0 -0.5px 0 0 rgba(0, 0, 0, 0.25),
-    0 0 0 0.5px rgba(255, 255, 255, 0.06),
-    0 1px 3px rgba(0, 0, 0, 0.20);
 
   --lg-separator: rgba(255, 255, 255, 0.1);
   --lg-border: rgba(255, 255, 255, 0.08);
 
-  --lg-accent: #0A84FF;
   --lg-destructive: #FF453A;
   --lg-destructive-bg: rgba(255, 69, 58, 0.23);
 
   --lg-default-bg: #FFFFFF;
   --lg-default-text: #000000;
-
-  --lg-btn-bg: rgba(255, 255, 255, 0.07);
-  --lg-btn-bg-hover: rgba(255, 255, 255, 0.1);
-  --lg-btn-text: rgba(255, 255, 255, 0.85);
 
   --lg-alert-secondary-bg: #141414;
   --lg-alert-secondary-bg-hover: #1f1f1f;
@@ -2405,75 +2225,8 @@ html.dark {
   --lg-alert-destructive-bg-hover: rgba(255, 56, 60, 0.32);
   --lg-alert-destructive-text: #FF4245;
 
-  --lg-window-shadow: 0px 0px 0px 1px rgba(255, 255, 255, 0.08), 0px 16px 48px rgba(0, 0, 0, 0.5);
-
   --lg-sidebar-selected: rgba(255, 255, 255, 0.09);
   --lg-sidebar-hover: rgba(255, 255, 255, 0.04);
-
-  --lg-segment-bg: rgba(255, 255, 255, 0.04);
-  --lg-segment-separator: rgba(255, 255, 255, 0.1);
-  --lg-segment-active: rgba(255, 255, 255, 0.85);
-  --lg-segment-inactive: rgba(255, 255, 255, 0.4);
-
-  --lg-table-header-border: rgba(255, 255, 255, 0.05);
-  --lg-table-col-border: rgba(255, 255, 255, 0.1);
-
-  --lg-close-text: rgba(255, 255, 255, 0.5);
-}
-
-
-/* ── COMPONENT: Glass Surface ───────────────────────
-   Base backdrop-filter + tint for any glass container.
-   WebKit mask-image fixes rounded-corner compositing. */
-
-.lg-surface {
-  isolation: isolate;
-  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
-  mask-image: linear-gradient(#000, #000);
-}
-
-.lg-surface::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: -1;
-  pointer-events: none;
-  background: var(--lg-tint);
-}
-
-
-/* ── COMPONENT: Alert Dialog ────────────────────────
-   macOS 26 alert — glass surface + pill buttons.
-   Used by ConversationDeleteDialog. */
-
-.liquid-glass-dialog {
-  width: 360px;
-  border-radius: var(--lg-window-r) !important;
-  overflow: hidden;
-}
-
-html.dark .liquid-glass-dialog {
-  isolation: isolate;
-  backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(var(--lg-saturate));
-  -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
-  mask-image: linear-gradient(#000, #000);
-  background: var(--sidebar);
-  border-color: rgba(255, 255, 255, 0.05);
-  box-shadow: 0 17px 45px rgba(0, 0, 0, 0.5);
-}
-
-html.dark .liquid-glass-dialog::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: var(--lg-window-r);
-  z-index: -1;
-  pointer-events: none;
-  background: var(--lg-tint);
 }
 
 .liquid-glass-icon {
@@ -2540,7 +2293,7 @@ html.dark .liquid-glass-dialog::after {
   pointer-events: none;
 }
 
-/* Multiline glass input — matches .lg-input surface treatment */
+/* Multiline liquid glass input */
 .liquid-glass-textarea {
   background: var(--lg-input-bg);
   box-shadow: var(--lg-input-border);
@@ -2585,131 +2338,6 @@ html.dark .liquid-glass-textarea:focus {
   }
 }
 
-.liquid-glass-close {
-  color: var(--lg-close-text);
-}
-
-
-/* ── COMPONENT: Regular Button (24px) ───────────────
-   Standard macOS 26 control button.
-   BG: #000 at 5% opacity (light) / #FFF at 7% (dark). */
-
-.lg-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--lg-control-h);
-  padding: 0 16px;
-  border: none;
-  border-radius: var(--lg-control-r);
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  background: var(--lg-btn-bg);
-  color: var(--lg-btn-text);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.lg-btn:hover {
-  background: var(--lg-btn-bg-hover);
-}
-
-.lg-btn:active {
-  transform: scale(0.97);
-}
-
-
-/* ── COMPONENT: Default Button (Primary Action) ────
-   Save, OK — solid tint with inverted text.
-   Light: black bg / white text.  Dark: white bg / black text. */
-
-.lg-btn-default {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--lg-control-h);
-  padding: 0 16px;
-  border: none;
-  border-radius: var(--lg-control-r);
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  background: var(--lg-default-bg);
-  color: var(--lg-default-text);
-  cursor: pointer;
-  transition: opacity 0.15s;
-}
-
-.lg-btn-default:hover {
-  opacity: 0.85;
-}
-
-.lg-btn-default:active {
-  transform: scale(0.97);
-}
-
-
-/* ── COMPONENT: Text Field ──────────────────────────
-   24px, 6px radius, white fill, 1px border.
-   Focus ring: 3.5px blue (thick) + 1px blue (thin). */
-
-.lg-input {
-  height: var(--lg-control-h);
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--lg-control-r);
-  background: var(--lg-input-bg);
-  box-shadow: var(--lg-input-border);
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  color: var(--lg-text-primary);
-  outline: none;
-  caret-color: var(--lg-input-cursor);
-  transition: box-shadow 0.15s;
-}
-
-.lg-input::placeholder {
-  color: var(--lg-input-placeholder);
-  font-weight: var(--lg-font-weight);
-}
-
-.lg-input:focus {
-  box-shadow: var(--lg-input-border), var(--lg-input-focus);
-}
-
-
-/* ── COMPONENT: Search Field ────────────────────────
-   Pill-shaped variant of text field (border-radius 1000px).
-   Includes leading magnifying glass icon slot. */
-
-.lg-search {
-  height: var(--lg-control-h);
-  padding: 0 8px 0 8px;
-  border: none;
-  border-radius: var(--lg-search-r);
-  background: var(--lg-input-bg);
-  box-shadow: var(--lg-input-border);
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  color: var(--lg-text-primary);
-  outline: none;
-  caret-color: var(--lg-input-cursor);
-  transition: box-shadow 0.15s;
-}
-
-.lg-search::placeholder {
-  color: var(--lg-input-placeholder);
-  font-weight: var(--lg-font-weight);
-}
-
-.lg-search:focus {
-  box-shadow: var(--lg-input-border), var(--lg-input-focus);
-}
-
-
 /* ── COMPONENT: Apple Tooltip ───────────────────────
    Solid tooltip matching chat input box styling.
    9px rounded, same bg/border as the chat input. */
@@ -2727,188 +2355,4 @@ html.dark .apple-tooltip {
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
   color: rgba(255, 255, 255, 0.85);
-}
-
-
-/* ── COMPONENT: Form Label ──────────────────────────
-   Right-aligned labels for form rows.
-   Apple uses weight 510, 13px, letter-spacing -0.02em. */
-
-.lg-label {
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height-sm);
-  letter-spacing: var(--lg-letter-spacing);
-  color: var(--lg-text-label);
-}
-
-
-/* ── COMPONENT: Section Header ──────────────────────
-   Sidebar / list section divider — bold 11px, muted text. */
-
-.lg-section-header {
-  padding: 15px 12px 5px 18px;
-  font-size: var(--lg-font-size-sm);
-  font-weight: var(--lg-font-weight-bold);
-  line-height: var(--lg-line-height-sm);
-  color: var(--lg-text-secondary);
-}
-
-
-/* ── COMPONENT: Segmented Control ───────────────────
-   24px height, 6px radius, subtle background.
-   Active segment: primary text. Inactive: muted text.
-   1px separator between segments. */
-
-.lg-segmented {
-  display: inline-flex;
-  align-items: center;
-  height: var(--lg-control-h);
-  padding: 0;
-  border-radius: var(--lg-control-r);
-  background: var(--lg-segment-bg);
-  isolation: isolate;
-}
-
-.lg-segmented-item {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 1 0;
-  height: 100%;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  color: var(--lg-segment-inactive);
-  cursor: pointer;
-  border-radius: var(--lg-control-r);
-  transition: color 0.15s;
-}
-
-.lg-segmented-item[aria-selected="true"],
-.lg-segmented-item.active {
-  color: var(--lg-segment-active);
-}
-
-.lg-segmented-separator {
-  width: 1px;
-  height: 14px;
-  background: var(--lg-segment-separator);
-  flex-shrink: 0;
-}
-
-
-/* ── COMPONENT: Separator / Divider ─────────────────
-   1px line — horizontal (default) or vertical. */
-
-.lg-separator {
-  border: none;
-  border-top: 1px solid var(--lg-separator);
-  margin: 0;
-}
-
-.lg-separator-vertical {
-  border: none;
-  border-left: 1px solid var(--lg-separator);
-  align-self: stretch;
-}
-
-
-/* ── COMPONENT: Table ───────────────────────────────
-   Compact data table matching Apple's file picker table.
-   Header: 28px, bold 11px. Rows: 20px, medium 13px. */
-
-.lg-table-header {
-  display: flex;
-  align-items: center;
-  height: var(--lg-table-header-h);
-  border-bottom: 1px solid var(--lg-table-header-border);
-}
-
-.lg-table-header-cell {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  font-size: var(--lg-font-size-sm);
-  font-weight: var(--lg-font-weight-bold);
-  line-height: var(--lg-line-height-sm);
-  color: var(--lg-text-primary);
-}
-
-.lg-table-header-cell-secondary {
-  color: var(--lg-text-secondary);
-  font-weight: var(--lg-font-weight);
-}
-
-.lg-table-row {
-  display: flex;
-  align-items: center;
-  height: var(--lg-table-row-h);
-}
-
-.lg-table-cell {
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  color: var(--lg-text-primary);
-}
-
-.lg-table-cell-secondary {
-  color: var(--lg-text-secondary);
-}
-
-
-/* ── COMPONENT: Pulldown / Pop-Up Button ────────────
-   Dropdown trigger — same height/radius as buttons.
-   Includes trailing chevron indicator. */
-
-.lg-pulldown {
-  display: inline-flex;
-  align-items: center;
-  height: var(--lg-control-h);
-  padding: 0 0 0 12px;
-  gap: 8px;
-  border: none;
-  border-radius: var(--lg-control-r);
-  background: var(--lg-control-bg);
-  font-size: var(--lg-font-size);
-  font-weight: var(--lg-font-weight);
-  line-height: var(--lg-line-height);
-  color: var(--lg-text-primary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.lg-pulldown:hover {
-  background: var(--lg-control-bg-hover);
-}
-
-.lg-pulldown-chevron {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  font-size: 10px;
-  font-weight: var(--lg-font-weight-bold);
-  color: var(--lg-text-primary);
-}
-
-
-/* ── COMPONENT: Bottom Button Bar ───────────────────
-   Dialog footer — separator top, leading + trailing buttons.
-   Spacing element in middle pushes trailing to the right. */
-
-.lg-button-bar {
-  display: flex;
-  align-items: center;
-  padding: 22px 17px 20px;
-  gap: 8px;
-  border-top: 1px solid var(--lg-separator);
 }
