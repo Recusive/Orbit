@@ -57,6 +57,7 @@ hashbrown = { workspace = true }
 hostname = "0.4"  # For non-macOS device ID generation
 regex = "1"  # Component name validation
 ignore = { workspace = true } # Workspace doc discovery for Vault
+tempfile = { workspace = true }
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon", "macos-private-api"] }
@@ -79,5 +80,4 @@ sentry = { workspace = true }
 tauri-plugin-liquid-glass = "0.1"
 
 [dev-dependencies]
-tempfile = "3.10"
 tokio-test = "0.4"

@@ -101,8 +101,7 @@ describe('browser-tool-handler', () => {
   describe('browser_screenshot', () => {
     it('returns parsed screenshot result on success', async () => {
       const payload = {
-        image: 'base64-image-data',
-        mimeType: 'image/jpeg',
+        filePath: '/tmp/orbit-screenshot-12345.jpg',
         metadata: { captureMethod: 'native_wkwebview' },
       };
       mockBrowserScreenshot.mockResolvedValue(JSON.stringify(payload));
@@ -142,11 +141,11 @@ describe('browser-tool-handler', () => {
       const typedResult = result as {
         success: true;
         result: {
-          image: null;
+          filePath: null;
           metadata: { url: string; error: string };
         };
       };
-      expect(typedResult.result.image).toBeNull();
+      expect(typedResult.result.filePath).toBeNull();
       expect(typedResult.result.metadata.url).toBe('https://example.com');
       expect(typedResult.result.metadata.error).toContain('Screenshot capture failed:');
     });

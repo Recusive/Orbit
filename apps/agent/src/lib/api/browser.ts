@@ -54,10 +54,8 @@ export interface BrowserToolResponsePayload {
 
 /** Browser screenshot response payload */
 export interface BrowserScreenshotInfo {
-  /** Base64 JPEG data when capture succeeds */
-  image: string | null;
-  /** MIME type for image payload */
-  mimeType?: string;
+  /** Path to saved JPEG file when capture succeeds */
+  filePath: string | null;
   /** Capture metadata (always present) */
   metadata: Record<string, unknown>;
 }
@@ -171,30 +169,18 @@ export async function browserEvalAsync(script: string, timeoutMs?: number): Prom
 /**
  * Capture browser screenshot payload.
  *
- * Returns JSON with `image` (base64 JPEG or null) and `metadata`.
+ * Returns JSON with `filePath` (temp JPEG path or null) and `metadata`.
  *
  * @example
  * ```ts
  * const screenshotJson = await browserScreenshot();
  * const screenshot: BrowserScreenshotInfo = JSON.parse(screenshotJson);
- * console.log(screenshot.image ? 'got pixels' : 'metadata only');
+ * console.log(screenshot.filePath ? 'saved to file' : 'metadata only');
  * ```
  */
 export async function browserScreenshot(): Promise<string> {
   logger.debug('Capturing browser screenshot');
   return invoke<string>('browser_screenshot');
-}
-
-/**
- * Capture browser screenshot and parse the result.
- *
- * Convenience wrapper around `browserScreenshot` that parses the JSON.
- *
- * @returns Parsed screenshot payload
- */
-export async function browserScreenshotInfo(): Promise<BrowserScreenshotInfo> {
-  const json = await browserScreenshot();
-  return JSON.parse(json) as BrowserScreenshotInfo;
 }
 
 /**

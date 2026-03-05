@@ -5,7 +5,7 @@ import { createBrowserMcpServer } from '../browser/browser-mcp-server.js';
 import type { BrowserToolBridge } from '../browser/browser-tool-bridge.js';
 
 interface McpToolResponse {
-  content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[];
+  content: { type: 'text'; text: string }[];
   isError?: boolean;
 }
 
@@ -22,9 +22,9 @@ interface McpServerInternal {
 
 describe('Browser MCP screenshot tool', () => {
   const sendRequestMock = mock(
-    (): Promise<{ image: string | null; mimeType?: string; metadata: Record<string, unknown> }> =>
+    (): Promise<{ filePath?: string | null; metadata: Record<string, unknown> }> =>
       Promise.resolve({
-        image: null,
+        filePath: null,
         metadata: {},
       })
   );
@@ -45,10 +45,9 @@ describe('Browser MCP screenshot tool', () => {
     return tool.handler;
   }
 
-  it('returns image + metadata text blocks when pixel data is available', async () => {
+  it('returns file path + metadata text when image file is available', async () => {
     sendRequestMock.mockResolvedValue({
-      image: 'base64-image',
-      mimeType: 'image/jpeg',
+      filePath: '/tmp/orbit-screenshot-12345.jpg',
       metadata: { url: 'https://example.com', captureMethod: 'native_wkwebview' },
     });
 
@@ -56,21 +55,18 @@ describe('Browser MCP screenshot tool', () => {
     const result = await handler({}, {});
 
     expect(result.isError).toBeUndefined();
-    expect(result.content.length).toBe(2);
-    expect(result.content[0]).toEqual({
-      type: 'image',
-      data: 'base64-image',
-      mimeType: 'image/jpeg',
-    });
-    expect(result.content[1]).toEqual({
-      type: 'text',
-      text: '{"url":"https://example.com","captureMethod":"native_wkwebview"}',
-    });
+    expect(result.content).toHaveLength(1);
+    const text = result.content[0]?.text ?? '';
+    expect(text).toContain('Screenshot saved to: /tmp/orbit-screenshot-12345.jpg');
+    expect(text).toContain('Use the Read tool to view this image.');
+    expect(text).toContain(
+      'Metadata: {"url":"https://example.com","captureMethod":"native_wkwebview"}'
+    );
   });
 
-  it('returns metadata text only when image is null', async () => {
+  it('returns metadata-only text when file path is null', async () => {
     sendRequestMock.mockResolvedValue({
-      image: null,
+      filePath: null,
       metadata: { captureMethod: 'metadata_fallback', url: 'about:blank' },
     });
 
@@ -78,12 +74,10 @@ describe('Browser MCP screenshot tool', () => {
     const result = await handler({}, {});
 
     expect(result.isError).toBeUndefined();
-    expect(result.content).toEqual([
-      {
-        type: 'text',
-        text: '{"captureMethod":"metadata_fallback","url":"about:blank"}',
-      },
-    ]);
+    expect(result.content).toHaveLength(1);
+    const text = result.content[0]?.text ?? '';
+    expect(text).toContain('metadata only');
+    expect(text).toContain('Metadata: {"captureMethod":"metadata_fallback","url":"about:blank"}');
   });
 
   it('returns error content when bridge call fails', async () => {

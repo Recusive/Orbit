@@ -51,14 +51,15 @@
     reason = "We intentionally ignore some Results"
 )]
 
+use std::env;
+use std::fs;
+use std::path::PathBuf;
 use std::result::Result as StdResult;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use base64::engine::general_purpose::STANDARD as Base64Standard;
-use base64::Engine as _;
 use tokio::task::spawn_blocking;
 
 use hashbrown::HashMap;
@@ -69,7 +70,7 @@ use tauri::{
     AppHandle, Emitter as _, LogicalPosition, LogicalSize, Manager as _, State, WebviewUrl,
 };
 use tokio::sync::oneshot;
-use tokio::time::timeout;
+use tokio::time::{sleep, timeout};
 use uuid::Uuid;
 
 use crate::core::sentry_utils::SentryCapture as _;
@@ -113,6 +114,11 @@ const JS_EVAL_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// The label for the browser window.
 const BROWSER_WINDOW_LABEL: &str = "browser-window";
+
+/// Max tracked screenshot files per browser session.
+///
+/// Oldest file is evicted when capacity is reached.
+const MAX_SCREENSHOT_FILES: usize = 20;
 
 /// Corner radius for the browser window, matching the activity card's CSS
 /// `--content-card-radius` (10px). On macOS, a CALayer mask clips the native
@@ -231,6 +237,8 @@ pub struct BrowserWindowState {
     last_bounds: Mutex<Option<BrowserBounds>>,
     /// Whether a screenshot request is currently in-flight.
     screenshot_in_progress: AtomicBool,
+    /// Screenshot temp files tracked for cleanup on browser close/recreate.
+    screenshot_files: Mutex<Vec<PathBuf>>,
 }
 
 impl BrowserWindowState {
@@ -248,6 +256,29 @@ impl BrowserWindowState {
     /// macOS event loop.
     pub fn try_is_active(&self) -> Option<bool> {
         self.exists.try_lock().map(|guard| *guard)
+    }
+}
+
+/// Delete all tracked screenshot temp files for a browser session.
+///
+/// Must not be called while holding `exists.lock()`. This function may spin
+/// while waiting for an in-flight screenshot to complete, and that screenshot
+/// can need `exists.lock()` to finish teardown.
+async fn cleanup_screenshot_files(state: &BrowserWindowState) {
+    // Native capture has a 10s recv timeout. Wait slightly longer here so
+    // cleanup doesn't block forever on exceptional paths.
+    let deadline = Instant::now() + Duration::from_secs(12);
+    while state.screenshot_in_progress.load(Ordering::Acquire) {
+        if Instant::now() >= deadline {
+            log::warn!("Timed out waiting for in-flight screenshot during cleanup");
+            break;
+        }
+        sleep(Duration::from_millis(10)).await;
+    }
+
+    let paths: Vec<_> = state.screenshot_files.lock().drain(..).collect();
+    for path in paths {
+        let _ = fs::remove_file(path);
     }
 }
 
@@ -326,9 +357,9 @@ pub async fn browser_create(
 ) -> Result<BrowserInfo> {
     let initial_url = url.unwrap_or_else(|| "https://example.com".to_owned());
 
-    // Close existing browser window if any
-    // Use a single lock scope to prevent race conditions between check and update
-    {
+    // Close existing browser window if any, then cleanup tracked screenshot files.
+    // Run cleanup outside of exists.lock() to avoid deadlock with in-flight captures.
+    let needs_cleanup = {
         let mut exists = state.exists.lock();
         if *exists {
             if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
@@ -336,7 +367,13 @@ pub async fn browser_create(
                 let _ = window.close();
             }
             *exists = false;
+            true
+        } else {
+            false
         }
+    };
+    if needs_cleanup {
+        cleanup_screenshot_files(state.inner().as_ref()).await;
     }
 
     // Get the main webview window to use as parent
@@ -535,17 +572,36 @@ pub async fn browser_close(
     app: AppHandle,
     state: State<'_, Arc<BrowserWindowState>>,
 ) -> Result<()> {
-    if !*state.exists.lock() {
+    // Phase 1: mark closed while holding lock
+    let had_browser = {
+        let mut exists = state.exists.lock();
+        if !*exists {
+            false
+        } else {
+            *exists = false;
+            true
+        }
+    };
+
+    if !had_browser {
+        // Cleanup stale screenshot files from previously torn-down sessions.
+        cleanup_screenshot_files(state.inner().as_ref()).await;
         return Err("No browser exists".to_owned());
     }
 
+    // Phase 2: cleanup any tracked screenshot files.
+    cleanup_screenshot_files(state.inner().as_ref()).await;
+
+    // Phase 3: close the browser window. If close fails, restore exists=true
+    // so other commands can still reach the live window.
     if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
-        window
-            .close()
-            .map_err(|e| format!("Failed to close browser: {e}"))?;
+        if let Err(error) = window.close() {
+            *state.exists.lock() = true;
+            return Err(format!("Failed to close browser: {error}"));
+        }
     }
 
-    *state.exists.lock() = false;
+    // Phase 4: reset remaining state.
     *state.hidden.lock() = false;
     *state.last_bounds.lock() = None;
     state.screenshot_in_progress.store(false, Ordering::Release);
@@ -718,7 +774,7 @@ pub async fn browser_screenshot(
                         .map(|inner| (f64::from(inner.width), f64::from(inner.height)));
 
                     Ok(serde_json::json!({
-                        "image": null,
+                        "filePath": null,
                         "metadata": {
                             "url": url,
                             "width": size.map(|(width, _)| width),
@@ -778,14 +834,40 @@ async fn browser_screenshot_native(
         format!("Screenshot capture failed: {e}")
     })?;
 
-    let b64 = Base64Standard.encode(&bytes);
+    let tmp = tempfile::Builder::new()
+        .prefix("orbit-screenshot-")
+        .suffix(".jpg")
+        .tempfile_in(env::temp_dir())
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+
+    fs::write(tmp.path(), &bytes).map_err(|e| format!("Failed to write screenshot: {e}"))?;
+
+    let (_, file_path) = tmp
+        .keep()
+        .map_err(|e| format!("Failed to persist temp file: {e}"))?;
+
+    // Browser may have been closed while capture was running.
+    if !*state.exists.lock() {
+        let _ = fs::remove_file(&file_path);
+        return Err("Browser closed during screenshot capture".to_owned());
+    }
+
+    let evicted = {
+        let mut files = state.screenshot_files.lock();
+        let old = (files.len() >= MAX_SCREENSHOT_FILES).then(|| files.remove(0));
+        files.push(file_path.clone());
+        old
+    };
+    if let Some(path) = evicted {
+        let _ = fs::remove_file(path);
+    }
 
     Ok(serde_json::json!({
-        "image": b64,
-        "mimeType": "image/jpeg",
+        "filePath": file_path.to_string_lossy(),
         "metadata": {
             "captureMethod": "native_wkwebview",
-            "byteLength": bytes.len()
+            "byteLength": bytes.len(),
+            "mimeType": "image/jpeg"
         }
     })
     .to_string())
@@ -1062,4 +1144,89 @@ pub async fn browser_eval_async(
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
     browser_eval(script, app, state, result_state).await
+}
+
+#[cfg(test)]
+mod screenshot_cleanup_tests {
+    use super::*;
+    use std::fs;
+
+    fn make_state() -> BrowserWindowState {
+        BrowserWindowState::default()
+    }
+
+    #[tokio::test]
+    async fn cleanup_deletes_tracked_files() {
+        let state = make_state();
+        let tempdir = tempfile::tempdir().ok();
+        assert!(tempdir.is_some());
+        let Some(tempdir) = tempdir else {
+            return;
+        };
+
+        let p1 = tempdir.path().join("a.jpg");
+        let p2 = tempdir.path().join("b.jpg");
+        let _ = fs::write(&p1, b"img1");
+        let _ = fs::write(&p2, b"img2");
+        assert!(p1.exists());
+        assert!(p2.exists());
+
+        {
+            let mut files = state.screenshot_files.lock();
+            files.push(p1.clone());
+            files.push(p2.clone());
+        }
+
+        cleanup_screenshot_files(&state).await;
+
+        assert!(!p1.exists());
+        assert!(!p2.exists());
+        assert!(state.screenshot_files.lock().is_empty());
+    }
+
+    #[tokio::test]
+    async fn eviction_deletes_oldest_at_capacity() {
+        let state = make_state();
+        let tempdir = tempfile::tempdir().ok();
+        assert!(tempdir.is_some());
+        let Some(tempdir) = tempdir else {
+            return;
+        };
+
+        for i in 0..MAX_SCREENSHOT_FILES {
+            let path = tempdir.path().join(format!("{i}.jpg"));
+            let _ = fs::write(&path, b"img");
+            state.screenshot_files.lock().push(path);
+        }
+
+        let new_path = tempdir.path().join("new.jpg");
+        let _ = fs::write(&new_path, b"img");
+        assert!(new_path.exists());
+        let evicted = {
+            let mut files = state.screenshot_files.lock();
+            let old = (files.len() >= MAX_SCREENSHOT_FILES).then(|| files.remove(0));
+            files.push(new_path);
+            old
+        };
+        if let Some(path) = evicted {
+            let _ = fs::remove_file(path);
+        }
+
+        let files = state.screenshot_files.lock();
+        assert_eq!(files.len(), MAX_SCREENSHOT_FILES);
+        assert!(!tempdir.path().join("0.jpg").exists());
+        let head = files.first();
+        assert!(head.is_some());
+        let Some(head) = head else {
+            return;
+        };
+        assert_eq!(*head, tempdir.path().join("1.jpg"));
+    }
+
+    #[tokio::test]
+    async fn cleanup_is_noop_when_empty() {
+        let state = make_state();
+        cleanup_screenshot_files(&state).await;
+        assert!(state.screenshot_files.lock().is_empty());
+    }
 }

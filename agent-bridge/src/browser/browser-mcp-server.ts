@@ -213,37 +213,30 @@ export function createBrowserMcpServer(
 
     tool(
       'browser_screenshot',
-      'Take a screenshot of the current page. Returns a JPEG image of the visible viewport plus page metadata.',
+      'Take a screenshot of the current browser page. Saves a JPEG to a temp file and returns the path. Use the Read tool on the returned file path to view the image.',
       {},
       async () => {
         logger.debug('Taking browser screenshot');
         try {
           const result = await bridge.sendRequest<{
-            image: string | null;
-            mimeType?: string;
+            filePath?: string | null;
             metadata: Record<string, unknown>;
           }>('browser_screenshot', {});
 
-          const content: (
-            | { type: 'text'; text: string }
-            | { type: 'image'; data: string; mimeType: string }
-          )[] = [];
-
-          if (typeof result.image === 'string' && result.image.length > 0) {
-            content.push({
-              type: 'image' as const,
-              data: result.image,
-              mimeType: result.mimeType ?? 'image/jpeg',
-            });
+          const parts: string[] = [];
+          if (typeof result.filePath === 'string' && result.filePath.length > 0) {
+            parts.push(`Screenshot saved to: ${result.filePath}`);
+            parts.push(
+              'Use the Read tool to view this image. Read the file BEFORE closing or recreating the browser - the file is cleaned up on close.'
+            );
+          } else {
+            parts.push('Screenshot capture returned metadata only (no image file).');
           }
 
-          content.push({
-            type: 'text' as const,
-            text: safeStringify(result.metadata),
-          });
+          parts.push(`Metadata: ${safeStringify(result.metadata)}`);
 
           return {
-            content,
+            content: [{ type: 'text' as const, text: parts.join('\n') }],
           };
         } catch (error: unknown) {
           return {

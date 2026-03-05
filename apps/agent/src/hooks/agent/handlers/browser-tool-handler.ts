@@ -454,7 +454,7 @@ export async function executeBrowserTool(
           return {
             success: true,
             result: {
-              image: null,
+              filePath: null,
               metadata: {
                 url: info?.url ?? useBrowserStore.getState().navigation.url,
                 error: `Screenshot capture failed: ${message}`,
