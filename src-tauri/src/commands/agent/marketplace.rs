@@ -44,6 +44,9 @@ const SEARCH_TIMEOUT_SECS: u64 = 15;
 const INSTALL_TIMEOUT_SECS: u64 = 60;
 const CACHE_TTL_SECS: u64 = 300;
 const CACHE_MAX_ENTRIES: usize = 50;
+const BROWSE_CACHE_MAX_ENTRIES: usize = 2;
+const BROWSE_MAX_RESULTS: usize = 24;
+const BROWSE_MAX_BODY_BYTES: usize = 512 * 1024;
 const DEFAULT_LIMIT: u32 = 50;
 const MIN_LIMIT: u32 = 1;
 const MAX_LIMIT: u32 = 100;
@@ -141,6 +144,7 @@ struct CacheEntry {
 #[derive(Debug, Default)]
 pub struct MarketplaceCache {
     search_cache: RwLock<HashMap<String, CacheEntry>>,
+    browse_cache: RwLock<HashMap<String, CacheEntry>>,
     install_lock: Mutex<()>,
 }
 
@@ -150,6 +154,7 @@ impl MarketplaceCache {
     pub fn new() -> Self {
         Self {
             search_cache: RwLock::new(HashMap::new()),
+            browse_cache: RwLock::new(HashMap::new()),
             install_lock: Mutex::new(()),
         }
     }
@@ -160,6 +165,43 @@ impl MarketplaceCache {
 #[serde(rename_all = "camelCase")]
 struct SearchApiResponse {
     skills: Vec<MarketplaceSkill>,
+}
+
+/// Permissive browse candidate parsed from Next.js RSC JSON chunks.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BrowseSkillCandidate {
+    source: Option<String>,
+    skill_id: Option<String>,
+    name: Option<String>,
+    installs: Option<u64>,
+}
+
+/// Browse category for marketplace landing results.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum BrowseCategory {
+    /// Trending skills by short-term momentum.
+    Trending,
+    /// Top skills by all-time installs.
+    Top,
+}
+
+impl BrowseCategory {
+    fn url(self) -> &'static str {
+        match self {
+            Self::Trending => "https://skills.sh/trending",
+            Self::Top => "https://skills.sh",
+        }
+    }
+
+    fn cache_key(self) -> &'static str {
+        match self {
+            Self::Trending => "trending",
+            Self::Top => "top",
+        }
+    }
 }
 
 fn parse_scope(scope: &str) -> Result<InstallScope, String> {
@@ -223,10 +265,11 @@ fn insert_cache_entry(
     entries: &mut HashMap<String, CacheEntry>,
     key: String,
     results: Vec<MarketplaceSkill>,
+    max_entries: usize,
 ) {
     remove_expired_cache_entries(entries);
 
-    if !entries.contains_key(&key) && entries.len() >= CACHE_MAX_ENTRIES {
+    if !entries.contains_key(&key) && entries.len() >= max_entries {
         evict_oldest_cache_entry(entries);
     }
 
@@ -285,6 +328,78 @@ fn parse_search_response(body: &str) -> Result<Vec<MarketplaceSkill>, String> {
     let parsed: SearchApiResponse = serde_json::from_value(raw)
         .map_err(|err| format!("Malformed marketplace payload: {err}"))?;
     Ok(parsed.skills)
+}
+
+fn parse_browse_candidate(candidate: &str) -> Option<BrowseSkillCandidate> {
+    if let Ok(parsed) = serde_json::from_str::<BrowseSkillCandidate>(candidate) {
+        return Some(parsed);
+    }
+
+    if candidate.contains("\\\"") {
+        let unescaped = candidate.replace("\\\"", "\"");
+        if let Ok(parsed) = serde_json::from_str::<BrowseSkillCandidate>(&unescaped) {
+            return Some(parsed);
+        }
+    }
+
+    None
+}
+
+fn parse_browse_page(body: &str) -> Result<Vec<MarketplaceSkill>, String> {
+    if body.len() > BROWSE_MAX_BODY_BYTES {
+        return Err("Response from skills.sh exceeds size limit".to_owned());
+    }
+
+    let has_skill_id_marker = body.contains("\"skillId\"") || body.contains("\\\"skillId\\\"");
+    if body.len() > 100 && !has_skill_id_marker {
+        return Err("Unexpected response from skills.sh".to_owned());
+    }
+
+    let mut results = Vec::new();
+    let mut seen = HashSet::new();
+
+    // Anchor on "skillId" markers and extract the nearest enclosing {…}.
+    // This is O(n), works at any nesting depth, and directly targets skill
+    // objects regardless of surrounding HTML/JS structure.
+    for (pos, _) in body.match_indices("skillId") {
+        if results.len() >= BROWSE_MAX_RESULTS {
+            break;
+        }
+
+        let Some(open) = body[..pos].rfind('{') else {
+            continue;
+        };
+        let Some(close_rel) = body[pos..].find('}') else {
+            continue;
+        };
+        let close = pos + close_rel;
+
+        let candidate = &body[open..=close];
+        if let Some(parsed) = parse_browse_candidate(candidate) {
+            let (Some(source), Some(skill_id), Some(name), Some(installs)) =
+                (parsed.source, parsed.skill_id, parsed.name, parsed.installs)
+            else {
+                continue;
+            };
+
+            let id = format!("{source}/{skill_id}");
+            if seen.insert(id.clone()) {
+                results.push(MarketplaceSkill {
+                    id,
+                    skill_id,
+                    name,
+                    installs,
+                    source,
+                });
+            }
+        }
+    }
+
+    if !body.trim().is_empty() && results.is_empty() {
+        log::warn!("skills_marketplace_browse parsed zero candidates from non-empty body");
+    }
+
+    Ok(results)
 }
 
 fn project_manifest_path(workspace_path: &Path) -> PathBuf {
@@ -523,7 +638,65 @@ pub async fn skills_marketplace_search(
 
     {
         let mut write_guard = cache.search_cache.write().await;
-        insert_cache_entry(&mut write_guard, key, parsed_results.clone());
+        insert_cache_entry(
+            &mut write_guard,
+            key,
+            parsed_results.clone(),
+            CACHE_MAX_ENTRIES,
+        );
+    }
+
+    Ok(parsed_results)
+}
+
+/// Browse marketplace skills from the landing categories.
+#[tauri::command]
+pub async fn skills_marketplace_browse(
+    cache: State<'_, MarketplaceCache>,
+    category: BrowseCategory,
+) -> Result<Vec<MarketplaceSkill>, String> {
+    let cache_key = category.cache_key().to_owned();
+
+    {
+        let read_guard = cache.browse_cache.read().await;
+        if let Some(entry) = read_guard.get(&cache_key) {
+            if entry.created_at.elapsed() <= Duration::from_secs(CACHE_TTL_SECS) {
+                return Ok(entry.results.clone());
+            }
+        }
+    }
+
+    let client = create_http_client()?;
+    let response = client
+        .get(category.url())
+        .send()
+        .await
+        .map_err(|err| format!("Marketplace browse request failed: {err}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!(
+            "Marketplace browse request failed with HTTP {}",
+            response.status()
+        ));
+    }
+
+    let body = response
+        .text()
+        .await
+        .map_err(|err| format!("Failed to read marketplace browse response body: {err}"))?;
+    let mut parsed_results = parse_browse_page(&body)?;
+    if parsed_results.len() > BROWSE_MAX_RESULTS {
+        parsed_results.truncate(BROWSE_MAX_RESULTS);
+    }
+
+    {
+        let mut write_guard = cache.browse_cache.write().await;
+        insert_cache_entry(
+            &mut write_guard,
+            cache_key,
+            parsed_results.clone(),
+            BROWSE_CACHE_MAX_ENTRIES,
+        );
     }
 
     Ok(parsed_results)
@@ -697,6 +870,7 @@ mod tests {
                     installs: 0,
                     source: "owner/repo".to_owned(),
                 }],
+                CACHE_MAX_ENTRIES,
             );
         }
 
@@ -710,6 +884,7 @@ mod tests {
                 installs: 1,
                 source: "owner/repo".to_owned(),
             }],
+            CACHE_MAX_ENTRIES,
         );
 
         assert_eq!(entries.len(), CACHE_MAX_ENTRIES);
@@ -740,6 +915,145 @@ mod tests {
         assert_eq!(parsed.len(), 1);
         let first = parsed.first().expect("should have at least one result");
         assert_eq!(first.skill_id, "skill");
+    }
+
+    #[test]
+    fn parse_browse_page_accepts_expected_order() {
+        let body = r#"
+          <html>
+            <script>
+              self.__next_f.push([1,"{\"source\":\"owner/repo\",\"skillId\":\"skill-a\",\"name\":\"Skill A\",\"installs\":101}"]);
+            </script>
+          </html>
+        "#;
+
+        let parsed = parse_browse_page(body).expect("browse page should parse");
+        assert_eq!(parsed.len(), 1);
+        let first = parsed
+            .first()
+            .expect("should have at least one browse result");
+        assert_eq!(first.id, "owner/repo/skill-a");
+        assert_eq!(first.installs, 101);
+    }
+
+    #[test]
+    fn parse_browse_page_accepts_reordered_fields() {
+        let body = r#"
+          <html>
+            <script>
+              self.__next_f.push([1,"{\"name\":\"Skill A\",\"installs\":101,\"skillId\":\"skill-a\",\"source\":\"owner/repo\"}"]);
+            </script>
+          </html>
+        "#;
+
+        let parsed =
+            parse_browse_page(body).expect("browse page should parse with reordered fields");
+        assert_eq!(parsed.len(), 1);
+        let first = parsed
+            .first()
+            .expect("should have at least one browse result");
+        assert_eq!(first.skill_id, "skill-a");
+    }
+
+    #[test]
+    fn parse_browse_page_accepts_extra_fields() {
+        let body = r#"
+          <html>
+            <script>
+              self.__next_f.push([1,"{\"source\":\"owner/repo\",\"skillId\":\"skill-a\",\"name\":\"Skill A\",\"installs\":101,\"description\":\"extra\"}"]);
+            </script>
+          </html>
+        "#;
+
+        let parsed = parse_browse_page(body).expect("browse page should parse with extra fields");
+        assert_eq!(parsed.len(), 1);
+    }
+
+    #[test]
+    fn parse_browse_page_returns_empty_for_no_skill_objects() {
+        let body = "<html><body>no skills here</body></html>";
+        let parsed = parse_browse_page(body).expect("no-skill page should parse to empty");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn parse_browse_page_deduplicates_matching_ids() {
+        let body = r#"
+          <html>
+            <script>
+              self.__next_f.push([1,"{\"source\":\"owner/repo\",\"skillId\":\"skill-a\",\"name\":\"Skill A\",\"installs\":101}"]);
+              self.__next_f.push([1,"{\"source\":\"owner/repo\",\"skillId\":\"skill-a\",\"name\":\"Skill A\",\"installs\":101}"]);
+            </script>
+          </html>
+        "#;
+
+        let parsed = parse_browse_page(body).expect("duplicate browse entries should parse");
+        assert_eq!(parsed.len(), 1);
+    }
+
+    #[test]
+    fn parse_browse_page_rejects_unexpected_response_shape() {
+        let body = "x".repeat(120);
+        let error = parse_browse_page(&body).expect_err("invalid browse response should fail");
+        assert_eq!(error, "Unexpected response from skills.sh");
+    }
+
+    #[test]
+    fn parse_browse_page_rejects_oversized_body() {
+        let body = "a".repeat(BROWSE_MAX_BODY_BYTES + 1);
+        let error = parse_browse_page(&body).expect_err("oversized browse response should fail");
+        assert_eq!(error, "Response from skills.sh exceeds size limit");
+    }
+
+    #[test]
+    fn parse_browse_page_handles_brace_heavy_pages_without_skills() {
+        let mut body = String::from("\"skillId\"");
+        for _ in 0_i32..3000_i32 {
+            body.push_str("{}");
+        }
+
+        let parsed = parse_browse_page(&body).expect("brace-heavy pages should return empty data");
+        assert!(parsed.is_empty());
+    }
+
+    #[test]
+    fn parse_browse_page_reaches_skill_payload_after_many_non_matching_objects() {
+        let mut body = String::from("\"skillId\"");
+        for _ in 0_i32..100_i32 {
+            body.push_str("{}");
+        }
+        body.push_str(
+            r#"{"source":"owner/repo","skillId":"skill-a","name":"Skill A","installs":1}"#,
+        );
+
+        let parsed =
+            parse_browse_page(&body).expect("parser should reach valid skill payload candidates");
+        assert_eq!(parsed.len(), 1);
+        let first = parsed
+            .first()
+            .expect("parsed list should contain the valid skill payload");
+        assert_eq!(first.skill_id, "skill-a");
+    }
+
+    #[test]
+    fn parse_browse_page_extracts_nested_skills_from_rsc_payload() {
+        // Simulates real skills.sh RSC structure: skill objects nested inside
+        // {"initialSkills":[...]} with escaped quotes (\"...\").
+        let body = concat!(
+            "<html><script>self.__next_f.push([1,\"",
+            r#"16:[\"$\",\"$L1e\",null,{\"initialSkills\":["#,
+            r#"{\"source\":\"owner/repo\",\"skillId\":\"skill-a\",\"name\":\"Skill A\",\"installs\":100},"#,
+            r#"{\"source\":\"owner/repo\",\"skillId\":\"skill-b\",\"name\":\"Skill B\",\"installs\":200}"#,
+            r#"]}]"#,
+            "\"])</script></html>",
+        );
+
+        let parsed = parse_browse_page(body).expect("nested RSC skill objects should parse");
+        assert_eq!(parsed.len(), 2);
+        let first = parsed.first().expect("should have first skill");
+        let second = parsed.get(1).expect("should have second skill");
+        assert_eq!(first.skill_id, "skill-a");
+        assert_eq!(second.skill_id, "skill-b");
     }
 
     #[test]

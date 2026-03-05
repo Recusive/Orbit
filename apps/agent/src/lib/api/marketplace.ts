@@ -15,11 +15,19 @@ export interface MarketplaceInstallResult {
   readonly warnings?: string[];
 }
 
+export type BrowseCategory = 'trending' | 'top';
+
 export async function searchMarketplaceSkills(
   query: string,
   limit?: number
 ): Promise<MarketplaceSkill[]> {
   return invoke<MarketplaceSkill[]>('skills_marketplace_search', { query, limit });
+}
+
+export async function browseMarketplaceSkills(
+  category: BrowseCategory
+): Promise<MarketplaceSkill[]> {
+  return invoke<MarketplaceSkill[]>('skills_marketplace_browse', { category });
 }
 
 export async function installMarketplaceSkill(

@@ -374,6 +374,7 @@ pub fn run() {
             // Skill definition commands
             agent_cmd::agent_list_skills,
             marketplace::skills_marketplace_search,
+            marketplace::skills_marketplace_browse,
             marketplace::skills_marketplace_install,
             marketplace::skills_marketplace_installed,
             // Command definition commands
