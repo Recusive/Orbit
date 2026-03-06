@@ -288,6 +288,15 @@ export const LoadConversationSchema = z
   })
   .strict();
 
+const ThinkingPhaseSchema = z
+  .object({
+    content: z.string(),
+    contentOffset: z.number().optional(),
+    ordinal: z.number().optional(),
+    durationMs: z.number().optional(),
+  })
+  .strict();
+
 export const RewindConversationSchema = z
   .object({
     type: z.literal('conversation:rewind'),
@@ -316,6 +325,9 @@ export const RewindConversationSchema = z
           role: z.enum(['user', 'assistant']),
           content: z.string(),
           parentUuid: z.string().nullish(),
+          thinking: z.string().optional(),
+          thinkingDurationMs: z.number().optional(),
+          thinkingPhases: z.array(ThinkingPhaseSchema).optional(),
           toolUses: z
             .array(
               z.object({
@@ -325,6 +337,7 @@ export const RewindConversationSchema = z
                 output: z.string().optional(),
                 success: z.boolean(),
                 contentOffset: z.number().optional(),
+                ordinal: z.number().optional(),
               })
             )
             .optional(),
@@ -1458,6 +1471,7 @@ const PersistedToolUseSchema = z
     output: z.string().optional(),
     success: z.boolean().default(true),
     contentOffset: z.number().optional(),
+    ordinal: z.number().optional(),
   })
   .strict();
 
@@ -1482,6 +1496,7 @@ const PersistedMessageSchema = z
     content: z.string(),
     thinking: z.string().optional(),
     thinkingDurationMs: z.number().optional(),
+    thinkingPhases: z.array(ThinkingPhaseSchema).optional(),
     isInterrupted: z.boolean().optional(),
     turnDurationMs: z.number().optional(),
     // Support both old 'timestamp' and new 'createdAt' field names
@@ -1504,6 +1519,7 @@ const PersistedMessageSchema = z
     content: msg.content,
     thinking: msg.thinking,
     thinkingDurationMs: msg.thinkingDurationMs,
+    thinkingPhases: msg.thinkingPhases ?? [],
     isInterrupted: msg.isInterrupted,
     turnDurationMs: msg.turnDurationMs,
     // Prefer createdAt, fall back to timestamp, default to 0
@@ -1547,6 +1563,7 @@ export const ConversationRewoundSchema = z
           content: z.string(),
           thinking: z.string().optional(),
           thinkingDurationMs: z.number().optional(),
+          thinkingPhases: z.array(ThinkingPhaseSchema).optional(),
           timestamp: z.number(),
           /** Tool uses for this message (for restoring tool widgets) */
           toolUses: z
@@ -1558,6 +1575,7 @@ export const ConversationRewoundSchema = z
                 output: z.string().optional(),
                 success: z.boolean(),
                 contentOffset: z.number().optional(),
+                ordinal: z.number().optional(),
               })
             )
             .optional(),

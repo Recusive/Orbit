@@ -108,6 +108,9 @@ export async function handleConversationLoad(
             ...(m.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: m.thinkingDurationMs }
               : {}),
+            ...(m.thinkingPhases && m.thinkingPhases.length > 0
+              ? { thinkingPhases: m.thinkingPhases }
+              : {}),
             ...(m.isInterrupted === true ? { isInterrupted: true } : {}),
             ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
@@ -378,6 +381,9 @@ export async function handleConversationRewind(
               role: m.role,
               content: m.content,
               timestamp: m.createdAt,
+              thinking: m.thinking,
+              thinkingDurationMs: m.thinkingDurationMs,
+              thinkingPhases: m.thinkingPhases,
               toolUses: m.toolUses,
               parentUuid: m.parentUuid,
             })),
@@ -399,6 +405,13 @@ export async function handleConversationRewind(
             role: m.role,
             content: m.content,
             timestamp: Date.now(),
+            ...(m.thinking ? { thinking: m.thinking } : {}),
+            ...(m.thinkingDurationMs !== undefined
+              ? { thinkingDurationMs: m.thinkingDurationMs }
+              : {}),
+            ...(m.thinkingPhases && m.thinkingPhases.length > 0
+              ? { thinkingPhases: m.thinkingPhases }
+              : {}),
             toolUses: m.toolUses,
             parentUuid: m.parentUuid,
           })),

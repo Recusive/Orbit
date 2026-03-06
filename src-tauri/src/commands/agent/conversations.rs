@@ -8,8 +8,8 @@
 )]
 
 use orbit_conversations::{
-    Conversation, ConversationManager, ConversationSummary, Message, MessageRole, TokenUsage,
-    ToolUse,
+    Conversation, ConversationManager, ConversationSummary, Message, MessageRole, ThinkingPhase,
+    TokenUsage, ToolUse,
 };
 use orbit_core::Result;
 use tauri::State;
@@ -30,6 +30,9 @@ pub struct MessageDto {
     /// Duration of the thinking phase in milliseconds
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking_duration_ms: Option<u64>,
+    /// Individual thinking phases with offsets for interleaved rendering.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thinking_phases: Vec<ThinkingPhaseDto>,
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
@@ -68,6 +71,26 @@ pub struct ToolUseDto {
     /// Byte offset into the message content where this tool was invoked
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_offset: Option<u32>,
+    /// Stable ordering key shared with thinking phases
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordinal: Option<u32>,
+}
+
+/// Serializable thinking phase for frontend
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThinkingPhaseDto {
+    /// Thinking content
+    pub content: String,
+    /// UTF-16 offset into the message content where this phase occurred
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
+    /// Stable ordering key shared with tool ordinals
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordinal: Option<u32>,
+    /// Duration of this specific thinking phase in milliseconds
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }
 
 /// Serializable token usage for frontend
@@ -137,6 +160,11 @@ impl From<Message> for MessageDto {
             content: msg.content,
             thinking: msg.thinking,
             thinking_duration_ms: msg.thinking_duration_ms,
+            thinking_phases: msg
+                .thinking_phases
+                .into_iter()
+                .map(ThinkingPhaseDto::from)
+                .collect(),
             is_interrupted: msg.is_interrupted,
             turn_duration_ms: msg.turn_duration_ms,
             created_at: msg.created_at,
@@ -156,6 +184,18 @@ impl From<ToolUse> for ToolUseDto {
             output: tu.output,
             success: tu.success,
             content_offset: tu.content_offset,
+            ordinal: tu.ordinal,
+        }
+    }
+}
+
+impl From<ThinkingPhase> for ThinkingPhaseDto {
+    fn from(phase: ThinkingPhase) -> Self {
+        Self {
+            content: phase.content,
+            content_offset: phase.content_offset,
+            ordinal: phase.ordinal,
+            duration_ms: phase.duration_ms,
         }
     }
 }
@@ -172,6 +212,11 @@ impl From<MessageDto> for Message {
             content: dto.content,
             thinking: dto.thinking,
             thinking_duration_ms: dto.thinking_duration_ms,
+            thinking_phases: dto
+                .thinking_phases
+                .into_iter()
+                .map(ThinkingPhase::from)
+                .collect(),
             is_interrupted: dto.is_interrupted,
             turn_duration_ms: dto.turn_duration_ms,
             created_at: dto.created_at,
@@ -191,6 +236,18 @@ impl From<ToolUseDto> for ToolUse {
             output: dto.output,
             success: dto.success,
             content_offset: dto.content_offset,
+            ordinal: dto.ordinal,
+        }
+    }
+}
+
+impl From<ThinkingPhaseDto> for ThinkingPhase {
+    fn from(dto: ThinkingPhaseDto) -> Self {
+        Self {
+            content: dto.content,
+            content_offset: dto.content_offset,
+            ordinal: dto.ordinal,
+            duration_ms: dto.duration_ms,
         }
     }
 }
@@ -372,4 +429,121 @@ pub fn conversation_fork(
         workspace_path.as_deref(),
     )?;
     Ok(forked.map(ConversationDto::from))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn tool_use_dto_round_trip_preserves_ordinal() {
+        let tool = ToolUse {
+            id: String::from("t1"),
+            name: String::from("Bash"),
+            input: json!({ "command": "ls" }),
+            output: Some(String::from("file1.txt")),
+            success: true,
+            content_offset: Some(12),
+            ordinal: Some(3),
+        };
+
+        let dto = ToolUseDto::from(tool);
+        assert_eq!(dto.ordinal, Some(3));
+        assert_eq!(dto.content_offset, Some(12));
+
+        let round_trip = ToolUse::from(dto);
+        assert_eq!(round_trip.ordinal, Some(3));
+        assert_eq!(round_trip.content_offset, Some(12));
+    }
+
+    #[test]
+    fn thinking_phase_dto_round_trip_preserves_fields() {
+        let phase = ThinkingPhase {
+            content: String::from("phase 1"),
+            content_offset: Some(8),
+            ordinal: Some(2),
+            duration_ms: Some(1200),
+        };
+
+        let dto = ThinkingPhaseDto::from(phase);
+        assert_eq!(dto.content, "phase 1");
+        assert_eq!(dto.content_offset, Some(8));
+        assert_eq!(dto.ordinal, Some(2));
+        assert_eq!(dto.duration_ms, Some(1200));
+
+        let round_trip = ThinkingPhase::from(dto);
+        assert_eq!(round_trip.content_offset, Some(8));
+        assert_eq!(round_trip.ordinal, Some(2));
+        assert_eq!(round_trip.duration_ms, Some(1200));
+    }
+
+    #[test]
+    fn message_dto_round_trip_preserves_thinking_phases_and_tool_ordinals() {
+        let message = Message {
+            id: String::from("a1"),
+            role: MessageRole::Assistant,
+            content: String::from("done"),
+            thinking: Some(String::from("phase 1\n\nphase 2")),
+            thinking_duration_ms: Some(4200),
+            thinking_phases: vec![
+                ThinkingPhase {
+                    content: String::from("phase 1"),
+                    content_offset: Some(0),
+                    ordinal: Some(0),
+                    duration_ms: Some(1100),
+                },
+                ThinkingPhase {
+                    content: String::from("phase 2"),
+                    content_offset: Some(4),
+                    ordinal: Some(2),
+                    duration_ms: Some(2200),
+                },
+            ],
+            is_interrupted: Some(true),
+            turn_duration_ms: Some(5000),
+            created_at: 123,
+            tool_uses: vec![ToolUse {
+                id: String::from("t1"),
+                name: String::from("Read"),
+                input: json!({ "file_path": "/tmp/test.txt" }),
+                output: Some(String::from("contents")),
+                success: false,
+                content_offset: Some(4),
+                ordinal: Some(1),
+            }],
+            usage: Some(TokenUsage {
+                input_tokens: 1,
+                output_tokens: 2,
+                cache_read_input_tokens: Some(3),
+                cache_creation_input_tokens: Some(4),
+                total_cost_usd: Some(0.5_f64),
+            }),
+            parent_uuid: Some(String::from("u1")),
+        };
+
+        let dto = MessageDto::from(message);
+        assert_eq!(dto.thinking_phases.len(), 2);
+        assert_eq!(dto.tool_uses.first().map(|t| t.ordinal), Some(Some(1)));
+        assert_eq!(
+            dto.thinking_phases.first().map(|p| p.duration_ms),
+            Some(Some(1100))
+        );
+
+        let round_trip = Message::from(dto);
+        assert_eq!(round_trip.thinking_phases.len(), 2);
+        assert_eq!(
+            round_trip.thinking_phases.get(1).map(|p| p.ordinal),
+            Some(Some(2))
+        );
+        assert_eq!(
+            round_trip.thinking_phases.get(1).map(|p| p.duration_ms),
+            Some(Some(2200))
+        );
+        assert_eq!(
+            round_trip.tool_uses.first().map(|t| t.ordinal),
+            Some(Some(1))
+        );
+        assert_eq!(round_trip.parent_uuid.as_deref(), Some("u1"));
+    }
 }

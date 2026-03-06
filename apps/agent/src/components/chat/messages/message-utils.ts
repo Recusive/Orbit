@@ -4,7 +4,7 @@
  * Helper functions for message rendering and memoization.
  */
 
-import type { ChatMessage, MessageItemProps, Segment } from './types';
+import type { ChatMessage, MessageItemProps, Segment, ThinkingBlock } from './types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 
 // ============================================
@@ -113,44 +113,130 @@ export function getActiveChain<T extends ChainableMessage>(allMessages: T[]): T[
   return chain;
 }
 
+type Marker =
+  | { kind: 'thinking'; offset: number; block: ThinkingBlock; index: number; ordinal: number }
+  | { kind: 'tool'; offset: number; tool: ToolExecution; ordinal: number };
+
 /**
- * Build interleaved segments for assistant messages.
- * Segments alternate between content and tool widgets based on contentOffset.
+ * Build interleaved segments for assistant messages using a unified marker sweep.
+ * Content is sliced at both tool offsets and thinking offsets so text-only multi-phase
+ * messages still interleave correctly.
  */
-export function buildSegments(displayedContent: string, tools: ToolExecution[]): Segment[] {
-  const sortedTools = [...tools].sort((a, b) => (a.contentOffset ?? 0) - (b.contentOffset ?? 0));
+export function buildUnifiedSegments(
+  content: string,
+  tools: ToolExecution[],
+  thinkingBlocks: ThinkingBlock[] | undefined,
+  isThinkingActive: boolean | undefined,
+  isStreaming: boolean | undefined
+): Segment[] {
+  const markers: Marker[] = [];
+  const thinkingArr = thinkingBlocks ?? [];
+  const activeThinkingIndex =
+    isStreaming === true && isThinkingActive === true ? thinkingArr.length - 1 : -1;
+  const legacyBlocks: { block: ThinkingBlock; index: number }[] = [];
+  let activeTrailingBlock: { block: ThinkingBlock; index: number } | undefined;
+
+  const existingOrdinals = [
+    ...tools.map((t) => t.ordinal).filter((n): n is number => n !== undefined),
+    ...thinkingArr.map((b) => b.ordinal).filter((n): n is number => n !== undefined),
+  ];
+  let ordinalCounter = existingOrdinals.length > 0 ? Math.max(...existingOrdinals) + 1 : 0;
+
+  for (const tool of tools) {
+    markers.push({
+      kind: 'tool',
+      offset: tool.contentOffset ?? 0,
+      tool,
+      ordinal: tool.ordinal ?? ordinalCounter++,
+    });
+  }
+
+  for (const [index, block] of thinkingArr.entries()) {
+    if (block.contentOffset !== undefined) {
+      markers.push({
+        kind: 'thinking',
+        offset: block.contentOffset,
+        block,
+        index,
+        ordinal: block.ordinal ?? ordinalCounter++,
+      });
+    } else if (index === activeThinkingIndex) {
+      activeTrailingBlock = { block, index };
+    } else {
+      legacyBlocks.push({ block, index });
+    }
+  }
+
+  markers.sort((a, b) => {
+    if (a.offset !== b.offset) return a.offset - b.offset;
+    return a.ordinal - b.ordinal;
+  });
 
   const segments: Segment[] = [];
-  let lastOffset = 0;
+  let cursor = 0;
 
-  for (const tool of sortedTools) {
-    const offset = tool.contentOffset ?? 0;
-    // Add content before this tool
-    if (offset > lastOffset) {
-      const text = displayedContent.slice(lastOffset, offset);
+  for (const { block, index } of legacyBlocks) {
+    segments.push({
+      type: 'thinking',
+      block,
+      index,
+      isStreaming: false,
+      key: `thinking-${String(index)}`,
+    });
+  }
+
+  for (const marker of markers) {
+    if (marker.offset > cursor) {
+      const text = content.slice(cursor, marker.offset);
       if (text.trim()) {
-        segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+        segments.push({ type: 'content', text, key: `content-${String(cursor)}` });
       }
+      cursor = marker.offset;
     }
-    // Add the tool
-    segments.push({ type: 'tool', tool, key: tool.id });
-    lastOffset = offset;
+
+    if (marker.kind === 'thinking') {
+      segments.push({
+        type: 'thinking',
+        block: marker.block,
+        index: marker.index,
+        isStreaming: false,
+        key: `thinking-${String(marker.index)}`,
+      });
+    } else {
+      segments.push({ type: 'tool', tool: marker.tool, key: marker.tool.id });
+    }
   }
 
-  // Add remaining content after last tool
-  if (lastOffset < displayedContent.length) {
-    const text = displayedContent.slice(lastOffset);
+  if (cursor < content.length) {
+    const text = content.slice(cursor);
     if (text.trim()) {
-      segments.push({ type: 'content', text, key: `content-${String(lastOffset)}` });
+      segments.push({ type: 'content', text, key: `content-${String(cursor)}` });
     }
   }
 
-  // If no tools, just render all content
-  if (segments.length === 0 && displayedContent.trim()) {
-    segments.push({ type: 'content', text: displayedContent, key: 'content-0' });
+  if (activeTrailingBlock !== undefined) {
+    segments.push({
+      type: 'thinking',
+      block: activeTrailingBlock.block,
+      index: activeTrailingBlock.index,
+      isStreaming: true,
+      key: `thinking-${String(activeTrailingBlock.index)}`,
+    });
+  }
+
+  if (segments.length === 0 && content.trim()) {
+    segments.push({ type: 'content', text: content, key: 'content-0' });
   }
 
   return segments;
+}
+
+/**
+ * Legacy wrapper kept so existing tool-only callers reuse the unified implementation.
+ * Prefer `buildUnifiedSegments` for new code.
+ */
+export function buildSegments(displayedContent: string, tools: ToolExecution[]): Segment[] {
+  return buildUnifiedSegments(displayedContent, tools, undefined, undefined, undefined);
 }
 
 /**
@@ -265,6 +351,8 @@ export function arePropsEqual(prev: MessageItemProps, next: MessageItemProps): b
     if (prevTool.status !== nextTool.status) return false;
     if (prevTool.toolOutput !== nextTool.toolOutput) return false;
     if (prevTool.success !== nextTool.success) return false;
+    if (prevTool.contentOffset !== nextTool.contentOffset) return false;
+    if (prevTool.ordinal !== nextTool.ordinal) return false;
   }
 
   return true;

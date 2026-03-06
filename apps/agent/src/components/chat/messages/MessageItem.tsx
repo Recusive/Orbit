@@ -16,7 +16,7 @@ import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
 import { FeedbackDialog } from './feedback-dialog';
 import { MessageActions } from './message-actions';
-import { arePropsEqual, buildSegments, hasVisibleContent } from './message-utils';
+import { arePropsEqual, buildUnifiedSegments, hasVisibleContent } from './message-utils';
 
 import type { MessageItemProps } from './types';
 import type { FC } from 'react';
@@ -299,9 +299,34 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   // Build interleaved segments for assistant messages
   // Memoized to prevent re-computation on every render - only recomputes when
   // content or tools change. This is critical for streaming performance.
+  const effectiveThinkingBlocks = useMemo(
+    () =>
+      message.thinkingBlocks ??
+      (message.thinking
+        ? [{ content: message.thinking, durationMs: message.thinkingDurationMs ?? 0 }]
+        : undefined),
+    [message.thinkingBlocks, message.thinking, message.thinkingDurationMs]
+  );
+
   const segments = useMemo(
-    () => (message.role === 'assistant' ? buildSegments(animatedContent, tools) : []),
-    [message.role, animatedContent, tools]
+    () =>
+      message.role === 'assistant'
+        ? buildUnifiedSegments(
+            animatedContent,
+            tools,
+            effectiveThinkingBlocks,
+            message.isThinkingActive,
+            message.isStreaming
+          )
+        : [],
+    [
+      message.role,
+      animatedContent,
+      tools,
+      effectiveThinkingBlocks,
+      message.isThinkingActive,
+      message.isStreaming,
+    ]
   );
 
   // Don't render empty assistant message bubbles
@@ -347,29 +372,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
         >
           {/* Content and tool segments */}
           <div className="space-y-2">
-            {/* Thinking Boxes - one per thinking phase, inside space-y-2 for consistent spacing */}
-            {message.thinkingBlocks !== undefined && message.thinkingBlocks.length > 0 ? (
-              message.thinkingBlocks.map((block, i) => (
-                <ThinkingBox
-                  key={`thinking-${String(i)}-${String(block.durationMs)}`}
-                  thinking={block.content}
-                  thinkingDurationMs={block.durationMs}
-                  isStreaming={
-                    message.isStreaming === true &&
-                    message.isThinkingActive === true &&
-                    i === (message.thinkingBlocks?.length ?? 0) - 1
-                  }
-                />
-              ))
-            ) : message.thinking ? (
-              <ThinkingBox
-                thinking={message.thinking}
-                thinkingDurationMs={message.thinkingDurationMs}
-                isStreaming={message.isStreaming}
-              />
-            ) : null}
-
             {segments.map((segment) => {
+              if (segment.type === 'thinking') {
+                return (
+                  <ThinkingBox
+                    key={segment.key}
+                    thinking={segment.block.content}
+                    thinkingDurationMs={segment.block.durationMs}
+                    isStreaming={segment.isStreaming}
+                  />
+                );
+              }
               if (segment.type === 'content') {
                 // Use mode="static" to prevent scrollbar jumping during streaming.
                 // Default "streaming" mode uses block splitting + useTransition which

@@ -16,6 +16,7 @@ export interface ConversationMessageDto {
   content: string;
   thinking?: string;
   thinkingDurationMs?: number;
+  thinkingPhases?: ThinkingPhaseDto[];
   /** Whether this assistant message was interrupted by the user (Stop button). */
   isInterrupted?: boolean;
   /** Wall-clock duration of the entire assistant turn in milliseconds. */
@@ -39,6 +40,14 @@ export interface ToolUseDto {
   output?: string;
   success: boolean;
   contentOffset?: number;
+  ordinal?: number;
+}
+
+export interface ThinkingPhaseDto {
+  content: string;
+  contentOffset?: number;
+  ordinal?: number;
+  durationMs?: number;
 }
 
 export interface TokenUsageDto {

@@ -18,7 +18,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { startTransition } from 'react';
 
-import type { ChatMessage } from '@/components/chat';
+import type { ChatMessage, ThinkingBlock } from '@/components/chat';
 import type { RafBatchHandler } from '@/lib/utils/event-batcher';
 import type { ExtensionMessage } from '@/types/protocol';
 
@@ -27,7 +27,7 @@ import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-hand
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
-import { toConversationSummaries } from '@/lib/mappers';
+import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
@@ -117,6 +117,66 @@ function scheduleSidebarRefresh(): void {
   }
 }
 
+function mapPersistedMessage(m: {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  thinking?: string | undefined;
+  thinkingDurationMs?: number | undefined;
+  thinkingPhases?:
+    | {
+        content: string;
+        contentOffset?: number | undefined;
+        ordinal?: number | undefined;
+        durationMs?: number | undefined;
+      }[]
+    | undefined;
+  isInterrupted?: boolean | undefined;
+  turnDurationMs?: number | undefined;
+  parentUuid?: string | null | undefined;
+  toolUses?: { name: string; success: boolean }[] | undefined;
+}): ChatMessage {
+  const thinkingPhases = m.thinkingPhases ?? [];
+  const thinkingBlocks: ThinkingBlock[] | undefined =
+    thinkingPhases.length > 0
+      ? thinkingPhases.map((phase, index) => ({
+          content: phase.content,
+          durationMs:
+            phase.durationMs ??
+            (index === thinkingPhases.length - 1 ? (m.thinkingDurationMs ?? 0) : 0),
+          contentOffset: phase.contentOffset,
+          ordinal: phase.ordinal,
+        }))
+      : m.thinking
+        ? [{ content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 }]
+        : undefined;
+
+  const base: ChatMessage = {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    displayedContent: m.content,
+    ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
+    ...(thinkingBlocks ? { thinkingBlocks } : {}),
+    ...(m.thinking ? { thinking: m.thinking } : {}),
+    ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
+    ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
+  };
+
+  if (m.isInterrupted === true) {
+    const hasRejectedQuestion = m.toolUses?.some(
+      (tool) => tool.name.toLowerCase() === 'askuserquestion' && !tool.success
+    );
+    return {
+      ...base,
+      isInterrupted: true,
+      ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
+    };
+  }
+
+  return base;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Service Class
 // ────────────────────────────────────────────────────────────────────────────
@@ -130,6 +190,7 @@ class ChatMessageService {
   // Per-message tracking
   private pendingChunkLengths = new Map<string, number>();
   private thinkingStartTimes = new Map<string, number>();
+  private markerOrdinals = new Map<string, number>();
 
   // Track whether the current turn used tools (for re-asserting isAgentRunning on tool:start)
   private turnHadTools = new Map<string, boolean>();
@@ -219,9 +280,53 @@ class ChatMessageService {
     this.toolBatchers.clear();
     this.pendingChunkLengths.clear();
     this.thinkingStartTimes.clear();
+    this.markerOrdinals.clear();
     this.agentRunningTimers.clear();
     this.agentRunningTimerDueAt.clear();
     this.turnHadTools.clear();
+  }
+
+  finalizeInterruptedMessage(message: ChatMessage): ChatMessage {
+    if (
+      message.isThinkingActive !== true ||
+      message.thinkingBlocks === undefined ||
+      message.thinkingBlocks.length === 0
+    ) {
+      return message;
+    }
+
+    const blocks = [...message.thinkingBlocks];
+    const lastBlock = blocks[blocks.length - 1];
+    if (!lastBlock) {
+      return message;
+    }
+
+    const startTime = this.thinkingStartTimes.get(message.id);
+    const finalDuration = startTime !== undefined ? Date.now() - startTime : lastBlock.durationMs;
+
+    blocks[blocks.length - 1] = {
+      ...lastBlock,
+      ...(lastBlock.contentOffset === undefined ? { contentOffset: message.content.length } : {}),
+      durationMs: finalDuration,
+    };
+
+    this.thinkingStartTimes.delete(message.id);
+
+    return {
+      ...message,
+      isThinkingActive: false,
+      thinkingBlocks: blocks,
+    };
+  }
+
+  private nextMarkerOrdinal(messageId: string): number {
+    const next = this.markerOrdinals.get(messageId) ?? 0;
+    this.markerOrdinals.set(messageId, next + 1);
+    return next;
+  }
+
+  private clearMarkerOrdinal(messageId: string): void {
+    this.markerOrdinals.delete(messageId);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -521,6 +626,7 @@ class ChatMessageService {
 
     // Clean up pending chunk tracking for this message
     this.pendingChunkLengths.delete(message.message_id);
+    this.clearMarkerOrdinal(message.message_id);
 
     // Calculate final thinking duration
     const thinkingStart = this.thinkingStartTimes.get(message.message_id);
@@ -548,6 +654,7 @@ class ChatMessageService {
           finalBlocks[finalBlocks.length - 1] = {
             ...lastBlock,
             durationMs: finalThinkingDuration,
+            contentOffset: lastMsg.content.length,
           };
         }
       }
@@ -597,10 +704,13 @@ class ChatMessageService {
                   }
                 : {}),
               success: tool.success ?? true,
+              ...(tool.contentOffset !== undefined ? { contentOffset: tool.contentOffset } : {}),
+              ...(tool.ordinal !== undefined ? { ordinal: tool.ordinal } : {}),
             }))
           : undefined;
 
       const { workspacePath, activeWorktreePath } = useUIStore.getState();
+      const thinkingPhasesDto = serializeThinkingBlocks(completedMsg.thinkingBlocks);
 
       if (!wasMessagePersisted(sid, completedMsg.id)) {
         void conversationAddMessage(
@@ -613,6 +723,7 @@ class ChatMessageService {
             ...(completedMsg.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: completedMsg.thinkingDurationMs }
               : {}),
+            ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
             createdAt: Date.now(),
             ...(usageDto ? { usage: usageDto } : {}),
             ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
@@ -708,6 +819,7 @@ class ChatMessageService {
     this.flushSession(sid);
     this.cleanupBatchers(sid);
     this.pendingChunkLengths.delete(message.message_id);
+    this.clearMarkerOrdinal(message.message_id);
 
     // Errors are always terminal — clear immediately, cancel any delayed clear
     this.forceCompleteOrphanedTools(sid);
@@ -822,17 +934,7 @@ class ChatMessageService {
 
       const newMessages: ChatMessage[] = conv.messages
         .filter((m) => activeChainIds.has(m.id))
-        .map((m) => ({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          displayedContent: m.content,
-          thinking: m.thinking ?? undefined,
-          thinkingDurationMs: m.thinkingDurationMs ?? undefined,
-          turnDurationMs: m.turnDurationMs ?? undefined,
-          isInterrupted: m.isInterrupted ?? undefined,
-          parentUuid: m.parentUuid ?? undefined,
-        }));
+        .map((m) => mapPersistedMessage({ ...m, role: m.role as 'user' | 'assistant' }));
 
       // Replace messages in store — full swap, no merge
       useChatStore.getState().setMessages(sessionId, newMessages);
@@ -992,38 +1094,7 @@ class ChatMessageService {
             (m): m is typeof m & { role: 'user' | 'assistant' } =>
               m.role === 'user' || m.role === 'assistant'
           )
-          .map((m) => {
-            const base: ChatMessage = {
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              displayedContent: m.content,
-              ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
-              ...(m.thinking
-                ? {
-                    thinking: m.thinking,
-                    thinkingBlocks: [
-                      { content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 },
-                    ],
-                  }
-                : {}),
-              ...(m.thinkingDurationMs !== undefined
-                ? { thinkingDurationMs: m.thinkingDurationMs }
-                : {}),
-              ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
-            };
-            if (m.isInterrupted === true) {
-              const hasRejectedQuestion = m.toolUses.some(
-                (t) => t.name.toLowerCase() === 'askuserquestion' && !t.success
-              );
-              return {
-                ...base,
-                isInterrupted: true as const,
-                ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
-              };
-            }
-            return base;
-          });
+          .map((m) => mapPersistedMessage(m));
 
         const backendMessages = getActiveChain(allBackendMessages);
 
@@ -1177,6 +1248,7 @@ class ChatMessageService {
                 success: t.success,
                 ...(t.output !== undefined ? { output: t.output } : {}),
                 ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+                ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
               })),
               message.session_id
             );
@@ -1206,20 +1278,7 @@ class ChatMessageService {
     useChatStore.getState().bumpRewindEpoch();
 
     // Prepare rewound messages
-    const rewoundMessages: ChatMessage[] = message.messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      displayedContent: m.content,
-      ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
-      ...(m.thinking
-        ? {
-            thinking: m.thinking,
-            thinkingBlocks: [{ content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 }],
-          }
-        : {}),
-      ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
-    }));
+    const rewoundMessages: ChatMessage[] = message.messages.map((m) => mapPersistedMessage(m));
 
     const isSameSession = message.new_session_id === message.session_id;
 
@@ -1253,6 +1312,7 @@ class ChatMessageService {
             success: t.success,
             ...(t.output !== undefined ? { output: t.output } : {}),
             ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+            ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
           }))
         );
       }
@@ -1309,14 +1369,25 @@ class ChatMessageService {
       message.content_offset ??
         (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0)
     );
+    const toolOrdinal = this.nextMarkerOrdinal(message.message_id);
 
     // Call startTool synchronously for immediate widget rendering
     useToolStore
       .getState()
-      .startTool(toolId, message.message_id, toolName, message.tool_input, contentOffset, sid);
+      .startTool(
+        toolId,
+        message.message_id,
+        toolName,
+        message.tool_input,
+        contentOffset,
+        sid,
+        toolOrdinal
+      );
 
     // Finalize current thinking block and mark thinking phase complete
     if (currentMsg?.isThinkingActive === true) {
+      const thinkingContentOffset =
+        currentMsg.content.length + (this.pendingChunkLengths.get(message.message_id) ?? 0);
       useChatStore.getState().updateMessage(sid, message.message_id, (msg) => {
         let updatedBlocks = msg.thinkingBlocks;
         if (updatedBlocks !== undefined && updatedBlocks.length > 0) {
@@ -1327,6 +1398,7 @@ class ChatMessageService {
             updatedBlocks[updatedBlocks.length - 1] = {
               ...lastBlock,
               durationMs: Date.now() - startTime,
+              contentOffset: thinkingContentOffset,
             };
           }
         }
@@ -1523,6 +1595,7 @@ class ChatMessageService {
           // Fast path: append to last assistant message
           // Finalize thinking block if active
           let updatedBlocks = lastMsg.thinkingBlocks;
+          const thinkingContentOffset = lastMsg.content.length;
           if (
             lastMsg.isThinkingActive === true &&
             updatedBlocks !== undefined &&
@@ -1535,6 +1608,7 @@ class ChatMessageService {
               updatedBlocks[updatedBlocks.length - 1] = {
                 ...lastBlock,
                 durationMs: Date.now() - startTime,
+                contentOffset: thinkingContentOffset,
               };
             }
           }
@@ -1613,7 +1687,11 @@ class ChatMessageService {
               if (blocks.length > 0) {
                 this.thinkingStartTimes.set(messageId, Date.now());
               }
-              blocks.push({ content: accumulatedThinking, durationMs: 0 });
+              blocks.push({
+                content: accumulatedThinking,
+                durationMs: 0,
+                ordinal: this.nextMarkerOrdinal(messageId),
+              });
             } else {
               const lastBlock = blocks[blocks.length - 1];
               if (lastBlock !== undefined) {
@@ -1625,7 +1703,11 @@ class ChatMessageService {
               }
             }
 
-            const newThinking = (m.thinking ?? '') + accumulatedThinking;
+            const existingThinking = m.thinking ?? '';
+            const newThinking =
+              needsNewBlock && existingThinking.length > 0
+                ? `${existingThinking}\n\n${accumulatedThinking}`
+                : existingThinking + accumulatedThinking;
             return {
               ...m,
               thinking: newThinking,
@@ -1644,7 +1726,13 @@ class ChatMessageService {
             displayedContent: '',
             isStreaming: true,
             thinking: accumulatedThinking,
-            thinkingBlocks: [{ content: accumulatedThinking, durationMs: 0 }],
+            thinkingBlocks: [
+              {
+                content: accumulatedThinking,
+                durationMs: 0,
+                ordinal: this.nextMarkerOrdinal(messageId),
+              },
+            ],
             isThinkingActive: true,
             parentUuid,
           });
