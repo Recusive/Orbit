@@ -117,6 +117,7 @@ const LARGE_EVAL_RESULT_LIMIT_CHARS: usize = 500_000;
 const DEFAULT_WAIT_TIMEOUT_MS: u64 = 30_000;
 const MAX_WAIT_TIMEOUT_MS: u64 = 120_000;
 const WAIT_POLL_INTERVAL_MS: u64 = 100;
+const ORBIT_RUNTIME_SCRIPT: &str = include_str!("orbit_runtime.js");
 
 /// The label for the browser window.
 const BROWSER_WINDOW_LABEL: &str = "browser-window";
@@ -434,6 +435,152 @@ fn normalize_wait_timeout(timeout_ms: Option<u64>) -> Duration {
     match timeout_ms {
         Some(0) | None => Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS),
         Some(value) => Duration::from_millis(value.min(MAX_WAIT_TIMEOUT_MS)),
+    }
+}
+
+fn ensure_browser_exists(state: &BrowserWindowState) -> Result<()> {
+    if !*state.exists.lock() {
+        return Err("No browser exists".to_owned());
+    }
+    Ok(())
+}
+
+fn expected_orbit_runtime_version() -> Result<&'static str> {
+    ORBIT_RUNTIME_SCRIPT
+        .lines()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            trimmed
+                .strip_prefix("const RUNTIME_VERSION = '")
+                .and_then(|rest| rest.strip_suffix("';"))
+        })
+        .ok_or_else(|| "Orbit runtime version not found".to_owned())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrbitRuntimeMethod {
+    Snapshot,
+    Click,
+    Type,
+    Fill,
+    GetText,
+    GetHtml,
+    Count,
+    Check,
+    Uncheck,
+    Select,
+    Hover,
+    Focus,
+    Scroll,
+    ScrollIntoView,
+    IsVisible,
+    IsEnabled,
+    GetAttribute,
+    BoundingBox,
+    GetCookies,
+    ClearCookies,
+    StorageGet,
+    StorageSet,
+    StorageClear,
+    GetNetworkRequests,
+    GetConsoleLogs,
+    RuntimeInfo,
+}
+
+impl OrbitRuntimeMethod {
+    fn from_input(value: &str) -> Result<Self> {
+        match value {
+            "snapshot" => Ok(Self::Snapshot),
+            "click" => Ok(Self::Click),
+            "type" => Ok(Self::Type),
+            "fill" => Ok(Self::Fill),
+            "getText" => Ok(Self::GetText),
+            "getHtml" => Ok(Self::GetHtml),
+            "count" => Ok(Self::Count),
+            "check" => Ok(Self::Check),
+            "uncheck" => Ok(Self::Uncheck),
+            "select" => Ok(Self::Select),
+            "hover" => Ok(Self::Hover),
+            "focus" => Ok(Self::Focus),
+            "scroll" => Ok(Self::Scroll),
+            "scrollIntoView" => Ok(Self::ScrollIntoView),
+            "isVisible" => Ok(Self::IsVisible),
+            "isEnabled" => Ok(Self::IsEnabled),
+            "getAttribute" => Ok(Self::GetAttribute),
+            "boundingBox" => Ok(Self::BoundingBox),
+            "getCookies" => Ok(Self::GetCookies),
+            "clearCookies" => Ok(Self::ClearCookies),
+            "storageGet" => Ok(Self::StorageGet),
+            "storageSet" => Ok(Self::StorageSet),
+            "storageClear" => Ok(Self::StorageClear),
+            "getNetworkRequests" => Ok(Self::GetNetworkRequests),
+            "getConsoleLogs" => Ok(Self::GetConsoleLogs),
+            "runtimeInfo" => Ok(Self::RuntimeInfo),
+            _ => Err(format!("Unsupported Orbit runtime method: {value}")),
+        }
+    }
+
+    fn as_js_name(self) -> &'static str {
+        match self {
+            Self::Snapshot => "snapshot",
+            Self::Click => "click",
+            Self::Type => "type",
+            Self::Fill => "fill",
+            Self::GetText => "getText",
+            Self::GetHtml => "getHtml",
+            Self::Count => "count",
+            Self::Check => "check",
+            Self::Uncheck => "uncheck",
+            Self::Select => "select",
+            Self::Hover => "hover",
+            Self::Focus => "focus",
+            Self::Scroll => "scroll",
+            Self::ScrollIntoView => "scrollIntoView",
+            Self::IsVisible => "isVisible",
+            Self::IsEnabled => "isEnabled",
+            Self::GetAttribute => "getAttribute",
+            Self::BoundingBox => "boundingBox",
+            Self::GetCookies => "getCookies",
+            Self::ClearCookies => "clearCookies",
+            Self::StorageGet => "storageGet",
+            Self::StorageSet => "storageSet",
+            Self::StorageClear => "storageClear",
+            Self::GetNetworkRequests => "getNetworkRequests",
+            Self::GetConsoleLogs => "getConsoleLogs",
+            Self::RuntimeInfo => "runtimeInfo",
+        }
+    }
+
+    #[cfg(test)]
+    fn all() -> &'static [Self] {
+        &[
+            Self::Snapshot,
+            Self::Click,
+            Self::Type,
+            Self::Fill,
+            Self::GetText,
+            Self::GetHtml,
+            Self::Count,
+            Self::Check,
+            Self::Uncheck,
+            Self::Select,
+            Self::Hover,
+            Self::Focus,
+            Self::Scroll,
+            Self::ScrollIntoView,
+            Self::IsVisible,
+            Self::IsEnabled,
+            Self::GetAttribute,
+            Self::BoundingBox,
+            Self::GetCookies,
+            Self::ClearCookies,
+            Self::StorageGet,
+            Self::StorageSet,
+            Self::StorageClear,
+            Self::GetNetworkRequests,
+            Self::GetConsoleLogs,
+            Self::RuntimeInfo,
+        ]
     }
 }
 
@@ -776,9 +923,7 @@ async fn browser_eval_inner(
     state: &State<'_, Arc<BrowserWindowState>>,
     result_state: &State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
-    if !*state.exists.lock() {
-        return Err("No browser exists".to_owned());
-    }
+    ensure_browser_exists(state.inner().as_ref())?;
 
     let window = app
         .get_webview_window(BROWSER_WINDOW_LABEL)
@@ -866,6 +1011,220 @@ async fn browser_eval_inner(
             }
         },
     }
+}
+
+fn build_browser_eval_direct_wrapper(
+    eval_id_json: &str,
+    script_body: &str,
+    small_limit: usize,
+    large_limit: usize,
+) -> String {
+    // SAFETY: `script_body` is embedded directly into JavaScript. This helper is
+    // only used by trusted Rust call sites that construct scripts from internal
+    // code and JSON-serialized values, never from arbitrary user input.
+    format!(
+        "(async () => {{
+            const __evalId = {eval_id_json};
+            try {{
+                const __result = await (async function() {{
+{script_body}
+                }})();
+                const __json = JSON.stringify(__result ?? null);
+                if (__json.length <= {small_limit}) {{
+                    const __data = encodeURIComponent(__json);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
+                    return;
+                }}
+                if (__json.length <= {large_limit}) {{
+                    const __channel = window.__orbit_eval_channel;
+                    if (!__channel || typeof __channel.postResult !== 'function') {{
+                        throw new Error('Large eval result transport unavailable.');
+                    }}
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&large=true`;
+                    await __channel.postResult(__evalId, __json);
+                    return;
+                }}
+                {{
+                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 500000). Use compact:true or target a subtree.`);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
+                    return;
+                }}
+            }} catch (__error) {{
+                const __errorMsg = encodeURIComponent(__error?.message || String(__error));
+                window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
+            }}
+        }})();",
+    )
+}
+
+async fn browser_eval_direct_inner(
+    script: &str,
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    ensure_browser_exists(state.inner().as_ref())?;
+
+    let window = app
+        .get_webview_window(BROWSER_WINDOW_LABEL)
+        .ok_or("Browser window not found")?;
+
+    let eval_id = Uuid::new_v4().to_string();
+    let result_rx = result_state.register(eval_id.clone());
+    let eval_id_json = serde_json::to_string(&eval_id).unwrap_or_else(|_| format!("\"{eval_id}\""));
+    let wrapped_script = build_browser_eval_direct_wrapper(
+        &eval_id_json,
+        script,
+        SMALL_EVAL_RESULT_LIMIT_CHARS,
+        LARGE_EVAL_RESULT_LIMIT_CHARS,
+    );
+
+    if let Err(error) = window.eval(&wrapped_script) {
+        let _ = result_state.cancel(&eval_id);
+        return Err(format!("JavaScript execution failed: {error}"));
+    }
+
+    match timeout(JS_EVAL_TIMEOUT, result_rx).await {
+        Ok(Ok(Ok(result))) => Ok(result),
+        Ok(Ok(Err(err))) => Err(err),
+        Ok(Err(_)) => Err("JavaScript evaluation was cancelled".to_owned()),
+        Err(_) => {
+            let awaiting_large_payload = result_state.cancel(&eval_id);
+            if awaiting_large_payload {
+                Err(LARGE_EVAL_TIMEOUT_MESSAGE.to_owned())
+            } else {
+                Err(format!(
+                    "JavaScript evaluation timed out after {} seconds",
+                    JS_EVAL_TIMEOUT.as_secs()
+                ))
+            }
+        },
+    }
+}
+
+async fn browser_runtime_version_inner(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<Option<String>> {
+    let raw = browser_eval_direct_inner(
+        "return window.__orbit?.VERSION ?? null;",
+        app,
+        state,
+        result_state,
+    )
+    .await?;
+    serde_json::from_str::<Option<String>>(&raw)
+        .map_err(|error| format!("Failed to parse Orbit runtime version: {error}"))
+}
+
+async fn browser_ensure_runtime_inner(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let expected_version = expected_orbit_runtime_version()?;
+    let current_version = browser_runtime_version_inner(app, state, result_state).await?;
+    if current_version.as_deref() == Some(expected_version) {
+        return Ok(());
+    }
+
+    let inject_script = format!("{ORBIT_RUNTIME_SCRIPT}\nreturn window.__orbit?.VERSION ?? null;");
+    let raw = browser_eval_direct_inner(&inject_script, app, state, result_state).await?;
+    let injected_version = serde_json::from_str::<Option<String>>(&raw)
+        .map_err(|error| format!("Failed to parse injected Orbit runtime version: {error}"))?;
+
+    if injected_version.as_deref() != Some(expected_version) {
+        return Err(format!(
+            "Orbit runtime injection failed (expected {expected_version}, received {})",
+            injected_version.unwrap_or_else(|| "null".to_owned())
+        ));
+    }
+
+    Ok(())
+}
+
+/// Invoke a typed Orbit runtime method from the embedded browser.
+#[tauri::command]
+pub async fn browser_invoke_runtime(
+    method: String,
+    args_json: String,
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    let runtime_method = OrbitRuntimeMethod::from_input(&method)?;
+    let method_name_json = serde_json::to_string(runtime_method.as_js_name())
+        .map_err(|error| format!("Failed to encode Orbit runtime method name: {error}"))?;
+    let args_json_literal = serde_json::to_string(&args_json)
+        .map_err(|error| format!("Failed to encode Orbit runtime args: {error}"))?;
+    let script = format!(
+        "const __orbit = window.__orbit;
+        if (!__orbit || typeof __orbit[{method_name_json}] !== 'function') {{
+            throw new Error('Orbit runtime unavailable.');
+        }}
+        // NOTE: `args_json` is already a JSON string from the frontend. Encode
+        // that string again for safe JS injection, then parse it back here.
+        return __orbit[{method_name_json}](...JSON.parse({args_json_literal}));",
+    );
+
+    browser_eval_direct_inner(&script, &app, &state, &result_state).await
+}
+
+/// Return the currently installed Orbit runtime version from the page.
+#[tauri::command]
+pub async fn browser_runtime_version(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<Option<String>> {
+    browser_runtime_version_inner(&app, &state, &result_state).await
+}
+
+/// Ensure the Orbit runtime is installed and matches the bundled version.
+#[tauri::command]
+pub async fn browser_ensure_runtime(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    browser_ensure_runtime_inner(&app, &state, &result_state).await
+}
+
+/// Return the current browser URL without executing page JavaScript.
+#[tauri::command]
+pub async fn browser_get_url(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+) -> Result<String> {
+    ensure_browser_exists(state.inner().as_ref())?;
+
+    let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) else {
+        *state.exists.lock() = false;
+        return Err("Browser window not found".to_owned());
+    };
+
+    let url = window
+        .url()
+        .map_err(|error| format!("Failed to read browser URL: {error}"))?;
+
+    Ok(serde_json::json!({ "url": url.to_string() }).to_string())
+}
+
+/// Return the current document title using the CSP-safe eval transport.
+#[tauri::command]
+pub async fn browser_get_title(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    browser_eval_direct_inner(
+        "return { title: document.title ?? '' };",
+        &app,
+        &state,
+        &result_state,
+    )
+    .await
 }
 
 /// Capture a screenshot of the embedded browser.
@@ -1367,7 +1726,8 @@ pub async fn browser_wait_for_selector(
     let mut ticker = interval(poll_interval);
 
     loop {
-        let raw = browser_eval_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let raw =
+            browser_eval_direct_inner(&poll_script, &app, &browser_state, &result_state).await?;
         let matched = serde_json::from_str::<bool>(&raw)
             .map_err(|e| format!("Failed to parse selector wait result: {e}"))?;
         if matched {
@@ -1401,7 +1761,8 @@ pub async fn browser_wait_for_url(
     let mut ticker = interval(poll_interval);
 
     loop {
-        let raw = browser_eval_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let raw =
+            browser_eval_direct_inner(&poll_script, &app, &browser_state, &result_state).await?;
         let poll_result = serde_json::from_str::<UrlWaitResult>(&raw)
             .map_err(|e| format!("Failed to parse URL wait result: {e}"))?;
 
@@ -1512,6 +1873,7 @@ mod screenshot_cleanup_tests {
 #[cfg(test)]
 mod eval_result_tests {
     use super::*;
+    use regex::Regex;
 
     #[tokio::test]
     async fn handle_eval_result_url_completes_small_results() {
@@ -1577,5 +1939,102 @@ mod eval_result_tests {
             normalize_wait_timeout(Some(42_000)),
             Duration::from_millis(42_000)
         );
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_omits_new_function() {
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-1\"",
+            "return { ok: true };",
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(!wrapper.contains("new Function"));
+        assert!(wrapper.contains("const __result = await (async function() {"));
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_round_trips_runtime_source() {
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-2\"",
+            ORBIT_RUNTIME_SCRIPT,
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(wrapper.contains("const RUNTIME_VERSION = '1.0.0';"));
+        assert!(wrapper.contains("window.__orbit = runtime;"));
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_handles_closing_tokens_in_script_body() {
+        let script_body = "const marker = '})();'; return marker;";
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-3\"",
+            script_body,
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(wrapper.contains(script_body));
+        assert!(wrapper.ends_with("})();"));
+    }
+
+    #[test]
+    fn orbit_runtime_method_round_trips_all_variants() {
+        for method in OrbitRuntimeMethod::all() {
+            let round_trip = OrbitRuntimeMethod::from_input(method.as_js_name());
+            assert_eq!(round_trip, Ok(*method));
+        }
+    }
+
+    #[test]
+    fn orbit_runtime_method_rejects_unknown_and_adversarial_inputs() {
+        assert_eq!(
+            OrbitRuntimeMethod::from_input("unknown"),
+            Err("Unsupported Orbit runtime method: unknown".to_owned())
+        );
+        assert_eq!(
+            OrbitRuntimeMethod::from_input("'); process.exit(1); //"),
+            Err("Unsupported Orbit runtime method: '); process.exit(1); //".to_owned())
+        );
+    }
+
+    #[test]
+    fn runtime_allowlist_matches_runtime_public_methods() {
+        let pattern = Regex::new(r"(?m)^ {4}([A-Za-z][A-Za-z0-9]*)\([^)]*\) \{$");
+        assert!(pattern.is_ok());
+        let Some(pattern) = pattern.ok() else {
+            return;
+        };
+
+        let mut runtime_methods = pattern
+            .captures_iter(ORBIT_RUNTIME_SCRIPT)
+            .filter_map(|captures| captures.get(1).map(|capture| capture.as_str().to_owned()))
+            .filter(|name| name != "getUrl" && name != "getTitle")
+            .collect::<Vec<_>>();
+        let mut allowlist_methods = OrbitRuntimeMethod::all()
+            .iter()
+            .map(|method| method.as_js_name().to_owned())
+            .collect::<Vec<_>>();
+
+        runtime_methods.sort_unstable();
+        runtime_methods.dedup();
+        allowlist_methods.sort_unstable();
+
+        assert_eq!(runtime_methods, allowlist_methods);
+    }
+
+    #[test]
+    fn expected_runtime_version_matches_bundled_runtime() {
+        assert_eq!(expected_orbit_runtime_version(), Ok("1.0.0"));
+    }
+
+    #[test]
+    fn browser_get_url_requires_existing_browser_state() {
+        let state = BrowserWindowState::default();
+        let result = ensure_browser_exists(&state);
+        assert_eq!(result, Err("No browser exists".to_owned()));
     }
 }

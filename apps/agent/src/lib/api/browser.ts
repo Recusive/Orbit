@@ -60,6 +60,34 @@ export interface BrowserScreenshotInfo {
   metadata: Record<string, unknown>;
 }
 
+export type OrbitRuntimeMethod =
+  | 'snapshot'
+  | 'click'
+  | 'type'
+  | 'fill'
+  | 'getText'
+  | 'getHtml'
+  | 'count'
+  | 'check'
+  | 'uncheck'
+  | 'select'
+  | 'hover'
+  | 'focus'
+  | 'scroll'
+  | 'scrollIntoView'
+  | 'isVisible'
+  | 'isEnabled'
+  | 'getAttribute'
+  | 'boundingBox'
+  | 'getCookies'
+  | 'clearCookies'
+  | 'storageGet'
+  | 'storageSet'
+  | 'storageClear'
+  | 'getNetworkRequests'
+  | 'getConsoleLogs'
+  | 'runtimeInfo';
+
 // ============================================
 // Embedded Browser Operations
 // ============================================
@@ -164,6 +192,48 @@ export async function browserEval(script: string): Promise<string> {
 export async function browserEvalAsync(script: string, timeoutMs?: number): Promise<string> {
   logger.debug('Executing script with result');
   return invoke<string>('browser_eval_async', { script, timeoutMs });
+}
+
+/**
+ * Invoke an allowlisted Orbit runtime method inside the embedded browser.
+ */
+export async function browserInvokeRuntime(
+  method: OrbitRuntimeMethod,
+  args: unknown[]
+): Promise<string> {
+  logger.debug('Invoking Orbit runtime method', { method });
+  return invoke<string>('browser_invoke_runtime', {
+    method,
+    argsJson: JSON.stringify(args),
+  });
+}
+
+/**
+ * Read the current Orbit runtime version from the page, if present.
+ */
+export async function browserRuntimeVersion(): Promise<string | null> {
+  return invoke<string | null>('browser_runtime_version');
+}
+
+/**
+ * Ensure the Orbit runtime is installed and up to date.
+ */
+export async function browserEnsureRuntime(): Promise<void> {
+  return invoke('browser_ensure_runtime');
+}
+
+/**
+ * Return the current page URL from the embedded browser.
+ */
+export async function browserGetUrl(): Promise<string> {
+  return invoke<string>('browser_get_url');
+}
+
+/**
+ * Return the current document title from the embedded browser.
+ */
+export async function browserGetTitle(): Promise<string> {
+  return invoke<string>('browser_get_title');
 }
 
 /**

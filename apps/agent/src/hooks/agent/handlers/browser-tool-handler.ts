@@ -1,7 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
 
-import orbitRuntimeSource from '../../../../../../src-tauri/src/commands/browser/orbit_runtime.js?raw';
-
 import { recordBrowserActivityFromAI } from './browser-handlers';
 
 import type { WebviewMessage } from '@/types/protocol';
@@ -9,11 +7,14 @@ import type { WebviewMessage } from '@/types/protocol';
 import {
   browserBack,
   browserClose,
+  browserEnsureRuntime,
   browserEval,
-  browserEvalAsync,
   browserForward,
+  browserGetTitle,
+  browserGetUrl,
   browserHas,
   browserInfo,
+  browserInvokeRuntime,
   browserNavigate,
   browserReload,
   browserScreenshot,
@@ -31,17 +32,13 @@ const BROWSER_READY_TIMEOUT_MS = 10000;
 const BROWSER_READY_POLL_MS = 250;
 const DEFAULT_WAIT_TIMEOUT_MS = 30000;
 const MAX_WAIT_TIMEOUT_MS = 120000;
-const RUNTIME_UNAVAILABLE_MESSAGE = 'Page CSP blocks script injection. Runtime unavailable.';
+const RUNTIME_UNAVAILABLE_MESSAGE = 'Orbit runtime unavailable.';
 const NO_TARGET_MESSAGE = 'Provide ref (from snapshot) or selector (CSS)';
-
-// Browser API detection state with promise coalescing to prevent race conditions
-let browserHasTauriApi: boolean | null = null;
-let detectionPromise: Promise<boolean> | null = null;
 
 // AbortController for canceling browser ready polling
 let browserReadyAbortController: AbortController | null = null;
 
-// Snapshot epoch cache for degraded/CSP fallbacks before the Rust-side runtime wiring lands
+// Snapshot epoch cache for blank/degraded fallback responses.
 let browserSnapshotEpoch = 0;
 
 interface BrowserToolExecutionResult {
@@ -74,9 +71,6 @@ interface SnapshotResponse {
  */
 const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:'];
 
-const EXPECTED_ORBIT_RUNTIME_VERSION =
-  /const RUNTIME_VERSION = '([^']+)'/.exec(orbitRuntimeSource)?.[1] ?? 'unknown';
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -85,8 +79,11 @@ function extractErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function isCspRuntimeErrorMessage(message: string): boolean {
-  return message.includes('CSP');
+function isRuntimeUnavailableMessage(message: string): boolean {
+  return (
+    message.includes(RUNTIME_UNAVAILABLE_MESSAGE) ||
+    message.includes('Orbit runtime injection failed')
+  );
 }
 
 /**
@@ -129,10 +126,6 @@ function validateBrowserUrl(
   }
 }
 
-function serializeForInjection(value: unknown): string {
-  return JSON.stringify(value);
-}
-
 function parseEvalResult(raw: string): unknown {
   const parsed: unknown = JSON.parse(raw);
   if (isRecord(parsed) && '__error' in parsed) {
@@ -173,9 +166,12 @@ function getOptionalTarget(toolInput: Record<string, unknown>): BrowserToolTarge
   return hasRefTarget(target) || hasSelectorTarget(target) ? target : null;
 }
 
+/** Default to document body when no ref or selector is provided. */
+function getTargetOrBody(toolInput: Record<string, unknown>): BrowserToolTarget {
+  return getOptionalTarget(toolInput) ?? { selector: 'body' };
+}
+
 function resetBrowserApiCache(): void {
-  browserHasTauriApi = null;
-  detectionPromise = null;
   if (browserReadyAbortController) {
     browserReadyAbortController.abort();
     browserReadyAbortController = null;
@@ -192,42 +188,8 @@ export function resetBrowserToolState(): void {
   resetBrowserApiCache();
 }
 
-async function detectBrowserTauriApi(): Promise<boolean> {
-  if (browserHasTauriApi !== null) {
-    return browserHasTauriApi;
-  }
-
-  detectionPromise ??= (async (): Promise<boolean> => {
-    try {
-      const raw = await browserEval('return typeof window.__TAURI__?.core?.invoke === "function"');
-      browserHasTauriApi = parseEvalResult(raw) === true;
-    } catch (error) {
-      logger.warn('Browser Tauri API probe failed', {
-        error: extractErrorMessage(error),
-      });
-      browserHasTauriApi = false;
-    }
-    return browserHasTauriApi;
-  })();
-
-  return detectionPromise;
-}
-
 async function evalScript(script: string): Promise<string> {
-  const hasTauriApi = await detectBrowserTauriApi();
-  if (!hasTauriApi) {
-    return browserEval(script);
-  }
-
-  try {
-    return await browserEvalAsync(script);
-  } catch (error) {
-    logger.warn('browserEvalAsync failed, falling back to sync eval', {
-      error: extractErrorMessage(error),
-    });
-    resetBrowserApiCache();
-    return browserEval(script);
-  }
+  return browserEval(script);
 }
 
 async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
@@ -256,43 +218,13 @@ async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
   return false;
 }
 
-async function getOrbitRuntimeVersion(): Promise<string | null> {
-  const raw = await evalScript('return window.__orbit?.VERSION ?? null');
-  const parsed = parseEvalResult(raw);
-  return typeof parsed === 'string' ? parsed : null;
-}
-
-async function ensureOrbitRuntime(): Promise<void> {
-  const currentVersion = await getOrbitRuntimeVersion();
-  if (currentVersion === EXPECTED_ORBIT_RUNTIME_VERSION) {
-    return;
-  }
-
-  try {
-    const injectScript = `${orbitRuntimeSource}\nreturn window.__orbit?.VERSION ?? null;`;
-    const raw = await evalScript(injectScript);
-    const injectedVersion = parseEvalResult(raw);
-    if (injectedVersion !== EXPECTED_ORBIT_RUNTIME_VERSION) {
-      throw new Error(
-        `Orbit runtime injection failed (expected ${EXPECTED_ORBIT_RUNTIME_VERSION}, received ${String(injectedVersion)})`
-      );
-    }
-  } catch (error) {
-    const message = extractErrorMessage(error);
-    if (isCspRuntimeErrorMessage(message)) {
-      throw new Error(RUNTIME_UNAVAILABLE_MESSAGE, { cause: error });
-    }
-    throw error;
-  }
-}
-
 async function warmOrbitRuntimeIfPossible(url: string): Promise<void> {
   if (url === 'about:blank') {
     return;
   }
 
   try {
-    await ensureOrbitRuntime();
+    await browserEnsureRuntime();
   } catch (error) {
     logger.warn('Orbit runtime warm-up failed', {
       error: extractErrorMessage(error),
@@ -300,118 +232,13 @@ async function warmOrbitRuntimeIfPossible(url: string): Promise<void> {
   }
 }
 
-async function invokeOrbitRuntimeMethod<T>(methodName: string, args: unknown[] = []): Promise<T> {
-  await ensureOrbitRuntime();
-
-  const script = `
-    const orbit = window.__orbit;
-    if (!orbit || typeof orbit[${serializeForInjection(methodName)}] !== 'function') {
-      return { __error: ${serializeForInjection(RUNTIME_UNAVAILABLE_MESSAGE)} };
-    }
-    return orbit[${serializeForInjection(methodName)}](...${serializeForInjection(args)});
-  `;
-
-  const raw = await evalScript(script);
+async function invokeOrbitRuntimeMethod<T>(
+  methodName: Parameters<typeof browserInvokeRuntime>[0],
+  args: unknown[] = []
+): Promise<T> {
+  await browserEnsureRuntime();
+  const raw = await browserInvokeRuntime(methodName, args);
   return parseEvalResult(raw) as T;
-}
-
-function createClickSelectorScript(selector: string): string {
-  return `
-    const el = document.querySelector(${serializeForInjection(selector)});
-    if (el instanceof HTMLElement) {
-      el.click();
-      return { clicked: true };
-    }
-    return { __error: ${serializeForInjection(`No element found for selector: ${selector}`)} };
-  `;
-}
-
-function createTypeSelectorScript(selector: string, text: string): string {
-  return `
-    const el = document.querySelector(${serializeForInjection(selector)});
-    if (!el) {
-      return { __error: ${serializeForInjection(`No element found for selector: ${selector}`)} };
-    }
-    const setValue = (target, value) => {
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), 'value');
-        if (setter && typeof setter.set === 'function') {
-          setter.set.call(target, value);
-        } else {
-          target.value = value;
-        }
-        return true;
-      }
-      if (target instanceof HTMLElement && target.isContentEditable) {
-        target.textContent = value;
-        return true;
-      }
-      return false;
-    };
-    let currentValue =
-      el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
-        ? el.value
-        : el instanceof HTMLElement && el.isContentEditable
-          ? el.textContent || ''
-          : null;
-    if (currentValue === null) {
-      return { __error: 'Target is not a typable element' };
-    }
-    el.focus?.();
-    for (const character of ${serializeForInjection(text)}) {
-      const keyCode = character.length === 1 ? character.toUpperCase().charCodeAt(0) : 0;
-      el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: character, keyCode, which: keyCode }));
-      el.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, cancelable: true, key: character, keyCode, which: keyCode }));
-      if (!setValue(el, String(currentValue + character))) {
-        return { __error: 'Target is not a typable element' };
-      }
-      currentValue += character;
-      el.dispatchEvent(new Event('input', { bubbles: true }));
-      el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true, key: character, keyCode, which: keyCode }));
-    }
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    return { typed: true };
-  `;
-}
-
-function createFillSelectorScript(selector: string, value: string): string {
-  return `
-    const el = document.querySelector(${serializeForInjection(selector)});
-    if (!el) {
-      return { __error: ${serializeForInjection(`No element found for selector: ${selector}`)} };
-    }
-    const setValue = (target, nextValue) => {
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
-        const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(target), 'value');
-        if (setter && typeof setter.set === 'function') {
-          setter.set.call(target, nextValue);
-        } else {
-          target.value = nextValue;
-        }
-        return true;
-      }
-      if (target instanceof HTMLElement && target.isContentEditable) {
-        target.textContent = nextValue;
-        return true;
-      }
-      return false;
-    };
-    if (!setValue(el, ${serializeForInjection(value)})) {
-      return { __error: 'Target is not a fillable element' };
-    }
-    el.focus?.();
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    el.dispatchEvent(new Event('change', { bubbles: true }));
-    return { filled: true };
-  `;
-}
-
-function createGetTextSelectorScript(selector: string): string {
-  return `return document.querySelector(${serializeForInjection(selector)})?.textContent?.trim() ?? ''`;
-}
-
-function createGetHtmlSelectorScript(selector: string, outer: boolean): string {
-  return `return document.querySelector(${serializeForInjection(selector)})?.${outer ? 'outerHTML' : 'innerHTML'} ?? ''`;
 }
 
 function clampWaitTimeout(value: unknown): number {
@@ -428,7 +255,7 @@ function buildDegradedSnapshot(url: string): SnapshotResponse {
   browserSnapshotEpoch += 1;
   return {
     epoch: browserSnapshotEpoch,
-    snapshot: '- document [CSP blocked — runtime could not be injected]',
+    snapshot: '- document [Orbit runtime unavailable]',
     refCount: 0,
     totalElements: 0,
     emittedElements: 0,
@@ -565,7 +392,7 @@ export async function executeBrowserTool(
           return { success: true, result };
         } catch (error) {
           const message = extractErrorMessage(error);
-          if (isCspRuntimeErrorMessage(message)) {
+          if (isRuntimeUnavailableMessage(message)) {
             return { success: true, result: buildDegradedSnapshot(currentUrl) };
           }
           return { success: false, error: message };
@@ -573,12 +400,12 @@ export async function executeBrowserTool(
       }
 
       case 'browser_get_url': {
-        const raw = await evalScript('return { url: location.href }');
+        const raw = await browserGetUrl();
         return { success: true, result: parseEvalResult(raw) };
       }
 
       case 'browser_get_title': {
-        const raw = await evalScript('return { title: document.title ?? "" }');
+        const raw = await browserGetTitle();
         return { success: true, result: parseEvalResult(raw) };
       }
 
@@ -586,10 +413,6 @@ export async function executeBrowserTool(
         const target = getRequiredTarget(toolInput);
         if (!target) {
           return { success: false, error: NO_TARGET_MESSAGE };
-        }
-        if (!hasRefTarget(target) && hasSelectorTarget(target)) {
-          const raw = await evalScript(createClickSelectorScript(target.selector));
-          return { success: true, result: parseEvalResult(raw) };
         }
         const result = await invokeOrbitRuntimeMethod('click', [target]);
         return { success: true, result };
@@ -600,12 +423,6 @@ export async function executeBrowserTool(
         if (!target || typeof toolInput['text'] !== 'string') {
           return { success: false, error: 'Missing ref/selector or text for browser_type' };
         }
-        if (!hasRefTarget(target) && hasSelectorTarget(target)) {
-          const raw = await evalScript(
-            createTypeSelectorScript(target.selector, toolInput['text'])
-          );
-          return { success: true, result: parseEvalResult(raw) };
-        }
         const result = await invokeOrbitRuntimeMethod('type', [target, toolInput['text']]);
         return { success: true, result };
       }
@@ -615,41 +432,19 @@ export async function executeBrowserTool(
         if (!target || typeof toolInput['value'] !== 'string') {
           return { success: false, error: 'Missing ref/selector or value for browser_fill' };
         }
-        if (!hasRefTarget(target) && hasSelectorTarget(target)) {
-          const raw = await evalScript(
-            createFillSelectorScript(target.selector, toolInput['value'])
-          );
-          return { success: true, result: parseEvalResult(raw) };
-        }
         const result = await invokeOrbitRuntimeMethod('fill', [target, toolInput['value']]);
         return { success: true, result };
       }
 
       case 'browser_get_text': {
-        const target = getOptionalTarget(toolInput);
-        if (!target || (!hasRefTarget(target) && !hasSelectorTarget(target))) {
-          const raw = await evalScript(createGetTextSelectorScript('body'));
-          return { success: true, result: parseEvalResult(raw) };
-        }
-        if (!hasRefTarget(target) && hasSelectorTarget(target)) {
-          const raw = await evalScript(createGetTextSelectorScript(target.selector));
-          return { success: true, result: parseEvalResult(raw) };
-        }
+        const target = getTargetOrBody(toolInput);
         const result = await invokeOrbitRuntimeMethod('getText', [target]);
         return { success: true, result };
       }
 
       case 'browser_get_html': {
         const outer = toolInput['outer'] === true;
-        const target = getOptionalTarget(toolInput);
-        if (!target || (!hasRefTarget(target) && !hasSelectorTarget(target))) {
-          const raw = await evalScript(createGetHtmlSelectorScript('body', outer));
-          return { success: true, result: parseEvalResult(raw) };
-        }
-        if (!hasRefTarget(target) && hasSelectorTarget(target)) {
-          const raw = await evalScript(createGetHtmlSelectorScript(target.selector, outer));
-          return { success: true, result: parseEvalResult(raw) };
-        }
+        const target = getTargetOrBody(toolInput);
         const result = await invokeOrbitRuntimeMethod('getHtml', [target, outer]);
         return { success: true, result };
       }
@@ -861,10 +656,8 @@ export async function executeBrowserTool(
         if (typeof toolInput['selector'] !== 'string') {
           return { success: false, error: 'Missing selector for browser_count' };
         }
-        const raw = await evalScript(
-          `return { count: document.querySelectorAll(${serializeForInjection(toolInput['selector'])}).length }`
-        );
-        return { success: true, result: parseEvalResult(raw) };
+        const result = await invokeOrbitRuntimeMethod('count', [toolInput['selector']]);
+        return { success: true, result };
       }
 
       case 'browser_cookies_get': {
@@ -933,8 +726,8 @@ export async function executeBrowserTool(
           return { success: true, result };
         } catch (error) {
           const message = extractErrorMessage(error);
-          if (isCspRuntimeErrorMessage(message)) {
-            return { success: true, result: { available: false, reason: 'CSP blocked' } };
+          if (isRuntimeUnavailableMessage(message)) {
+            return { success: true, result: { available: false, reason: 'Runtime unavailable' } };
           }
           return { success: false, error: message };
         }
