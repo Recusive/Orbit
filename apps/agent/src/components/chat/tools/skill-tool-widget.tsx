@@ -1,4 +1,4 @@
-import { CheckCircle2, Loader2, Sparkles, XCircle } from 'lucide-react';
+import { CheckCircle2, Loader2, XCircle } from 'lucide-react';
 
 import type { FC } from 'react';
 
@@ -20,29 +20,19 @@ export const SkillToolWidget: FC<SkillToolWidgetProps> = ({
 
   return (
     <div
-      className={cn('flex items-center gap-2 py-1.5 text-sm rounded-xl', isFailed && 'opacity-60')}
+      className={cn(
+        'flex items-center gap-2 py-1.5 text-base rounded-xl',
+        isFailed && 'opacity-60'
+      )}
     >
       <div className="flex items-center gap-2 min-w-0">
-        {/* Icon */}
-        <Sparkles
-          className={cn(
-            'h-4 w-4 shrink-0',
-            isFailed ? 'text-destructive/60' : 'text-foreground',
-            isRunning && 'animate-pulse'
-          )}
-        />
-
-        {/* Label */}
-        <span className="text-sm text-lg-text-secondary font-medium">Skill</span>
-
-        {/* Skill name */}
         <span
           className={cn(
-            'text-sm font-medium truncate',
+            'text-base font-medium truncate',
             isFailed ? 'text-lg-text-secondary' : 'text-foreground'
           )}
         >
-          {skillName}
+          Skill {skillName}
         </span>
 
         {/* Status indicator */}

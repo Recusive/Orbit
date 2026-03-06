@@ -241,6 +241,18 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   onFeedback,
 }) {
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [messageHovered, setMessageHovered] = useState(false);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onMouseEnterMessage = useCallback((): void => {
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    setMessageHovered(true);
+  }, []);
+  const onMouseLeaveMessage = useCallback((): void => {
+    hoverTimer.current = setTimeout(() => {
+      setMessageHovered(false);
+    }, 200);
+  }, []);
 
   // Message is complete when streaming has finished
   // Note: displayedContent.length === content.length check removed - with backend batching,
@@ -325,11 +337,13 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
-          className="group/actions my-1"
+          className="my-1"
           style={{
             paddingLeft: CHAT_SPACING.assistantPadding,
             paddingRight: CHAT_SPACING.assistantPadding,
           }}
+          onMouseEnter={onMouseEnterMessage}
+          onMouseLeave={onMouseLeaveMessage}
         >
           {/* Content and tool segments */}
           <div className="space-y-2">
@@ -408,6 +422,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           {isComplete && isLastInAssistantGroup && !(isAgentRunning && isLastMessage) ? (
             <>
               <MessageActions
+                isHovered={messageHovered}
                 rewindDisabled={isLastAssistantMessage || isAgentRunning}
                 turnDurationMs={message.turnDurationMs}
                 onCopy={() => {

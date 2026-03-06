@@ -1,4 +1,4 @@
-import { ChevronRight, ExternalLink, Globe, Loader2, XCircle } from 'lucide-react';
+import { ChevronRight, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -51,21 +51,13 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Web Fetch output' : 'Expand Web Fetch output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-base',
           'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
+        {/* Left: tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Globe
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
+          <span className={cn('text-base font-medium truncate', 'text-foreground')}>
             {statusLabel}
           </span>
 
@@ -103,7 +95,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
             <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* URL */}
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   url
                 </div>
                 <button
@@ -123,7 +115,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
               {/* Prompt */}
               <div className="h-px bg-border/20 mx-3" />
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1">
                   prompt
                 </div>
                 <div className="text-sm text-lg-text-secondary line-clamp-2">{prompt}</div>

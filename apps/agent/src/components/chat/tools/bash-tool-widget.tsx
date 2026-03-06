@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2, Terminal, XCircle } from 'lucide-react';
+import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useEffect, useState } from 'react';
 
@@ -111,8 +111,6 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const hasMoreLines = outputLines.length > maxCollapsedLines;
   const displayOutput = isExpanded ? output : outputLines.slice(0, maxCollapsedLines).join('\n');
 
-  const statusLabel = isRunning ? 'Running Bash' : 'Bash';
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row like Read widget */}
@@ -123,22 +121,17 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-base',
           'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Terminal
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
-            {statusLabel}
+        {/* Left: verb + full command + spinner */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <span className="text-base font-medium text-foreground shrink-0">
+            {isRunning ? 'Running' : 'Ran'}
+          </span>
+          <span className="text-base font-medium truncate text-lg-text-secondary" title={command}>
+            {command}
           </span>
 
           {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
@@ -178,7 +171,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
             <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Command section */}
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   command
                 </div>
                 {highlightedCommand ? (
@@ -198,7 +191,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                 <>
                   <div className="h-px bg-border/20 mx-3" />
                   <div className="px-3 py-2">
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1">
                       description
                     </div>
                     <div className="text-sm text-lg-text-secondary">{description}</div>
@@ -209,7 +202,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
               {/* Output section */}
               <div className="h-px bg-border/20 mx-3" />
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   output
                 </div>
                 {isRunning && !output ? (

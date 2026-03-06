@@ -32,140 +32,10 @@ import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
-import { HyperText } from '@/components/ui/hyper-text';
-import { ThinkingDots } from '@/components/ui/thinking-dots';
+import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useSmoothScroll } from '@/hooks/ui';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { deduplicateAndSortTools, useRunningTool, useToolStore } from '@/stores/agent/tool-store';
-
-// Rotating loading messages - fun tech-themed phrases (fallback when no tool is running)
-const LOADING_MESSAGES = [
-  'Thinking',
-  'Generating',
-  'Computing',
-  'Brewing code',
-  'Crunching bits',
-  'Parsing thoughts',
-  'Compiling ideas',
-  'Downloading wisdom',
-  'Summoning bytes',
-  'Consulting the cloud',
-  'Reticulating splines',
-  'Feeding the hamsters',
-  'Warming up GPUs',
-  'Juggling tensors',
-  'Wrangling tokens',
-] as const;
-
-/** Max characters for file name in loading status (prevents UI overflow) */
-const MAX_FILENAME_LENGTH = 20;
-
-/**
- * Truncate a file name if it exceeds max length.
- * Preserves extension when possible (e.g., "very-long-na...tsx")
- */
-function truncateFileName(fileName: string): string {
-  if (fileName.length <= MAX_FILENAME_LENGTH) {
-    return fileName;
-  }
-
-  // Try to preserve extension
-  const lastDot = fileName.lastIndexOf('.');
-  if (lastDot > 0 && fileName.length - lastDot <= 5) {
-    // Has extension of 5 chars or less (e.g., .tsx, .json)
-    const ext = fileName.slice(lastDot);
-    const nameWithoutExt = fileName.slice(0, lastDot);
-    const maxNameLength = MAX_FILENAME_LENGTH - ext.length - 3; // 3 for "..."
-    if (maxNameLength > 3) {
-      return `${nameWithoutExt.slice(0, maxNameLength)}...${ext}`;
-    }
-  }
-
-  // No extension or too long - just truncate
-  return `${fileName.slice(0, MAX_FILENAME_LENGTH - 3)}...`;
-}
-
-/**
- * Extract and truncate file name from a path.
- * Handles both Unix (/) and Windows (\) path separators.
- * Returns 'file' if path is empty or invalid.
- * (Code review: Codex cycle 2 #4)
- */
-function getFileName(filePath: string): string {
-  // Split on both forward and back slashes to handle Unix and Windows paths
-  const parts = filePath.split(/[/\\]/);
-  const raw = parts.pop();
-  const fileName = raw !== undefined && raw.length > 0 ? raw : 'file';
-  return truncateFileName(fileName);
-}
-
-/**
- * Maps tool names to user-friendly status messages.
- * Shows contextual info based on what the agent is actually doing.
- */
-function getToolStatusMessage(toolName: string, toolInput: Record<string, unknown>): string {
-  const filePath = toolInput['file_path'];
-
-  switch (toolName.toLowerCase()) {
-    case 'bash':
-      return 'Running command';
-    case 'read':
-      if (typeof filePath === 'string') {
-        return `Reading ${getFileName(filePath)}`;
-      }
-      return 'Reading file';
-    case 'write':
-      if (typeof filePath === 'string') {
-        return `Writing ${getFileName(filePath)}`;
-      }
-      return 'Writing file';
-    case 'edit':
-      if (typeof filePath === 'string') {
-        return `Editing ${getFileName(filePath)}`;
-      }
-      return 'Editing file';
-    case 'glob':
-      return 'Searching files';
-    case 'grep':
-      return 'Searching code';
-    case 'task':
-      return 'Running subagent';
-    case 'todowrite':
-      return 'Updating tasks';
-    case 'webfetch':
-      return 'Fetching URL';
-    case 'websearch':
-      return 'Searching web';
-    case 'lsp':
-      return 'Analyzing code';
-    case 'notebookedit':
-      return 'Editing notebook';
-    default:
-      // Capitalize first letter of tool name
-      return `Running ${toolName}`;
-  }
-}
-
-function useRotatingMessage(isActive: boolean, intervalMs = 2500): string {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (!isActive) {
-      setIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setIndex((prev) => (prev + 1) % LOADING_MESSAGES.length);
-    }, intervalMs);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [isActive, intervalMs]);
-
-  return LOADING_MESSAGES[index] ?? 'Thinking';
-}
+import { deduplicateAndSortTools, useToolStore } from '@/stores/agent/tool-store';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -295,10 +165,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // achieved through backend batching (50ms) + Streamdown's incremental markdown rendering.
   const isLoading = isAgentRunning;
 
-  // Get currently running tool from store for contextual status
-  // (Uses dedicated selector for better encapsulation - code review cycle 2, issue #1)
-  const runningTool = useRunningTool();
-
   // Subscribe to activeTools and completedTools via a single combined selector
   // with useShallow. This bypasses the store's internal get() which can return
   // stale state in the persist(immer(...)) middleware stack — causing tool widgets
@@ -383,14 +249,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
     return ids;
   }, [messages]);
-
-  // Rotating loading message for a bit of personality (fallback)
-  const rotatingMessage = useRotatingMessage(isLoading);
-
-  // Show tool-specific message when a tool is running, otherwise rotate
-  const loadingMessage = runningTool
-    ? getToolStatusMessage(runningTool.toolName, runningTool.toolInput)
-    : rotatingMessage;
 
   // Track active animation cleanup timeouts per message ID (code review: Opus #3)
   // Using individual timeouts prevents rapid messages from clearing each other's animations
@@ -479,17 +337,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
         {/* Progress indicator - shows while agent is running */}
         {isLoading ? (
-          <div className="flex items-center gap-2 px-3 py-2">
-            <ThinkingDots size={13} speed={1.2} />
-            <HyperText
-              key={loadingMessage}
-              className="font-mono text-sm text-muted-foreground"
-              duration={1200}
-              loop
-              loopPause={800}
-            >
-              {loadingMessage}
-            </HyperText>
+          <div className="flex items-center gap-2 px-[9px] py-2">
+            <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
           </div>
         ) : null}
 

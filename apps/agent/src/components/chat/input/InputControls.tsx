@@ -79,7 +79,6 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
               className={cn(
                 `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
-                'hover:scale-[1.02] active:scale-[0.98]',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                 inputMode === 'default' &&
                   'bg-lg-control text-foreground hover:bg-lg-control-hover',

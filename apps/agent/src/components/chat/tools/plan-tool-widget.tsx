@@ -5,7 +5,7 @@
  * Instead of showing raw diff lines like WriteToolWidget, it renders the plan
  * content as formatted markdown for better readability.
  */
-import { ChevronRight, ClipboardList, Loader2, XCircle } from 'lucide-react';
+import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -65,32 +65,15 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Plan output' : 'Expand Plan output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center py-1.5 text-sm',
+          'group flex items-center py-1.5 text-base',
           'cursor-pointer w-full text-left rounded-xl',
           !isFailed && 'border-2 border-dotted border-mode-plan/40'
         )}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <ClipboardList
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
           <span
             className={cn(
-              'text-sm font-medium',
-              isFailed ? 'text-lg-text-secondary' : 'text-mode-plan'
-            )}
-          >
-            Plan
-          </span>
-
-          <span
-            className={cn(
-              'text-sm font-medium truncate cursor-pointer hover:underline',
+              'text-base font-medium truncate cursor-pointer hover:underline',
               'text-lg-text-secondary'
             )}
             onClick={handleFileClick}

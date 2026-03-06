@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Loader2, XCircle } from 'lucide-react';
+import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -94,21 +94,13 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-base',
           'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
+        {/* Left: tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Bot
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span className={cn('text-sm font-medium truncate', 'text-foreground')}>
+          <span className={cn('text-base font-medium truncate', 'text-foreground')}>
             {statusLabel}
           </span>
 
@@ -147,7 +139,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
               {/* Task details */}
               <div className="px-3 py-2">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase">
+                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize">
                     agent
                   </div>
                   <span className="px-1 py-0.5 rounded bg-lg-control text-sm font-medium text-foreground">
@@ -155,7 +147,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   </span>
                   {model ? <span className="text-sm text-muted-foreground">({model})</span> : null}
                 </div>
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1">
                   prompt
                 </div>
                 <div className="text-sm text-lg-text-secondary line-clamp-3" title={prompt}>

@@ -964,15 +964,15 @@ html.dark [data-streamdown='code-block-container'] {
   position: relative;
   padding: 0.125rem 0.25rem;
   border-radius: var(--radius-md);
-  background-color: rgba(0, 0, 0, 0.06);
+  background-color: color-mix(in oklch, var(--primary) 8%, transparent);
   font-family: 'Geist Mono Variable', 'Geist Mono', ui-monospace, Menlo, monospace;
   font-size: 0.75rem; /* 12px - VS Code inline code */
   font-weight: 500;
-  color: var(--foreground);
+  color: var(--primary);
 }
 
 html.dark .chat-markdown code:not(pre code) {
-  background-color: rgba(255, 255, 255, 0.08);
+  background-color: color-mix(in oklch, var(--primary) 12%, transparent);
 }
 
 /* Code blocks */
@@ -2351,8 +2351,9 @@ html.dark {
   border: none;
   border-radius: var(--lg-window-r);
   padding: 8px 12px;
-  outline: none;
-  transition: box-shadow 150ms ease;
+  outline: 3px solid transparent;
+  outline-offset: -1px;
+  transition: box-shadow 150ms ease, outline-color 150ms ease;
 }
 
 .liquid-glass-textarea::placeholder {
@@ -2361,11 +2362,11 @@ html.dark {
 }
 
 .liquid-glass-textarea:focus {
-  box-shadow: 0px 0px 0px 3px rgba(0, 122, 255, 0.4);
+  outline-color: color-mix(in oklch, var(--primary) 35%, transparent);
 }
 
 html.dark .liquid-glass-textarea:focus {
-  box-shadow: var(--lg-input-focus);
+  outline-color: color-mix(in oklch, var(--primary) 40%, transparent);
 }
 
 .liquid-glass-textarea:disabled {

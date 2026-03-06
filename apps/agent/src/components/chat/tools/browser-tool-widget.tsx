@@ -174,23 +174,13 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
+          'group flex items-center gap-1.5 py-1.5 text-base',
           'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
+        {/* Left: tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Globe
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span className={cn('text-sm font-medium shrink-0', 'text-lg-text-secondary')}>
-            Browser
-          </span>
+          <span className={cn('text-base font-medium shrink-0', 'text-foreground')}>Browser</span>
 
           {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
