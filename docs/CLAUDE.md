@@ -4,17 +4,19 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## Folder Guide
 
-| Folder          | What's in it                        | When to look                     |
-| --------------- | ----------------------------------- | -------------------------------- |
-| `decisions/`    | ADRs, why we chose X over Y         | Understanding past trade-offs    |
-| `architecture/` | System design, technical decisions  | How something works internally   |
-| `design/`       | UI/UX guidelines, visual systems    | Typography, icons, themes        |
-| `development/`  | Build workflow, CI/CD, debugging    | Setup, builds, fixing issues     |
-| `plans/`        | Feature proposals, refactor plans   | What's been planned or proposed  |
-| `quality/`      | Linting, audits, health metrics     | Code standards, audit results    |
-| `reference/`    | SDK docs, prompts, external guides  | API references, prompt templates |
-| `specs/`        | Behavior specs, acceptance criteria | What "done" looks like           |
-| `orbitweb/`     | Marketing site context              | Orbitweb-specific (read-only)    |
+| Folder               | What's in it                        | When to look                     |
+| -------------------- | ----------------------------------- | -------------------------------- |
+| `decisions/`         | ADRs, why we chose X over Y         | Understanding past trade-offs    |
+| `architecture/`      | System design, technical decisions  | How something works internally   |
+| `design/`            | UI/UX guidelines, visual systems    | Typography, icons, themes        |
+| `development/`       | Build workflow, CI/CD, debugging    | Setup, builds, fixing issues     |
+| `plans/`             | Feature proposals, refactor plans   | What's been planned or proposed  |
+| `plans/due/`         | Upcoming plans queued for work      | What needs to be built next      |
+| `plans/implemented/` | Completed plans                     | What's already been shipped      |
+| `quality/`           | Linting, audits, health metrics     | Code standards, audit results    |
+| `reference/`         | SDK docs, prompts, external guides  | API references, prompt templates |
+| `specs/`             | Behavior specs, acceptance criteria | What "done" looks like           |
+| `orbitweb/`          | Marketing site context              | Orbitweb-specific (read-only)    |
 
 ## decisions/ (4 files)
 
@@ -54,6 +56,25 @@ Use this to find the right file. Read the file directly — no links needed.
 - `CI-CD-GUIDE.md` — GitHub Actions CI/CD pipeline
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
 - `BUNDLING-TECHNICAL-NOTES.md` — Claude CLI bundling internals
+
+## plans/due/ (11 files)
+
+- `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
+- `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
+- `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
+- `agent-skills-validator-port.md` — Agent skills validator port
+- `browser-enhancement-12-features.md` — Browser enhancement features
+- `browser-navigate-verification-fix.md` — Browser navigate verification fix
+- `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
+- `codebase-cleanup-stubs-lsp-breadcrumbs.md` — Codebase cleanup (stubs, LSP, breadcrumbs)
+- `instant-title-generation.md` — Instant title generation
+- `ios-runtime-backend-completion.md` — iOS runtime backend completion
+- `worktree-default-orbit-location.md` — Worktree default Orbit location
+
+## plans/implemented/ (2 files)
+
+- `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
+- `thinking-block-interleave-and-session-switch-fix.md` — Thinking block interleave and session switch fix
 
 ## plans/ (19 files)
 
