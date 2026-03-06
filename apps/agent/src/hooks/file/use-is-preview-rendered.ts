@@ -8,6 +8,7 @@ export function useIsPreviewRendered(file: ViewedFile | null): boolean {
   const markdownPreview = useMarkdownPreview(file?.path ?? null);
 
   if (!file) return false;
+  if (file.fileType === 'image') return false;
   if (file.language !== 'markdown') return false;
   if (file.viewMode === 'diff') return false;
   if (!markdownPreview) return false;

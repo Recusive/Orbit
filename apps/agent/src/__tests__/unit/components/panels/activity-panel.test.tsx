@@ -8,6 +8,8 @@ import { MAX_PREVIEW_LINES } from '@/hooks/file/use-is-preview-rendered';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
+let nextInstanceId = 0;
+
 vi.mock('@/components/files', () => ({
   FileIcon: () => <span data-testid="mock-file-icon" />,
   FileViewer: () => <div data-testid="mock-file-viewer">Viewer</div>,
@@ -54,10 +56,12 @@ function resetStores(): void {
 
 function createFile(overrides: Partial<ViewedFile> = {}): ViewedFile {
   return {
+    instanceId: ++nextInstanceId,
     path: '/docs/README.md',
     content: '# Title\n\ncontent',
     originalContent: '# Title\n\ncontent',
     language: 'markdown',
+    fileType: 'text',
     viewMode: 'file',
     isModified: false,
     isExternal: false,
@@ -75,6 +79,7 @@ function setActiveFile(file: ViewedFile, preview = false): void {
 
 describe('ActivityPanel markdown preview controls', () => {
   beforeEach(() => {
+    nextInstanceId = 0;
     resetStores();
     vi.clearAllMocks();
   });
@@ -161,6 +166,51 @@ describe('ActivityPanel markdown preview controls', () => {
       originalContent: largeContent,
     });
     setActiveFile(file, true);
+
+    render(<ActivityPanel />);
+
+    const searchButton = screen.getByRole('button', { name: 'Search in file' });
+    expect(searchButton).not.toBeDisabled();
+    expect(searchButton).toHaveAttribute('title', 'Search (⌘F)');
+  });
+
+  it('disables search button for image preview tabs', () => {
+    const file = createFile({
+      path: '/assets/photo.png',
+      language: 'plaintext',
+      content: '',
+      originalContent: '',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/photo.png',
+        mimeType: 'image/png',
+        fileSize: 1024,
+      },
+    });
+    setActiveFile(file);
+
+    render(<ActivityPanel />);
+
+    const searchButton = screen.getByRole('button', { name: 'Search in file' });
+    expect(searchButton).toBeDisabled();
+    expect(searchButton).toHaveAttribute('title', 'Search unavailable in preview');
+  });
+
+  it('keeps search button enabled for image tabs in source view mode', () => {
+    const file = createFile({
+      path: '/assets/diagram.svg',
+      language: 'xml',
+      content: '<svg />',
+      originalContent: '<svg />',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/diagram.svg',
+        mimeType: 'image/svg+xml',
+        fileSize: 1024,
+        svgSourceView: true,
+      },
+    });
+    setActiveFile(file);
 
     render(<ActivityPanel />);
 

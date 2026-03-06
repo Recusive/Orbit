@@ -6,6 +6,8 @@ import { FileViewerContent } from '@/components/files/file-viewer-content';
 import { MAX_PREVIEW_LINES } from '@/hooks/file/use-is-preview-rendered';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 
+let nextInstanceId = 0;
+
 vi.mock('@/components/editor', () => ({
   EditorBreadcrumbs: () => <div data-testid="mock-breadcrumbs" />,
   EditorSkeleton: () => <div data-testid="mock-editor-skeleton" />,
@@ -18,6 +20,20 @@ vi.mock('@/components/editor/CodeMirrorEditor', () => ({
 
 vi.mock('@/components/files/markdown-preview', () => ({
   MarkdownPreview: () => <div data-testid="mock-markdown-preview">Preview</div>,
+}));
+
+vi.mock('@/components/files/image-preview', () => ({
+  ImagePreview: ({ onViewSource }: { readonly onViewSource: () => Promise<void> }) => (
+    <button
+      data-testid="mock-image-preview"
+      onClick={() => {
+        void onViewSource();
+      }}
+      type="button"
+    >
+      Image Preview
+    </button>
+  ),
 }));
 
 vi.mock('@/components/git', () => ({
@@ -71,10 +87,12 @@ function createDiffData(): ViewedFileDiff {
 
 function createFile(overrides: Partial<ViewedFile> = {}): ViewedFile {
   return {
+    instanceId: ++nextInstanceId,
     path: '/docs/README.md',
     content: '# Title\n\ncontent',
     originalContent: '# Title\n\ncontent',
     language: 'markdown',
+    fileType: 'text',
     viewMode: 'file',
     isModified: false,
     isExternal: false,
@@ -84,6 +102,7 @@ function createFile(overrides: Partial<ViewedFile> = {}): ViewedFile {
 
 describe('FileViewerContent', () => {
   beforeEach(() => {
+    nextInstanceId = 0;
     resetStore();
     vi.clearAllMocks();
   });
@@ -200,5 +219,47 @@ describe('FileViewerContent', () => {
     expect(state.searchOpen).toBe(true);
     expect(state.searchQuery).toBe('Header');
     expect(state.searchTrigger?.path).toBe(file.path);
+  });
+
+  it('renders image preview for image files', async () => {
+    const file = createFile({
+      path: '/assets/photo.png',
+      language: 'plaintext',
+      content: '',
+      originalContent: '',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/photo.png',
+        mimeType: 'image/png',
+        fileSize: 1024,
+      },
+    });
+
+    render(<FileViewerContent file={file} />);
+
+    expect(await screen.findByTestId('mock-image-preview')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-editor')).not.toBeInTheDocument();
+  });
+
+  it('renders editor for image files in source view mode', async () => {
+    const file = createFile({
+      path: '/assets/diagram.svg',
+      language: 'xml',
+      content: '<svg />',
+      originalContent: '<svg />',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/diagram.svg',
+        mimeType: 'image/svg+xml',
+        fileSize: 2048,
+        svgSourceView: true,
+      },
+    });
+
+    render(<FileViewerContent file={file} />);
+
+    expect(await screen.findByTestId('mock-editor')).toBeInTheDocument();
+    expect(screen.queryByTestId('mock-image-preview')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'View as image' })).toBeInTheDocument();
   });
 });

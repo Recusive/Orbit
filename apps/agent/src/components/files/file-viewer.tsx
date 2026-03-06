@@ -17,6 +17,8 @@ import {
 export const FileViewer: FC = () => {
   const activeFile = useActiveFile();
   const isPreviewRendered = useIsPreviewRendered(activeFile);
+  const isImagePreview =
+    activeFile?.fileType === 'image' && !(activeFile.imageData?.svgSourceView ?? false);
   const { isLoading, path: loadingPath } = useFileViewerLoading();
   const toggleSearch = useFileViewerStore((state) => state.toggleSearch);
 
@@ -26,7 +28,7 @@ export const FileViewer: FC = () => {
       // Cmd+F to search - scoped by active file path for split view
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
-        if (activeFile?.path && !isPreviewRendered) {
+        if (activeFile?.path && !isPreviewRendered && !isImagePreview) {
           toggleSearch(activeFile.path);
         }
       }
@@ -36,7 +38,7 @@ export const FileViewer: FC = () => {
     return (): void => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [toggleSearch, activeFile?.path, isPreviewRendered]);
+  }, [toggleSearch, activeFile?.path, isImagePreview, isPreviewRendered]);
 
   return (
     <div className="flex flex-col h-full relative">

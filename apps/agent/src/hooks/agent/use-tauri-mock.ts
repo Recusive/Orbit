@@ -517,6 +517,8 @@ export function handleMockMessage(message: WebviewMessage): void {
             uuid: crypto.randomUUID(),
             request_uuid: message.uuid,
             path: message.path,
+            // Mock mode has no asset protocol or file metadata access, so image files
+            // intentionally stay on the plain text path for browser-only development.
             content: getMockFileContent(message.path),
           },
           '*'

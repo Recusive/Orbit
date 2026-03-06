@@ -226,6 +226,24 @@ export async function browserStop(): Promise<void> {
   return invoke('browser_stop');
 }
 
+/**
+ * Wait for a selector to reach the requested state in the embedded browser.
+ */
+export async function browserWaitForSelector(
+  selector: string,
+  state?: string,
+  timeout?: number
+): Promise<void> {
+  return invoke('browser_wait_for_selector', { selector, state, timeout });
+}
+
+/**
+ * Wait for the current browser URL to match the requested pattern.
+ */
+export async function browserWaitForUrl(url: string, timeout?: number): Promise<void> {
+  return invoke('browser_wait_for_url', { url, timeout });
+}
+
 // ============================================
 // Visibility Operations
 // ============================================

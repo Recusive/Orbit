@@ -49,6 +49,7 @@ import type {
 
 const logger = createLogger('OrbitAgent');
 const BROWSER_MCP_SERVER_KEY = 'orbit-browser';
+const IOS_MCP_SERVER_KEY = 'orbit-ios';
 
 /**
  * Type guard for tool_result blocks
@@ -546,84 +547,7 @@ export class OrbitAgent {
       systemPrompt: {
         type: 'preset' as const,
         preset: 'claude_code' as const,
-        append: `
-## Browser Automation
-
-You have access to embedded browser automation tools via MCP. Use mcp__orbit-browser__browser_open to start a browser session.
-
-### Panel Control
-- **mcp__orbit-browser__browser_open**: Open the browser panel and optionally navigate to a URL.
-- **mcp__orbit-browser__browser_close**: Close the browser panel when done with automation.
-
-### Navigation
-- **mcp__orbit-browser__browser_navigate**: Go to URL
-- **mcp__orbit-browser__browser_back / mcp__orbit-browser__browser_forward / mcp__orbit-browser__browser_reload**: History navigation
-
-### Interaction
-- **mcp__orbit-browser__browser_click**: Click by CSS selector
-- **mcp__orbit-browser__browser_type**: Type text into an input field
-
-### Observation
-- **mcp__orbit-browser__browser_get_text**: Get page or element text
-- **mcp__orbit-browser__browser_get_html**: Get page or element HTML
-- **mcp__orbit-browser__browser_screenshot**: Save viewport screenshot to temp file - use Read to view the image
-- **mcp__orbit-browser__browser_console_logs**: Get console logs
-
-### JavaScript
-- **mcp__orbit-browser__browser_eval**: Execute JavaScript in page context
-
-### Recommended Workflow
-1. Use mcp__orbit-browser__browser_open to start a browser session (or browser_navigate if already open)
-2. Use browser_get_text/browser_get_html to inspect content
-3. Use browser_click/browser_type for interactions
-4. Use browser_console_logs to check for JavaScript errors
-5. Use browser_close when done
-
-### Tips
-- **Use browser_open first** - it opens the panel and navigates in one step
-- **Use specific CSS selectors** for reliable interaction
-- **Check console for errors** after page loads or after interactions fail
-
-## Chrome DevTools (Advanced)
-
-When browser is open, you also have access to Chrome DevTools Protocol tools via mcp__orbit-devtools__*:
-
-### Console
-- **devtools_console_get**: Get console logs with filtering by type (log/warn/error/info/debug)
-- **devtools_console_clear**: Clear console messages
-- **devtools_console_eval**: Execute JavaScript in console context
-
-### Network (Detailed)
-- **devtools_network_get**: Get network requests with filtering (url pattern, method, status)
-- **devtools_network_detail**: Get full request/response details including headers and body
-- **devtools_network_clear**: Clear network logs
-
-### DOM Inspection
-- **devtools_dom_query**: Query DOM with CSS selectors, get element structure
-- **devtools_dom_html**: Get outer HTML of elements
-- **devtools_dom_styles**: Get computed CSS styles for elements
-- **devtools_dom_attributes**: Get all attributes of an element
-
-### Performance
-- **devtools_perf_metrics**: Get performance metrics (memory, DOM stats, rendering times)
-- **devtools_perf_trace_start**: Start recording performance trace
-- **devtools_perf_trace_stop**: Stop trace and get timeline events
-
-### Storage
-- **devtools_storage_local / devtools_storage_session**: Get localStorage/sessionStorage
-- **devtools_storage_cookies**: Get cookies (optionally filter by domain)
-- **devtools_storage_set_local / devtools_storage_set_session**: Set storage items
-- **devtools_storage_set_cookie**: Set a cookie with full options
-- **devtools_storage_clear**: Clear storage (local/session/cookies/all)
-
-### General
-- **devtools_eval**: Execute JavaScript with full page access, can await promises
-- **devtools_page_info**: Get current page title and URL
-
-### When to Use DevTools vs Browser Tools
-- **Browser tools (mcp__orbit-browser__)**: Page interaction, navigation, clicking, typing
-- **DevTools tools (mcp__orbit-devtools__)**: Deep inspection, debugging, storage, performance analysis
-`,
+        append: this._buildSystemPromptAppend(),
       },
       // Working directory
       cwd: this.cwd,
@@ -1107,6 +1031,134 @@ When browser is open, you also have access to Chrome DevTools Protocol tools via
     );
 
     return options;
+  }
+
+  private _buildSystemPromptAppend(): string {
+    const sections = [
+      `
+## Browser Automation
+
+You have access to embedded browser automation tools via MCP. Use mcp__orbit-browser__browser_open to start a browser session.
+
+### Core Workflow
+1. Open or navigate the browser.
+2. Call mcp__orbit-browser__browser_snapshot to inspect the page and obtain ref handles like \`e1\`, \`e2\`.
+3. Use those refs for interactions and inspection tools whenever possible.
+4. After navigation, large DOM changes, or any stale-ref error, call mcp__orbit-browser__browser_snapshot again before continuing.
+5. Use CSS selectors only as a fallback when no snapshot ref is available.
+
+### Panel Control
+- **mcp__orbit-browser__browser_open**: Open the browser panel and optionally navigate to a URL.
+- **mcp__orbit-browser__browser_close**: Close the browser panel when done with automation.
+
+### Navigation
+- **mcp__orbit-browser__browser_navigate**: Go to URL
+- **mcp__orbit-browser__browser_back / mcp__orbit-browser__browser_forward / mcp__orbit-browser__browser_reload**: History navigation
+- **mcp__orbit-browser__browser_get_url / mcp__orbit-browser__browser_get_title**: Read the current page location/title after redirects or navigation
+
+### Interaction
+- **mcp__orbit-browser__browser_click**: Click by ref (preferred) or CSS selector
+- **mcp__orbit-browser__browser_type**: Append text to an input field by ref or selector
+- **mcp__orbit-browser__browser_fill**: Replace the value of an input field by ref or selector
+- **mcp__orbit-browser__browser_check / mcp__orbit-browser__browser_uncheck / mcp__orbit-browser__browser_select**: Form controls by ref or selector
+- **mcp__orbit-browser__browser_hover / mcp__orbit-browser__browser_focus / mcp__orbit-browser__browser_scroll_into_view**: Prepare targets for interaction
+- **mcp__orbit-browser__browser_wait_for_selector / mcp__orbit-browser__browser_wait_for_url**: Wait for async content or redirects before continuing
+
+### Observation
+- **mcp__orbit-browser__browser_snapshot**: Primary inspection tool. Returns a semantic tree with stable refs for later actions.
+- **mcp__orbit-browser__browser_get_text / mcp__orbit-browser__browser_get_html**: Read page or element content by ref or selector
+- **mcp__orbit-browser__browser_screenshot**: Save viewport screenshot to temp file - use Read to view the image
+- **mcp__orbit-browser__browser_console_logs**: Get console logs
+- **mcp__orbit-browser__browser_network_requests / mcp__orbit-browser__browser_runtime_info**: Debug network/runtime issues
+
+### JavaScript
+- **mcp__orbit-browser__browser_eval**: Execute JavaScript in page context
+
+### Recommended Workflow
+1. Use mcp__orbit-browser__browser_open to start a browser session (or browser_navigate if already open)
+2. Use mcp__orbit-browser__browser_snapshot immediately to inspect the page and get refs
+3. Use ref-based browser_click/browser_fill/browser_type/browser_get_text/browser_get_html calls
+4. Re-run browser_snapshot after navigation or when a ref becomes stale
+5. Use browser_console_logs, browser_network_requests, or browser_runtime_info when automation behaves unexpectedly
+6. Use browser_close when done
+
+### Tips
+- **Use browser_open first** - it opens the panel and navigates in one step
+- **Prefer refs over selectors** - refs from browser_snapshot are more reliable than CSS selectors
+- **Use browser_fill to replace, browser_type to append**
+- **If a tool says a ref is stale, call browser_snapshot again**
+- **Selectors are fallback-only** - use them when no ref is available or when CSP/runtime limits prevent ref-based actions
+- **Check console for errors** after page loads or after interactions fail
+
+## Chrome DevTools (Advanced)
+
+When browser is open, you also have access to Chrome DevTools Protocol tools via mcp__orbit-devtools__*:
+
+### Console
+- **devtools_console_get**: Get console logs with filtering by type (log/warn/error/info/debug)
+- **devtools_console_clear**: Clear console messages
+- **devtools_console_eval**: Execute JavaScript in console context
+
+### Network (Detailed)
+- **devtools_network_get**: Get network requests with filtering (url pattern, method, status)
+- **devtools_network_detail**: Get full request/response details including headers and body
+- **devtools_network_clear**: Clear network logs
+
+### DOM Inspection
+- **devtools_dom_query**: Query DOM with CSS selectors, get element structure
+- **devtools_dom_html**: Get outer HTML of elements
+- **devtools_dom_styles**: Get computed CSS styles for elements
+- **devtools_dom_attributes**: Get all attributes of an element
+
+### Performance
+- **devtools_perf_metrics**: Get performance metrics (memory, DOM stats, rendering times)
+- **devtools_perf_trace_start**: Start recording performance trace
+- **devtools_perf_trace_stop**: Stop trace and get timeline events
+
+### Storage
+- **devtools_storage_local / devtools_storage_session**: Get localStorage/sessionStorage
+- **devtools_storage_cookies**: Get cookies (optionally filter by domain)
+- **devtools_storage_set_local / devtools_storage_set_session**: Set storage items
+- **devtools_storage_set_cookie**: Set a cookie with full options
+- **devtools_storage_clear**: Clear storage (local/session/cookies/all)
+
+### General
+- **devtools_eval**: Execute JavaScript with full page access, can await promises
+- **devtools_page_info**: Get current page title and URL
+
+### When to Use DevTools vs Browser Tools
+- **Browser tools (mcp__orbit-browser__)**: Page interaction, navigation, clicking, typing
+- **DevTools tools (mcp__orbit-devtools__)**: Deep inspection, debugging, storage, performance analysis
+`,
+    ];
+
+    if (Object.hasOwn(this._mcpServers, IOS_MCP_SERVER_KEY)) {
+      sections.push(`
+## iOS Simulator Automation
+
+You may also have access to iOS simulator automation tools via MCP when the \`mcp__orbit-ios__*\` tool namespace is present.
+
+### Core Workflow
+1. Call \`mcp__orbit-ios__ios_launch\` first to boot the simulator, start Safari, and acquire the session lease.
+2. Use \`mcp__orbit-ios__ios_navigate\` to open the target page.
+3. Call \`mcp__orbit-ios__ios_snapshot\` to inspect the mobile page and obtain refs like \`e1\`, \`e2\`.
+4. Use those refs for \`ios_tap\`, \`ios_fill\`, \`ios_type\`, \`ios_get_text\`, and \`ios_get_html\` whenever possible.
+5. Re-run \`ios_snapshot\` after navigation, major DOM changes, or stale-ref errors.
+
+### Mobile-Specific Actions
+- **\`mcp__orbit-ios__ios_swipe\`**: Native touch gesture for mobile carousels and scroll regions
+- **\`mcp__orbit-ios__ios_scroll\`**: Scroll the viewport and inspect updated positions
+- **\`mcp__orbit-ios__ios_screenshot\`**: Capture a PNG screenshot of the current mobile viewport
+- **\`mcp__orbit-ios__ios_console_logs\` / \`mcp__orbit-ios__ios_eval\`**: Debug mobile Safari behavior
+
+### Recovery Rules
+- **If a tool says \`No iOS lease for session\`**: call \`mcp__orbit-ios__ios_launch\` first
+- **If Appium exited unexpectedly**: call \`mcp__orbit-ios__ios_launch\` to restart; the system does not auto-recover
+- **Use \`mcp__orbit-ios__ios_close\` when done** so the simulator lease is released cleanly
+`);
+    }
+
+    return sections.join('\n');
   }
 
   async startSession(): Promise<void> {

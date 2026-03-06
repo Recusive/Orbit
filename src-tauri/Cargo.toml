@@ -60,7 +60,7 @@ ignore = { workspace = true } # Workspace doc discovery for Vault
 tempfile = { workspace = true }
 
 # Tauri
-tauri = { workspace = true, features = ["tray-icon", "macos-private-api"] }
+tauri = { workspace = true, features = ["tray-icon", "macos-private-api", "protocol-asset"] }
 tauri-plugin-log = { workspace = true }
 tauri-plugin-fs = { workspace = true }
 tauri-plugin-shell = { workspace = true }

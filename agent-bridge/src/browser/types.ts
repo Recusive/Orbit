@@ -1,59 +1,86 @@
 /**
  * Browser MCP Types
  *
- * Type definitions for browser automation commands used by AI agents.
- * These types define the contract between the agent and the browser
- * automation layer.
+ * Shared browser-tool input contracts and lightweight result types used by the
+ * embedded browser MCP server and its frontend bridge.
  */
+
+import { z } from 'zod';
+
+// ============================================
+// Shared Schemas
+// ============================================
+
+export const BrowserTargetShape = {
+  ref: z.string().optional().describe('Element ref from browser_snapshot (preferred)'),
+  selector: z.string().optional().describe('CSS selector (legacy, still supported)'),
+} satisfies Record<string, z.ZodType>;
+
+export const OptionalTargetSchema = z.object(BrowserTargetShape);
+
+export const TargetSchema = OptionalTargetSchema.refine(
+  (value) => value.ref !== undefined || value.selector !== undefined,
+  'Provide ref (from snapshot) or selector (CSS)'
+);
+
+export const BrowserScrollDirections = ['up', 'down', 'left', 'right'] as const;
+export const BrowserStorageStores = ['local', 'session'] as const;
+export const BrowserConsoleLogLevels = ['error', 'warn', 'info', 'log'] as const;
+export const BrowserWaitForSelectorStates = ['attached', 'detached', 'hidden', 'visible'] as const;
+
+export type BrowserTargetInput = z.infer<typeof TargetSchema>;
+export type BrowserOptionalTargetInput = z.infer<typeof OptionalTargetSchema>;
+export type BrowserScrollDirection = (typeof BrowserScrollDirections)[number];
+export type BrowserStorageStore = (typeof BrowserStorageStores)[number];
+export type BrowserConsoleLogLevel = (typeof BrowserConsoleLogLevels)[number];
+export type BrowserWaitForSelectorState = (typeof BrowserWaitForSelectorStates)[number];
+
+function getValidationErrorMessage(error: z.ZodError): string {
+  return error.issues[0]?.message ?? 'Invalid browser tool input';
+}
+
+export function validateTargetInput(input: unknown): BrowserTargetInput {
+  const result = TargetSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error(getValidationErrorMessage(result.error));
+  }
+  return result.data;
+}
+
+export function validateOptionalTargetInput(input: unknown): BrowserOptionalTargetInput {
+  const result = OptionalTargetSchema.safeParse(input);
+  if (!result.success) {
+    throw new Error(getValidationErrorMessage(result.error));
+  }
+  return result.data;
+}
 
 // ============================================
 // Result Types
 // ============================================
 
-/**
- * Result of a browser tool execution.
- */
 export interface BrowserToolResult {
-  /** Whether the command succeeded */
   success: boolean;
-  /** Result data (type depends on the command) */
   data?: unknown;
-  /** Error message if success is false */
   error?: string;
 }
 
-/**
- * Typed result with known data shape.
- */
 export interface BrowserToolResultTyped<T> extends BrowserToolResult {
   success: true;
   data: T;
 }
 
-/**
- * Error result type.
- */
 export interface BrowserToolError extends BrowserToolResult {
   success: false;
   error: string;
 }
 
-// ============================================
-// MCP Tool Types
-// ============================================
-
-/**
- * MCP tool request sent to the frontend.
- */
 export interface McpToolRequest {
   requestId: string;
   toolName: string;
   toolInput: Record<string, unknown>;
 }
 
-/**
- * MCP tool response from the frontend.
- */
 export interface McpToolResponse {
   requestId: string;
   success: boolean;
@@ -61,147 +88,29 @@ export interface McpToolResponse {
   error?: string;
 }
 
-// ============================================
-// Command Types
-// ============================================
-
-/**
- * Open a browser or navigate to a URL.
- */
-export interface BrowserOpenCommand {
-  type: 'browser:open';
-  /** URL to open (optional, opens blank if not provided) */
-  url?: string;
+export interface BrowserCookie {
+  name: string;
+  value: string;
+  domain: string | null;
+  path: string | null;
+  expires: number | null;
 }
 
-/**
- * Navigate to a specific URL.
- */
-export interface BrowserNavigateCommand {
-  type: 'browser:navigate';
-  /** URL to navigate to */
+export interface BrowserNetworkRequest {
   url: string;
+  method: string;
+  status: number;
+  duration: number;
+  size: number;
 }
 
-/**
- * Click an element by CSS selector.
- */
-export interface BrowserClickCommand {
-  type: 'browser:click';
-  /** CSS selector for the element to click */
-  selector: string;
+export interface BrowserBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-/**
- * Type text into an input element.
- */
-export interface BrowserTypeCommand {
-  type: 'browser:type';
-  /** CSS selector for the input element */
-  selector: string;
-  /** Text to type */
-  text: string;
-}
-
-/**
- * Execute JavaScript and return the result.
- */
-export interface BrowserEvalCommand {
-  type: 'browser:eval';
-  /** JavaScript code to execute */
-  script: string;
-}
-
-/**
- * Capture a screenshot or page info.
- */
-export interface BrowserScreenshotCommand {
-  type: 'browser:screenshot';
-}
-
-/**
- * Get HTML content of an element or the entire page.
- */
-export interface BrowserGetHtmlCommand {
-  type: 'browser:get_html';
-  /** CSS selector (optional, returns document HTML if not provided) */
-  selector?: string;
-}
-
-/**
- * Get text content of an element or the entire page.
- */
-export interface BrowserGetTextCommand {
-  type: 'browser:get_text';
-  /** CSS selector (optional, returns document text if not provided) */
-  selector?: string;
-}
-
-/**
- * Navigate back in browser history.
- */
-export interface BrowserBackCommand {
-  type: 'browser:back';
-}
-
-/**
- * Navigate forward in browser history.
- */
-export interface BrowserForwardCommand {
-  type: 'browser:forward';
-}
-
-/**
- * Reload the current page.
- */
-export interface BrowserReloadCommand {
-  type: 'browser:reload';
-}
-
-/**
- * Close the browser.
- */
-export interface BrowserCloseCommand {
-  type: 'browser:close';
-}
-
-/**
- * Get console logs from the browser.
- */
-export interface BrowserConsoleLogsCommand {
-  type: 'browser:console_logs';
-}
-
-/**
- * Union type of all browser commands.
- */
-export type BrowserCommand =
-  | BrowserOpenCommand
-  | BrowserNavigateCommand
-  | BrowserClickCommand
-  | BrowserTypeCommand
-  | BrowserEvalCommand
-  | BrowserScreenshotCommand
-  | BrowserGetHtmlCommand
-  | BrowserGetTextCommand
-  | BrowserBackCommand
-  | BrowserForwardCommand
-  | BrowserReloadCommand
-  | BrowserCloseCommand
-  | BrowserConsoleLogsCommand;
-
-/**
- * Extract the command type string from a BrowserCommand.
- */
-export type BrowserCommandType = BrowserCommand['type'];
-
-// ============================================
-// Data Types for Specific Commands
-// ============================================
-
-/**
- * Screenshot/page info data.
- */
 export interface BrowserScreenshotData {
   url: string;
   title: string;
@@ -212,29 +121,279 @@ export interface BrowserScreenshotData {
   devicePixelRatio: number;
 }
 
-/**
- * Console log entry.
- */
 export interface BrowserConsoleLogEntry {
-  level: 'log' | 'info' | 'warn' | 'error';
+  level: BrowserConsoleLogLevel;
   message: string;
   timestamp: number;
 }
+
+export interface BrowserRuntimeInfo {
+  available: boolean;
+  reason?: string;
+  version?: string;
+  epoch?: number;
+  capabilities?: {
+    snapshot: boolean;
+    refResolution: boolean;
+    consoleCapture: boolean;
+    networkCapture: boolean;
+    storageAccess: boolean;
+  };
+}
+
+export interface SnapshotResponse {
+  epoch: number;
+  snapshot: string;
+  refCount: number;
+  totalElements: number;
+  emittedElements: number;
+  truncated: boolean;
+  url: string;
+  title: string;
+  durationMs: number;
+}
+
+// ============================================
+// Command Types
+// ============================================
+
+export interface BrowserOpenCommand {
+  type: 'browser:open';
+  url?: string;
+}
+
+export interface BrowserNavigateCommand {
+  type: 'browser:navigate';
+  url: string;
+}
+
+export interface BrowserSnapshotCommand {
+  type: 'browser:snapshot';
+  interactive?: boolean;
+  cursor?: boolean;
+  compact?: boolean;
+}
+
+export interface BrowserGetUrlCommand {
+  type: 'browser:get_url';
+}
+
+export interface BrowserGetTitleCommand {
+  type: 'browser:get_title';
+}
+
+export interface BrowserClickCommand extends BrowserTargetInput {
+  type: 'browser:click';
+}
+
+export interface BrowserTypeCommand extends BrowserTargetInput {
+  type: 'browser:type';
+  text: string;
+}
+
+export interface BrowserFillCommand extends BrowserTargetInput {
+  type: 'browser:fill';
+  value: string;
+}
+
+export interface BrowserSelectCommand extends BrowserTargetInput {
+  type: 'browser:select';
+  values: string[];
+}
+
+export interface BrowserCheckCommand extends BrowserTargetInput {
+  type: 'browser:check';
+}
+
+export interface BrowserUncheckCommand extends BrowserTargetInput {
+  type: 'browser:uncheck';
+}
+
+export interface BrowserHoverCommand extends BrowserTargetInput {
+  type: 'browser:hover';
+}
+
+export interface BrowserFocusCommand extends BrowserTargetInput {
+  type: 'browser:focus';
+}
+
+export interface BrowserScrollCommand extends BrowserOptionalTargetInput {
+  type: 'browser:scroll';
+  direction: BrowserScrollDirection;
+  amount?: number;
+}
+
+export interface BrowserScrollIntoViewCommand extends BrowserTargetInput {
+  type: 'browser:scroll_into_view';
+}
+
+export interface BrowserWaitForSelectorCommand {
+  type: 'browser:wait_for_selector';
+  selector: string;
+  state?: BrowserWaitForSelectorState;
+  timeout?: number;
+}
+
+export interface BrowserWaitForUrlCommand {
+  type: 'browser:wait_for_url';
+  url: string;
+  timeout?: number;
+}
+
+export interface BrowserEvalCommand {
+  type: 'browser:eval';
+  script: string;
+}
+
+export interface BrowserScreenshotCommand {
+  type: 'browser:screenshot';
+}
+
+export interface BrowserGetHtmlCommand extends BrowserOptionalTargetInput {
+  type: 'browser:get_html';
+  outer?: boolean;
+}
+
+export interface BrowserGetTextCommand extends BrowserOptionalTargetInput {
+  type: 'browser:get_text';
+}
+
+export interface BrowserIsVisibleCommand extends BrowserTargetInput {
+  type: 'browser:is_visible';
+}
+
+export interface BrowserIsEnabledCommand extends BrowserTargetInput {
+  type: 'browser:is_enabled';
+}
+
+export interface BrowserGetAttributeCommand extends BrowserTargetInput {
+  type: 'browser:get_attribute';
+  name: string;
+}
+
+export interface BrowserBoundingBoxCommand extends BrowserTargetInput {
+  type: 'browser:bounding_box';
+}
+
+export interface BrowserCountCommand {
+  type: 'browser:count';
+  selector: string;
+}
+
+export interface BrowserCookiesGetCommand {
+  type: 'browser:cookies_get';
+  name?: string;
+  domain?: string;
+}
+
+export interface BrowserCookiesClearCommand {
+  type: 'browser:cookies_clear';
+  name?: string;
+  domain?: string;
+}
+
+export interface BrowserStorageGetCommand {
+  type: 'browser:storage_get';
+  key: string;
+  store?: BrowserStorageStore;
+}
+
+export interface BrowserStorageSetCommand {
+  type: 'browser:storage_set';
+  key: string;
+  value: string;
+  store?: BrowserStorageStore;
+}
+
+export interface BrowserStorageClearCommand {
+  type: 'browser:storage_clear';
+  store?: BrowserStorageStore;
+}
+
+export interface BrowserNetworkRequestsCommand {
+  type: 'browser:network_requests';
+  filter?: {
+    url?: string;
+    method?: string;
+    status?: number;
+  };
+}
+
+export interface BrowserConsoleLogsCommand {
+  type: 'browser:console_logs';
+  level?: BrowserConsoleLogLevel;
+}
+
+export interface BrowserBackCommand {
+  type: 'browser:back';
+}
+
+export interface BrowserForwardCommand {
+  type: 'browser:forward';
+}
+
+export interface BrowserReloadCommand {
+  type: 'browser:reload';
+}
+
+export interface BrowserCloseCommand {
+  type: 'browser:close';
+}
+
+export interface BrowserRuntimeInfoCommand {
+  type: 'browser:runtime_info';
+}
+
+export type BrowserCommand =
+  | BrowserOpenCommand
+  | BrowserNavigateCommand
+  | BrowserSnapshotCommand
+  | BrowserGetUrlCommand
+  | BrowserGetTitleCommand
+  | BrowserClickCommand
+  | BrowserTypeCommand
+  | BrowserFillCommand
+  | BrowserSelectCommand
+  | BrowserCheckCommand
+  | BrowserUncheckCommand
+  | BrowserHoverCommand
+  | BrowserFocusCommand
+  | BrowserScrollCommand
+  | BrowserScrollIntoViewCommand
+  | BrowserWaitForSelectorCommand
+  | BrowserWaitForUrlCommand
+  | BrowserEvalCommand
+  | BrowserScreenshotCommand
+  | BrowserGetHtmlCommand
+  | BrowserGetTextCommand
+  | BrowserIsVisibleCommand
+  | BrowserIsEnabledCommand
+  | BrowserGetAttributeCommand
+  | BrowserBoundingBoxCommand
+  | BrowserCountCommand
+  | BrowserCookiesGetCommand
+  | BrowserCookiesClearCommand
+  | BrowserStorageGetCommand
+  | BrowserStorageSetCommand
+  | BrowserStorageClearCommand
+  | BrowserNetworkRequestsCommand
+  | BrowserConsoleLogsCommand
+  | BrowserBackCommand
+  | BrowserForwardCommand
+  | BrowserReloadCommand
+  | BrowserCloseCommand
+  | BrowserRuntimeInfoCommand;
+
+export type BrowserCommandType = BrowserCommand['type'];
 
 // ============================================
 // Helper Type Guards
 // ============================================
 
-/**
- * Type guard to check if a result is successful.
- */
 export function isSuccess<T>(result: BrowserToolResult): result is BrowserToolResultTyped<T> {
   return result.success;
 }
 
-/**
- * Type guard to check if a result is an error.
- */
 export function isError(result: BrowserToolResult): result is BrowserToolError {
   return !result.success;
 }

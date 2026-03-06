@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Spec Generator'
+  short_description: 'Generate behavior specs from plans'
+  default_prompt: 'Use $spec-generator to turn docs/plans/agent-browser-integration.md into docs/specs/agent-browser-integration-spec.md.'

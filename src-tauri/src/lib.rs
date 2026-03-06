@@ -264,6 +264,7 @@ pub fn run() {
     // Initialize browser window state
     let browser_state = Arc::new(BrowserWindowState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
+    let browser_result_state_for_events = Arc::clone(&browser_result_state);
 
     // Clone browser state for the main-window focus listener (Arc is moved into .manage())
     #[cfg(target_os = "macos")]
@@ -296,6 +297,10 @@ pub fn run() {
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+            browser::register_browser_large_eval_result_listener(
+                app.handle(),
+                Arc::clone(&browser_result_state_for_events),
+            );
 
             #[cfg(target_os = "macos")]
             {
@@ -591,6 +596,8 @@ pub fn run() {
             browser::browser_eval,
             browser::browser_js_callback,
             browser::browser_eval_async,
+            browser::browser_wait_for_selector,
+            browser::browser_wait_for_url,
             browser::browser_screenshot,
             browser::browser_open_devtools,
             browser::app_open_devtools,

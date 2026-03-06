@@ -19,18 +19,28 @@ export interface ViewedFileDiff {
 // View mode for files with diff data
 export type FileViewMode = 'file' | 'diff';
 
+export interface ImageData {
+  assetUrl: string;
+  mimeType: string;
+  fileSize: number;
+  svgSourceView?: boolean;
+}
+
 // File being viewed in the file viewer
 export interface ViewedFile {
+  instanceId: number;
   path: string;
   content: string;
   originalContent: string; // Content when file was opened (for dirty detection)
   language: string;
+  fileType: 'text' | 'image';
   scrollPosition?: number;
   // Diff support for files opened from Changes tab
   diffData?: ViewedFileDiff;
   viewMode: FileViewMode;
   isModified: boolean; // Track if content has been modified
   isExternal: boolean; // File is outside workspace (read-only, no save)
+  imageData?: ImageData;
 }
 
 // Position to navigate to after opening a file
@@ -61,6 +71,7 @@ export interface SearchTrigger {
 // Monotonic counter for unique IDs (guaranteed unique, unlike Date.now())
 let gotoIdCounter = 0;
 let searchIdCounter = 0;
+let tabInstanceCounter = 0;
 
 interface FileViewerState {
   // Open file tabs
@@ -102,6 +113,8 @@ interface FileViewerActions {
 
   // Content management
   setFileContent: (path: string, content: string, language?: string) => void;
+  setImageFile: (path: string, instanceId: number, imageData: ImageData) => void;
+  updateImageData: (path: string, partial: Partial<ImageData>) => void;
   updateContent: (path: string, content: string) => void; // For editor changes
   markSaved: (path: string) => void; // Mark file as saved (not modified)
 
@@ -254,10 +267,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
             // Create new tab
             const fileContent = content ?? '';
             const newTab: ViewedFile = {
+              instanceId: ++tabInstanceCounter,
               path,
               content: fileContent,
               originalContent: fileContent,
               language: getLanguageFromPath(path),
+              fileType: 'text',
               viewMode: 'file',
               isModified: false,
               isExternal: isPathExternal(path),
@@ -289,10 +304,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
           } else {
             // Create new tab with diff data
             const newTab: ViewedFile = {
+              instanceId: ++tabInstanceCounter,
               path,
               content: diffData.newContent,
               originalContent: diffData.newContent,
               language: language ?? getLanguageFromPath(path),
+              fileType: 'text',
               diffData,
               viewMode: 'diff',
               isModified: false,
@@ -317,12 +334,20 @@ export const useFileViewerStore = create<FileViewerStore>()(
           const tabIndex = state.openTabs.findIndex((tab) => tab.path === path);
           if (tabIndex === -1) {
             Reflect.deleteProperty(state.markdownPreview, path);
+            if (state.loadingPath === path) {
+              state.isLoading = false;
+              state.loadingPath = null;
+            }
             return;
           }
 
           // Remove the tab
           state.openTabs.splice(tabIndex, 1);
           Reflect.deleteProperty(state.markdownPreview, path);
+          if (state.loadingPath === path) {
+            state.isLoading = false;
+            state.loadingPath = null;
+          }
 
           // If closing active tab, switch to another
           if (state.activeTabPath === path) {
@@ -363,6 +388,8 @@ export const useFileViewerStore = create<FileViewerStore>()(
           state.markdownPreview = {};
           state.history = [];
           state.historyIndex = -1;
+          state.isLoading = false;
+          state.loadingPath = null;
         });
       },
 
@@ -386,10 +413,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
           } else {
             // Create new tab with content
             state.openTabs.push({
+              instanceId: ++tabInstanceCounter,
               path,
               content,
               originalContent: content,
               language: language ?? getLanguageFromPath(path),
+              fileType: 'text',
               viewMode: 'file',
               isModified: false,
               isExternal: isPathExternal(path),
@@ -398,6 +427,32 @@ export const useFileViewerStore = create<FileViewerStore>()(
           }
           state.isLoading = false;
           state.loadingPath = null;
+        });
+      },
+
+      setImageFile: (path: string, instanceId: number, imageData: ImageData): void => {
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab?.instanceId !== instanceId) {
+            state.isLoading = false;
+            state.loadingPath = null;
+            return;
+          }
+
+          tab.fileType = 'image';
+          tab.imageData = imageData;
+          tab.isModified = false;
+          state.isLoading = false;
+          state.loadingPath = null;
+        });
+      },
+
+      updateImageData: (path: string, partial: Partial<ImageData>): void => {
+        set((state) => {
+          const tab = state.openTabs.find((t) => t.path === path);
+          if (tab?.imageData) {
+            tab.imageData = { ...tab.imageData, ...partial };
+          }
         });
       },
 

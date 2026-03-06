@@ -1,0 +1,4 @@
+interface:
+  display_name: 'Spec Audit'
+  short_description: 'Audit behavior specs for production readiness'
+  default_prompt: 'Use $audit-spec to audit docs/specs/agent-browser-integration-spec.md and write the report to reviews/audit-spec.md.'

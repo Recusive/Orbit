@@ -8,7 +8,6 @@ import type { TerminalPanelProps } from '@/components/terminal/terminal-panel';
 import type { HeaderTab } from '@/stores/ui/ui-store';
 import type { CSSProperties, FC } from 'react';
 
-import welcomeBg from '@/assets/welcome-bg.png';
 import { ActionsBar } from '@/components/layout/actions-bar';
 import { ActivityCard } from '@/components/layout/activity-card';
 import { AppShell } from '@/components/layout/app-shell';
@@ -543,8 +542,8 @@ const App: FC = () => {
     };
   }, [launchPhase]);
 
-  // ASCII → ui-reveal: fires when BeamAsciiPre completes
-  const handleAsciiComplete = useCallback((): void => {
+  // ASCII → ui-reveal: fires when DiffSection entrance + scanline complete
+  const handleDiffComplete = useCallback((): void => {
     const s = useLaunchSequenceStore.getState();
     if (s.phase === 'ascii') {
       s.advancePhase();
@@ -578,9 +577,10 @@ const App: FC = () => {
     };
   }, [launchPhase, isWelcome]);
 
-  // Derived launch props for WelcomePage
-  const showAscii = launchPhase !== 'idle' && launchPhase !== 'wallpaper';
   const deferToast = isWelcome && !toastReady;
+
+  // Diff animation starts once wallpaper phase completes (ascii phase begins)
+  const showDiff = launchPhase !== 'idle' && launchPhase !== 'wallpaper';
 
   // Slower sidebar transition during launch reveal — 500ms vs normal 200ms.
   // Paired Elements Rule: AppShell (margin-left) and ContentCard (margin) must match.
@@ -788,31 +788,19 @@ const App: FC = () => {
                       terminalBelow={terminalChatOpen || terminalBothOpen}
                       transitionOverride={launchTransitionOverride}
                     >
-                      {/* Welcome background image — inside the card.
+                      {/* Welcome background — menu-bg base with dithered mountain silhouette.
                           During launch sequence: opacity animates 0→1 with wallpaper easing.
-                          transitionend on wallpaper div triggers next phase (with runId guard). */}
+                          transitionend triggers next phase (with runId guard). */}
                       {isWelcome ? (
-                        <>
-                          <div
-                            className="absolute inset-0 bg-cover bg-center bg-no-repeat rounded-[inherit]"
-                            style={{
-                              backgroundImage: `url(${welcomeBg})`,
-                              opacity: launchPhase === 'idle' ? 0 : 1,
-                              transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,
-                            }}
-                            onTransitionEnd={handleWallpaperTransitionEnd}
-                            aria-hidden="true"
-                          />
-                          {/* Paired Elements Rule: overlay shares same opacity + transition */}
-                          <div
-                            className="absolute inset-0 hidden dark:block bg-linear-to-t from-orbit-100/80 via-orbit-100/55 to-orbit-100/35 rounded-[inherit]"
-                            style={{
-                              opacity: launchPhase === 'idle' ? 0 : 1,
-                              transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,
-                            }}
-                            aria-hidden="true"
-                          />
-                        </>
+                        <div
+                          className="absolute inset-0 rounded-[inherit] overflow-hidden"
+                          style={{
+                            opacity: launchPhase === 'idle' ? 0 : 1,
+                            transition: isLaunchAnimating ? WALLPAPER_TRANSITION : undefined,
+                          }}
+                          onTransitionEnd={handleWallpaperTransitionEnd}
+                          aria-hidden="true"
+                        />
                       ) : null}
 
                       {/* ContentTopBar — follows the chat area.
@@ -843,9 +831,9 @@ const App: FC = () => {
                         ) : null}
                         {isWelcome ? (
                           <WelcomePage
-                            showAscii={showAscii}
-                            onAsciiAnimationComplete={handleAsciiComplete}
                             deferToast={deferToast}
+                            animate={showDiff}
+                            onAnimationComplete={handleDiffComplete}
                           />
                         ) : (
                           <>

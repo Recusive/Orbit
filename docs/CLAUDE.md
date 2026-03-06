@@ -4,16 +4,17 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## Folder Guide
 
-| Folder          | What's in it                       | When to look                     |
-| --------------- | ---------------------------------- | -------------------------------- |
-| `decisions/`    | ADRs, why we chose X over Y        | Understanding past trade-offs    |
-| `architecture/` | System design, technical decisions | How something works internally   |
-| `design/`       | UI/UX guidelines, visual systems   | Typography, icons, themes        |
-| `development/`  | Build workflow, CI/CD, debugging   | Setup, builds, fixing issues     |
-| `plans/`        | Feature proposals, refactor plans  | What's been planned or proposed  |
-| `quality/`      | Linting, audits, health metrics    | Code standards, audit results    |
-| `reference/`    | SDK docs, prompts, external guides | API references, prompt templates |
-| `orbitweb/`     | Marketing site context             | Orbitweb-specific (read-only)    |
+| Folder          | What's in it                        | When to look                     |
+| --------------- | ----------------------------------- | -------------------------------- |
+| `decisions/`    | ADRs, why we chose X over Y         | Understanding past trade-offs    |
+| `architecture/` | System design, technical decisions  | How something works internally   |
+| `design/`       | UI/UX guidelines, visual systems    | Typography, icons, themes        |
+| `development/`  | Build workflow, CI/CD, debugging    | Setup, builds, fixing issues     |
+| `plans/`        | Feature proposals, refactor plans   | What's been planned or proposed  |
+| `quality/`      | Linting, audits, health metrics     | Code standards, audit results    |
+| `reference/`    | SDK docs, prompts, external guides  | API references, prompt templates |
+| `specs/`        | Behavior specs, acceptance criteria | What "done" looks like           |
+| `orbitweb/`     | Marketing site context              | Orbitweb-specific (read-only)    |
 
 ## decisions/ (4 files)
 
@@ -76,6 +77,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `VAULT-IMPLEMENTATION-PLAN.md` — Vault secure storage
 - `background-chat-sessions.md` — Background chat sessions
 
+## specs/ (1 file)
+
+- `agent-browser-integration-spec.md` — Behavior spec for browser accessibility snapshot + ref system and iOS Simulator support (companion to `plans/agent-browser-integration.md`)
+
 ## quality/ (3 files)
 
 - `LINTING-AND-QUALITY.md` — ESLint, Prettier, Clippy setup
@@ -99,5 +104,6 @@ Use this to find the right file. Read the file directly — no links needed.
 
 - Guides: `UPPER-CASE.md` (e.g. `DEVELOPMENT.md`, `CSP-SECURITY.md`)
 - Plans: `*-PLAN.md` in `plans/`
+- Specs: `*-spec.md` in `specs/` (companion to plan with same base name)
 - References: descriptive names matching upstream sources
 - No loose files at docs root — everything goes in a category folder

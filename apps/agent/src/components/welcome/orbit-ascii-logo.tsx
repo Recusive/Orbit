@@ -54,9 +54,9 @@ export const OrbitAsciiLogo: FC<OrbitAsciiLogoProps> = ({
           <BeamAsciiPre
             text={ORBIT_ART}
             ariaLabel="ORBIT"
-            className="text-[22px] leading-[1.15]"
+            className="text-[18px] leading-[1.15]"
             duration={1600}
-            settledColor="var(--foreground)"
+            settledColor="var(--muted-foreground)"
           />
 
           {/* Tagline — beam starts after the main art finishes.
@@ -236,7 +236,7 @@ const ScrambleOrbitLogo: FC<ScrambleOrbitLogoProps> = ({
       {showAscii ? (
         <>
           <pre
-            className="font-mono text-[22px] leading-[1.15] text-foreground whitespace-pre select-none"
+            className="font-mono text-[18px] leading-[1.15] text-muted-foreground whitespace-pre select-none"
             aria-label="ORBIT"
             role="img"
           >

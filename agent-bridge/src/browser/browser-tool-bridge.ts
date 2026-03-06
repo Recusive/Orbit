@@ -16,6 +16,31 @@ import { createLogger } from '../common/logging/logger.js';
 import type { McpToolRequest, McpToolResponse } from './types.js';
 
 const logger = createLogger('BrowserToolBridge');
+const DEFAULT_TIMEOUT_MS = 30000;
+const ACTION_TIMEOUT_MS = 10000;
+const SNAPSHOT_TIMEOUT_MS = 15000;
+const MAX_WAIT_TIMEOUT_MS = 120000;
+const STATEFUL_BROWSER_TOOLS = new Set([
+  'browser_open',
+  'browser_close',
+  'browser_navigate',
+  'browser_back',
+  'browser_forward',
+  'browser_reload',
+  'browser_snapshot',
+  'browser_click',
+  'browser_type',
+  'browser_fill',
+  'browser_select',
+  'browser_check',
+  'browser_uncheck',
+  'browser_hover',
+  'browser_focus',
+  'browser_scroll',
+  'browser_scroll_into_view',
+  'browser_wait_for_selector',
+  'browser_wait_for_url',
+]);
 
 /**
  * Pending tool request with resolver
@@ -25,6 +50,64 @@ interface PendingRequest {
   reject: (error: Error) => void;
   timeout: ReturnType<typeof setTimeout>;
   toolName: string;
+}
+
+class AsyncQueue {
+  private tail: Promise<void> = Promise.resolve();
+
+  enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.tail.catch(() => undefined).then(task);
+    this.tail = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+}
+
+function clampWaitTimeout(toolInput: Record<string, unknown>): number {
+  const timeout = toolInput.timeout;
+  if (typeof timeout !== 'number' || !Number.isFinite(timeout) || timeout <= 0) {
+    return DEFAULT_TIMEOUT_MS;
+  }
+  return Math.min(Math.trunc(timeout), MAX_WAIT_TIMEOUT_MS);
+}
+
+export function getBrowserToolTimeoutMs(
+  toolName: string,
+  toolInput: Record<string, unknown>
+): number {
+  switch (toolName) {
+    case 'browser_snapshot':
+      return SNAPSHOT_TIMEOUT_MS;
+    case 'browser_click':
+    case 'browser_type':
+    case 'browser_fill':
+    case 'browser_select':
+    case 'browser_check':
+    case 'browser_uncheck':
+    case 'browser_hover':
+    case 'browser_focus':
+    case 'browser_scroll':
+    case 'browser_scroll_into_view':
+      return ACTION_TIMEOUT_MS;
+    case 'browser_wait_for_selector':
+    case 'browser_wait_for_url':
+      return clampWaitTimeout(toolInput);
+    case 'browser_open':
+    case 'browser_close':
+    case 'browser_navigate':
+    case 'browser_back':
+    case 'browser_forward':
+    case 'browser_reload':
+      return DEFAULT_TIMEOUT_MS;
+    default:
+      return DEFAULT_TIMEOUT_MS;
+  }
+}
+
+export function isStatefulBrowserTool(toolName: string): boolean {
+  return STATEFUL_BROWSER_TOOLS.has(toolName);
 }
 
 /**
@@ -39,10 +122,10 @@ export type ToolRequestCallback = (request: McpToolRequest) => void;
  * webview/frontend communication.
  */
 export class BrowserToolBridge {
-  private static readonly TIMEOUT_MS = 30000; // 30 second timeout
-
   // Pending requests waiting for response
   private readonly pendingRequests = new Map<string, PendingRequest>();
+
+  private readonly statefulQueue = new AsyncQueue();
 
   // Event emitter for tool requests
   private readonly emitter = new EventEmitter();
@@ -107,29 +190,36 @@ export class BrowserToolBridge {
    * @returns Promise that resolves with the tool result
    */
   async sendRequest<T = unknown>(toolName: string, toolInput: Record<string, unknown>): Promise<T> {
+    if (isStatefulBrowserTool(toolName)) {
+      return this.statefulQueue.enqueue(() => this.sendRequestInternal<T>(toolName, toolInput));
+    }
+
+    return this.sendRequestInternal<T>(toolName, toolInput);
+  }
+
+  /**
+   * [warning] TESTED: This bridge is covered by integration tests.
+   *     If you modify this, run: cd agent-bridge && bun test
+   *     Test files: src/__tests__/browser-ref-flow.test.ts, src/__tests__/browser-timeout.test.ts
+   */
+  private async sendRequestInternal<T>(
+    toolName: string,
+    toolInput: Record<string, unknown>
+  ): Promise<T> {
     if (this.disposed) {
       throw new Error('BrowserToolBridge has been disposed');
     }
 
-    // Generate unique request ID with timestamp, random string, and counter to prevent collisions
     const requestId = `browser-${String(Date.now())}-${Math.random().toString(36).slice(2, 11)}-${String(this.pendingRequests.size)}`;
+    const timeoutMs = getBrowserToolTimeoutMs(toolName, toolInput);
 
     return new Promise<T>((resolve, reject) => {
-      // Set up timeout
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(requestId);
-        logger.warn(
-          { requestId, toolName, timeoutMs: BrowserToolBridge.TIMEOUT_MS },
-          'Tool request timed out'
-        );
-        reject(
-          new Error(
-            `Tool request '${toolName}' timed out after ${String(BrowserToolBridge.TIMEOUT_MS)}ms`
-          )
-        );
-      }, BrowserToolBridge.TIMEOUT_MS);
+        logger.warn({ requestId, toolName, timeoutMs }, 'Tool request timed out');
+        reject(new Error(`${toolName} timed out after ${String(timeoutMs)}ms`));
+      }, timeoutMs);
 
-      // Store pending request
       this.pendingRequests.set(requestId, {
         resolve: resolve as (result: unknown) => void,
         reject,
@@ -137,7 +227,6 @@ export class BrowserToolBridge {
         toolName,
       });
 
-      // Emit request to registered callbacks
       const request: McpToolRequest = {
         requestId,
         toolName,

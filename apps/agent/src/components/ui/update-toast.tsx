@@ -10,7 +10,8 @@ import { toast } from 'sonner';
 
 import type { FC, ReactNode } from 'react';
 
-import welcomeBg from '@/assets/welcome-bg.png';
+import welcomeBgDark from '@/assets/welcome-bg-dark.png';
+import welcomeBgLight from '@/assets/welcome-bg-light.png';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
@@ -214,7 +215,12 @@ const UpdateCard: FC<UpdateCardProps> = ({
     <style>{TOAST_STYLES}</style>
     <div className="ot-card">
       <div className="ot-image-wrapper">
-        <img className="ot-image" src={welcomeBg} alt="Update background" draggable={false} />
+        <img
+          className="ot-image"
+          src={document.documentElement.classList.contains('dark') ? welcomeBgDark : welcomeBgLight}
+          alt="Update background"
+          draggable={false}
+        />
         <div className="ot-overlay-text">{overlayText}</div>
       </div>
       <div className="ot-content">

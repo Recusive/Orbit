@@ -30,7 +30,7 @@ We want to adopt agent-browser's tool interface and key features — executing t
 Claude Agent SDK
     │ tool_use: browser_snapshot
     ▼
-agent-bridge/src/browser/browser-mcp-server.ts   ← EXPAND (13 → ~35 tools)
+agent-bridge/src/browser/browser-mcp-server.ts   ← EXPAND (13 → 38 tools)
     │ bridge.sendRequest()
     ▼
 agent-bridge/src/browser/browser-tool-bridge.ts   ← MODIFY (add AsyncQueue + per-tool timeouts)
@@ -174,38 +174,41 @@ All methods accept either `@ref` or CSS selector:
 **CSP handling** (addresses audit edge case):
 
 - If a page's Content-Security-Policy blocks inline script execution, `ensureOrbitRuntime()` catches the error and returns a clear diagnostic: `"Page CSP blocks script injection. Runtime unavailable."` Tools that depend on the runtime will fail with this message rather than silently returning empty results.
-- Snapshot will still report page URL and title (available without script injection) so the agent has context.
+- Snapshot will still report page URL (via Rust `browser_info`). Title is empty until `BrowserInfo` is extended to expose `WKWebView.title`. `browser_eval` remains functional on CSP-blocked pages via native `evaluateJavaScript`.
 
 ### Phase 2: Expand MCP Server (agent-bridge)
 
 **File**: `agent-bridge/src/browser/browser-mcp-server.ts`
 
-Add ~22 new tools. All follow existing pattern (delegate to `bridge.sendRequest()`):
+Add ~25 new tools. All follow existing pattern (delegate to `bridge.sendRequest()`):
 
-| Tool                        | Input Schema                                             | Description                       |
-| --------------------------- | -------------------------------------------------------- | --------------------------------- |
-| `browser_snapshot`          | `{ interactive?: bool, cursor?: bool, compact?: bool }`  | **Accessibility tree with @refs** |
-| `browser_fill`              | `{ ref: string, value: string }`                         | Fill input (proper events)        |
-| `browser_check`             | `{ ref: string }`                                        | Check checkbox                    |
-| `browser_uncheck`           | `{ ref: string }`                                        | Uncheck checkbox                  |
-| `browser_select`            | `{ ref: string, values: string[] }`                      | Select dropdown option(s)         |
-| `browser_hover`             | `{ ref: string }`                                        | Hover over element                |
-| `browser_focus`             | `{ ref: string }`                                        | Focus element                     |
-| `browser_scroll`            | `{ ref?: string, direction: string, amount?: number }`   | Scroll page or element            |
-| `browser_scroll_into_view`  | `{ ref: string }`                                        | Scroll element into viewport      |
-| `browser_wait_for_selector` | `{ selector: string, state?: string, timeout?: number }` | Wait for element                  |
-| `browser_wait_for_url`      | `{ url: string, timeout?: number }`                      | Wait for URL match                |
-| `browser_is_visible`        | `{ ref: string }`                                        | Check element visibility          |
-| `browser_is_enabled`        | `{ ref: string }`                                        | Check if element is enabled       |
-| `browser_get_attribute`     | `{ ref: string, attribute: string }`                     | Get HTML attribute                |
-| `browser_bounding_box`      | `{ ref: string }`                                        | Get element dimensions            |
-| `browser_count`             | `{ selector: string }`                                   | Count matching elements           |
-| `browser_cookies_get`       | `{}`                                                     | Get cookies                       |
-| `browser_cookies_clear`     | `{}`                                                     | Clear cookies                     |
-| `browser_storage_get`       | `{ type: string, key?: string }`                         | Get storage value                 |
-| `browser_storage_set`       | `{ type: string, key: string, value: string }`           | Set storage value                 |
-| `browser_storage_clear`     | `{ type: string }`                                       | Clear storage                     |
-| `browser_network_requests`  | `{}`                                                     | Get captured network requests     |
+| Tool                        | Input Schema                                                   | Description                               |
+| --------------------------- | -------------------------------------------------------------- | ----------------------------------------- |
+| `browser_snapshot`          | `{ interactive?: bool, cursor?: bool, compact?: bool }`        | **Accessibility tree with @refs**         |
+| `browser_get_url`           | `{}`                                                           | Get current page URL                      |
+| `browser_get_title`         | `{}`                                                           | Get current page title                    |
+| `browser_fill`              | `{ ref: string, value: string }`                               | Fill input (proper events)                |
+| `browser_check`             | `{ ref: string }`                                              | Check checkbox                            |
+| `browser_uncheck`           | `{ ref: string }`                                              | Uncheck checkbox                          |
+| `browser_select`            | `{ ref: string, values: string[] }`                            | Select dropdown option(s)                 |
+| `browser_hover`             | `{ ref: string }`                                              | Hover over element                        |
+| `browser_focus`             | `{ ref: string }`                                              | Focus element                             |
+| `browser_scroll`            | `{ ref?: string, direction: string, amount?: number }`         | Scroll page or element                    |
+| `browser_scroll_into_view`  | `{ ref: string }`                                              | Scroll element into viewport              |
+| `browser_wait_for_selector` | `{ selector: string, state?: string, timeout?: number }`       | Wait for element                          |
+| `browser_wait_for_url`      | `{ url: string, timeout?: number }`                            | Wait for URL match                        |
+| `browser_is_visible`        | `{ ref: string }`                                              | Check element visibility                  |
+| `browser_is_enabled`        | `{ ref: string }`                                              | Check if element is enabled               |
+| `browser_get_attribute`     | `{ ref: string, name: string }`                                | Get HTML attribute by name                |
+| `browser_bounding_box`      | `{ ref: string }`                                              | Get element dimensions                    |
+| `browser_count`             | `{ selector: string }`                                         | Count matching elements                   |
+| `browser_cookies_get`       | `{ name?: string, domain?: string }`                           | Get cookies (optional filters)            |
+| `browser_cookies_clear`     | `{ name?: string, domain?: string }`                           | Clear cookies (optional filters)          |
+| `browser_storage_get`       | `{ key: string, store?: "local" \| "session" }`                | Get storage value                         |
+| `browser_storage_set`       | `{ key: string, value: string, store?: "local" \| "session" }` | Set storage value                         |
+| `browser_storage_clear`     | `{ store?: "local" \| "session" }`                             | Clear storage                             |
+| `browser_network_requests`  | `{}`                                                           | Get captured network requests             |
+| `browser_runtime_info`      | `{}`                                                           | Runtime version, epoch, capabilities (P3) |
 
 Also **update existing tools** with dual-input migration schema (addresses audit Critical #3):
 
@@ -827,29 +830,30 @@ async swipe(direction: string, distance = 300) {
 
 Separate MCP server (not merged with browser tools — different execution target):
 
-| Tool                    | Input Schema                                           | Description                          |
-| ----------------------- | ------------------------------------------------------ | ------------------------------------ |
-| `ios_device_list`       | `{}`                                                   | List all simulators + real devices   |
-| `ios_launch`            | `{ device?: string }`                                  | Boot simulator + start Safari        |
-| `ios_close`             | `{}`                                                   | Shutdown simulator + cleanup         |
-| `ios_navigate`          | `{ url: string }`                                      | Navigate Safari to URL               |
-| `ios_snapshot`          | `{ interactive?: bool, cursor?: bool }`                | **Same a11y tree + refs** as desktop |
-| `ios_tap`               | `{ ref: string }`                                      | Tap element (touch)                  |
-| `ios_fill`              | `{ ref: string, value: string }`                       | Fill input field                     |
-| `ios_type`              | `{ ref: string, text: string }`                        | Type with keyboard events            |
-| `ios_swipe`             | `{ direction: string, distance?: number }`             | **iOS-native swipe gesture**         |
-| `ios_scroll`            | `{ ref?: string, direction: string, amount?: number }` | Scroll via JS                        |
-| `ios_screenshot`        | `{ path?: string }`                                    | Capture screenshot (base64 or file)  |
-| `ios_get_text`          | `{ ref?: string }`                                     | Get text content                     |
-| `ios_get_html`          | `{ ref?: string }`                                     | Get HTML content                     |
-| `ios_eval`              | `{ script: string }`                                   | Execute JavaScript in Safari         |
-| `ios_back`              | `{}`                                                   | Navigate back                        |
-| `ios_forward`           | `{}`                                                   | Navigate forward                     |
-| `ios_reload`            | `{}`                                                   | Reload page                          |
-| `ios_select`            | `{ ref: string, values: string[] }`                    | Select dropdown                      |
-| `ios_check`             | `{ ref: string }` / `ios_uncheck`                      | Toggle checkbox                      |
-| `ios_wait_for_selector` | `{ selector: string, timeout?: number }`               | Wait for element                     |
-| `ios_console_logs`      | `{}`                                                   | Get captured console logs            |
+| Tool                    | Input Schema                                                      | Description                           |
+| ----------------------- | ----------------------------------------------------------------- | ------------------------------------- |
+| `ios_device_list`       | `{}`                                                              | List available simulators             |
+| `ios_launch`            | `{ device: string }`                                              | Boot simulator + start Safari         |
+| `ios_close`             | `{}`                                                              | Release lease, shutdown if last       |
+| `ios_navigate`          | `{ url: string }`                                                 | Navigate Safari to URL                |
+| `ios_back`              | `{}`                                                              | Navigate back                         |
+| `ios_forward`           | `{}`                                                              | Navigate forward                      |
+| `ios_reload`            | `{}`                                                              | Reload page                           |
+| `ios_snapshot`          | `{ interactive?: bool, cursor?: bool, compact?: bool }`           | **Same a11y tree + refs** as desktop  |
+| `ios_get_text`          | `TargetSchema`                                                    | Get text content                      |
+| `ios_get_html`          | `TargetSchema + { outer?: bool }`                                 | Get HTML content                      |
+| `ios_screenshot`        | `{}`                                                              | Capture screenshot (base64 PNG)       |
+| `ios_tap`               | `TargetSchema`                                                    | Tap element (touch)                   |
+| `ios_fill`              | `TargetSchema + { value: string }`                                | Clear + fill input field              |
+| `ios_type`              | `TargetSchema + { text: string }`                                 | Append text with keyboard events      |
+| `ios_select`            | `TargetSchema + { values: string[] }`                             | Select dropdown option(s)             |
+| `ios_check`             | `TargetSchema`                                                    | Check checkbox (no-op if checked)     |
+| `ios_uncheck`           | `TargetSchema`                                                    | Uncheck checkbox (no-op if unchecked) |
+| `ios_swipe`             | `{ direction: string, target?: TargetSchema, duration?: number }` | **iOS-native swipe gesture**          |
+| `ios_scroll`            | `{ direction: string, amount?: number }`                          | Scroll via JS `window.scrollBy`       |
+| `ios_eval`              | `{ script: string }`                                              | Execute JavaScript in Safari          |
+| `ios_wait_for_selector` | `{ selector: string, state?: string, timeout?: number }`          | Wait for element                      |
+| `ios_console_logs`      | `{ level?: "error" \| "warn" \| "info" \| "log" }`                | Get captured console logs             |
 
 ### Phase 8: Wire iOS MCP Server Into Agent
 
@@ -919,14 +923,14 @@ These are external CLI tools installed outside the project. They do NOT use the 
 | `src-tauri/src/commands/browser/orbit_runtime.js`                | **CREATE** | ~600 line JS runtime (snapshot w/ epoch, WeakRef, shadow DOM, iframes, interactions)       |
 | `src-tauri/src/commands/browser/mod.rs`                          | **MODIFY** | Add `initialization_script`, increase size limit to 500KB w/ truncation, add wait commands |
 | `src-tauri/src/lib.rs`                                           | **MODIFY** | Register new `browser_wait_*` commands                                                     |
-| `agent-bridge/src/browser/browser-mcp-server.ts`                 | **MODIFY** | Add ~22 new tool definitions with `TargetSchema` (dual ref/selector input)                 |
+| `agent-bridge/src/browser/browser-mcp-server.ts`                 | **MODIFY** | Add 25 new tool definitions with `TargetSchema` (dual ref/selector input), 13 → 38 total   |
 | `agent-bridge/src/browser/browser-tool-bridge.ts`                | **MODIFY** | Add `AsyncQueue` for stateful tool serialization, per-tool timeout config                  |
 | `agent-bridge/src/browser/types.ts`                              | **MODIFY** | Add new tool types, `TargetSchema`                                                         |
-| `apps/agent/src/hooks/agent/handlers/browser-tool-handler.ts`    | **MODIFY** | Add ~22 new handler cases, `ensureOrbitRuntime()` with version check                       |
+| `apps/agent/src/hooks/agent/handlers/browser-tool-handler.ts`    | **MODIFY** | Add 25 new handler cases, `ensureOrbitRuntime()` with version check                        |
 | `apps/agent/src/lib/api/browser.ts`                              | **MODIFY** | Add `browserWaitForSelector` invoke wrapper                                                |
 | `agent-bridge/src/__tests__/browser-ref-flow.test.ts`            | **CREATE** | Snapshot → ref → click, selector fallback, dual-input tests                                |
 | `agent-bridge/src/__tests__/browser-ref-epoch.test.ts`           | **CREATE** | Stale ref detection, epoch increment on navigation                                         |
-| `agent-bridge/src/__tests__/browser-backward-compat.test.ts`     | **CREATE** | All 13 existing tools work with selector-only input                                        |
+| `agent-bridge/src/__tests__/browser-backward-compat.test.ts`     | **CREATE** | All 13 existing tools preserve current inputs; 4 element tools still accept selector-only  |
 | `agent-bridge/src/__tests__/browser-snapshot-truncation.test.ts` | **CREATE** | Large DOM truncation, payload size enforcement                                             |
 | `agent-bridge/src/__tests__/browser-timeout.test.ts`             | **CREATE** | Per-tool timeout enforcement, error diagnostics                                            |
 
@@ -983,15 +987,15 @@ The manual verification below is SUPPLEMENTARY. The following automated tests ar
 
 #### Desktop Browser — Automated Tests
 
-| Test File                                                                | Runner     | What it covers                                                                                                                    |
-| ------------------------------------------------------------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `agent-bridge/src/__tests__/browser-ref-flow.test.ts`                    | Bun test   | Snapshot → ref assignment → click by ref → verify state change. Selector fallback. Dual-input (`ref` + `selector`) normalization. |
-| `agent-bridge/src/__tests__/browser-ref-epoch.test.ts`                   | Bun test   | Stale ref detection after epoch change. Epoch increment on navigation. Error messages for stale refs.                             |
-| `agent-bridge/src/__tests__/browser-backward-compat.test.ts`             | Bun test   | All 13 existing browser tools still work with `selector`-only input. No regressions.                                              |
-| `agent-bridge/src/__tests__/browser-snapshot-truncation.test.ts`         | Bun test   | Large DOM → truncation at depth limit. Truncation stats in response. Payload under 500KB.                                         |
-| `agent-bridge/src/__tests__/browser-timeout.test.ts`                     | Bun test   | Per-tool timeout enforcement. Timeout error includes tool name + elapsed time.                                                    |
-| `apps/agent/src/__tests__/unit/hooks/agent/browser-tool-handler.test.ts` | Vitest     | Updated: new tool handler cases, `ensureOrbitRuntime()` version check, CSP error path.                                            |
-| `src-tauri/src/commands/browser/tests.rs`                                | Cargo test | `orbit_runtime.js` inclusion. Dual-channel transport (URL path ≤100KB, event path ≤500KB). Wait command serialization.            |
+| Test File                                                                | Runner     | What it covers                                                                                                                                 |
+| ------------------------------------------------------------------------ | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-bridge/src/__tests__/browser-ref-flow.test.ts`                    | Bun test   | Snapshot → ref assignment → click by ref → verify state change. Selector fallback. Dual-input (`ref` + `selector`) normalization.              |
+| `agent-bridge/src/__tests__/browser-ref-epoch.test.ts`                   | Bun test   | Stale ref detection after epoch change. Epoch increment on navigation. Error messages for stale refs.                                          |
+| `agent-bridge/src/__tests__/browser-backward-compat.test.ts`             | Bun test   | All 13 existing tools preserve current inputs. 4 element-targeting tools accept selector-only. `browser_type` append behavior change verified. |
+| `agent-bridge/src/__tests__/browser-snapshot-truncation.test.ts`         | Bun test   | Large DOM → truncation at depth limit. Truncation stats in response. Payload under 500KB.                                                      |
+| `agent-bridge/src/__tests__/browser-timeout.test.ts`                     | Bun test   | Per-tool timeout enforcement. Timeout error includes tool name + elapsed time.                                                                 |
+| `apps/agent/src/__tests__/unit/hooks/agent/browser-tool-handler.test.ts` | Vitest     | Updated: new tool handler cases, `ensureOrbitRuntime()` version check, CSP error path.                                                         |
+| `src-tauri/src/commands/browser/tests.rs`                                | Cargo test | `orbit_runtime.js` inclusion. Dual-channel transport (URL path ≤100KB, event path ≤500KB). Wait command serialization.                         |
 
 #### iOS Simulator — Automated Tests (local-gated)
 
@@ -1047,25 +1051,25 @@ All from **repo root** unless otherwise noted:
 
 All 17 edge cases from all three audits have been addressed:
 
-| Edge Case                                                      | Where Addressed                                         | Handling                                                                                                                        |
-| -------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| **Stale refs after navigation/DOM mutation**                   | Phase 1.1 (ref epoch + scoped invalidation)             | Epoch increments on navigation + snapshot. DOM mutations use lazy validation (WeakRef + isConnected) — no over-invalidation     |
-| **Concurrent tool execution with shared ref state**            | Phase 3 (request serialization)                         | `AsyncQueue` serializes stateful tools. Read-only tools run concurrently                                                        |
-| **CSP/page constraints block runtime injection**               | Phase 1.2 (injection strategy, CSP handling)            | Catch injection error → diagnostic message. Snapshot degrades to URL+title only                                                 |
-| **iframes/shadow DOM**                                         | Phase 1.1 (snapshot engine)                             | Same-origin iframes: recursive walk. Shadow DOM: open roots walked. Cross-origin/closed: marked opaque in output                |
-| **Appium already running with incompatible state/version**     | Phase 6.3 (Appium lifecycle)                            | Version check on existing Appium. Match → reuse. Mismatch → throw with both versions                                            |
-| **Port 4723 already occupied**                                 | Phase 6.3 (Appium lifecycle)                            | Scan ports 4723–4729. All occupied → throw with PID diagnostics                                                                 |
-| **Session deletion during `ios_launch`**                       | Phase 6.2 (IOSManager lifecycle)                        | `AbortController` cancels in-progress launch. Partial resources cleaned up by `close()`                                         |
-| **Non-macOS hosts**                                            | Part B (platform gating)                                | `canEnableIOS()` checks `process.platform === 'darwin'`. iOS tools never registered on other platforms                          |
-| **Snapshot payload exceeds transport limits**                  | Phase 4 (dual-channel transport)                        | Small payloads use fast URL path. Large payloads use Tauri event channel. Truncation as defense-in-depth                        |
-| **Two sessions both using iOS, one closes**                    | IOSService (lease model)                                | `release()` only triggers shutdown when `leaseholders.size === 0`. Session A's close is a no-op while B holds a lease           |
-| **App shutdown while async iOS teardown in flight**            | index.ts (async gracefulShutdown)                       | `gracefulShutdown` awaits `iosService.dispose()` then starts grace timer. SIGKILL escalation for hung Appium                    |
-| **Snapshot under 500KB but exceeds URL callback limits**       | Phase 4 (dual-channel transport)                        | `SMALL_LIMIT = 100KB` stays on URL path. 100KB–500KB uses Tauri event channel. Never encodes large payloads as URLs             |
-| **Dynamic SPAs causing frequent epoch invalidation**           | Phase 1.1 (scoped invalidation)                         | Epoch does NOT increment on DOM mutations. Refs validated lazily via WeakRef + isConnected. Stable between snapshots            |
-| **iOS prerequisites disappear mid-session**                    | IOSManager + IOSService                                 | Dead Appium detected on next tool call → clear error → agent decides to retry `ios_launch` or report failure                    |
-| **`large=true` URL arrives but event payload dropped/delayed** | Phase 4 (large-result handshake timeout)                | Existing `JS_EVAL_TIMEOUT` covers both channels. Event listener ignores stale evalIds. Timeout → clear transport error          |
-| **Session crashes after iOS lease acquire, before release**    | IOSService (`forceRelease`) + session-manager `finally` | `deleteSession` uses `try/finally` to guarantee `forceRelease`. `dispose()` iterates all sessions. `forceRelease` is idempotent |
-| **`capability:ios` event with no frontend handler**            | Phase 8 (removed from scope)                            | No `capability:ios` event emitted. iOS availability discoverable via MCP tool list presence                                     |
+| Edge Case                                                      | Where Addressed                                         | Handling                                                                                                                                           |
+| -------------------------------------------------------------- | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stale refs after navigation/DOM mutation**                   | Phase 1.1 (ref epoch + scoped invalidation)             | Epoch increments on navigation + snapshot. DOM mutations use lazy validation (WeakRef + isConnected) — no over-invalidation                        |
+| **Concurrent tool execution with shared ref state**            | Phase 3 (request serialization)                         | `AsyncQueue` serializes stateful tools. Read-only tools run concurrently                                                                           |
+| **CSP/page constraints block runtime injection**               | Phase 1.2 (injection strategy, CSP handling)            | Catch injection error → diagnostic message. Snapshot degrades to URL only (title empty until `BrowserInfo` extension). `browser_eval` still works. |
+| **iframes/shadow DOM**                                         | Phase 1.1 (snapshot engine)                             | Same-origin iframes: recursive walk. Shadow DOM: open roots walked. Cross-origin/closed: marked opaque in output                                   |
+| **Appium already running with incompatible state/version**     | Phase 6.3 (Appium lifecycle)                            | Version check on existing Appium. Match → reuse. Mismatch → throw with both versions                                                               |
+| **Port 4723 already occupied**                                 | Phase 6.3 (Appium lifecycle)                            | Scan ports 4723–4729. All occupied → throw with PID diagnostics                                                                                    |
+| **Session deletion during `ios_launch`**                       | Phase 6.2 (IOSManager lifecycle)                        | `AbortController` cancels in-progress launch. Partial resources cleaned up by `close()`                                                            |
+| **Non-macOS hosts**                                            | Part B (platform gating)                                | `canEnableIOS()` checks `process.platform === 'darwin'`. iOS tools never registered on other platforms                                             |
+| **Snapshot payload exceeds transport limits**                  | Phase 4 (dual-channel transport)                        | Small payloads use fast URL path. Large payloads use Tauri event channel. Truncation as defense-in-depth                                           |
+| **Two sessions both using iOS, one closes**                    | IOSService (lease model)                                | `release()` only triggers shutdown when `leaseholders.size === 0`. Session A's close is a no-op while B holds a lease                              |
+| **App shutdown while async iOS teardown in flight**            | index.ts (async gracefulShutdown)                       | `gracefulShutdown` awaits `iosService.dispose()` then starts grace timer. SIGKILL escalation for hung Appium                                       |
+| **Snapshot under 500KB but exceeds URL callback limits**       | Phase 4 (dual-channel transport)                        | `SMALL_LIMIT = 100KB` stays on URL path. 100KB–500KB uses Tauri event channel. Never encodes large payloads as URLs                                |
+| **Dynamic SPAs causing frequent epoch invalidation**           | Phase 1.1 (scoped invalidation)                         | Epoch does NOT increment on DOM mutations. Refs validated lazily via WeakRef + isConnected. Stable between snapshots                               |
+| **iOS prerequisites disappear mid-session**                    | IOSManager + IOSService                                 | Dead Appium detected on next tool call → clear error → agent decides to retry `ios_launch` or report failure                                       |
+| **`large=true` URL arrives but event payload dropped/delayed** | Phase 4 (large-result handshake timeout)                | Existing `JS_EVAL_TIMEOUT` covers both channels. Event listener ignores stale evalIds. Timeout → clear transport error                             |
+| **Session crashes after iOS lease acquire, before release**    | IOSService (`forceRelease`) + session-manager `finally` | `deleteSession` uses `try/finally` to guarantee `forceRelease`. `dispose()` iterates all sessions. `forceRelease` is idempotent                    |
+| **`capability:ios` event with no frontend handler**            | Phase 8 (removed from scope)                            | No `capability:ios` event emitted. iOS availability discoverable via MCP tool list presence                                                        |
 
 ---
 
@@ -1081,11 +1085,10 @@ All 17 edge cases from all three audits have been addressed:
 
 ## What We're NOT Doing (Deferred)
 
-- Pixel screenshots on desktop (requires `WKWebView.takeSnapshot` via objc)
+- Annotated pixel screenshots with element overlays (basic `browser_screenshot` via `WKWebView.takeSnapshot` already exists and is in scope; only annotated overlay screenshots are deferred)
 - PDF generation (requires `WKWebView.createPDF` via objc)
 - Multi-tab support (architecture change)
 - Real iOS device support (requires USB + signing — needs separate setup flow)
 - iOS video recording (Appium supports but adds complexity)
 - iOS multi-touch gestures (Appium supports but not needed yet)
 - iOS network throttling (Appium plugin available)
-- Annotated screenshots with pixel capture (DOM overlay works, but pixel capture needs native)

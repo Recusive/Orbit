@@ -67,10 +67,11 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::webview::{PageLoadEvent, PageLoadPayload, WebviewWindowBuilder};
 use tauri::{
-    AppHandle, Emitter as _, LogicalPosition, LogicalSize, Manager as _, State, WebviewUrl,
+    AppHandle, Emitter as _, Listener as _, LogicalPosition, LogicalSize, Manager as _, State,
+    WebviewUrl,
 };
 use tokio::sync::oneshot;
-use tokio::time::{sleep, timeout};
+use tokio::time::{interval, sleep, timeout};
 use uuid::Uuid;
 
 use crate::core::sentry_utils::SentryCapture as _;
@@ -111,9 +112,35 @@ fn to_screen_coords(
 
 /// Timeout for waiting on JavaScript evaluation results.
 const JS_EVAL_TIMEOUT: Duration = Duration::from_secs(30);
+const SMALL_EVAL_RESULT_LIMIT_CHARS: usize = 100_000;
+const LARGE_EVAL_RESULT_LIMIT_CHARS: usize = 500_000;
+const DEFAULT_WAIT_TIMEOUT_MS: u64 = 30_000;
+const MAX_WAIT_TIMEOUT_MS: u64 = 120_000;
+const WAIT_POLL_INTERVAL_MS: u64 = 100;
 
 /// The label for the browser window.
 const BROWSER_WINDOW_LABEL: &str = "browser-window";
+const LARGE_EVAL_TIMEOUT_MESSAGE: &str =
+    "Large eval result not received within timeout. The page may have navigated or script execution was interrupted.";
+const BROWSER_BOOTSTRAP_SCRIPT: &str = concat!(
+    include_str!("browser_init.js"),
+    "\n",
+    include_str!("orbit_runtime.js"),
+    "\n",
+    r#"
+(function () {
+    window.__orbit_eval_channel = window.__orbit_eval_channel || {
+        async postResult(evalId, data) {
+            const emitter = window.__TAURI__?.event?.emit;
+            if (typeof emitter !== 'function') {
+                throw new Error('Large eval result transport unavailable.');
+            }
+            await emitter('browser:eval-large-result', { evalId, data });
+        },
+    };
+})();
+"#
+);
 
 /// Max tracked screenshot files per browser session.
 ///
@@ -138,6 +165,7 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
     if let Some(query) = url.query() {
         let mut id = None;
         let mut success = false;
+        let mut large = false;
         let mut data = None;
         let mut error = None;
 
@@ -146,6 +174,7 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
                 match key {
                     "id" => id = Some(value.to_owned()),
                     "success" => success = value == "true",
+                    "large" => large = value == "true",
                     "data" => {
                         if let Ok(decoded) = urlencoding::decode(value) {
                             data = Some(decoded.into_owned());
@@ -163,7 +192,11 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
 
         if let Some(req_id) = id {
             if success {
-                result_state.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
+                if large {
+                    result_state.mark_awaiting_large_payload(&req_id);
+                } else {
+                    result_state.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
+                }
             } else {
                 result_state
                     .complete_err(&req_id, error.unwrap_or_else(|| "Unknown error".to_owned()));
@@ -175,6 +208,16 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
         log::warn!("Malformed eval result URL: no query string in {url_str}");
     }
     true
+}
+
+/// Register the large-result event listener used by `browser_eval`.
+pub fn register_browser_large_eval_result_listener(
+    app: &AppHandle,
+    result_state: Arc<BrowserResultState>,
+) {
+    let _ = app.listen_any("browser:eval-large-result", move |event| {
+        handle_large_eval_result_payload(event.payload(), &result_state);
+    });
 }
 
 /// Handle an `orbit-eval://element-selected?data=...` navigation callback.
@@ -221,6 +264,28 @@ pub struct BrowserNavigatedPayload {
 pub struct BrowserLoadingPayload {
     /// Whether the page is currently loading.
     pub is_loading: bool,
+}
+
+#[derive(Debug)]
+struct PendingEvalRequest {
+    sender: oneshot::Sender<StdResult<String, String>>,
+    awaiting_large_payload: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct LargeEvalResultPayload {
+    #[serde(rename = "evalId")]
+    eval_id: String,
+    data: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UrlWaitResult {
+    matched: bool,
+    #[serde(rename = "currentUrl")]
+    current_url: String,
+    #[serde(rename = "regexError")]
+    regex_error: Option<String>,
 }
 
 /// State for managing the browser child window.
@@ -295,7 +360,7 @@ struct BrowserBounds {
 #[derive(Debug, Default)]
 pub struct BrowserResultState {
     /// Map of pending evaluation request IDs to their result senders.
-    pending: Mutex<HashMap<String, oneshot::Sender<StdResult<String, String>>>>,
+    pending: Mutex<HashMap<String, PendingEvalRequest>>,
 }
 
 impl BrowserResultState {
@@ -308,15 +373,21 @@ impl BrowserResultState {
     /// Register a new evaluation request and return the receiver.
     pub fn register(&self, id: String) -> oneshot::Receiver<StdResult<String, String>> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.pending.lock().insert(id, tx);
+        let _ = self.pending.lock().insert(
+            id,
+            PendingEvalRequest {
+                sender: tx,
+                awaiting_large_payload: false,
+            },
+        );
         rx
     }
 
     /// Complete an evaluation request with a successful result.
     pub fn complete_ok(&self, id: &str, result: String) {
-        let maybe_tx = self.pending.lock().remove(id);
-        if let Some(tx) = maybe_tx {
-            let _ = tx.send(Ok(result));
+        let maybe_pending = self.pending.lock().remove(id);
+        if let Some(pending) = maybe_pending {
+            let _ = pending.sender.send(Ok(result));
         } else {
             log::warn!("Received result for unknown eval request: {id}");
         }
@@ -324,17 +395,45 @@ impl BrowserResultState {
 
     /// Complete an evaluation request with an error.
     pub fn complete_err(&self, id: &str, error: String) {
-        let maybe_tx = self.pending.lock().remove(id);
-        if let Some(tx) = maybe_tx {
-            let _ = tx.send(Err(error));
+        let maybe_pending = self.pending.lock().remove(id);
+        if let Some(pending) = maybe_pending {
+            let _ = pending.sender.send(Err(error));
         } else {
             log::warn!("Received error for unknown eval request: {id}");
         }
     }
 
+    /// Mark a pending request as waiting for a large event payload.
+    pub fn mark_awaiting_large_payload(&self, id: &str) {
+        if let Some(pending) = self.pending.lock().get_mut(id) {
+            pending.awaiting_large_payload = true;
+        } else {
+            log::warn!("Received large-result marker for unknown eval request: {id}");
+        }
+    }
+
     /// Cancel a pending evaluation request.
-    pub fn cancel(&self, id: &str) {
-        let _ = self.pending.lock().remove(id);
+    #[must_use]
+    pub fn cancel(&self, id: &str) -> bool {
+        self.pending
+            .lock()
+            .remove(id)
+            .is_some_and(|pending| pending.awaiting_large_payload)
+    }
+}
+
+fn handle_large_eval_result_payload(payload: &str, result_state: &BrowserResultState) {
+    match serde_json::from_str::<LargeEvalResultPayload>(payload) {
+        Ok(message) => result_state.complete_ok(&message.eval_id, message.data),
+        Err(error) => log::warn!("Failed to parse browser:eval-large-result payload: {error}"),
+    }
+}
+
+#[must_use]
+fn normalize_wait_timeout(timeout_ms: Option<u64>) -> Duration {
+    match timeout_ms {
+        Some(0) | None => Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS),
+        Some(value) => Duration::from_millis(value.min(MAX_WAIT_TIMEOUT_MS)),
     }
 }
 
@@ -419,8 +518,9 @@ pub async fn browser_create(
         .position(screen_x, screen_y)
         // Don't show in taskbar/dock as separate window
         .skip_taskbar(true)
-        // Initialization script to block DevTools shortcuts in the browser
-        .initialization_script(include_str!("browser_init.js"))
+        // Initialization script to block DevTools shortcuts, preload the
+        // Orbit runtime, and install the large-eval result transport hook.
+        .initialization_script(BROWSER_BOOTSTRAP_SCRIPT)
         // Navigation handler for eval result interception
         .on_navigation(move |url: &tauri::Url| {
             // Intercept orbit-eval:// callback URLs (eval results, element selection)
@@ -667,6 +767,15 @@ pub async fn browser_eval(
     state: State<'_, Arc<BrowserWindowState>>,
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
+    browser_eval_inner(&script, &app, &state, &result_state).await
+}
+
+async fn browser_eval_inner(
+    script: &str,
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
     if !*state.exists.lock() {
         return Err("No browser exists".to_owned());
     }
@@ -687,7 +796,7 @@ pub async fn browser_eval(
     //
     // Code review cycle 1, issue #12: Previously used direct format!() interpolation
     // which was vulnerable to script breakout attacks.
-    let script_json = serde_json::to_string(&script).unwrap_or_else(|_| {
+    let script_json = serde_json::to_string(script).unwrap_or_else(|_| {
         // Fallback: manual escaping for edge cases (should never happen with valid UTF-8)
         format!(
             "\"{}\"",
@@ -706,24 +815,38 @@ pub async fn browser_eval(
             try {{
                 const __result = await (new Function(__scriptSource))();
                 const __json = JSON.stringify(__result ?? null);
-                if (__json.length > 100000) {{
-                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 100000)`);
+                if (__json.length <= {small_limit}) {{
+                    const __data = encodeURIComponent(__json);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
+                    return;
+                }}
+                if (__json.length <= {large_limit}) {{
+                    const __channel = window.__orbit_eval_channel;
+                    if (!__channel || typeof __channel.postResult !== 'function') {{
+                        throw new Error('Large eval result transport unavailable.');
+                    }}
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&large=true`;
+                    await __channel.postResult(__evalId, __json);
+                    return;
+                }}
+                {{
+                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 500000). Use compact:true or target a subtree.`);
                     window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
                     return;
                 }}
-                const __data = encodeURIComponent(__json);
-                window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
             }} catch (__error) {{
                 const __errorMsg = encodeURIComponent(__error.message || String(__error));
                 window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
             }}
         }})();",
         eval_id_json = serde_json::to_string(&eval_id).unwrap_or_else(|_| format!("\"{eval_id}\"")),
-        script_json = script_json
+        script_json = script_json,
+        small_limit = SMALL_EVAL_RESULT_LIMIT_CHARS,
+        large_limit = LARGE_EVAL_RESULT_LIMIT_CHARS,
     );
 
     if let Err(e) = window.eval(&wrapped_script) {
-        result_state.cancel(&eval_id);
+        let _ = result_state.cancel(&eval_id);
         return Err(format!("JavaScript execution failed: {e}"));
     }
 
@@ -732,11 +855,15 @@ pub async fn browser_eval(
         Ok(Ok(Err(err))) => Err(err),
         Ok(Err(_)) => Err("JavaScript evaluation was cancelled".to_owned()),
         Err(_) => {
-            result_state.cancel(&eval_id);
-            Err(format!(
-                "JavaScript evaluation timed out after {} seconds",
-                JS_EVAL_TIMEOUT.as_secs()
-            ))
+            let awaiting_large_payload = result_state.cancel(&eval_id);
+            if awaiting_large_payload {
+                Err(LARGE_EVAL_TIMEOUT_MESSAGE.to_owned())
+            } else {
+                Err(format!(
+                    "JavaScript evaluation timed out after {} seconds",
+                    JS_EVAL_TIMEOUT.as_secs()
+                ))
+            }
         },
     }
 }
@@ -1146,6 +1273,157 @@ pub async fn browser_eval_async(
     browser_eval(script, app, state, result_state).await
 }
 
+fn build_wait_for_selector_script(selector: &str, state: &str) -> Result<String> {
+    let selector_json =
+        serde_json::to_string(selector).map_err(|e| format!("Invalid selector: {e}"))?;
+    let state_json = serde_json::to_string(state).map_err(|e| format!("Invalid state: {e}"))?;
+
+    Ok(format!(
+        "return (() => {{
+            const element = document.querySelector({selector_json});
+            const desiredState = {state_json};
+            const isVisible = (node) => {{
+                if (!(node instanceof Element)) {{
+                    return false;
+                }}
+                const style = window.getComputedStyle(node);
+                if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) {{
+                    return false;
+                }}
+                const rect = node.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            }};
+
+            switch (desiredState) {{
+                case 'attached':
+                    return element !== null;
+                case 'detached':
+                    return element === null;
+                case 'hidden':
+                    return element !== null && !isVisible(element);
+                case 'visible':
+                    return element !== null && isVisible(element);
+                default:
+                    throw new Error(`Invalid wait state: ${{desiredState}}`);
+            }}
+        }})();"
+    ))
+}
+
+fn build_wait_for_url_script(url_pattern: &str) -> Result<String> {
+    let pattern_json =
+        serde_json::to_string(url_pattern).map_err(|e| format!("Invalid URL pattern: {e}"))?;
+
+    Ok(format!(
+        "return (() => {{
+            const currentUrl = location.href;
+            const pattern = {pattern_json};
+            const lastSlash = pattern.lastIndexOf('/');
+            const looksLikeRegex = pattern.startsWith('/') && lastSlash > 0;
+
+            if (looksLikeRegex) {{
+                const source = pattern.slice(1, lastSlash);
+                const flags = pattern.slice(lastSlash + 1);
+                try {{
+                    const regex = new RegExp(source, flags);
+                    return {{
+                        matched: regex.test(currentUrl),
+                        currentUrl,
+                        regexError: null,
+                    }};
+                }} catch (error) {{
+                    return {{
+                        matched: false,
+                        currentUrl,
+                        regexError: error?.message || String(error),
+                    }};
+                }}
+            }}
+
+            return {{
+                matched: currentUrl === pattern,
+                currentUrl,
+                regexError: null,
+            }};
+        }})();"
+    ))
+}
+
+/// Wait until a selector reaches the requested DOM state.
+#[tauri::command]
+pub async fn browser_wait_for_selector(
+    selector: String,
+    state: Option<String>,
+    timeout: Option<u64>,
+    app: AppHandle,
+    browser_state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let desired_state = state.unwrap_or_else(|| "visible".to_owned());
+    let timeout_duration = normalize_wait_timeout(timeout);
+    let poll_script = build_wait_for_selector_script(&selector, &desired_state)?;
+    let poll_interval = Duration::from_millis(WAIT_POLL_INTERVAL_MS);
+    let started_at = Instant::now();
+    let mut ticker = interval(poll_interval);
+
+    loop {
+        let raw = browser_eval_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let matched = serde_json::from_str::<bool>(&raw)
+            .map_err(|e| format!("Failed to parse selector wait result: {e}"))?;
+        if matched {
+            return Ok(());
+        }
+
+        if started_at.elapsed() >= timeout_duration {
+            return Err(format!(
+                "browser_wait_for_selector: selector '{selector}' not found after {}ms (state: {desired_state})",
+                timeout_duration.as_millis()
+            ));
+        }
+
+        let _ = ticker.tick().await;
+    }
+}
+
+/// Wait until the current browser URL matches an exact string or regex pattern.
+#[tauri::command]
+pub async fn browser_wait_for_url(
+    url: String,
+    timeout: Option<u64>,
+    app: AppHandle,
+    browser_state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let timeout_duration = normalize_wait_timeout(timeout);
+    let poll_script = build_wait_for_url_script(&url)?;
+    let poll_interval = Duration::from_millis(WAIT_POLL_INTERVAL_MS);
+    let started_at = Instant::now();
+    let mut ticker = interval(poll_interval);
+
+    loop {
+        let raw = browser_eval_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let poll_result = serde_json::from_str::<UrlWaitResult>(&raw)
+            .map_err(|e| format!("Failed to parse URL wait result: {e}"))?;
+
+        if let Some(error) = poll_result.regex_error {
+            return Err(format!("Invalid URL pattern: {error}"));
+        }
+        if poll_result.matched {
+            return Ok(());
+        }
+
+        if started_at.elapsed() >= timeout_duration {
+            return Err(format!(
+                "browser_wait_for_url: URL did not match '{url}' after {}ms (current: {})",
+                timeout_duration.as_millis(),
+                poll_result.current_url
+            ));
+        }
+
+        let _ = ticker.tick().await;
+    }
+}
+
 #[cfg(test)]
 mod screenshot_cleanup_tests {
     use super::*;
@@ -1228,5 +1506,76 @@ mod screenshot_cleanup_tests {
         let state = make_state();
         cleanup_screenshot_files(&state).await;
         assert!(state.screenshot_files.lock().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod eval_result_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn handle_eval_result_url_completes_small_results() {
+        let state = BrowserResultState::new();
+        let receiver = state.register("req-small".to_owned());
+        let url = tauri::Url::parse(
+            "orbit-eval://result?id=req-small&success=true&data=%7B%22ok%22%3Atrue%7D",
+        );
+        assert!(url.is_ok());
+        let Some(url) = url.ok() else {
+            return;
+        };
+
+        assert!(handle_eval_result_url(&url, &state));
+
+        let result = receiver.await;
+        assert!(result.is_ok());
+        let Some(result) = result.ok() else {
+            return;
+        };
+        assert_eq!(result, Ok("{\"ok\":true}".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn large_result_flow_waits_for_event_payload() {
+        let state = BrowserResultState::new();
+        let receiver = state.register("req-large".to_owned());
+        let url = tauri::Url::parse("orbit-eval://result?id=req-large&success=true&large=true");
+        assert!(url.is_ok());
+        let Some(url) = url.ok() else {
+            return;
+        };
+
+        assert!(handle_eval_result_url(&url, &state));
+        handle_large_eval_result_payload(
+            r#"{"evalId":"req-large","data":"{\"snapshot\":true}"}"#,
+            &state,
+        );
+
+        let result = receiver.await;
+        assert!(result.is_ok());
+        let Some(result) = result.ok() else {
+            return;
+        };
+        assert_eq!(result, Ok("{\"snapshot\":true}".to_owned()));
+    }
+
+    #[test]
+    fn normalize_wait_timeout_uses_default_and_cap() {
+        assert_eq!(
+            normalize_wait_timeout(None),
+            Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(0)),
+            Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(MAX_WAIT_TIMEOUT_MS + 5_000)),
+            Duration::from_millis(MAX_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(42_000)),
+            Duration::from_millis(42_000)
+        );
     }
 }

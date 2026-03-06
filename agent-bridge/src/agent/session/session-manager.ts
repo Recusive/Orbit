@@ -16,11 +16,13 @@ import { ClaudeCredentials } from '../../common/auth/credentials.js'; // [oauth-
 import { TextEventBatcher } from '../../common/batching/index.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
+import { createIOSMcpServer } from '../../ios/index.js';
 import { OrbitAgent } from '../core/agent.js';
 
 import { getStorageDirPath, getStoredSessionsSnapshot } from './session-storage.js';
 
 import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
+import type { IOSService } from '../../ios/ios-service.js';
 import type { OrbitAgentConfig } from '../core/agent.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
 
@@ -195,6 +197,10 @@ export interface SessionConfig {
   resumeSessionAt?: string;
   /** Whether to fork the session (create new branch) vs continue original */
   forkSession?: boolean;
+}
+
+interface SessionManagerOptions {
+  iosService?: IOSService;
 }
 
 /**
@@ -898,6 +904,7 @@ export class SessionManager extends Disposable {
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
   private browserToolUnsubscribers = new Map<string, () => void>();
+  private readonly iosService?: IOSService;
 
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
@@ -906,8 +913,9 @@ export class SessionManager extends Disposable {
   // and results all share the same messageId for proper UI interleaving.
   private currentTurnId = new Map<string, string>();
 
-  constructor() {
+  constructor(options: SessionManagerOptions = {}) {
     super();
+    this.iosService = options.iosService;
 
     // Initialize text batcher - fires batched text events every 16ms (~1 frame)
     // Keep backend batching minimal; frontend RAF batching handles render smoothness.
@@ -969,6 +977,10 @@ export class SessionManager extends Disposable {
 
   /**
    * Create a new agent session
+   *
+   * [warning] TESTED: This function is covered by integration-style session wiring tests.
+   *     If you modify this, run: cd agent-bridge && bun test
+   *     Test file: src/__tests__/ios-session-wiring.test.ts
    */
   async createSession(sessionId: string, config?: SessionConfig): Promise<void> {
     if (this.activeSessions.has(sessionId)) {
@@ -1090,6 +1102,13 @@ export class SessionManager extends Disposable {
         });
       },
     };
+
+    if (this.iosService) {
+      finalConfig.mcpServers = {
+        ...(finalConfig.mcpServers ?? {}),
+        'orbit-ios': createIOSMcpServer(this.iosService, sessionId),
+      };
+    }
 
     logger.info(
       {
@@ -1777,10 +1796,21 @@ export class SessionManager extends Disposable {
     }
 
     const agent = this.activeSessions.get(sessionId);
+    let stopError: unknown;
+
     if (agent) {
-      await agent.stopSession();
-      this.activeSessions.delete(sessionId);
+      try {
+        await agent.stopSession();
+      } catch (error) {
+        stopError = error;
+      }
     }
+
+    this.activeSessions.delete(sessionId);
+
+    await this.iosService?.forceRelease(sessionId).catch((error: unknown) => {
+      logger.warn({ sessionId, error }, 'iOS lease release failed during session deletion');
+    });
 
     this.pendingTools.delete(sessionId);
     this.approvedToolNames.delete(sessionId);
@@ -1788,6 +1818,13 @@ export class SessionManager extends Disposable {
     this.sessionInitFired.delete(sessionId);
     this.pendingDisplayNames.delete(sessionId);
     this.currentTurnId.delete(sessionId);
+
+    if (stopError !== undefined) {
+      if (stopError instanceof Error) {
+        throw stopError;
+      }
+      throw new Error('Session stop failed during deleteSession()', { cause: stopError });
+    }
   }
 
   /**
@@ -2605,47 +2642,89 @@ Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
     );
   }
 
+  async shutdownAsync(): Promise<void> {
+    if (this.isDisposed) {
+      return;
+    }
+
+    this.logContentLossIfNeeded();
+    this.textBatcher.destroy();
+    this.denyPendingPermissionRequests();
+    this.cancelSessionConsumers();
+    this.disposeBrowserToolSubscriptions();
+
+    for (const [sessionId, agent] of this.activeSessions.entries()) {
+      try {
+        await agent.stopSession();
+      } catch (error) {
+        logger.error({ sessionId, error }, 'Error stopping session');
+      }
+
+      await this.iosService?.release(sessionId).catch((error: unknown) => {
+        logger.warn({ sessionId, error }, 'iOS lease release failed during async shutdown');
+      });
+    }
+
+    this.activeSessions.clear();
+    super.dispose();
+  }
+
   /**
    * Dispose the session manager
    */
   override dispose(): void {
-    // Log content loss metrics on shutdown if any loss occurred
-    if (this.hasContentLoss()) {
-      logger.warn(
-        { metrics: this.contentLossMetrics },
-        'Content loss detected during session manager lifetime - this indicates SDK integration issues'
-      );
+    if (this.isDisposed) {
+      return;
     }
 
-    // Flush and destroy text batcher
+    this.logContentLossIfNeeded();
     this.textBatcher.destroy();
-
-    // Deny all pending permission requests
-    for (const [, resolver] of this.permissionResolvers.entries()) {
-      resolver({ decision: 'deny', always: false });
-    }
-    this.permissionResolvers.clear();
-
-    // Cancel all background consumers
-    for (const [, consumer] of this.sessionConsumers.entries()) {
-      consumer.cancel();
-    }
-    this.sessionConsumers.clear();
-
-    for (const [, unsubscribe] of this.browserToolUnsubscribers.entries()) {
-      unsubscribe();
-    }
-    this.browserToolUnsubscribers.clear();
+    this.denyPendingPermissionRequests();
+    this.cancelSessionConsumers();
+    this.disposeBrowserToolSubscriptions();
 
     // Stop all active sessions
     for (const [sessionId, agent] of this.activeSessions.entries()) {
       void agent.stopSession().catch((err: unknown) => {
         logger.error({ sessionId, error: err }, 'Error stopping session');
       });
+      void this.iosService?.forceRelease(sessionId).catch((error: unknown) => {
+        logger.warn({ sessionId, error }, 'iOS lease release failed during dispose');
+      });
     }
     this.activeSessions.clear();
 
     super.dispose();
+  }
+
+  private logContentLossIfNeeded(): void {
+    if (this.hasContentLoss()) {
+      logger.warn(
+        { metrics: this.contentLossMetrics },
+        'Content loss detected during session manager lifetime - this indicates SDK integration issues'
+      );
+    }
+  }
+
+  private denyPendingPermissionRequests(): void {
+    for (const [, resolver] of this.permissionResolvers.entries()) {
+      resolver({ decision: 'deny', always: false });
+    }
+    this.permissionResolvers.clear();
+  }
+
+  private cancelSessionConsumers(): void {
+    for (const [, consumer] of this.sessionConsumers.entries()) {
+      consumer.cancel();
+    }
+    this.sessionConsumers.clear();
+  }
+
+  private disposeBrowserToolSubscriptions(): void {
+    for (const [, unsubscribe] of this.browserToolUnsubscribers.entries()) {
+      unsubscribe();
+    }
+    this.browserToolUnsubscribers.clear();
   }
 }
 

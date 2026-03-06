@@ -15,6 +15,8 @@ const {
   mockBrowserReload,
   mockBrowserScreenshot,
   mockBrowserToolResponse,
+  mockBrowserWaitForSelector,
+  mockBrowserWaitForUrl,
 } = vi.hoisted(() => ({
   mockBrowserBack: vi.fn<[], Promise<void>>(),
   mockBrowserClose: vi.fn<[], Promise<void>>(),
@@ -27,6 +29,11 @@ const {
   mockBrowserReload: vi.fn<[], Promise<void>>(),
   mockBrowserScreenshot: vi.fn<[], Promise<string>>(),
   mockBrowserToolResponse: vi.fn<[string, unknown], Promise<void>>(),
+  mockBrowserWaitForSelector: vi.fn<
+    [string, string | undefined, number | undefined],
+    Promise<void>
+  >(),
+  mockBrowserWaitForUrl: vi.fn<[string, number | undefined], Promise<void>>(),
 }));
 
 const { mockRecordBrowserActivityFromAI } = vi.hoisted(() => ({
@@ -65,6 +72,8 @@ vi.mock('@/lib/api/browser', () => ({
   browserReload: mockBrowserReload,
   browserScreenshot: mockBrowserScreenshot,
   browserToolResponse: mockBrowserToolResponse,
+  browserWaitForSelector: mockBrowserWaitForSelector,
+  browserWaitForUrl: mockBrowserWaitForUrl,
 }));
 
 vi.mock('@/stores/browser/browser-store', () => ({
@@ -96,6 +105,8 @@ describe('browser-tool-handler', () => {
     mockBrowserHas.mockResolvedValue(true);
     mockBrowserNavigate.mockResolvedValue(undefined);
     mockBrowserInfo.mockResolvedValue(null);
+    mockBrowserWaitForSelector.mockResolvedValue(undefined);
+    mockBrowserWaitForUrl.mockResolvedValue(undefined);
   });
 
   describe('browser_screenshot', () => {
@@ -178,6 +189,124 @@ describe('browser-tool-handler', () => {
       expect(browserLifecycleStoreState.reset).toHaveBeenCalledTimes(1);
       expect(browserStoreState.setPendingNavigationUrl).toHaveBeenCalledWith('about:blank');
       expect(result.success).toBe(true);
+    });
+  });
+
+  describe('runtime-backed tools', () => {
+    it('browser_snapshot returns a degraded success payload when CSP blocks runtime injection', async () => {
+      mockBrowserInfo.mockResolvedValue({
+        label: 'browser-window',
+        url: 'https://example.com',
+        active: true,
+      });
+      mockBrowserEval
+        .mockResolvedValueOnce('false')
+        .mockResolvedValueOnce('null')
+        .mockRejectedValueOnce(new Error('CSP blocked inline script injection'));
+
+      const result = await executeBrowserTool('browser_snapshot', {});
+
+      expect(result.success).toBe(true);
+      expect(result.result).toEqual({
+        epoch: 1,
+        snapshot: '- document [CSP blocked — runtime could not be injected]',
+        refCount: 0,
+        totalElements: 0,
+        emittedElements: 0,
+        truncated: false,
+        url: 'https://example.com',
+        title: '',
+        durationMs: 0,
+      });
+    });
+
+    it('browser_runtime_info reports unavailable when no browser is open', async () => {
+      mockBrowserHas.mockResolvedValue(false);
+
+      const result = await executeBrowserTool('browser_runtime_info', {});
+
+      expect(result).toEqual({
+        success: true,
+        result: { available: false, reason: 'No browser open' },
+      });
+    });
+
+    it('re-injects the orbit runtime when the bundled version does not match', async () => {
+      mockBrowserEval
+        .mockResolvedValueOnce('false')
+        .mockResolvedValueOnce('"0.9.0"')
+        .mockResolvedValueOnce('"1.0.0"')
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            available: true,
+            version: '1.0.0',
+            epoch: 4,
+            capabilities: {
+              snapshot: true,
+              refResolution: true,
+              consoleCapture: true,
+              networkCapture: true,
+              storageAccess: true,
+            },
+          })
+        );
+
+      const result = await executeBrowserTool('browser_runtime_info', {});
+
+      expect(result).toEqual({
+        success: true,
+        result: {
+          available: true,
+          version: '1.0.0',
+          epoch: 4,
+          capabilities: {
+            snapshot: true,
+            refResolution: true,
+            consoleCapture: true,
+            networkCapture: true,
+            storageAccess: true,
+          },
+        },
+      });
+      expect(mockBrowserEval.mock.calls[2]?.[0]).toContain("const RUNTIME_VERSION = '1.0.0'");
+    });
+
+    it('browser_type selector fallback appends text instead of replacing the existing value', async () => {
+      mockBrowserEval.mockResolvedValueOnce('false').mockResolvedValueOnce('{"typed":true}');
+
+      const result = await executeBrowserTool('browser_type', {
+        selector: '#search',
+        text: 'abc',
+      });
+
+      expect(result).toEqual({ success: true, result: { typed: true } });
+      const injectedScript = mockBrowserEval.mock.calls[1]?.[0] ?? '';
+      expect(injectedScript).toContain('let currentValue =');
+      expect(injectedScript).toContain('currentValue + character');
+      expect(injectedScript).toContain("dispatchEvent(new Event('change'");
+    });
+  });
+
+  describe('wait tools', () => {
+    it('browser_wait_for_selector delegates to the browser wait API', async () => {
+      const result = await executeBrowserTool('browser_wait_for_selector', {
+        selector: '#ready',
+        state: 'visible',
+        timeout: 45000,
+      });
+
+      expect(mockBrowserWaitForSelector).toHaveBeenCalledWith('#ready', 'visible', 45000);
+      expect(result).toEqual({ success: true, result: { matched: true } });
+    });
+
+    it('browser_wait_for_url clamps timeout to the phase maximum', async () => {
+      const result = await executeBrowserTool('browser_wait_for_url', {
+        url: '/dashboard/i',
+        timeout: 999999,
+      });
+
+      expect(mockBrowserWaitForUrl).toHaveBeenCalledWith('/dashboard/i', 120000);
+      expect(result).toEqual({ success: true, result: { matched: true } });
     });
   });
 });

@@ -38,14 +38,31 @@
         "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:5176 http://localhost:5199",
         "style-src": "'self' 'unsafe-inline' https://streamdown.ai http://localhost:*",
         "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* ws://localhost:* https://github.com https://*.githubusercontent.com",
-        "img-src": "'self' data: blob:",
+        "img-src": "'self' data: blob: asset: http://asset.localhost",
         "font-src": "'self' data: https://streamdown.ai",
         "worker-src": "'self' blob:",
         "frame-src": "'self' http://localhost:*",
         "object-src": "'none'"
       },
       "freezePrototype": false,
-      "dangerousDisableAssetCspModification": false
+      "dangerousDisableAssetCspModification": false,
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": [
+            "$HOME/**",
+            "$TEMP/**",
+            "$DESKTOP/**",
+            "$DOCUMENT/**",
+            "$DOWNLOAD/**",
+            "/Volumes/**",
+            "/tmp/**",
+            "/private/tmp/**"
+          ],
+          "deny": [],
+          "requireLiteralLeadingDot": false
+        }
+      }
     }
   },
   "bundle": {

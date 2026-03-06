@@ -47,7 +47,7 @@ const AVAILABLE_TOOLS = [
 
 // Scope labels and styles
 const SCOPE_CONFIG: Record<CommandScope, { label: string; className: string }> = {
-  builtin: { label: 'Built-in', className: 'bg-blue-500/10 text-blue-500' },
+  builtin: { label: 'Built-in', className: 'bg-info-muted text-info' },
   default: { label: 'Default', className: 'bg-purple-500/10 text-purple-500' },
   project: { label: 'Project', className: 'bg-success-muted text-success' },
   personal: { label: 'Personal', className: 'bg-orange-500/10 text-orange-500' },
@@ -818,7 +818,7 @@ export const SlashCommandsSettings: FC = () => {
           {builtinCommands.length > 0 && (
             <div>
               <div className="text-xs font-medium text-muted-foreground/90 mb-2 flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-blue-500" />
+                <span className="h-2 w-2 rounded-full bg-info" />
                 Built-in Commands
                 <Lock className="h-3 w-3" />
               </div>

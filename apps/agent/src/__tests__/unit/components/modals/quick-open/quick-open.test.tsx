@@ -19,6 +19,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import type { FuzzySearchResult } from '@/lib/api/search';
+import type { ViewedFile } from '@/stores/file/file-viewer-store';
 
 import { QuickOpen } from '@/components/modals/quick-open/quick-open';
 import { DELAYS } from '@/lib/utils';
@@ -73,6 +74,22 @@ function createMockFuzzyResults(count: number, prefix = 'file'): FuzzySearchResu
   }));
 }
 
+let nextInstanceId = 0;
+
+function createViewedFile(path: string): ViewedFile {
+  return {
+    instanceId: ++nextInstanceId,
+    path,
+    content: '',
+    originalContent: '',
+    language: 'typescript',
+    fileType: 'text',
+    viewMode: 'file',
+    isModified: false,
+    isExternal: false,
+  };
+}
+
 /**
  * Render QuickOpen with controlled open state.
  * Uses delay: null to make userEvent synchronous, allowing precise control of debounce timing.
@@ -106,6 +123,7 @@ async function advancePastDebounce(): Promise<void> {
 // =============================================================================
 
 beforeEach(() => {
+  nextInstanceId = 0;
   // Reset stores to initial state
   useFileStore.setState(useFileStore.getInitialState(), true);
   useFileViewerStore.setState(useFileViewerStore.getInitialState(), true);
@@ -294,24 +312,8 @@ describe('QuickOpen', () => {
       // Set up open tabs (recent files)
       useFileViewerStore.setState({
         openTabs: [
-          {
-            path: '/workspace/src/recent-1.ts',
-            content: '',
-            originalContent: '',
-            language: 'typescript',
-            viewMode: 'file',
-            isModified: false,
-            isExternal: false,
-          },
-          {
-            path: '/workspace/src/recent-2.ts',
-            content: '',
-            originalContent: '',
-            language: 'typescript',
-            viewMode: 'file',
-            isModified: false,
-            isExternal: false,
-          },
+          createViewedFile('/workspace/src/recent-1.ts'),
+          createViewedFile('/workspace/src/recent-2.ts'),
         ],
       });
 
@@ -329,15 +331,9 @@ describe('QuickOpen', () => {
 
     it('should limit recent files to 10', async () => {
       // Set up 15 open tabs
-      const tabs = Array.from({ length: 15 }, (_, i) => ({
-        path: `/workspace/src/file-${String(i)}.ts`,
-        content: '',
-        originalContent: '',
-        language: 'typescript',
-        viewMode: 'file' as const,
-        isModified: false,
-        isExternal: false,
-      }));
+      const tabs = Array.from({ length: 15 }, (_, i) =>
+        createViewedFile(`/workspace/src/file-${String(i)}.ts`)
+      );
 
       useFileViewerStore.setState({ openTabs: tabs });
 
@@ -358,17 +354,7 @@ describe('QuickOpen', () => {
 
     it('should hide recent files when query is entered', async () => {
       useFileViewerStore.setState({
-        openTabs: [
-          {
-            path: '/workspace/src/recent.ts',
-            content: '',
-            originalContent: '',
-            language: 'typescript',
-            viewMode: 'file',
-            isModified: false,
-            isExternal: false,
-          },
-        ],
+        openTabs: [createViewedFile('/workspace/src/recent.ts')],
       });
 
       const { user } = renderQuickOpen();
@@ -389,17 +375,7 @@ describe('QuickOpen', () => {
     it('should preserve Nucleo relevance order (no recent-files boost)', async () => {
       // Set up a recent file
       useFileViewerStore.setState({
-        openTabs: [
-          {
-            path: '/workspace/src/button.ts',
-            content: '',
-            originalContent: '',
-            language: 'typescript',
-            viewMode: 'file',
-            isModified: false,
-            isExternal: false,
-          },
-        ],
+        openTabs: [createViewedFile('/workspace/src/button.ts')],
       });
 
       // Search returns multiple results — accordion has highest score
@@ -484,17 +460,7 @@ describe('QuickOpen', () => {
 
     it('should open recent file when clicked', async () => {
       useFileViewerStore.setState({
-        openTabs: [
-          {
-            path: '/workspace/src/recent.ts',
-            content: '',
-            originalContent: '',
-            language: 'typescript',
-            viewMode: 'file',
-            isModified: false,
-            isExternal: false,
-          },
-        ],
+        openTabs: [createViewedFile('/workspace/src/recent.ts')],
       });
 
       const { onOpenChange, user } = renderQuickOpen();

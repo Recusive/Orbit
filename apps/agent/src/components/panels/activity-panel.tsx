@@ -249,6 +249,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   // Show scrollbar when hovered or dragging
   const showScrollbar = isHovered || isDragging;
   const isMarkdown = activeFile?.language === 'markdown';
+  const isImageTab =
+    activeFile?.fileType === 'image' && !(activeFile.imageData?.svgSourceView ?? false);
+  const isSearchDisabled = isPreviewRendered || isImageTab;
   const isThresholdBlocked = markdownPreview && !isPreviewRendered;
   const previewToggleLabel = isThresholdBlocked
     ? 'Preview unavailable - file too large'
@@ -332,19 +335,19 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       >
         <button
           onClick={() => {
-            if (activeTabPath && !isPreviewRendered) {
+            if (activeTabPath && !isSearchDisabled) {
               onToggleSearch(activeTabPath);
             }
           }}
-          disabled={isPreviewRendered}
+          disabled={isSearchDisabled}
           className={cn(
             'h-6 w-6 flex items-center justify-center rounded transition-colors',
-            isPreviewRendered
+            isSearchDisabled
               ? 'cursor-not-allowed text-muted-foreground/40'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           )}
           aria-label="Search in file"
-          title={isPreviewRendered ? 'Search unavailable in preview' : 'Search (⌘F)'}
+          title={isSearchDisabled ? 'Search unavailable in preview' : 'Search (⌘F)'}
         >
           <Search className="h-4 w-4" />
         </button>

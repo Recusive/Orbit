@@ -7,3 +7,4 @@ export type { UseFileTreeOptions, UseFileTreeResult, UseFileTreeItemResult } fro
 
 export { useFileDiagnostics } from './use-file-diagnostics';
 export { MAX_PREVIEW_LINES, useIsPreviewRendered } from './use-is-preview-rendered';
+export { useSvgSourceToggle } from './use-svg-source-toggle';
