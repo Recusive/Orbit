@@ -135,7 +135,7 @@ export const WelcomePage: FC<WelcomePageProps> = ({
               </div>
               {/* Card body — shows as skeleton, then crossfades to content */}
               <div
-                className="flex-1 px-4 py-3 backdrop-blur-md bg-[var(--orbit-background-alpha-200)] overflow-hidden"
+                className="flex-1 px-4 py-3 border border-dashed border-[var(--border)] overflow-hidden"
                 style={{
                   borderRadius: 9,
                   opacity: showCards ? 1 : 0,
