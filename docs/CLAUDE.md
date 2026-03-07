@@ -57,10 +57,11 @@ Use this to find the right file. Read the file directly — no links needed.
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
 - `BUNDLING-TECHNICAL-NOTES.md` — Claude CLI bundling internals
 
-## plans/due/ (11 files)
+## plans/due/ (12 files)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
+- `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
 - `agent-skills-validator-port.md` — Agent skills validator port
 - `browser-enhancement-12-features.md` — Browser enhancement features
