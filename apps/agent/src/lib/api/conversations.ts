@@ -120,8 +120,8 @@ export async function conversationUpdateTitle(
   sessionId: string,
   title: string,
   workspacePath?: string
-): Promise<void> {
-  return invoke('conversation_update_title', { sessionId, title, workspacePath });
+): Promise<boolean> {
+  return invoke<boolean>('conversation_update_title', { sessionId, title, workspacePath });
 }
 
 export async function conversationAddMessage(

@@ -463,8 +463,6 @@ pub enum BridgeRequest {
     GenerateTitle {
         #[serde(rename = "userMessage")]
         user_message: String,
-        #[serde(rename = "assistantResponse")]
-        assistant_response: String,
     },
     // Canvas Operations
     #[serde(rename = "canvas:create_session")]

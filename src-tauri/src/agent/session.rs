@@ -720,12 +720,11 @@ impl SessionManager {
     }
 
     /// Generate a concise AI title for a conversation
-    pub fn generate_title(&self, user_message: &str, assistant_response: &str) -> Result<String> {
+    pub fn generate_title(&self, user_message: &str) -> Result<String> {
         self.ensure_running()?;
 
         let request = BridgeRequest::GenerateTitle {
             user_message: user_message.to_owned(),
-            assistant_response: assistant_response.to_owned(),
         };
 
         let bridge = self.bridge.lock();

@@ -14,6 +14,10 @@
  *    Do NOT downgrade Zustand below v4 without verifying startTransition still works.
  * 4. handleMessage() wraps dispatch in try-catch with structured error logging per
  *    session. Errors never propagate to the caller (use-tauri-message-listener).
+ *
+ * [warning] TESTED: The title remap and retry paths in this service are covered by
+ * integration tests. If you modify this, run: bun run test -- title-remap-and-retry
+ * Test file: src/__tests__/services/chat/title-remap-and-retry.test.ts
  */
 import { createLogger } from '@orbit/common/lib';
 import { startTransition } from 'react';
@@ -31,7 +35,14 @@ import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers'
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
-import { flushPendingTitle, generateAITitle } from '@/services/session';
+import {
+  clearSessionTitleState,
+  flushPendingTitle,
+  generateAITitle,
+  getPreferredTitle,
+  remapSessionTitleState,
+  retryPendingPersistence,
+} from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
@@ -515,6 +526,7 @@ class ChatMessageService {
       useUIStore.getState().remapConversation(frontendSessionId, sdkSessionId);
       // Migrate service-owned in-flight state (timers + tool flags).
       this.remapRunningState(frontendSessionId, sdkSessionId);
+      remapSessionTitleState(frontendSessionId, sdkSessionId);
 
       // Only update UI navigation if the user is still on this session.
       // remapSession() already conditionally updates activeSessionId in ChatStore
@@ -788,28 +800,24 @@ class ChatMessageService {
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
 
-    // Generate AI title after a completed turn with at least 1 user + 1 assistant message.
-    // Uses >= 1 instead of === 1 so retries work on subsequent turns if the first attempt
-    // failed (e.g., Haiku call error, network issue). The aiTitleGenerated Set in
-    // session-title-service.ts prevents duplicate generation after success.
-    // Fire-and-forget — the placeholder title stays until Haiku responds (~1-2s).
+    // Retry AI title generation after a completed turn if the send-time attempt failed.
+    // This still uses only the first user message so the title is deterministic from
+    // send-time input rather than assistant output.
     {
       const currentSession = useChatStore.getState().sessions[sid];
       if (currentSession) {
         const msgs = currentSession.messages;
         const userMsgs = msgs.filter((m) => m.role === 'user');
-        const assistantMsgs = msgs.filter((m) => m.role === 'assistant');
-        if (userMsgs.length >= 1 && assistantMsgs.length >= 1) {
+        if (userMsgs.length >= 1) {
           const userText = userMsgs[0]?.content ?? '';
-          // Use first non-empty assistant message — tool-heavy first turns may have
-          // empty content on the first assistant message (only tool use, no text).
-          const assistantText = assistantMsgs.find((m) => m.content.length > 0)?.content ?? '';
-          if (userText.length > 0 && assistantText.length > 0) {
-            generateAITitle(sid, userText, assistantText);
+          if (userText.length > 0) {
+            generateAITitle(sid, userText);
           }
         }
       }
     }
+
+    retryPendingPersistence(sid);
   }
 
   private handleAgentError(message: Extract<ExtensionMessage, { type: 'agent:error' }>): void {
@@ -827,6 +835,7 @@ class ChatMessageService {
     this.turnHadTools.delete(sid);
     useChatStore.getState().setAgentRunning(sid, false);
     useChatStore.getState().setStopPending(sid, false);
+    retryPendingPersistence(sid);
 
     // Detect auth-related errors
     const rawError = message.error;
@@ -1072,9 +1081,12 @@ class ChatMessageService {
           sessionId: message.session_id,
         });
         if (!isStaleNavigation) {
+          const preferredTitle = getPreferredTitle(message.session_id);
           useFileStore.getState().switchSession(message.session_id);
           useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore.getState().setActiveConversation(message.session_id, message.title);
+          useUIStore
+            .getState()
+            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
           useToolStore.getState().switchSession(message.session_id);
         }
         useUIStore.getState().setLoadingConversation(false);
@@ -1231,8 +1243,11 @@ class ChatMessageService {
         // handleLoadConversation sets activeSession immediately on sidebar click,
         // so this guard won't break sidebar navigation.
         if (!isStaleNavigation) {
+          const preferredTitle = getPreferredTitle(message.session_id);
           useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore.getState().setActiveConversation(message.session_id, message.title);
+          useUIStore
+            .getState()
+            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
           useToolStore.getState().switchSession(message.session_id);
         }
 
@@ -1324,6 +1339,7 @@ class ChatMessageService {
   ): void {
     useToolStore.getState().clearSessionTools(message.session_id);
     useFileStore.getState().clearSessionFiles(message.session_id);
+    clearSessionTitleState(message.session_id);
     useChatStore.getState().destroySession(message.session_id);
     this.destroySession(message.session_id);
   }

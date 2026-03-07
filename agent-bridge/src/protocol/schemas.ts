@@ -495,7 +495,6 @@ export const GenerateTitleRequestSchema = z
   .object({
     type: z.literal('generate_title'),
     userMessage: z.string(),
-    assistantResponse: z.string(),
   })
   .strict();
 export type GenerateTitleRequest = z.infer<typeof GenerateTitleRequestSchema>;

@@ -57,7 +57,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
 - `BUNDLING-TECHNICAL-NOTES.md` — Claude CLI bundling internals
 
-## plans/due/ (12 files)
+## plans/due/ (9 files)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
@@ -68,14 +68,16 @@ Use this to find the right file. Read the file directly — no links needed.
 - `browser-navigate-verification-fix.md` — Browser navigate verification fix
 - `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
 - `codebase-cleanup-stubs-lsp-breadcrumbs.md` — Codebase cleanup (stubs, LSP, breadcrumbs)
-- `instant-title-generation.md` — Instant title generation
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 
-## plans/implemented/ (2 files)
+## plans/implemented/ (5 files)
 
 - `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
+- `instant-title-generation.md` — Instant title generation
 - `thinking-block-interleave-and-session-switch-fix.md` — Thinking block interleave and session switch fix
+- `title-divergence-fix.md` — Title divergence fix
+- `title-skeleton-loading.md` — Title skeleton loading state
 
 ## plans/ (19 files)
 

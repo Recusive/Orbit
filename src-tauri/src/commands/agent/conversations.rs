@@ -392,7 +392,7 @@ pub fn conversation_update_title(
     title: String,
     workspace_path: Option<String>,
     manager: State<'_, ConversationManager>,
-) -> Result<()> {
+) -> Result<bool> {
     manager.update_title(&session_id, &title, workspace_path.as_deref())
 }
 

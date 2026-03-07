@@ -11,6 +11,10 @@
  *    pending message send, cross-instance sync, ToolStore session sync
  * 4. Creates chat actions (handleSend, handleStop, etc.)
  *
+ * [warning] TESTED: The pending-message title generation effect is covered by
+ * integration tests. If you modify this, run: bun run test -- use-chat-messages-title
+ * Test file: src/__tests__/integration/hooks/chat/use-chat-messages-title.test.tsx
+ *
  * Previously 577 lines with useState, useSessionState, useMessageState,
  * createMessageHandler (1629-line closure), and buffer hydration.
  */
@@ -37,7 +41,7 @@ import type {
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
-import { applySessionTitle, generateFallbackTitle } from '@/services/session';
+import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import {
@@ -303,8 +307,9 @@ export function useChatMessages(): UseChatMessagesReturn {
       });
     }
 
-    // Update title (persists to UIStore + JSONL via Rust backend)
+    // Update title immediately, then kick off async title generation.
     applySessionTitle(lastCreatedSessionId, generateFallbackTitle(text));
+    generateAITitle(lastCreatedSessionId, text);
 
     // Build user message
     const chatStore = useChatStore.getState();

@@ -9,11 +9,13 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
-import { ClaudeCredentials } from '../../common/auth/credentials.js'; // [oauth-401-recovery] import — revert: remove this line
+import { ClaudeCredentials } from '../../common/auth/credentials.js';
 import { TextEventBatcher } from '../../common/batching/index.js';
+import { getShellEnvironment } from '../../common/env/shell-env.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { createIOSMcpServer } from '../../ios/index.js';
@@ -88,6 +90,35 @@ const GeneratedCommandSchema = z
   .strict();
 
 const logger = createLogger('SessionManager');
+const TITLE_MODEL = 'claude-haiku-4-5-20251001';
+const TITLE_QUERY_MODEL = 'haiku';
+
+function buildTitlePrompt(userMessage: string): string {
+  const maxTitleChars = 50;
+
+  return `Generate a short title (max ${String(maxTitleChars)} characters) for this conversation.
+The title should capture the main topic or intent.
+Do NOT use quotes, periods, or prefixes like "Title:".
+Do NOT exceed ${String(maxTitleChars)} characters. Just output the title text and nothing else.
+
+User: "${userMessage.slice(0, 300)}"`;
+}
+
+function cleanupGeneratedTitle(text: string, maxChars = 50): string {
+  let title = text
+    .replace(/^["']|["']$/g, '')
+    .replace(/^Title:\s*/i, '')
+    .replace(/\.$/, '')
+    .trim();
+
+  if (title.length > maxChars) {
+    const truncated = title.slice(0, maxChars);
+    const lastSpace = truncated.lastIndexOf(' ');
+    title = lastSpace > maxChars * 0.4 ? truncated.slice(0, lastSpace) : truncated;
+  }
+
+  return title;
+}
 
 /**
  * Agent message types sent to the frontend
@@ -2562,63 +2593,77 @@ Example format:
   /**
    * Generate a concise AI title for a conversation.
    *
-   * Uses query() directly with minimal options — no tools, no system prompt,
-   * no MCP, maxTurns=1. This avoids the heavy OrbitAgent initialization
-   * (system prompt, MCP servers, file checkpointing, permissions) that caused
-   * ~10s latency. Direct query() completes in ~1-2s.
+   * [warning] TESTED: This function is covered by integration tests.
+   *     If you modify this, run: cd agent-bridge && bun test title-generation
+   *     Test file: src/__tests__/title-generation.e2e.test.ts
    */
-  async generateTitle(userMessage: string, assistantResponse: string): Promise<string> {
-    const maxTitleChars = 50;
-
-    const prompt = `Generate a short title (max ${String(maxTitleChars)} characters) for this conversation.
-The title should capture the main topic or intent.
-Do NOT use quotes, periods, or prefixes like "Title:".
-Do NOT exceed ${String(maxTitleChars)} characters. Just output the title text and nothing else.
-
-User: "${userMessage.slice(0, 300)}"
-
-Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
-
-    const envClaudePath = process.env.CLAUDE_CLI_PATH;
-    const claudePath =
-      envClaudePath !== undefined && envClaudePath !== '' ? envClaudePath : undefined;
-
-    const q = query({
-      prompt,
-      options: {
-        pathToClaudeCodeExecutable: claudePath,
-        model: 'haiku',
-        maxTurns: 1,
-      },
-    });
+  async generateTitle(userMessage: string): Promise<string> {
+    const credentials = await ClaudeCredentials.getCredentials();
+    if (!credentials.hasCredentials || credentials.token === undefined) {
+      throw new Error('No credentials available for title generation');
+    }
 
     let resultText = '';
 
-    for await (const message of q) {
-      const msg = message as Record<string, unknown>;
-      if (msg.type === 'result') {
-        if (typeof msg.result === 'string') {
-          resultText = msg.result;
+    if (credentials.type === 'oauth') {
+      const shellEnv = getShellEnvironment();
+      if (shellEnv.PATH) {
+        process.env.PATH = shellEnv.PATH;
+      }
+
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.ANTHROPIC_AUTH_TOKEN;
+
+      const envClaudePath = process.env.CLAUDE_CLI_PATH;
+      const claudePath =
+        envClaudePath !== undefined && envClaudePath !== '' ? envClaudePath : undefined;
+
+      const q = query({
+        prompt: buildTitlePrompt(userMessage),
+        options: {
+          pathToClaudeCodeExecutable: claudePath,
+          model: TITLE_QUERY_MODEL,
+          maxTurns: 1,
+        },
+      });
+
+      for await (const message of q) {
+        const msg = message as Record<string, unknown>;
+        if (msg.type === 'result') {
+          if (typeof msg.result === 'string') {
+            resultText = msg.result;
+          }
+          break;
         }
-        break;
+      }
+    } else {
+      const client = new Anthropic({ apiKey: credentials.token, timeout: 15_000 });
+
+      const response = await client.messages.create({
+        model: TITLE_MODEL,
+        max_tokens: 80,
+        messages: [
+          {
+            role: 'user',
+            content: buildTitlePrompt(userMessage),
+          },
+        ],
+      });
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          resultText += block.text;
+        }
       }
     }
 
-    // Clean up: remove quotes, "Title:" prefix, trailing period
-    let title = resultText
-      .replace(/^["']|["']$/g, '')
-      .replace(/^Title:\s*/i, '')
-      .replace(/\.$/, '')
-      .trim();
-
-    // Hard cap: truncate at word boundary if Haiku exceeded the limit
-    if (title.length > maxTitleChars) {
-      const truncated = title.slice(0, maxTitleChars);
-      const lastSpace = truncated.lastIndexOf(' ');
-      title = lastSpace > maxTitleChars * 0.4 ? truncated.slice(0, lastSpace) : truncated;
+    const title = cleanupGeneratedTitle(resultText);
+    if (title.length === 0) {
+      throw new Error('Title generation returned no text');
     }
 
-    return title || 'Untitled';
+    return title;
   }
 
   /**

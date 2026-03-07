@@ -481,12 +481,9 @@ pub async fn agent_enhance_bug_report(
 #[tauri::command]
 pub async fn agent_generate_title(
     user_message: String,
-    assistant_response: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<String> {
-    state
-        .generate_title(&user_message, &assistant_response)
-        .map_err(to_error)
+    state.generate_title(&user_message).map_err(to_error)
 }
 
 /// Generate a command definition from a natural language description

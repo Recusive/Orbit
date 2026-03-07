@@ -826,7 +826,7 @@ impl ConversationManager {
         session_id: &str,
         title: &str,
         workspace_path: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         // Use find_conversation_path (searches all workspaces) instead of
         // conversation_path (single workspace). Matches how delete() works.
         // This prevents silent skips when the workspace path doesn't match
@@ -834,7 +834,7 @@ impl ConversationManager {
         let Some(jsonl_path) = self.find_conversation_path(session_id, workspace_path) else {
             // JSONL doesn't exist yet — the CLI hasn't created it.
             // Creating it prematurely would trigger the CLI's "Session ID already in use" guard.
-            return Ok(());
+            return Ok(false);
         };
 
         let line = serde_json::json!({
@@ -869,7 +869,7 @@ impl ConversationManager {
             ))
         })?;
 
-        Ok(())
+        Ok(true)
     }
 
     // ----------------------------------------
@@ -3239,9 +3239,32 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         // No JSONL file exists — update_title should silently skip (no error).
-        manager
+        let written = manager
             .update_title("session-1", "New Title", None)
             .expect("update_title should skip when JSONL doesn't exist");
+
+        assert!(!written);
+    }
+
+    #[test]
+    fn test_update_title_returns_true_when_file_exists() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("session-1.jsonl");
+        fs::write(
+            &path,
+            jsonl_content(&[r#"{"type":"summary","summary":"Original","leafUuid":""}"#]),
+        )
+        .expect("write");
+
+        let written = manager
+            .update_title("session-1", "Updated Title", None)
+            .expect("update_title should append to an existing JSONL");
+
+        assert!(written);
+        assert_eq!(read_last_summary(&path).as_deref(), Some("Updated Title"));
     }
 
     #[test]

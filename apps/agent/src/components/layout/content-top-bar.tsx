@@ -28,6 +28,7 @@ import {
   useWorkspaceName,
   useHasWorkspace,
   useActiveConversationTitle,
+  useIsTitleLoading,
   useReviewPanelOpen,
   useVaultOpen,
 } from '@/stores/ui/ui-store';
@@ -236,38 +237,6 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
   /* ── Overflow-fade detection ─────────────────────────────────── */
   const leftSectionRef = useRef<HTMLDivElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
-
-  const checkOverflow = useCallback((): void => {
-    const el = leftSectionRef.current;
-    if (el) {
-      setIsOverflowing(el.scrollWidth > el.clientWidth);
-    }
-  }, []);
-
-  // Re-check on container resize (window resize, panel drag)
-  useEffect(() => {
-    const el = leftSectionRef.current;
-    if (!el) return;
-    checkOverflow();
-    const ro = new ResizeObserver(checkOverflow);
-    ro.observe(el);
-    return (): void => {
-      ro.disconnect();
-    };
-  }, [checkOverflow]);
-
-  // Re-check when content or sidebar state changes
-  useEffect(() => {
-    checkOverflow();
-    // Re-check after sidebar controls animation settles (200ms transition)
-    const timer = setTimeout(checkOverflow, 250);
-    return (): void => {
-      clearTimeout(timer);
-    };
-  }, [sidebarOpen, workspaceName, conversationTitle, checkOverflow]);
-
-  const { postMessage } = useTauri();
-
   const {
     toggleLeftSidebar,
     toggleReviewPanel,
@@ -299,6 +268,38 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       terminalCollapsed: s.terminalCollapsed,
     }))
   );
+  const isTitleLoading = useIsTitleLoading(activeConversationId);
+
+  const checkOverflow = useCallback((): void => {
+    const el = leftSectionRef.current;
+    if (el) {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    }
+  }, []);
+
+  // Re-check on container resize (window resize, panel drag)
+  useEffect(() => {
+    const el = leftSectionRef.current;
+    if (!el) return;
+    checkOverflow();
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+    return (): void => {
+      ro.disconnect();
+    };
+  }, [checkOverflow]);
+
+  // Re-check when content or sidebar state changes
+  useEffect(() => {
+    checkOverflow();
+    // Re-check after sidebar controls animation settles (200ms transition)
+    const timer = setTimeout(checkOverflow, 250);
+    return (): void => {
+      clearTimeout(timer);
+    };
+  }, [sidebarOpen, workspaceName, conversationTitle, isTitleLoading, checkOverflow]);
+
+  const { postMessage } = useTauri();
 
   const handleNewSession = useCallback((): void => {
     setVaultOpen(false);
@@ -466,15 +467,19 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
         ) : null}
 
         {/* Separator + Chat name */}
-        {conversationTitle ? (
+        {conversationTitle || isTitleLoading ? (
           <>
             <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-            <span
-              data-tauri-drag-region={false}
-              className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
-            >
-              {conversationTitle}
-            </span>
+            {isTitleLoading ? (
+              <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
+            ) : (
+              <span
+                data-tauri-drag-region={false}
+                className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap animate-title-in"
+              >
+                {conversationTitle}
+              </span>
+            )}
           </>
         ) : null}
       </div>

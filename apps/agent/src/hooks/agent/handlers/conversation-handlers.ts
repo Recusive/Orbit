@@ -126,7 +126,9 @@ export async function handleConversationLoad(
     } else {
       // Conversation not found on disk — likely a cache-only session
       // (created via "New Session" but SDK hasn't written the JSONL file yet).
-      // Return empty messages but preserve whatever title the sidebar already has.
+      // Return empty messages with an 'Untitled' fallback. The header will use
+      // getPreferredTitle() to prefer the in-memory title (AI or manual) if one exists,
+      // so this fallback only appears when no title has been applied yet.
       logger.debug('Conversation not found on disk (cache-only?)', {
         sessionId: message.session_id,
       });

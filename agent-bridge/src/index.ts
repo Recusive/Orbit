@@ -694,10 +694,7 @@ async function handleRequest(
     }
 
     case 'generate_title': {
-      const title = await sessionManager.generateTitle(
-        request.userMessage,
-        request.assistantResponse
-      );
+      const title = await sessionManager.generateTitle(request.userMessage);
       sendResponse({ type: 'string', requestType: request.type, value: title });
       break;
     }

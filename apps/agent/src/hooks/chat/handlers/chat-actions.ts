@@ -13,7 +13,7 @@ import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
 import { serializeThinkingBlocks } from '@/lib/mappers';
 import { chatMessageService } from '@/services/chat/chat-message-service';
-import { applySessionTitle, generateFallbackTitle } from '@/services/session';
+import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -56,6 +56,11 @@ interface ChatActionsReturn {
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   const { postMessage } = deps;
 
+  /**
+   * [warning] TESTED: Send-time title generation in this action creator is covered by
+   * integration tests. If you modify this, run: bun run test -- chat-actions-title-generation
+   * Test file: src/__tests__/unit/hooks/chat/chat-actions-title-generation.test.ts
+   */
   const handleSend = (
     text: string,
     contextFiles?: string[],
@@ -148,6 +153,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
           applySessionTitle(sessionId, generateFallbackTitle(text));
+          generateAITitle(sessionId, text);
         }
 
         // Always send current thinking mode and model BEFORE message:send

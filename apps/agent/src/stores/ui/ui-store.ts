@@ -101,6 +101,7 @@ interface UIState {
   conversations: ConversationSummary[];
   // Conversation editing state (for inline rename)
   editingConversationId: string | null;
+  titleLoadingSessions: Set<string>;
   // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
@@ -156,6 +157,7 @@ interface UIActions {
   remapConversation: (oldSessionId: string, newSessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
   setEditingConversationId: (id: string | null) => void;
+  setTitleLoading: (sessionId: string, loading: boolean) => void;
   // Sidebar actions
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
@@ -280,6 +282,7 @@ export const useUIStore = create<UIStore>()(
     isConversationTransitioning: false,
     conversations: [],
     editingConversationId: null,
+    titleLoadingSessions: new Set<string>(),
     leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
     leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
     lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
@@ -487,6 +490,16 @@ export const useUIStore = create<UIStore>()(
     setEditingConversationId: (id: string | null): void => {
       set((state) => {
         state.editingConversationId = id;
+      });
+    },
+
+    setTitleLoading: (sessionId: string, loading: boolean): void => {
+      set((state) => {
+        if (loading) {
+          state.titleLoadingSessions.add(sessionId);
+        } else {
+          state.titleLoadingSessions.delete(sessionId);
+        }
       });
     },
 
@@ -873,6 +886,12 @@ export const useActiveConversationId = (): string | null => {
 
 export const useActiveConversationTitle = (): string | null => {
   return useUIStore((state) => state.activeConversationTitle);
+};
+
+export const useIsTitleLoading = (sessionId: string | null): boolean => {
+  return useUIStore((state) =>
+    sessionId !== null ? state.titleLoadingSessions.has(sessionId) : false
+  );
 };
 
 export const useIsLoadingConversation = (): boolean => {
