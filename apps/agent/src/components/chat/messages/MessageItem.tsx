@@ -193,6 +193,12 @@ const UserMessageBubble: FC<{
         isCollapsed ? 'pb-0' : 'pb-2.5',
         animate === true && 'animate-message-in'
       )}
+      onAnimationEnd={(e) => {
+        // Kill the animation after first play — prevents WebKit from replaying
+        // it on style recalculations triggered by sibling content changes
+        // (thinking→text transition, tool widgets appearing, etc.)
+        e.currentTarget.style.animation = 'none';
+      }}
     >
       {/* Content area with optional height clamp + mask fade when collapsed */}
       <div className="relative">

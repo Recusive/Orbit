@@ -97,9 +97,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // Track message IDs that should animate (newly sent user messages)
   // Using STATE (not ref) ensures animation class is applied on same render (code review: Codex cycle 2 #2)
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
-  // Track ALL known message IDs to detect truly new messages (code review: Codex #1)
-  // This prevents historical messages from animating during conversation:loaded
-  const knownMessageIds = useRef<Set<string>>(new Set());
+  // Track previous message count to distinguish real appends from ID reconciliation.
+  // reconcileMessageId changes msg.id (frontend UUID → SDK UUID) without adding messages.
+  // Without this guard, the changed ID is treated as "new" → animation replays.
+  const prevMessageCount = useRef(0);
 
   // CONSOLIDATED: Handle session changes in one place (code review: Codex cycle 2 #1)
   // This ensures scroll reset and animation clearing happen atomically
@@ -112,7 +113,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     // Session changed - clear animation state
     setAnimatingMessageIds(new Set());
-    knownMessageIds.current.clear();
+    prevMessageCount.current = 0;
 
     // Reset scroll position to top for new conversation
     const el = scrollRef.current;
@@ -132,31 +133,22 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     prevSessionIdRef.current = sessionId;
   }, [sessionId, scrollRef, stopScroll]);
 
-  // Detect newly added user messages and mark them for animation
-  // CRITICAL: We track by message ID, not array length. This prevents:
-  // - Historical messages animating on conversation:loaded (bulk load)
-  // - Messages animating on session switch (different conversation with more messages)
+  // Detect newly added user messages and mark them for animation.
+  // Uses message count to distinguish real appends from ID reconciliation:
+  // - Count increased by 1 + last message is user → animate (user just sent a message)
+  // - Count unchanged → ID reconciliation or message update → skip animation
+  // - Count increased by 2+ → bulk load (conversation:loaded) → skip animation
   useEffect(() => {
-    // Find messages that are truly new (not in knownMessageIds)
-    const newUserMessages: string[] = [];
-    for (const msg of messages) {
-      if (!knownMessageIds.current.has(msg.id)) {
-        // Track this ID as known
-        knownMessageIds.current.add(msg.id);
-        // Only animate user messages (not assistant responses)
-        if (msg.role === 'user') {
-          newUserMessages.push(msg.id);
-        }
-      }
-    }
+    const prevCount = prevMessageCount.current;
+    prevMessageCount.current = messages.length;
 
-    // Only animate if EXACTLY ONE new user message was added
-    // This filters out bulk loads (conversation:loaded adds many messages at once)
-    if (newUserMessages.length === 1 && newUserMessages[0] !== undefined) {
-      const newId = newUserMessages[0];
-      setAnimatingMessageIds((prev) => new Set(prev).add(newId));
-      // Scroll to bottom when user sends a new message
-      void scrollToBottom();
+    // Animate only when exactly one message was appended and it's a user message
+    if (messages.length === prevCount + 1) {
+      const lastMsg = messages[messages.length - 1];
+      if (lastMsg?.role === 'user') {
+        setAnimatingMessageIds((prev) => new Set(prev).add(lastMsg.id));
+        void scrollToBottom();
+      }
     }
   }, [messages, scrollToBottom]);
 
@@ -249,41 +241,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return ids;
   }, [messages]);
 
-  // Track active animation cleanup timeouts per message ID (code review: Opus #3)
-  // Using individual timeouts prevents rapid messages from clearing each other's animations
-  const animationTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-
-  // Clear animation IDs after animation completes (250ms duration + small buffer)
-  // Each message gets its own timeout for reliable cleanup during rapid sends
-  useEffect(() => {
-    // Get current animating IDs that don't have a timeout yet
-    for (const messageId of animatingMessageIds) {
-      if (!animationTimeouts.current.has(messageId)) {
-        const timeoutId = setTimeout(() => {
-          setAnimatingMessageIds((prev) => {
-            const next = new Set(prev);
-            next.delete(messageId);
-            return next;
-          });
-          animationTimeouts.current.delete(messageId);
-        }, 300); // 250ms animation + 50ms buffer
-        animationTimeouts.current.set(messageId, timeoutId);
-      }
-    }
-  }, [animatingMessageIds]);
-
-  // Cleanup all timeouts on unmount
-  useEffect(() => {
-    // Capture ref value for cleanup (React hooks/exhaustive-deps rule)
-    const timeouts = animationTimeouts.current;
-    return () => {
-      for (const timeoutId of timeouts.values()) {
-        clearTimeout(timeoutId);
-      }
-      timeouts.clear();
-    };
-  }, []);
-
   return (
     <div
       ref={mergedScrollRef}
@@ -303,15 +260,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         className="mx-auto pt-4 px-4"
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           const isLastAssistant = msg.id === lastAssistantMessageId;
           const isLastInGroup = lastInAssistantGroupIds.has(msg.id);
-          const isLastMsg = msg.id === messages[messages.length - 1]?.id;
+          const isLastMsg = index === messages.length - 1;
           const shouldAnimate = animatingMessageIds.has(msg.id);
           const tools = toolsByMessageId.get(msg.id) ?? [];
 
           return (
-            <div key={msg.id} className="mb-3">
+            // Index key: messages are append-only within a session. reconcileMessageId
+            // changes msg.id mid-session (frontend UUID → SDK UUID); using msg.id as key
+            // would cause React to unmount/remount the component, replaying the entrance
+            // animation. Index keys are stable across ID reconciliation. Session switches
+            // replace the entire array, correctly remounting all components.
+            <div key={index} className="mb-3">
               <MessageItem
                 message={msg}
                 tools={tools}
