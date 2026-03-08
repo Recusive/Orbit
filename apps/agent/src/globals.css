@@ -1811,30 +1811,21 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
     overflow: hidden;
   }
 
-  /* ─── Flow Token: per-word streaming animation (FlowToken-style) ─── */
+
+
+  /* ─── Flow Token: fade-in on creation during streaming ────────────────
+     Words enter the DOM one-by-one via StreamingRevealController. Each new
+     span gets this animation ONCE when React creates it. Existing spans
+     (matched by index during reconciliation) keep their state — no replay. */
   @keyframes flow-token-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+    from { opacity: 0; }
+    60% { opacity: 0.6; }
+    to { opacity: 1; }
   }
 
-  /* Tokens animate ONLY inside actively-streaming messages.
-     The [data-streaming="true"] attribute is set on .message-item.
-     --flow-duration is set dynamically by MessageItem based on content length:
-       Short content (1-2 lines) → 0.8s  (slower, animation clearly visible)
-       Long content (800+ chars)  → 0.4s  (faster, doesn't slow reading)
-     Using specific .message-item selector for safety against accidental attribute matches.
-
-     Code Review Cycle 1, Issue #9: Using ease-out instead of ease-in-out for
-     perceived faster response. ease-out starts fast and decelerates, which feels
-     more responsive for streaming text than ease-in-out's slow start. */
   .message-item[data-streaming="true"] .flow-token {
-    animation: flow-token-in var(--flow-duration, 0.6s) ease-out both;
+    animation: flow-token-in 300ms ease-out both;
   }
-
 }
 
 /* ── Glass Popover ──────────────────────────────────────
@@ -1982,10 +1973,10 @@ html.dark .glass-surface {
     opacity: 1;
   }
 
-  /* Flow token streaming animation */
+  /* Flow token fade-in — words still arrive one-by-one via the reveal
+     controller, just without the visual fade. */
   .message-item[data-streaming="true"] .flow-token {
     animation: none;
-    opacity: 1;
   }
 
   /* Tailwind built-in animations (pulse, spin, bounce, ping) */
@@ -2674,4 +2665,3 @@ html.dark .apple-tooltip {
   .diff-section .dh-r .m { color: var(--diff-kw); transition: none; }
   .diff-section .dh-g .m { color: var(--diff-str); transition: none; }
 }
-

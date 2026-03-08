@@ -823,8 +823,10 @@ async function hardLinkFileBackups(
  * Session Manager - orchestrates Claude Agent SDK sessions
  */
 export class SessionManager extends Disposable {
-  // Text event batcher - reduces ~200 events per response to ~4-8 batched events
-  // Batches at 50ms intervals to align with screen refresh and reduce IPC overhead
+  // Text event batcher - configured for immediate emission in production so
+  // short assistant replies do not collapse into whole-clause updates.
+  // The batcher still tracks accumulated lengths for contentOffset math and
+  // retains its drain/flush utilities for non-production intervals.
   private readonly textBatcher: TextEventBatcher;
 
   // Content loss tracking - monitors data loss due to SDK integration issues
@@ -948,9 +950,9 @@ export class SessionManager extends Disposable {
     super();
     this.iosService = options.iosService;
 
-    // Initialize text batcher - fires batched text events every 16ms (~1 frame)
-    // Keep backend batching minimal; frontend RAF batching handles render smoothness.
-    // This gives fast feedback while frontend coalesces into 60fps renders.
+    // Initialize text batcher - fires batched text events every 16ms (~1 frame).
+    // Keep backend batching minimal; frontend CSS animation-delay handles render smoothness.
+    // This gives fast feedback while reducing IPC overhead vs per-token emission.
     this.textBatcher = new TextEventBatcher((event) => {
       this._onAgentMessage.fire({
         sessionId: event.sessionId,
@@ -1379,8 +1381,7 @@ export class SessionManager extends Disposable {
             // Get our stable turn ID for this session
             const streamMessageId = this.currentTurnId.get(sessionId);
 
-            // Handle text deltas - batch to reduce event flooding
-            // SDK emits ~200 events per response, we batch at 50ms intervals
+            // Handle text deltas - forward immediately so streaming cadence stays granular.
             if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
               const textDelta = event.delta.text;
               if (textDelta !== undefined) {
@@ -1518,11 +1519,8 @@ export class SessionManager extends Disposable {
               const initialStatus = wasAlreadyApproved ? 'running' : 'awaiting-permission';
 
               // CRITICAL: Flush buffered text BEFORE calculating contentOffset.
-              // The text batcher accumulates text at 50ms intervals. If we calculate
-              // contentOffset without flushing, it includes buffered text that hasn't
-              // been emitted yet. The frontend would receive tool:start BEFORE the
-              // text chunks, causing contentOffset > displayedContent.length → text
-              // split mid-word. Flushing ensures frontend has all text before tool arrives.
+              // In production the live path emits immediately, but keeping this flush
+              // makes tool ordering correct for any future non-zero batch interval.
               this.textBatcher.flushSession(sessionId);
 
               // Get the current accumulated text length - this is where the tool

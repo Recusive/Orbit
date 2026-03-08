@@ -5,8 +5,9 @@
  * Same logic, but writes to ChatStore instead of React setState.
  *
  * KEY ARCHITECTURAL DECISIONS:
- * 1. RAF batchers are per-session — rewind on session A cancels only A's batchers.
- *    Batchers are created lazily and deleted on agent:complete / destroySession.
+ * 1. Text chunks are applied immediately for cadence fidelity. Thinking/tool events
+ *    still use per-session RAF batchers — rewind on session A cancels only A's batchers.
+ *    Batcher maps are created lazily and deleted on agent:complete / destroySession.
  * 2. Store interactions via getState() — reads/writes ChatStore, ToolStore,
  *    CheckpointStore, FileStore, UIStore at call time (not captured deps).
  * 3. startTransition imported from 'react' — works outside React components.
@@ -35,6 +36,7 @@ import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers'
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
+import { StreamingRevealController } from '@/services/chat/streaming-reveal-controller';
 import {
   clearSessionTitleState,
   flushPendingTitle,
@@ -193,7 +195,7 @@ function mapPersistedMessage(m: {
 // ────────────────────────────────────────────────────────────────────────────
 
 class ChatMessageService {
-  // Per-session RAF batchers (created lazily, deleted on agent:complete / destroy)
+  // Text chunks are applied immediately; thinking/tool events stay RAF-batched.
   private chunkBatchers = new Map<string, RafBatchHandler<TextChunkEvent>>();
   private thinkingBatchers = new Map<string, RafBatchHandler<ThinkingChunkEvent>>();
   private toolBatchers = new Map<string, RafBatchHandler<ToolEvent>>();
@@ -209,6 +211,9 @@ class ChatMessageService {
   private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // Due timestamps for delayed clears (needed for session remap with remaining delay).
   private agentRunningTimerDueAt = new Map<string, number>();
+
+  /** Word-by-word reveal controller for streaming messages. */
+  private revealController = new StreamingRevealController();
 
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
@@ -270,6 +275,7 @@ class ChatMessageService {
     this.chunkBatchers.get(sessionId)?.cancel();
     this.thinkingBatchers.get(sessionId)?.cancel();
     this.toolBatchers.get(sessionId)?.cancel();
+    this.revealController.stopAll(sessionId);
   }
 
   /** Full cleanup for a session — cancel batchers, timers, delete from Maps. */
@@ -294,6 +300,7 @@ class ChatMessageService {
     this.markerOrdinals.clear();
     this.agentRunningTimers.clear();
     this.agentRunningTimerDueAt.clear();
+    this.revealController.destroyAll();
     this.turnHadTools.clear();
   }
 
@@ -636,6 +643,15 @@ class ChatMessageService {
     // Clean up batcher Map entries (recreated lazily if session streams again)
     this.cleanupBatchers(sid);
 
+    // Accelerated drain — reveal remaining words at 10ms/word.
+    // When drain finishes, callback sets isStreaming: false (shimmer + content stay in sync).
+    this.revealController.beginDrain(sid, message.message_id, () => {
+      useChatStore.getState().updateMessage(sid, message.message_id, (m) => ({
+        ...m,
+        isStreaming: false,
+      }));
+    });
+
     // Clean up pending chunk tracking for this message
     this.pendingChunkLengths.delete(message.message_id);
     this.clearMarkerOrdinal(message.message_id);
@@ -673,7 +689,7 @@ class ChatMessageService {
 
       const completedMsg: ChatMessage = {
         ...lastMsg,
-        isStreaming: false,
+        // isStreaming stays true — drain callback sets false when all words are revealed
         isThinkingActive: false,
         ...(finalThinkingDuration !== undefined && lastMsg.thinking
           ? { thinkingDurationMs: finalThinkingDuration }
@@ -826,6 +842,8 @@ class ChatMessageService {
     // Flush pending batchers before handling error
     this.flushSession(sid);
     this.cleanupBatchers(sid);
+    // Errors are instant — snap displayedContent to full content
+    this.revealController.stopAll(sid);
     this.pendingChunkLengths.delete(message.message_id);
     this.clearMarkerOrdinal(message.message_id);
 
@@ -1583,7 +1601,7 @@ class ChatMessageService {
     let batcher = this.chunkBatchers.get(sessionId);
     if (batcher) return batcher;
 
-    batcher = rafBatch<TextChunkEvent>((events) => {
+    const processEvents = (events: TextChunkEvent[]): void => {
       if (events.length === 0) return;
 
       // Bail if session was destroyed during deferral
@@ -1634,19 +1652,21 @@ class ChatMessageService {
             return {
               ...m,
               content: newContent,
-              displayedContent: newContent,
+              // displayedContent NOT updated — reveal controller advances it word-by-word
               isThinkingActive: false,
               ...(updatedBlocks !== undefined ? { thinkingBlocks: updatedBlocks } : {}),
             };
           });
+          this.revealController.startOrContinue(sessionId, messageId);
         } else {
           // Slow path or new message
           const existingMsg = msgs.find((m) => m.id === messageId && m.role === 'assistant');
           if (existingMsg) {
             useChatStore.getState().updateMessage(sessionId, messageId, (m) => {
               const newContent = m.content + accumulatedContent;
-              return { ...m, content: newContent, displayedContent: newContent };
+              return { ...m, content: newContent };
             });
+            this.revealController.startOrContinue(sessionId, messageId);
           } else {
             // First chunk of new response (possibly a new turn in multi-tool flow)
             const parentUuid = msgs.at(-1)?.id ?? null;
@@ -1654,7 +1674,7 @@ class ChatMessageService {
               id: messageId,
               role: 'assistant',
               content: accumulatedContent,
-              displayedContent: accumulatedContent,
+              displayedContent: '',
               isStreaming: true,
               parentUuid,
             });
@@ -1662,10 +1682,13 @@ class ChatMessageService {
             // may have set it to false before this chunk arrived. Without this,
             // the loading indicator disappears between multi-turn tool calls.
             useChatStore.getState().setAgentRunning(sessionId, true);
+            this.revealController.startOrContinue(sessionId, messageId);
           }
         }
       }
-    });
+    };
+
+    batcher = rafBatch<TextChunkEvent>(processEvents);
 
     this.chunkBatchers.set(sessionId, batcher);
     return batcher;

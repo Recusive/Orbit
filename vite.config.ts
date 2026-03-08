@@ -201,6 +201,9 @@ export default defineConfig({
       '@pierre/diffs',
       '@pierre/diffs/react',
       '@pierre/precision-diffs',
+      // Milkdown Crepe — lazy-loaded by VaultCrepeEditor, must be pre-bundled to prevent
+      // runtime discovery triggering 504 "Outdated Optimize Dep" in Tauri's WKWebView.
+      '@milkdown/crepe',
     ],
   },
   // Tauri expects a fixed port

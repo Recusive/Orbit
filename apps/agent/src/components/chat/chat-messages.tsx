@@ -160,9 +160,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
   }, [messages, scrollToBottom]);
 
-  // Loading state - shown while agent is running
-  // Note: Animation interval was removed for performance. Streaming effect is now
-  // achieved through backend batching (50ms) + Streamdown's incremental markdown rendering.
+  // Loading state - shown while agent is running.
+  // Streaming cadence now comes from granular bridge chunks plus flow-token diffing.
   const isLoading = isAgentRunning;
 
   // Subscribe to activeTools and completedTools via a single combined selector

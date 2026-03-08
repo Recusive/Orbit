@@ -71,26 +71,28 @@ const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
 const STREAMDOWN_PLUGINS = { mermaid, code };
 
-/**
- * Calculate dynamic animation duration based on content length.
- *
- * Short responses get slower animations (0.8s) so each word is savored.
- * Long responses get faster animations (0.4s) to stay out of the way.
- * Linear interpolation between 0 and 800 characters.
- *
- * @param contentLength - Current length of the streaming content
- * @returns Duration string like "0.6s", or undefined if not streaming
- */
-function calculateFlowDuration(contentLength: number): string {
-  // Constants for the linear interpolation
-  const MAX_DURATION = 0.8; // seconds at 0 chars
-  const MIN_DURATION = 0.4; // seconds at 800+ chars
-  const THRESHOLD_CHARS = 800;
-
-  const ratio = Math.min(contentLength / THRESHOLD_CHARS, 1);
-  const duration = MAX_DURATION - ratio * (MAX_DURATION - MIN_DURATION);
-  return `${duration.toString()}s`;
-}
+const FlowTokenSegment: FC<{
+  readonly text: string;
+  readonly onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+}> = memo(function FlowTokenSegment({ text, onClick }) {
+  return (
+    <div
+      className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
+      onClick={onClick}
+    >
+      <Streamdown
+        remarkPlugins={REMARK_PLUGINS}
+        rehypePlugins={REHYPE_PLUGINS}
+        plugins={STREAMDOWN_PLUGINS}
+        components={STREAMDOWN_COMPONENTS}
+        linkSafety={LINK_SAFETY_DISABLED}
+        mode="static"
+      >
+        {text}
+      </Streamdown>
+    </div>
+  );
+});
 
 /** Collapsible user message bubble — clamps long content behind a "Show more" toggle. */
 const UserMessageBubble: FC<{
@@ -255,8 +257,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   }, []);
 
   // Message is complete when streaming has finished
-  // Note: displayedContent.length === content.length check removed - with backend batching,
-  // both fields are always equal. Streaming state is the authoritative signal.
+  // Note: displayedContent.length === content.length check removed. Streaming state
+  // is the authoritative signal; displayedContent mirrors content incrementally.
   const isComplete = !message.isStreaming;
 
   // Derive interrupt state from tools at render time.
@@ -272,29 +274,22 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     message.interruptReason ??
     (rejectedQuestion !== undefined ? 'User rejected to answer' : undefined);
 
-  // Use displayedContent directly - backend batching (50ms) provides smooth streaming
-  // Note: JS animation hooks cause flash when combined with auto-scroll during streaming
+  // Use displayedContent directly - the bridge now forwards granular chunks and the
+  // flow-token hook handles visual smoothing without client-side substring reveals.
   const animatedContent = message.displayedContent;
 
-  // Use the same rehype pipeline for both streaming and completed messages.
-  // Flow-token spans are inert when data-streaming="false" (no animation CSS applies).
-  // See REHYPE_PLUGINS comment above for why we don't switch pipelines.
-  const rehypePlugins = REHYPE_PLUGINS;
-
-  // Dynamic animation speed based on content length (see calculateFlowDuration)
-  const flowDuration = message.isStreaming
-    ? calculateFlowDuration(animatedContent.length)
-    : undefined;
-
   // Handle clicks on links in markdown content
-  const handleContentClick = (e: React.MouseEvent<HTMLDivElement>): void => {
-    const target = e.target as HTMLElement;
-    const anchor = target.closest('a');
-    if (anchor?.href) {
-      e.preventDefault();
-      onOpenUrl(anchor.href);
-    }
-  };
+  const handleContentClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>): void => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor?.href) {
+        e.preventDefault();
+        onOpenUrl(anchor.href);
+      }
+    },
+    [onOpenUrl]
+  );
 
   // Build interleaved segments for assistant messages
   // Memoized to prevent re-computation on every render - only recomputes when
@@ -308,12 +303,23 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     [message.thinkingBlocks, message.thinking, message.thinkingDurationMs]
   );
 
+  // Only include tools whose position has been reached by the reveal cursor.
+  // During streaming, displayedContent lags behind content. Without this filter,
+  // tool widgets would appear prematurely at the end of partially-revealed text.
+  const visibleTools = useMemo(
+    () =>
+      message.isStreaming === true
+        ? tools.filter((t) => (t.contentOffset ?? 0) <= animatedContent.length)
+        : tools,
+    [tools, animatedContent, message.isStreaming]
+  );
+
   const segments = useMemo(
     () =>
       message.role === 'assistant'
         ? buildUnifiedSegments(
             animatedContent,
-            tools,
+            visibleTools,
             effectiveThinkingBlocks,
             message.isThinkingActive,
             message.isStreaming
@@ -322,7 +328,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     [
       message.role,
       animatedContent,
-      tools,
+      visibleTools,
       effectiveThinkingBlocks,
       message.isThinkingActive,
       message.isStreaming,
@@ -338,11 +344,6 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     <div
       className="message-item space-y-2"
       data-streaming={message.isStreaming === true ? 'true' : 'false'}
-      style={
-        flowDuration !== undefined
-          ? ({ '--flow-duration': flowDuration } as React.CSSProperties)
-          : undefined
-      }
     >
       {/* Message block */}
       {message.role === 'user' ? (
@@ -388,22 +389,11 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                 // Default "streaming" mode uses block splitting + useTransition which
                 // causes height fluctuations that conflict with auto-scroll.
                 return (
-                  <div
+                  <FlowTokenSegment
                     key={segment.key}
-                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
+                    text={segment.text}
                     onClick={handleContentClick}
-                  >
-                    <Streamdown
-                      remarkPlugins={REMARK_PLUGINS}
-                      rehypePlugins={rehypePlugins}
-                      plugins={STREAMDOWN_PLUGINS}
-                      components={STREAMDOWN_COMPONENTS}
-                      linkSafety={LINK_SAFETY_DISABLED}
-                      mode="static"
-                    >
-                      {segment.text}
-                    </Streamdown>
-                  </div>
+                  />
                 );
               }
               return (
