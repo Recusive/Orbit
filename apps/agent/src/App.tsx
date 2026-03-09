@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { WelcomePage } from '@/components/welcome';
-import { startDemoConversation } from '@/hooks/agent/demo-conversation';
+import { isDemoConversationView, startDemoConversation } from '@/demo/conversation-playback';
 import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
@@ -109,7 +109,7 @@ const TerminalPanelBoth: FC<TerminalPanelProps> = (props) => (
  *
  * @returns cleanup function (for conversation playback cancellation)
  */
-function applyDemoView(view: string): (() => void) | undefined {
+function applyDemoView(view: string, scenario: string): (() => void) | undefined {
   const viewerStore = useFileViewerStore.getState();
   const uiStore = useUIStore.getState();
 
@@ -127,14 +127,12 @@ function applyDemoView(view: string): (() => void) | undefined {
       viewerStore.openFile(path, content);
       viewerStore.setFileContent(path, content);
       uiStore.openFileTab();
-      cleanupFn = startDemoConversation();
       break;
     }
 
     case 'showcase': {
       // Settings dialog open on accounts page showing Claude Code connected
       uiStore.openSettings('account');
-      cleanupFn = startDemoConversation();
       break;
     }
 
@@ -146,7 +144,6 @@ function applyDemoView(view: string): (() => void) | undefined {
       viewerStore.setFileContent(path, content);
       uiStore.openFileTab();
       uiStore.setActiveTab('editor');
-      cleanupFn = startDemoConversation();
       break;
     }
 
@@ -157,7 +154,6 @@ function applyDemoView(view: string): (() => void) | undefined {
       viewerStore.openFile(path, content);
       viewerStore.setFileContent(path, content);
       uiStore.openFileTab();
-      cleanupFn = startDemoConversation();
       break;
     }
 
@@ -165,6 +161,15 @@ function applyDemoView(view: string): (() => void) | undefined {
       // No view specified — default chat view, no editor
       break;
     }
+  }
+
+  // ── Conversation scenario ─────────────────────────────────────────────
+  // Explicit ?scenario= takes priority. Otherwise, view presets that
+  // previously started conversations default to 'clawdbot'.
+  if (scenario) {
+    cleanupFn = startDemoConversation(scenario);
+  } else if (isDemoConversationView(view)) {
+    cleanupFn = startDemoConversation('clawdbot');
   }
 
   return cleanupFn;
@@ -419,15 +424,77 @@ const App: FC = () => {
   useTrafficLights(sidebarOpen);
   const isFullscreen = useFullscreen();
 
-  // Apply demo-specific initial state based on the ?view= parameter
+  // Apply demo-specific initial state based on URL parameters.
+  // Panel layout params (sidebar, rightPanel, bottomPanel, reviewPanel) are handled
+  // synchronously at UIStore init time (getDemoPanelOverrides) to prevent first-frame flash.
+  // This effect handles params that need mounted DOM or stores: scenario, activityTab, tab, theme.
+  //
+  // autoplay=false: iframe loads eagerly but scenario waits for parent's postMessage trigger.
+  // This lets the marketing site preload demos without playing them until the user scrolls there.
   useEffect(() => {
     if (!isDemo) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get('scenario') ?? '';
+    const autoplay = params.get('autoplay');
+
+    // ── Non-scenario overrides (apply immediately regardless of autoplay) ──
+    const applyNonScenarioOverrides = (): void => {
+      const uiStore = useUIStore.getState();
+
+      const activityTabParam = params.get('activityTab');
+      if (
+        activityTabParam === 'file' ||
+        activityTabParam === 'source' ||
+        activityTabParam === 'browser'
+      ) {
+        uiStore.setActivityTab(activityTabParam);
+      }
+
+      const tabParam = params.get('tab');
+      if (tabParam === 'agent' || tabParam === 'editor' || tabParam === 'canvas') {
+        uiStore.setActiveTab(tabParam);
+      }
+
+      const themeParam = params.get('theme');
+      if (themeParam === 'light' || themeParam === 'dark') {
+        document.documentElement.classList.remove('light', 'dark');
+        document.documentElement.classList.add(themeParam);
+      }
+    };
+
     let cleanupConversation: (() => void) | undefined;
-    const timer = setTimeout(() => {
-      cleanupConversation = applyDemoView(demoView);
-    }, 800);
+
+    if (autoplay === 'false') {
+      // ── Deferred playback: wait for parent postMessage ────────────────
+      // Layout overrides apply immediately so the iframe shows a ready UI.
+      // Scenario starts only when the parent sends orbit-demo:start-scenario.
+      applyNonScenarioOverrides();
+
+      const handleStart = (event: MessageEvent): void => {
+        const data: unknown = event.data;
+        if (
+          typeof data === 'object' &&
+          data !== null &&
+          (data as Record<string, unknown>)['type'] === 'orbit-demo:start-scenario'
+        ) {
+          window.removeEventListener('message', handleStart);
+          cleanupConversation = applyDemoView(demoView, scenario);
+        }
+      };
+      window.addEventListener('message', handleStart);
+
+      return (): void => {
+        window.removeEventListener('message', handleStart);
+        cleanupConversation?.();
+      };
+    }
+
+    // ── Auto-play (default): start immediately ─────────────────────────
+    cleanupConversation = applyDemoView(demoView, scenario);
+    applyNonScenarioOverrides();
+
     return (): void => {
-      clearTimeout(timer);
       cleanupConversation?.();
     };
   }, [isDemo, demoView]);

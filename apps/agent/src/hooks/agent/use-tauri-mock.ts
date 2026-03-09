@@ -1,6 +1,6 @@
 import type { WebviewMessage } from '@/types/protocol';
 
-import { DEMO_SESSION_ID, isDemoConversationActive } from '@/hooks/agent/demo-conversation';
+import { DEMO_SESSION_ID, isDemoConversationActive } from '@/demo/conversation-playback';
 
 // ═══════════════════════════════════════════════════════════════
 // Mock handler for browser development
@@ -582,7 +582,6 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'file:reject_all':
     case 'diff:open':
     case 'url:open':
-    case 'permission:response':
     case 'inputMode:set':
     case 'thinking:set':
     case 'effort:set':
@@ -640,6 +639,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'commands:delete':
     case 'subagents:generate':
     case 'commands:generate':
+    case 'permission:response':
       break;
   }
 }

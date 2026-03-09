@@ -1,37 +1,19 @@
 /**
- * Demo Conversation Script
+ * ClawdBot Demo Scenario
  *
- * Simulates a real AI conversation for the marketing site demo.
- * Plays a scripted sequence of user prompt → AI streaming response with tool calls.
- * Used by ?view=hero and ?view=demo demo views.
- *
- * Architecture: Posts ExtensionMessage events via window.postMessage to simulate
- * the backend message flow. ChatMessageService processes these identically to
- * real backend messages — streaming, tool widgets, and all.
+ * Simulates building a ClawdBot system with Linear, Slack, and Playwright integrations.
+ * Demonstrates: WebSearch → Write → Bash tool chain with streaming text.
  */
 
-// ============================================
-// Types
-// ============================================
+import { DEMO_SESSION_ID } from './types';
 
-interface DemoEvent {
-  /** Delay in ms from the previous event */
-  delay: number;
-  /** The message to post via window.postMessage */
-  message: Record<string, unknown>;
-}
+import type { DemoEvent, DemoScript } from './types';
 
 // ============================================
 // Constants
 // ============================================
 
-export const DEMO_SESSION_ID = 'demo-session-001';
 const DEMO_MESSAGE_ID = 'demo-msg-001';
-const DEMO_USER_MESSAGE_ID = 'demo-user-001';
-
-// ============================================
-// Conversation Script
-// ============================================
 
 const USER_PROMPT =
   'Build me a ClawdBot system — an AI assistant that integrates with Linear for issue tracking, Slack for team notifications, and a headless browser for web research. Set up the project structure and core integrations.';
@@ -81,11 +63,15 @@ const TEXT_CHUNKS: readonly { text: string; delay: number }[] = [
   },
 ];
 
+// ============================================
+// Script Builder
+// ============================================
+
 /**
- * Build the full sequence of timed events that make up the demo conversation.
- * Returns an array of { delay, message } objects to be posted sequentially.
+ * Build the full sequence of timed events that make up the ClawdBot demo conversation.
+ * Returns a DemoScript with title, user prompt, and timed event sequence.
  */
-function buildDemoScript(): DemoEvent[] {
+export function buildClawdbotScript(): DemoScript {
   const events: DemoEvent[] = [];
   let chunkIndex = 0;
 
@@ -303,98 +289,9 @@ export async function research(url: string) {
     },
   });
 
-  return events;
-}
-
-// ============================================
-// Playback Engine
-// ============================================
-
-/** Whether a demo conversation is currently playing */
-let isDemoActive = false;
-
-/** Check if a demo conversation is currently active (used by mock handler) */
-export function isDemoConversationActive(): boolean {
-  return isDemoActive;
-}
-
-/** Tracks active playback timeouts for cleanup */
-let activeTimeoutIds: ReturnType<typeof setTimeout>[] = [];
-
-/**
- * Start the demo conversation playback.
- *
- * 1. Posts `conversation:created` to initialize a session
- * 2. Posts `conversation:loaded` with the user prompt pre-populated
- * 3. Plays the scripted AI response sequence with timed delays
- *
- * @returns cleanup function to cancel all pending timeouts
- */
-export function startDemoConversation(): () => void {
-  // Clear any previous playback
-  cancelDemoConversation();
-  isDemoActive = true;
-
-  const events = buildDemoScript();
-  activeTimeoutIds = [];
-
-  // Step 1: Create session (immediate)
-  window.postMessage(
-    {
-      type: 'conversation:created',
-      uuid: crypto.randomUUID(),
-      session_id: DEMO_SESSION_ID,
-      title: 'ClawdBot Setup',
-    },
-    '*'
-  );
-
-  // Step 2: Load conversation with user message (after session init settles)
-  const loadTimeout = setTimeout(() => {
-    window.postMessage(
-      {
-        type: 'conversation:loaded',
-        uuid: crypto.randomUUID(),
-        session_id: DEMO_SESSION_ID,
-        title: 'ClawdBot Setup',
-        messages: [
-          {
-            id: DEMO_USER_MESSAGE_ID,
-            role: 'user',
-            content: USER_PROMPT,
-            createdAt: Date.now(),
-            parentUuid: null,
-          },
-        ],
-      },
-      '*'
-    );
-  }, 500);
-  activeTimeoutIds.push(loadTimeout);
-
-  // Step 3: Play scripted events with cumulative delays
-  let cumulativeDelay = 1500; // Start after conversation loaded settles
-  for (const event of events) {
-    cumulativeDelay += event.delay;
-    const timeout = setTimeout(() => {
-      window.postMessage(event.message, '*');
-    }, cumulativeDelay);
-    activeTimeoutIds.push(timeout);
-  }
-
-  return cancelDemoConversation;
-}
-
-/** Cancel all pending demo playback timeouts */
-function cancelDemoConversation(): void {
-  for (const id of activeTimeoutIds) {
-    clearTimeout(id);
-  }
-  activeTimeoutIds = [];
-  isDemoActive = false;
-}
-
-/** Whether the given view should play the demo conversation */
-export function isDemoConversationView(view: string): boolean {
-  return view === 'hero' || view === 'demo';
+  return {
+    title: 'ClawdBot Setup',
+    userPrompt: USER_PROMPT,
+    events,
+  };
 }

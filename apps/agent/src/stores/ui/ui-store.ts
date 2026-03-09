@@ -213,6 +213,63 @@ type UIStore = UIState & UIActions;
 
 // Conversations are loaded from disk (JSONL files) — no localStorage persistence needed.
 
+// ============================================
+// Demo Mode Panel Overrides (synchronous, before store creation)
+// ============================================
+
+/**
+ * Read demo panel params from URL at module load time.
+ * Returns overrides only when `?demo=true` is present.
+ *
+ * This runs ONCE at module evaluation — before any React render.
+ * Prevents the "panel flash" where DEFAULT_UI_STATE renders one frame
+ * then the useEffect applies URL param overrides 800ms later.
+ */
+function getDemoPanelOverrides(): Partial<UIState> {
+  if (typeof window === 'undefined') return {};
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('demo') !== 'true') return {};
+
+  const overrides: Partial<UIState> = {};
+
+  const sidebar = params.get('sidebar');
+  if (sidebar !== null) {
+    const width = Number(sidebar);
+    overrides.leftSidebarWidth = width;
+    overrides.leftSidebarOpen = width > SIDEBAR.collapsed;
+    overrides.lastExpandedSidebarWidth = width > SIDEBAR.collapsed ? width : SIDEBAR.expanded;
+  }
+
+  const rightPanel = params.get('rightPanel');
+  if (rightPanel !== null) {
+    overrides.rightSidebarOpen = rightPanel === 'true';
+  }
+
+  const bottomPanel = params.get('bottomPanel');
+  if (bottomPanel !== null) {
+    overrides.bottomPanelOpen = bottomPanel === 'true';
+  }
+
+  const reviewPanel = params.get('reviewPanel');
+  if (reviewPanel !== null) {
+    overrides.reviewPanelOpen = reviewPanel === 'true';
+  }
+
+  const rightPanelWidth = params.get('rightPanelWidth');
+  if (rightPanelWidth !== null) {
+    const width = Number(rightPanelWidth);
+    overrides.reviewPanelWidth = Math.max(
+      PANEL_SIZES.review.min,
+      Math.min(PANEL_SIZES.review.max, width)
+    );
+  }
+
+  return overrides;
+}
+
+/** Evaluated once at module load — empty object for non-demo usage */
+const DEMO_PANEL_OVERRIDES = getDemoPanelOverrides();
+
 // Helper to load worktrees from localStorage
 // Uses Zod validation to prevent runtime errors from malformed data
 const loadWorktreesFromStorage = (): WorktreeUIState[] => {
@@ -283,13 +340,14 @@ export const useUIStore = create<UIStore>()(
     conversations: [],
     editingConversationId: null,
     titleLoadingSessions: new Set<string>(),
-    leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
-    leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
-    reviewPanelWidth: DEFAULT_UI_STATE.reviewPanelWidth,
-    rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
-    bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
+    leftSidebarOpen: DEMO_PANEL_OVERRIDES.leftSidebarOpen ?? DEFAULT_UI_STATE.leftSidebarOpen,
+    leftSidebarWidth: DEMO_PANEL_OVERRIDES.leftSidebarWidth ?? DEFAULT_UI_STATE.leftSidebarWidth,
+    lastExpandedSidebarWidth:
+      DEMO_PANEL_OVERRIDES.lastExpandedSidebarWidth ?? DEFAULT_UI_STATE.leftSidebarWidth,
+    reviewPanelOpen: DEMO_PANEL_OVERRIDES.reviewPanelOpen ?? DEFAULT_UI_STATE.reviewPanelOpen,
+    reviewPanelWidth: DEMO_PANEL_OVERRIDES.reviewPanelWidth ?? DEFAULT_UI_STATE.reviewPanelWidth,
+    rightSidebarOpen: DEMO_PANEL_OVERRIDES.rightSidebarOpen ?? DEFAULT_UI_STATE.rightSidebarOpen,
+    bottomPanelOpen: DEMO_PANEL_OVERRIDES.bottomPanelOpen ?? DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
