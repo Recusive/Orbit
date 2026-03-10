@@ -1,0 +1,166 @@
+import { EOL } from "os"
+import path from "path"
+
+import { Flag } from "../../flag/flag"
+import { Session } from "../../session"
+import { Filesystem } from "../../util/filesystem"
+import { Locale } from "../../util/locale"
+import { Process } from "../../util/process"
+import { which } from "../../util/which"
+import { bootstrap } from "../bootstrap"
+import { UI } from "../ui"
+
+import { cmd } from "./cmd"
+
+import type { Argv } from "yargs"
+
+function pagerCmd(): string[] {
+  const lessOptions = ["-R", "-S"]
+  if (process.platform !== "win32") {
+    return ["less", ...lessOptions]
+  }
+
+  // user could have less installed via other options
+  const lessOnPath = which("less")
+  if (lessOnPath !== null) {
+    const stat = Filesystem.stat(lessOnPath)
+    if (stat !== undefined && stat.size > 0) return [lessOnPath, ...lessOptions]
+  }
+
+  if (Flag.OPENCODE_GIT_BASH_PATH !== undefined) {
+    const less = path.join(Flag.OPENCODE_GIT_BASH_PATH, "..", "..", "usr", "bin", "less.exe")
+    const stat = Filesystem.stat(less)
+    if (stat !== undefined && stat.size > 0) return [less, ...lessOptions]
+  }
+
+  const git = which("git")
+  if (git !== null) {
+    const less = path.join(git, "..", "..", "usr", "bin", "less.exe")
+    const stat = Filesystem.stat(less)
+    if (stat !== undefined && stat.size > 0) return [less, ...lessOptions]
+  }
+
+  // Fall back to Windows built-in more (via cmd.exe)
+  return ["cmd", "/c", "more"]
+}
+
+export const SessionCommand = cmd({
+  command: "session",
+  describe: "manage sessions",
+  builder: (yargs: Argv) => yargs.command(SessionListCommand).command(SessionDeleteCommand).demandCommand(),
+  handler() {
+    // parent command - noop
+  },
+})
+
+export const SessionDeleteCommand = cmd({
+  command: "delete <sessionID>",
+  describe: "delete a session",
+  builder: (yargs: Argv) => {
+    return yargs.positional("sessionID", {
+      describe: "session ID to delete",
+      type: "string",
+      demandOption: true,
+    })
+  },
+  handler: async (args) => {
+    await bootstrap(process.cwd(), async () => {
+      try {
+        Session.get(args.sessionID)
+      } catch {
+        UI.error(`Session not found: ${args.sessionID}`)
+        process.exit(1)
+      }
+      await Session.remove(args.sessionID)
+      UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Session ${args.sessionID} deleted` + UI.Style.TEXT_NORMAL)
+    })
+  },
+})
+
+export const SessionListCommand = cmd({
+  command: "list",
+  describe: "list sessions",
+  builder: (yargs: Argv) => {
+    return yargs
+      .option("max-count", {
+        alias: "n",
+        describe: "limit to N most recent sessions",
+        type: "number",
+      })
+      .option("format", {
+        describe: "output format",
+        type: "string",
+        choices: ["table", "json"],
+        default: "table",
+      })
+  },
+  handler: async (args) => {
+    await bootstrap(process.cwd(), async () => {
+      const sessions = [...Session.list({ roots: true, limit: args.maxCount })]
+
+      if (sessions.length === 0) {
+        return
+      }
+
+      let output: string
+      if (args.format === "json") {
+        output = formatSessionJSON(sessions)
+      } else {
+        output = formatSessionTable(sessions)
+      }
+
+      const shouldPaginate =
+        process.stdout.isTTY && (args.maxCount === undefined || args.maxCount === 0) && args.format === "table"
+
+      if (shouldPaginate) {
+        const proc = Process.spawn(pagerCmd(), {
+          stdin: "pipe",
+          stdout: "inherit",
+          stderr: "inherit",
+        })
+
+        if (!proc.stdin) {
+          console.log(output)
+          return
+        }
+
+        proc.stdin.write(output)
+        proc.stdin.end()
+        await proc.exited
+      } else {
+        console.log(output)
+      }
+    })
+  },
+})
+
+function formatSessionTable(sessions: Session.Info[]): string {
+  const lines: string[] = []
+
+  const maxIdWidth = Math.max(20, ...sessions.map((s) => s.id.length))
+  const maxTitleWidth = Math.max(25, ...sessions.map((s) => s.title.length))
+
+  const header = `Session ID${" ".repeat(maxIdWidth - 10)}  Title${" ".repeat(maxTitleWidth - 5)}  Updated`
+  lines.push(header)
+  lines.push("─".repeat(header.length))
+  for (const session of sessions) {
+    const truncatedTitle = Locale.truncate(session.title, maxTitleWidth)
+    const timeStr = Locale.todayTimeOrDateTime(session.time.updated)
+    const line = `${session.id.padEnd(maxIdWidth)}  ${truncatedTitle.padEnd(maxTitleWidth)}  ${timeStr}`
+    lines.push(line)
+  }
+
+  return lines.join(EOL)
+}
+
+function formatSessionJSON(sessions: Session.Info[]): string {
+  const jsonData = sessions.map((session) => ({
+    id: session.id,
+    title: session.title,
+    updated: session.time.updated,
+    created: session.time.created,
+    projectId: session.projectID,
+    directory: session.directory,
+  }))
+  return JSON.stringify(jsonData, null, 2)
+}
