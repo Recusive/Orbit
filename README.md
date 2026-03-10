@@ -1,15 +1,22 @@
-# Orbit
+<p align="center">
+  <img src="src-tauri/icons/app-icons/orbit-primary/icon-Default.png" alt="Orbit" width="128" />
+</p>
 
-> Built for the way software gets built now.
+<h1 align="center">Orbit</h1>
 
-AI-native development environment. Full context. Zero switching. One agent across everything you build with.
+<p align="center">
+  <strong>Built for the way software gets built now.</strong><br/>
+  AI-native development environment. Full context. Zero switching. One agent across everything you build with.
+</p>
 
-[![CI](https://github.com/Recursive/Snowflake-V0/actions/workflows/ci.yml/badge.svg)](https://github.com/Recursive/Snowflake-V0/actions/workflows/ci.yml)
-![Tauri](https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![Rust](https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white)
-![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)
+<p align="center">
+  <a href="https://github.com/Recusive/Orbit/actions/workflows/ci.yml"><img src="https://github.com/Recusive/Orbit/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/Tauri-2.0-24C8D8?logo=tauri&logoColor=white" alt="Tauri" />
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React" />
+  <img src="https://img.shields.io/badge/Rust-1.85-DEA584?logo=rust&logoColor=black" alt="Rust" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white" alt="macOS" />
+</p>
 
 ---
 
