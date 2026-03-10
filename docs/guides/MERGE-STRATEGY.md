@@ -4,10 +4,10 @@
 
 We have two branches that contain the same codebase changes from `v0.0.6`:
 
-| Branch | Purpose | Commits |
-|--------|---------|---------|
+| Branch                    | Purpose                                   | Commits         |
+| ------------------------- | ----------------------------------------- | --------------- |
 | `feat/migration-granular` | ~2,600 small commits (contribution graph) | ~100 lines each |
-| `feat/migration` | Real development branch (ongoing work) | Normal commits |
+| `feat/migration`          | Real development branch (ongoing work)    | Normal commits  |
 
 Both started from `v0.0.6`. The granular branch is a mechanical split of the same code.
 
@@ -46,12 +46,14 @@ git rebase origin/main
 ```
 
 **What happens during rebase:**
+
 - Git replays your `feat/migration` commits on top of main
 - Commits that introduce code already on main (from the granular merge) will become **empty**
 - Git auto-skips empty commits, or you can use `--skip` if prompted
 - Only commits with **new work** (done after the granular split) will remain
 
 If you get conflicts:
+
 ```bash
 # For each conflict, keep your feat/migration version (it's the "real" one)
 git checkout --theirs .
@@ -112,6 +114,7 @@ A: You'll get merge conflicts during rebase. Resolve by keeping your feat/migrat
 
 **Q: Can I delete feat/migration-granular after merging it?**
 A: Yes. Once merged to main, the branch is just a pointer. Delete it on GitHub and locally:
+
 ```bash
 git branch -d feat/migration-granular
 git push origin --delete feat/migration-granular
@@ -122,6 +125,7 @@ A: That works too, but then the granular branch will have conflicts with main (s
 
 **Q: Will GitHub count all ~2,600 commits on my contribution graph?**
 A: Yes, as long as:
+
 1. You use **Rebase and merge** (not squash)
 2. The commit author email matches your GitHub account
 3. The commits land on the default branch (main)

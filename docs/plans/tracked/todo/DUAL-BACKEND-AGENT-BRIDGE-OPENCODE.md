@@ -1,11 +1,12 @@
 # Dual AI Backend: Agent-bridge (Claude) + Agent-backend (OpenCode)
 
-**Status:** REWORKED (2026-03-10) — 5 audit rounds
+**Status:** REWORKED (2026-03-10) — 6 audit rounds
 **Audit 1:** 4 critical + 6 recs + 8 edge cases → addressed
 **Audit 2:** 3 critical + 5 edge cases → addressed
 **Audit 3:** 1 critical + 5 edge cases → addressed
 **Audit 4:** 0 critical, 3 advisory edge cases → acknowledged
-**Audit 5 (deep):** 6 critical + 9 edge cases + 4 recs + 3 nice-to-haves → **addressed in this version**
+**Audit 5 (deep):** 6 critical + 9 edge cases + 4 recs + 3 nice-to-haves → addressed
+**Audit 6:** 3 critical + 4 recs + 3 nice-to-haves → **addressed in this version**
 
 ## Context
 
@@ -86,7 +87,7 @@ src-tauri/src/opencode/process.rs
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Top-bar `newSession` shortcut routed to Claude           | `content-top-bar.tsx` reads `activeBackend`, routes to correct repo (Phase 4)                                                                                                                     |
 | Claude repo create diverging from remap/title flow       | `ClaudeConversationRepo.create()` delegates to `postMessage('conversation:create')`, not direct Tauri invoke (Phase 4)                                                                            |
-| Offline build with no raw cached `api.json`              | Wrapper script generates `api.json` from existing `models-snapshot.ts` as fallback (Phase 9)                                                                                                      |
+| Offline build with no raw cached `api.json`              | Wrapper script uses committed `bootstrap-api.json` as fallback (Phase 9). No `models-snapshot.ts` fallback — that file is itself generated. (Audit 6 C2)                                          |
 | OpenCode server title updates racing sidebar refresh     | `session.updated` event from SSE is authoritative — oc-event-coordinator updates `oc-session-store`, sidebar reads reactively. No manual sidebar refresh needed. (Phase 2)                        |
 | Users wanting to see OpenCode providers before switching | `ProvidersSettings` page is always accessible — shows static informational catalog in Claude mode with "Switch to OpenCode to connect" banner. Live auth only when OpenCode is running. (Phase 7) |
 
@@ -102,11 +103,11 @@ src-tauri/src/opencode/process.rs
 | Top bar and sidebar creating sessions through different abstractions                    | Both route through `ConversationRepository`. `content-top-bar.tsx` calls `getConversationRepo(activeBackend).create()`, sidebar `use-sidebar-actions.ts` calls the same. Single abstraction, no drift. (Phase 4)                                                                                                               |
 | Dual OpenCode sidebar sources: `UIStore.ocConversations` vs `oc-session-store.sessions` | Removed ambiguity: `oc-session-store.sessions` is the SINGLE source of truth for OpenCode sessions. `UIStore.ocConversations` field is NOT created. `useConversationList()` hook reads from `oc-session-store` directly when backend is 'opencode'. (Phase 4/5)                                                                |
 
-| Re-Audit 3 Edge Case                                                    | How Addressed                                                                                                                                                                                                                                                                                                                                                                             |
-| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Static Claude-mode provider catalog drifting from real provider set     | Catalog is generated from `Agent-backend/packages/opencode/src/provider/provider.ts` at build time by `scripts/build-opencode.ts`. Output: `apps/agent/src/data/opencode-providers.json`. Regenerated on every `build:opencode` run, so it stays in sync with the binary. (Phase 9)                                                                                                       |
-| Top bar and sidebar drifting to different session-creation abstractions | Enforced structurally: `getConversationRepo()` is the only export that returns a `ConversationRepository`. Both `content-top-bar.tsx` and `use-sidebar-actions.ts` import from the same barrel (`services/conversations`). An ESLint `no-restricted-syntax` rule flags direct `postMessage({ type: 'conversation:create' })` calls outside the Claude repo implementation file. (Phase 4) |
-| Cached `api.json` for `MODELS_DEV_API_JSON` going stale                 | Refresh policy: `build:opencode` (no flag) uses cached file if it exists, generates from `models-snapshot.ts` if not. `build:opencode:full` (release builds) always fetches fresh from `models.dev` and overwrites the cache. CI runs `build:opencode:full` on release tags only; PR builds use cached. Cache file is gitignored (`scripts/opencode-models-cache/`). (Phase 9)            |
+| Re-Audit 3 Edge Case                                                    | How Addressed                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Static Claude-mode provider catalog drifting from real provider set     | Catalog is generated from `Agent-backend/packages/opencode/src/provider/provider.ts` at build time by `scripts/build-opencode.ts`. Output: `apps/agent/src/data/opencode-providers.json`. Regenerated on every `build:opencode` run, so it stays in sync with the binary. (Phase 9)                                                                                                          |
+| Top bar and sidebar drifting to different session-creation abstractions | Enforced structurally: `getConversationRepo()` is the only export that returns a `ConversationRepository`. Both `content-top-bar.tsx` and `use-sidebar-actions.ts` import from the same barrel (`services/conversations`). An ESLint `no-restricted-syntax` rule flags direct `postMessage({ type: 'conversation:create' })` calls outside the Claude repo implementation file. (Phase 4)    |
+| Cached `api.json` for `MODELS_DEV_API_JSON` going stale                 | Refresh policy: `build:opencode` (no flag) uses cached `api.json` if it exists, falls back to committed `bootstrap-api.json`. `build:opencode:full` (release builds) always fetches fresh from `models.dev` and overwrites the cache. CI runs `build:opencode:full` on release tags only; PR builds use cached. Cache file is gitignored; bootstrap file is committed. (Phase 9, Audit 6 C2) |
 
 | Audit 5 Critical Issue                                                           | How Addressed                                                                                                                                                                                                                                                                                                                                                               |
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -128,6 +129,19 @@ src-tauri/src/opencode/process.rs
 | OpenCode title update vs shared header              | `ConversationUiBridge.activeTitle` reads from `oc-session-store` when OpenCode active, `UIStore` when Claude. SSE `session.updated` updates `oc-session-store` → bridge → header reactively (Phase 4)   |
 | Missing `orbit-server` binary on startup            | `resolve_opencode_binary_path()` returns `Result`. If binary missing, `opencode_start()` returns clear error → frontend shows "OpenCode not built" in BackendSettings with build instructions (Phase 6) |
 | Clean checkout offline build                        | Committed `scripts/opencode-models-cache/bootstrap-api.json` (vendor snapshot). `build:opencode` uses this when no cached `api.json` exists. (Phase 9)                                                  |
+
+| Audit 6 Critical Issue                                                | How Addressed                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A6-1: ConversationUiBridge missing select/load/getActiveSessionId** | Added `select(sessionId)`, `restoreSelection()`, and `getActiveSessionId()` to `ConversationUiBridge`. Bridge is the single source of truth for selected session. Sidebar row highlighting, header title, and chat area all read through bridge — NEVER from `UIStore.activeConversationId` or `oc-session-store.activeSessionId` directly. `use-sidebar-actions.ts` routes `handleLoadConversation` through `bridge.select()`. (Phase 4) |
+| **A6-2: Offline build fallback internally inconsistent**              | Removed all `models-snapshot.ts` fallback references (that file is itself generated, doesn't exist on clean checkout). Single precedence chain: cached `api.json` → committed `bootstrap-api.json` → FAIL with clear message. `--with-models` fetches fresh and overwrites cache. (Phase 9)                                                                                                                                               |
+| **A6-3: CI rewrite drops Rust fmt/lint/test**                         | Preserved the existing `ci` script in full (all TS typechecks + ESLint + Vitest + `rust:fmt` + `rust:lint` + `rust:test`) and appended `&& bun run build:opencode`. Also wired `build:opencode` into `dev:debug`, `dev:quiet`, `build:debug`. (Phase 9)                                                                                                                                                                                   |
+
+| Audit 6 Recommendation                                   | How Addressed                                                                                                                                                                        |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| R1: Provider store only documents `GET /provider`        | `oc-provider-store` now loaded via `Promise.all([sdk.provider.list(), sdk.provider.auth()])` in lifecycle hook. `isLoading` flag shown as skeleton in `ProvidersSettings`. (Phase 5) |
+| R2: Part ordering ambiguous (append vs sorted insertion) | Clarified: `upsertPart` uses sorted insertion by `part.id` matching upstream TUI binary-search pattern. Replaces in-place if part already exists. (Phase 5)                          |
+| R3: Sibling dev scripts not wired                        | `dev:debug`, `dev:quiet`, `build:debug` all include `build:opencode`. Script entrypoint matrix added to Phase 9. (Phase 9)                                                           |
+| R4: ProvidersSettings remount behavior                   | Documented as safe to remount — all data is store-backed, no API calls on remount. Loading skeleton while `isLoading === true`. (Phase 7)                                            |
 
 ---
 
@@ -512,11 +526,15 @@ interface ConversationRepository {
 }
 ```
 
-**Layer 2: ConversationUiBridge** — UI state ownership (active title, loading, workspace bootstrap). Shared components (`content-top-bar`, `PrimarySidebar`, `use-sidebar-actions`) read from this bridge instead of Claude-specific UIStore state.
+**Layer 2: ConversationUiBridge** — UI state ownership (active title, loading, selection, workspace bootstrap). Shared components (`content-top-bar`, `PrimarySidebar`, `use-sidebar-actions`, `ConversationList`) read from this bridge instead of Claude-specific UIStore state.
 
 ```typescript
 // types/backend/conversation-ui-bridge.ts
 interface ConversationUiBridge {
+  // Active session — single source of truth for selected session (Audit 6 C1)
+  getActiveSessionId(): string | null;
+  select(sessionId: string): Promise<void>; // sidebar click → load + highlight
+  restoreSelection(): Promise<void>; // app startup → restore persisted session
   // Active session metadata — header reads this
   getActiveMeta(): { id: string | null; title: string | null; isTitleLoading: boolean };
   // Session CRUD — all UI entrypoints go through this
@@ -528,6 +546,18 @@ interface ConversationUiBridge {
   hydrateWorkspace(context: { workspacePath: string; worktreePath: string | null }): Promise<void>;
 }
 ```
+
+**Session selection ownership (Audit 6 C1):**
+
+The bridge is the **single source of truth** for which session is selected. Shared components NEVER read `UIStore.activeConversationId` or `oc-session-store.activeSessionId` directly — they call `bridge.getActiveSessionId()`.
+
+- **Claude bridge `select()`**: sets `UIStore.activeConversationId`, calls `conversation:load`, triggers pending-load state — mirrors current `handleLoadConversation()` in `use-sidebar-actions.ts:253-285`.
+- **OpenCode bridge `select()`**: sets `oc-session-store.activeSessionId`, calls `oc-session-service.loadMessages()`. Uses the same `isLoadingConversation` / `isConversationTransitioning` UX states as Claude for the content-swap skeleton — keeping transition behavior consistent across backends.
+- **Claude bridge `restoreSelection()`**: reads `localStorage['orbit-sessionId']`, validates via `conversation:load`, falls back to empty state.
+- **OpenCode bridge `restoreSelection()`**: reads `localStorage['orbit-oc-sessionId']`, validates via `GET /session/:id` (404 → clear and show empty state).
+- **Sidebar row highlighting**: `ConversationList.tsx` uses `bridge.getActiveSessionId()` instead of `UIStore.activeConversationId`.
+
+The bridge delegates to the underlying store for actual state storage (`UIStore.activeConversationId` for Claude, `oc-session-store.activeSessionId` for OpenCode), but external consumers only go through the bridge.
 
 The Claude implementation delegates to `UIStore.conversations`, `session-title-service`, and `conversationList()`. The OpenCode implementation delegates to `oc-session-store` and `oc-session-service`. Shared UI never touches backend-specific state directly.
 
@@ -547,20 +577,21 @@ The Claude implementation delegates to `UIStore.conversations`, `session-title-s
 
 ### Modified Files
 
-| File                                                                            | Change                                                                                                                                                                              |
-| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/components/layout/primary-sidebar/`                             | Session list uses `useConversationList()` hook. Conversation item actions delegate to bridge.                                                                                       |
-| `apps/agent/src/components/layout/primary-sidebar/PrimarySidebar.tsx`           | `openProject()` calls `bridge.hydrateWorkspace()` instead of `conversationList()` → `UIStore.setConversations()` directly. (Audit 5 C5: workspace bootstrap is backend-aware.)      |
-| `apps/agent/src/components/layout/primary-sidebar/hooks/use-sidebar-actions.ts` | All session CRUD routes through `ConversationUiBridge`. Worktree logic only runs when `getCapabilities(backend).worktreeIsolation === true`.                                        |
-| `apps/agent/src/components/layout/content-top-bar.tsx`                          | Title reads from `useConversationMeta()` instead of `useActiveConversationTitle()`. `handleNewSession` calls `bridge.create()`. (Audit 5 C5: no direct UIStore conversation reads.) |
+| File                                                                            | Change                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/agent/src/components/layout/primary-sidebar/`                             | Session list uses `useConversationList()` hook. Conversation item actions delegate to bridge.                                                                                                                                            |
+| `apps/agent/src/components/layout/primary-sidebar/PrimarySidebar.tsx`           | `openProject()` calls `bridge.hydrateWorkspace()` instead of `conversationList()` → `UIStore.setConversations()` directly. (Audit 5 C5: workspace bootstrap is backend-aware.)                                                           |
+| `apps/agent/src/components/layout/primary-sidebar/hooks/use-sidebar-actions.ts` | Session selection (`handleLoadConversation`) routes through `bridge.select()`. All session CRUD routes through `ConversationUiBridge`. Worktree logic only runs when `getCapabilities(backend).worktreeIsolation === true`. (Audit 6 C1) |
+| `apps/agent/src/components/layout/content-top-bar.tsx`                          | Title reads from `useConversationMeta()` instead of `useActiveConversationTitle()`. `handleNewSession` calls `bridge.create()`. (Audit 5 C5: no direct UIStore conversation reads.)                                                      |
 
 ### What Happens to UIStore.conversations
 
 - `UIStore.conversations` stays as-is for Claude mode — `claude-ui-bridge` reads/writes it
 - For OpenCode mode, `oc-ui-bridge` reads from `oc-session-store.sessions` — NO `UIStore.ocConversations` field
-- `UIStore.activeConversationId` continues working — both backends use it
+- `UIStore.activeConversationId` stays as Claude's internal selected-session state — `claude-ui-bridge.select()` writes it, `claude-ui-bridge.getActiveSessionId()` reads it
+- Shared components NEVER read `UIStore.activeConversationId` directly — they call `bridge.getActiveSessionId()` (Audit 6 C1: single source of truth for selection)
 - `UIStore.remapConversation()` only called in Claude mode
-- Shared components (`content-top-bar`, `PrimarySidebar`, sidebar actions) NEVER read `UIStore.conversations` or `useActiveConversationTitle()` directly — they go through the bridge hooks
+- Shared components (`content-top-bar`, `PrimarySidebar`, sidebar actions, `ConversationList`) NEVER read `UIStore.conversations`, `UIStore.activeConversationId`, or `useActiveConversationTitle()` directly — they go through the bridge hooks
 
 ### Drift Prevention (Re-Audit 3 Edge Case)
 
@@ -594,13 +625,13 @@ On backend switch: read the correct key. On restore: validate session exists (Op
 
 ### New Files
 
-| File                                                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/stores/opencode/oc-session-store.ts`    | Sessions + status. State: `sessions: Record<string, OcSession>`, `activeSessionId: string \| null` (persisted to `orbit-oc-sessionId`), `sessionStatuses: Record<string, OcSessionStatus>`, `sessionErrors: Record<string, string>`. Plain objects, not Map. LRU eviction (max 30 sessions).                                                                                                                                                                                                                                                                                                                                                                                           |
-| `apps/agent/src/stores/opencode/oc-message-store.ts`    | Messages + parts per session. (Audit 5 C2: redesigned for per-message part ordering.) State per session: `messagesById: Record<messageId, OcMessage>`, `messageOrder: string[]`, `partsByMessage: Record<messageId, OcPart[]>` (ordered arrays — insertion order preserved), `partsById: Record<partId, OcPart>` (for delta lookups by partId), `deltaBufferByPart: Record<partId, Array<{field, delta}>>`. Actions: `upsertMessage`, `removeMessage`, `upsertPart` (inserts into both `partsById` and appends to `partsByMessage[messageId]`), `removePart`, `appendDelta` (uses `partsById` for lookup, buffers if part missing), `flushDeltaBuffer`, `clearSession`. NOT persisted. |
-| `apps/agent/src/stores/opencode/oc-permission-store.ts` | Pending permissions + questions. State: `permissions: Record<id, OcPermissionAsked>`, `questions: Record<id, QuestionRequest>` (Audit 5 C3: full `QuestionRequest` shape with `questions: Array<QuestionInfo>`). Actions: `addPermission`, `removePermission`, `addQuestion`, `removeQuestion`.                                                                                                                                                                                                                                                                                                                                                                                        |
-| `apps/agent/src/stores/opencode/oc-provider-store.ts`   | Available providers + auth. State: `providers: OcProvider[]`, `connectedProviders: string[]`, `defaultModels: Record<providerId, modelId>`, `authMethods: Record<providerId, Array<{ type: 'oauth' \| 'api'; label: string }>>` (Audit 5 C4: both auth method types). Loaded via `GET /provider` when OpenCode mode activates.                                                                                                                                                                                                                                                                                                                                                         |
-| `apps/agent/src/stores/opencode/index.ts`               | Barrel exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| File                                                    | Purpose                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/agent/src/stores/opencode/oc-session-store.ts`    | Sessions + status. State: `sessions: Record<string, OcSession>`, `activeSessionId: string \| null` (persisted to `orbit-oc-sessionId`), `sessionStatuses: Record<string, OcSessionStatus>`, `sessionErrors: Record<string, string>`. Plain objects, not Map. LRU eviction (max 30 sessions).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `apps/agent/src/stores/opencode/oc-message-store.ts`    | Messages + parts per session. (Audit 5 C2: redesigned for per-message part ordering.) State per session: `messagesById: Record<messageId, OcMessage>`, `messageOrder: string[]`, `partsByMessage: Record<messageId, OcPart[]>` (ordered arrays — insertion order preserved), `partsById: Record<partId, OcPart>` (for delta lookups by partId), `deltaBufferByPart: Record<partId, Array<{field, delta}>>`. Actions: `upsertMessage`, `removeMessage`, `upsertPart` (inserts into `partsById` + sorted insertion by part ID into `partsByMessage[messageId]` — matches upstream TUI binary-search pattern for out-of-order robustness; replaces in-place if part already exists), `removePart`, `appendDelta` (uses `partsById` for lookup, buffers if part missing), `flushDeltaBuffer`, `clearSession`. NOT persisted. (Audit 6 R2) |
+| `apps/agent/src/stores/opencode/oc-permission-store.ts` | Pending permissions + questions. State: `permissions: Record<id, OcPermissionAsked>`, `questions: Record<id, QuestionRequest>` (Audit 5 C3: full `QuestionRequest` shape with `questions: Array<QuestionInfo>`). Actions: `addPermission`, `removePermission`, `addQuestion`, `removeQuestion`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `apps/agent/src/stores/opencode/oc-provider-store.ts`   | Available providers + auth. State: `providers: OcProvider[]`, `connectedProviders: string[]`, `defaultModels: Record<providerId, modelId>`, `authMethods: Record<providerId, Array<{ type: 'oauth' \| 'api'; label: string }>>` (Audit 5 C4: both auth method types), `isLoading: boolean`. **Initialization (Audit 6 R1):** `use-opencode-lifecycle.ts` calls `loadProviders()` on activation which runs `Promise.all([sdk.provider.list(), sdk.provider.auth()])` → populates both `providers` and `authMethods` in a single batch. `ProvidersSettings` renders a loading skeleton until `isLoading === false`. Re-fetched on every OpenCode activation (handles provider config changes between sessions).                                                                                                                         |
+| `apps/agent/src/stores/opencode/index.ts`               | Barrel exports                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 
 ### Why Plain Objects, Not Map
 
@@ -615,7 +646,7 @@ The audit noted that `ChatStore` deliberately avoids `Map` for session state due
 - `appendDelta` produces correct accumulated text
 - Delta buffer fills and flushes correctly
 - Tool parts transition through all 4 states
-- `upsertPart` inserts into `partsByMessage[messageId]` in order — parts render correctly per message
+- `upsertPart` uses sorted insertion by `part.id` into `partsByMessage[messageId]` — matches upstream TUI binary-search pattern for robustness against out-of-order events (Audit 6 R2). If part already exists (same id), replaces in-place without changing position.
 - `partsById` stays in sync with `partsByMessage` arrays
 - LRU eviction works (add 31 sessions, oldest evicted)
 - Plain object operations match Map performance for <1000 keys
@@ -730,6 +761,10 @@ if let Some(mut child) = oc_state.process.lock().take() {
 - `ProvidersSettings` (new) — OpenCode provider auth (20+ providers)
 - `BackendSettings` — only selects backend + shows health status
 - No duplication: each auth flow lives in exactly one page
+
+### ProvidersSettings Remount Behavior (Audit 6 R4)
+
+`ProvidersSettings` is safe to remount. All provider data is backed by `oc-provider-store` (populated by lifecycle hook on activation). Remounting triggers a fresh read from the store, not new API calls. Loading skeleton shown while `oc-provider-store.isLoading === true`. OAuth flows in progress are not interrupted by remount — they complete server-side and the store refreshes on next activation.
 
 ### Verification
 
@@ -856,13 +891,16 @@ async function startOpenCode(): Promise<void> {
 ```typescript
 // scripts/build-opencode.ts
 // 1. cd Agent-backend
-// 2. Models cache:
-//      If --with-models flag: fetch from models.dev → save to scripts/opencode-models-cache/api.json
-//      Else if cached api.json exists: reuse it
-//      Else: generate api.json from Agent-backend/packages/opencode/src/provider/models-snapshot.ts
+// 2. Models snapshot resolution (single precedence chain — Audit 6 C2):
+//      const cachePath = "scripts/opencode-models-cache/api.json";
+//      const bootstrapPath = "scripts/opencode-models-cache/bootstrap-api.json";
+//      If --with-models flag: fetch from models.dev → save to cachePath → use cachePath
+//      Else if cachePath exists: use cachePath (previous build's cache)
+//      Else if bootstrapPath exists: use bootstrapPath (committed vendor snapshot)
+//      Else: FAIL with "No cached or bootstrap provider snapshot. Run with --with-models first."
 //    Set MODELS_DEV_API_JSON=<resolved path> (bypasses network fetch in upstream build)
 // 3. Run: ./packages/opencode/script/build.ts --single
-//    Output: dist/opencode-darwin-arm64/bin/opencode (actual upstream path)
+//    Output: dist/opencode-{platform}-{arch}/bin/opencode (e.g. dist/opencode-darwin-arm64/bin/opencode)
 // 4. Copy to: src-tauri/binaries/orbit-server-aarch64-apple-darwin
 // 5. Generate static provider catalog:
 //    Parse Agent-backend/packages/opencode/src/provider/provider.ts → extract provider names/types
@@ -905,24 +943,41 @@ The existing dev/build/CI scripts must include `build:opencode` alongside `build
   // Updated existing scripts (add build:opencode AFTER build:sidecar)
   "dev": "bun run build:sidecar && bun run build:opencode && ORBIT_LOG_MODE=dev tauri dev",
   "build": "bun run build:sidecar && bun run build:opencode:full && ./scripts/build-with-env.sh",
-  "ci": "bun run check && bun run build:opencode",
+  // Preserve current CI semantics (includes Rust fmt/lint/test), then add OpenCode build (Audit 6 C3)
+  "ci": "bun run typecheck && bun run canvas:typecheck && bun run common:typecheck && bun run bridge:typecheck && bun run schemas:typecheck && bun run lint && bun run test && bun run rust:fmt && bun run rust:lint && bun run rust:test && bun run build:opencode",
+
+  // Wire into sibling dev scripts too (Audit 6 R3)
+  "dev:debug": "bun run build:sidecar && bun run build:opencode && ORBIT_LOG_MODE=debug tauri dev",
+  "dev:quiet": "bun run build:sidecar && bun run build:opencode && ORBIT_LOG_MODE=prod tauri dev",
+  "build:debug": "bun run build:sidecar && bun run build:opencode && ./scripts/build-with-env.sh --debug",
 }
 ```
 
-**Why `build:opencode` (not `:full`) in `dev`:** Dev builds use cached/generated `api.json` — no network fetch. Fast iteration.
+**Why `build:opencode` (not `:full`) in `dev`:** Dev builds use cached `api.json` or committed `bootstrap-api.json` — no network fetch. Fast iteration.
 
 **Why `build:opencode:full` in `build`:** Release builds fetch fresh models from `models.dev` to ensure the provider catalog is current.
 
-**Why `build:opencode` in `ci`:** PR CI validates the binary compiles but doesn't need fresh models. Release CI (tag trigger) should use `:full`.
+**Why `build:opencode` (not `:full`) in `ci`:** PR CI validates the binary compiles but doesn't need fresh models. Release CI (tag trigger) should use `:full`.
+
+**Script entrypoint matrix (Audit 6 N3):**
+
+| Script        | `build:sidecar`  | `build:opencode` | Notes                     |
+| ------------- | :--------------: | :--------------: | ------------------------- |
+| `dev`         |       Yes        |       Yes        | cached/bootstrap snapshot |
+| `dev:debug`   |       Yes        |       Yes        | cached/bootstrap snapshot |
+| `dev:quiet`   |       Yes        |       Yes        | cached/bootstrap snapshot |
+| `build`       |       Yes        |  Yes (`:full`)   | fresh models.dev fetch    |
+| `build:debug` |       Yes        |       Yes        | cached/bootstrap snapshot |
+| `ci`          | No (source-only) |       Yes        | after TS/Rust validation  |
 
 ### Network Dependency (Audit Issue C4 + Re-Audit RC3)
 
 The upstream build script uses `MODELS_DEV_API_JSON` env var (NOT a `--skip-models` flag — that doesn't exist):
 
-- **Default (dev/CI)**: `scripts/build-opencode.ts` sets `MODELS_DEV_API_JSON=scripts/opencode-models-cache/api.json`. If the cached file doesn't exist, it generates one from the existing `models-snapshot.ts` in the Agent-backend repo — no network fetch needed.
-- **`--with-models` flag**: fetches fresh from `models.dev`, saves to cache, then builds. For releases.
-- **CI**: caches `scripts/opencode-models-cache/api.json` across runs.
-- **If network fetch fails**: falls back to cached `api.json` + warning (not error).
+- **Default (dev/CI)**: `scripts/build-opencode.ts` sets `MODELS_DEV_API_JSON` to resolved path. Precedence: cached `api.json` → committed `bootstrap-api.json` → FAIL. No `models-snapshot.ts` fallback — that file is itself generated and won't exist on a clean checkout. (Audit 6 C2)
+- **`--with-models` flag**: fetches fresh from `models.dev`, saves to `api.json` cache, then builds. For releases.
+- **CI**: caches `scripts/opencode-models-cache/api.json` across runs. First run uses committed `bootstrap-api.json`.
+- **If `--with-models` fetch fails**: falls back to cached `api.json` if it exists, otherwise `bootstrap-api.json`, otherwise FAIL with clear message.
 
 ### Binary Name Mapping
 
@@ -1086,22 +1141,23 @@ Phase 9 (Build)             → Phase 6 (needs Rust process config)
 
 ### New Tests Required
 
-| Test                               | Scope       | What It Validates                                                                                                                                                            |
-| ---------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `backend-store.test.ts`            | Unit        | Persist/restore, switch guards, cleanup triggers                                                                                                                             |
-| `oc-message-store.test.ts`         | Unit        | Delta append, delta buffer flush, part upsert into both `partsById` and `partsByMessage`, part ordering preserved, LRU eviction, Immer whole-object replacement (Audit 5 C2) |
-| `oc-event-coordinator.test.ts`     | Unit        | Event dispatch for all 15+ handled event types, directory filtering, delta-before-part buffering                                                                             |
-| `oc-conversation-repo.test.ts`     | Unit        | Session list/create/delete mapping, stale session validation                                                                                                                 |
-| `claude-conversation-repo.test.ts` | Unit        | Delegates to existing Tauri commands correctly, does NOT call `conversationCreate()` directly                                                                                |
-| `use-conversation-list.test.ts`    | Unit        | Backend-aware hook returns correct data source                                                                                                                               |
-| `use-conversation-meta.test.ts`    | Unit        | Returns title/loading from correct bridge per backend (Audit 5 C5)                                                                                                           |
-| `backend-switch-cleanup.test.ts`   | Integration | Switch Claude→OpenCode: Claude queued messages cleared. Switch OpenCode→Claude: SSE disconnected, OpenCode permissions cleared.                                              |
-| `sse-manager.test.ts`              | Unit        | Reconnect backoff, generation counter, directory filter                                                                                                                      |
-| `build-opencode.test.ts`           | Script      | Binary produced at expected path, rename correct, `bootstrap-api.json` used when no cache                                                                                    |
-| `backend-chat-surface.test.tsx`    | Unit        | Renders `ClaudeChatController` in claude mode, `OcChatController` in opencode mode. Works with both `surface="agent"` and `surface="editor"`. (Audit 5 C1)                   |
-| `oc-question-card.test.tsx`        | Unit        | Renders multi-question form with options, multi-select, freeform. Reply sends `Array<QuestionAnswer>` with correct shape. Reject calls `question.reject`. (Audit 5 C3)       |
-| `providers-settings.test.tsx`      | Unit        | Shows static catalog in Claude mode (no API calls). Shows live provider list in OpenCode mode. API-key auth flow. OAuth auto + code flows. (Audit 5 C4)                      |
-| `resolve-binary.test.rs`           | Rust        | `resolve_opencode_binary_path()` finds prod path, falls back to dev, returns error when missing (Audit 5 C6)                                                                 |
+| Test                               | Scope       | What It Validates                                                                                                                                                                                     |
+| ---------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `backend-store.test.ts`            | Unit        | Persist/restore, switch guards, cleanup triggers                                                                                                                                                      |
+| `oc-message-store.test.ts`         | Unit        | Delta append, delta buffer flush, part upsert into both `partsById` and `partsByMessage`, part ordering preserved, LRU eviction, Immer whole-object replacement (Audit 5 C2)                          |
+| `oc-event-coordinator.test.ts`     | Unit        | Event dispatch for all 15+ handled event types, directory filtering, delta-before-part buffering                                                                                                      |
+| `oc-conversation-repo.test.ts`     | Unit        | Session list/create/delete mapping, stale session validation                                                                                                                                          |
+| `claude-conversation-repo.test.ts` | Unit        | Delegates to existing Tauri commands correctly, does NOT call `conversationCreate()` directly                                                                                                         |
+| `use-conversation-list.test.ts`    | Unit        | Backend-aware hook returns correct data source                                                                                                                                                        |
+| `use-conversation-meta.test.ts`    | Unit        | Returns title/loading from correct bridge per backend (Audit 5 C5)                                                                                                                                    |
+| `conversation-ui-bridge.test.ts`   | Unit        | `select()` sets correct store per backend, `getActiveSessionId()` reads from correct store, `restoreSelection()` validates and handles stale/404 sessions, sidebar highlight uses bridge (Audit 6 C1) |
+| `backend-switch-cleanup.test.ts`   | Integration | Switch Claude→OpenCode: Claude queued messages cleared. Switch OpenCode→Claude: SSE disconnected, OpenCode permissions cleared.                                                                       |
+| `sse-manager.test.ts`              | Unit        | Reconnect backoff, generation counter, directory filter                                                                                                                                               |
+| `build-opencode.test.ts`           | Script      | Binary produced at expected path, rename correct, `bootstrap-api.json` used when no cache                                                                                                             |
+| `backend-chat-surface.test.tsx`    | Unit        | Renders `ClaudeChatController` in claude mode, `OcChatController` in opencode mode. Works with both `surface="agent"` and `surface="editor"`. (Audit 5 C1)                                            |
+| `oc-question-card.test.tsx`        | Unit        | Renders multi-question form with options, multi-select, freeform. Reply sends `Array<QuestionAnswer>` with correct shape. Reject calls `question.reject`. (Audit 5 C3)                                |
+| `providers-settings.test.tsx`      | Unit        | Shows static catalog in Claude mode (no API calls). Shows live provider list in OpenCode mode. API-key auth flow. OAuth auto + code flows. (Audit 5 C4)                                               |
+| `resolve-binary.test.rs`           | Rust        | `resolve_opencode_binary_path()` finds prod path, falls back to dev, returns error when missing (Audit 5 C6)                                                                                          |
 
 ### Existing Tests to Verify (No Regressions)
 
@@ -1128,20 +1184,20 @@ Phase 9 (Build)             → Phase 6 (needs Rust process config)
 
 ## Risks and Mitigations
 
-| Risk                                           | Mitigation                                                                                                                   |
-| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| SSE reconnection race (stale events)           | Generation counter — discard events from old connections                                                                     |
-| Process crash mid-conversation                 | Save activeSessionId. Session persists in SQLite. Reload via API after restart.                                              |
-| Backend switch while agent busy                | Confirmation dialog. If confirmed, abort session first, then cleanup.                                                        |
-| Backend switch during startup/health-check     | AbortController guard — cancel in-flight operations on switch                                                                |
-| Workspace directory change                     | Watch workspacePath; call `updateDirectory()` on SDK client, reconnect SSE                                                   |
-| Port conflict on spawn                         | Verify port free, retry with new port (max 5)                                                                                |
-| Stale persisted session after workspace change | Validate via HTTP GET on restore; 404 → clear and show empty state                                                           |
-| Delta arrives before part created              | Delta buffer per partId; flush when `message.part.updated` arrives                                                           |
-| Claude state leaks across switch               | `cleanupClaudeState()` / `cleanupOpenCodeState()` on every switch                                                            |
-| OpenCode has no Claude-style rewind            | Capability matrix: `rewind: false` → rewind button hidden                                                                    |
-| `models.dev` fetch fails in CI                 | `MODELS_DEV_API_JSON` env var with cached `api.json`; generate from `models-snapshot.ts` as fallback; fail warning not error |
-| Upstream binary name mismatch                  | `scripts/build-opencode.ts` does explicit rename                                                                             |
+| Risk                                           | Mitigation                                                                                                                                                   |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| SSE reconnection race (stale events)           | Generation counter — discard events from old connections                                                                                                     |
+| Process crash mid-conversation                 | Save activeSessionId. Session persists in SQLite. Reload via API after restart.                                                                              |
+| Backend switch while agent busy                | Confirmation dialog. If confirmed, abort session first, then cleanup.                                                                                        |
+| Backend switch during startup/health-check     | AbortController guard — cancel in-flight operations on switch                                                                                                |
+| Workspace directory change                     | Watch workspacePath; call `updateDirectory()` on SDK client, reconnect SSE                                                                                   |
+| Port conflict on spawn                         | Verify port free, retry with new port (max 5)                                                                                                                |
+| Stale persisted session after workspace change | Validate via HTTP GET on restore; 404 → clear and show empty state                                                                                           |
+| Delta arrives before part created              | Delta buffer per partId; flush when `message.part.updated` arrives                                                                                           |
+| Claude state leaks across switch               | `cleanupClaudeState()` / `cleanupOpenCodeState()` on every switch                                                                                            |
+| OpenCode has no Claude-style rewind            | Capability matrix: `rewind: false` → rewind button hidden                                                                                                    |
+| `models.dev` fetch fails in CI                 | `MODELS_DEV_API_JSON` env var with cached `api.json` → committed `bootstrap-api.json` fallback chain; FAIL with clear message if neither exists (Audit 6 C2) |
+| Upstream binary name mismatch                  | `scripts/build-opencode.ts` does explicit rename                                                                                                             |
 
 ---
 
