@@ -1,0 +1,209 @@
+import { EOL } from "os"
+import path from "path"
+
+import { NamedError } from "@opencode-ai/util/error"
+import yargs from "yargs"
+import { hideBin } from "yargs/helpers"
+
+import { AcpCommand } from "./cli/cmd/acp"
+import { AgentCommand } from "./cli/cmd/agent"
+import { AuthCommand } from "./cli/cmd/auth"
+import { DbCommand } from "./cli/cmd/db"
+import { DebugCommand } from "./cli/cmd/debug"
+import { ExportCommand } from "./cli/cmd/export"
+import { GenerateCommand } from "./cli/cmd/generate"
+import { GithubCommand } from "./cli/cmd/github"
+import { ImportCommand } from "./cli/cmd/import"
+import { McpCommand } from "./cli/cmd/mcp"
+import { ModelsCommand } from "./cli/cmd/models"
+import { PrCommand } from "./cli/cmd/pr"
+import { RunCommand } from "./cli/cmd/run"
+import { ServeCommand } from "./cli/cmd/serve"
+import { SessionCommand } from "./cli/cmd/session"
+import { StatsCommand } from "./cli/cmd/stats"
+import { AttachCommand } from "./cli/cmd/tui/attach"
+import { TuiThreadCommand } from "./cli/cmd/tui/thread"
+import { UninstallCommand } from "./cli/cmd/uninstall"
+import { UpgradeCommand } from "./cli/cmd/upgrade"
+import { WebCommand } from "./cli/cmd/web"
+import { WorkspaceServeCommand } from "./cli/cmd/workspace-serve"
+import { FormatError } from "./cli/error"
+import { UI } from "./cli/ui"
+import { Global } from "./global"
+import { Installation } from "./installation"
+import { Database } from "./storage/db"
+import { JsonMigration } from "./storage/json-migration"
+import { Filesystem } from "./util/filesystem"
+import { Log } from "./util/log"
+
+process.on("unhandledRejection", (e) => {
+  Log.Default.error("rejection", {
+    e: e instanceof Error ? e.message : e,
+  })
+})
+
+process.on("uncaughtException", (e) => {
+  Log.Default.error("exception", {
+    e: e instanceof Error ? e.message : e,
+  })
+})
+
+// Ensure the process exits on terminal hangup (eg. closing the terminal tab).
+// Without this, long-running commands like `serve` block on a never-resolving
+// promise and survive as orphaned processes.
+process.on("SIGHUP", () => process.exit())
+
+let cli = yargs(hideBin(process.argv))
+  .parserConfiguration({ "populate--": true })
+  .scriptName("orbit")
+  .wrap(100)
+  .help("help", "show help")
+  .alias("help", "h")
+  .version("version", "show version number", Installation.VERSION)
+  .alias("version", "v")
+  .option("print-logs", {
+    describe: "print logs to stderr",
+    type: "boolean",
+  })
+  .option("log-level", {
+    describe: "log level",
+    type: "string",
+    choices: ["DEBUG", "INFO", "WARN", "ERROR"],
+  })
+  .middleware(async (opts) => {
+    await Log.init({
+      print: process.argv.includes("--print-logs"),
+      dev: Installation.isLocal(),
+      level: (() => {
+        if (opts.logLevel) return opts.logLevel as Log.Level
+        if (Installation.isLocal()) return "DEBUG"
+        return "INFO"
+      })(),
+    })
+
+    process.env.AGENT = "1"
+    process.env.OPENCODE = "1"
+    process.env.OPENCODE_PID = String(process.pid)
+
+    Log.Default.info("orbit", {
+      version: Installation.VERSION,
+      args: process.argv.slice(2),
+    })
+
+    const marker = path.join(Global.Path.data, "orbit.db")
+    if (!Filesystem.exists(marker)) {
+      const tty = process.stderr.isTTY
+      process.stderr.write("Performing one time database migration, may take a few minutes..." + EOL)
+      const width = 36
+      const orange = "\x1b[38;5;214m"
+      const muted = "\x1b[0;2m"
+      const reset = "\x1b[0m"
+      let last = -1
+      if (tty) process.stderr.write("\x1b[?25l")
+      try {
+        await JsonMigration.run(Database.Client().$client, {
+          progress: (event) => {
+            const percent = Math.floor((event.current / event.total) * 100)
+            if (percent === last && event.current !== event.total) return
+            last = percent
+            if (tty) {
+              const fill = Math.round((percent / 100) * width)
+              const bar = `${"■".repeat(fill)}${"･".repeat(width - fill)}`
+              process.stderr.write(
+                `\r${orange}${bar} ${String(percent).padStart(3)}%${reset} ${muted}${event.label.padEnd(12)} ${String(event.current)}/${String(event.total)}${reset}`,
+              )
+              if (event.current === event.total) process.stderr.write("\n")
+            } else {
+              process.stderr.write(`sqlite-migration:${String(percent)}${EOL}`)
+            }
+          },
+        })
+      } finally {
+        if (tty) process.stderr.write("\x1b[?25h")
+        else {
+          process.stderr.write(`sqlite-migration:done${EOL}`)
+        }
+      }
+      process.stderr.write("Database migration complete." + EOL)
+    }
+  })
+  .usage("\n" + UI.logo())
+  .completion("completion", "generate shell completion script")
+  .command(AcpCommand)
+  .command(McpCommand)
+  .command(TuiThreadCommand)
+  .command(AttachCommand)
+  .command(RunCommand)
+  .command(GenerateCommand)
+  .command(DebugCommand)
+  .command(AuthCommand)
+  .command(AgentCommand)
+  .command(UpgradeCommand)
+  .command(UninstallCommand)
+  .command(ServeCommand)
+  .command(WebCommand)
+  .command(ModelsCommand)
+  .command(StatsCommand)
+  .command(ExportCommand)
+  .command(ImportCommand)
+  .command(GithubCommand)
+  .command(PrCommand)
+  .command(SessionCommand)
+  .command(DbCommand)
+
+if (Installation.isLocal()) {
+  cli = cli.command(WorkspaceServeCommand)
+}
+
+cli = cli
+  .fail((_msg, err) => {
+    throw err
+  })
+  .strict()
+
+try {
+  await cli.parse()
+} catch (e) {
+  const data: Record<string, unknown> = {}
+  if (e instanceof NamedError) {
+    const obj = e.toObject()
+    if (typeof obj.data === "object" && obj.data !== null) {
+      Object.assign(data, obj.data)
+    }
+  }
+
+  if (e instanceof Error) {
+    Object.assign(data, {
+      name: e.name,
+      message: e.message,
+      cause: e.cause?.toString(),
+      stack: e.stack,
+    })
+  }
+
+  if (e instanceof ResolveMessage) {
+    Object.assign(data, {
+      name: e.name,
+      message: e.message,
+      code: e.code,
+      specifier: e.specifier,
+      referrer: e.referrer,
+      position: e.position,
+      importKind: e.importKind,
+    })
+  }
+  Log.Default.error("fatal", data)
+  const formatted = FormatError(e)
+  if (typeof formatted === "string") UI.error(formatted)
+  if (formatted === undefined) {
+    UI.error("Unexpected error, check log file at " + Log.file() + " for more details" + EOL)
+    process.stderr.write((e instanceof Error ? e.message : String(e)) + EOL)
+  }
+  process.exitCode = 1
+} finally {
+  // Some subprocesses don't react properly to SIGTERM and similar signals.
+  // Most notably, some docker-container-based MCP servers don't handle such signals unless
+  // run using `docker run --init`.
+  // Explicitly exit to avoid any hanging subprocesses.
+  process.exit()
+}
