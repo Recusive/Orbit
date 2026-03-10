@@ -84,7 +84,7 @@ pub fn current_rendition() -> &'static str {
 /// Fallback rendition detection for non-macOS.
 #[cfg(not(target_os = "macos"))]
 #[must_use]
-pub fn current_rendition() -> &'static str {
+pub const fn current_rendition() -> &'static str {
     "Default"
 }
 
