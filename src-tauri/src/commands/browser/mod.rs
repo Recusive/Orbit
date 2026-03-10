@@ -51,15 +51,18 @@
     reason = "We intentionally ignore some Results"
 )]
 
+#[cfg(target_os = "macos")]
 use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::result::Result as StdResult;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "macos")]
 use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "macos")]
 use tokio::task::spawn_blocking;
 
 use hashbrown::HashMap;
@@ -146,6 +149,7 @@ const BROWSER_BOOTSTRAP_SCRIPT: &str = concat!(
 /// Max tracked screenshot files per browser session.
 ///
 /// Oldest file is evicted when capacity is reached.
+#[cfg(any(target_os = "macos", test))]
 const MAX_SCREENSHOT_FILES: usize = 20;
 
 /// Corner radius for the browser window, matching the activity card's CSS
@@ -1249,8 +1253,12 @@ pub async fn browser_screenshot(
 
         #[cfg(not(target_os = "macos"))]
         {
-            match app.get_webview_window(BROWSER_WINDOW_LABEL) {
-                Some(window) => {
+            app.get_webview_window(BROWSER_WINDOW_LABEL).map_or_else(
+                || {
+                    *state.exists.lock() = false;
+                    Err("Browser window not found".to_owned())
+                },
+                |window| {
                     let url = window
                         .url()
                         .map_or_else(|_| "unknown".to_owned(), |value| value.to_string());
@@ -1270,11 +1278,7 @@ pub async fn browser_screenshot(
                     })
                     .to_string())
                 },
-                None => {
-                    *state.exists.lock() = false;
-                    Err("Browser window not found".to_owned())
-                },
-            }
+            )
         }
     };
 

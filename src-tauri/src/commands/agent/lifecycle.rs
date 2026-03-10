@@ -441,6 +441,7 @@ pub async fn agent_rewind_files(
 }
 
 /// Fork a session at a specific message point.
+///
 /// Creates a new SDK session that has context only UP TO the specified message.
 /// Used for rewind operations - Claude only sees the conversation history up to that point.
 #[tauri::command]

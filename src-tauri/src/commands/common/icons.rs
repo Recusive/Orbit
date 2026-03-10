@@ -7,20 +7,26 @@
     reason = "Tauri commands receive owned types from JSON deserialization"
 )]
 
+#[cfg(target_os = "macos")]
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::path::PathBuf;
+#[cfg(target_os = "macos")]
 use std::sync::mpsc::sync_channel;
 
-use orbit_app_icons::{
-    icon_path_for_appearance, resolve_active_id, scan_icons_dir, AppIconInfo, AppIconMeta,
-};
+use orbit_app_icons::AppIconInfo;
+#[cfg(target_os = "macos")]
+use orbit_app_icons::{icon_path_for_appearance, resolve_active_id, scan_icons_dir, AppIconMeta};
 use orbit_core::{Error, Result};
 use orbit_settings::SettingsManager;
-use tauri::{AppHandle, Manager as _, State};
+#[cfg(target_os = "macos")]
+use tauri::Manager as _;
+use tauri::{AppHandle, State};
 
 use crate::core::sentry_utils::SentryCapture as _;
 
 /// Resolve the bundled app-icons directory.
+#[cfg(target_os = "macos")]
 fn bundled_icons_dir(app: &AppHandle) -> Option<PathBuf> {
     let resource_dir = app.path().resource_dir().ok()?;
     let bundled_dir = resource_dir.join("app-icons");
@@ -41,10 +47,10 @@ pub fn list_app_icons(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (app, settings);
-        return Err(Error::Other(
+        Err(Error::Other(
             "App icon switching is only supported on macOS".to_owned(),
         ))
-        .capture("list_app_icons");
+        .capture("list_app_icons")
     }
 
     #[cfg(target_os = "macos")]
@@ -118,10 +124,10 @@ pub fn set_app_icon(
     #[cfg(not(target_os = "macos"))]
     {
         let _ = (id, app, settings);
-        return Err(Error::Other(
+        Err(Error::Other(
             "App icon switching is only supported on macOS".to_owned(),
         ))
-        .capture("set_app_icon");
+        .capture("set_app_icon")
     }
 
     #[cfg(target_os = "macos")]
