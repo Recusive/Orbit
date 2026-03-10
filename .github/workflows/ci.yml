@@ -76,6 +76,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
       - run: bun run build:frontend
+        env:
+          NODE_OPTIONS: '--max-old-space-size=4096'
 
       # Only upload artifacts on main branch to save storage
       # continue-on-error prevents storage quota issues from failing the build
