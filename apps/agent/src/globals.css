@@ -1146,8 +1146,8 @@ html.dark .chat-markdown code:not(pre code) {
 }
 
 /* Inline code inside table cells — strip padding and background so code fragments
- * don't create padded pill shapes that extend selection beyond the text glyphs.
- * Uses longhand padding properties to match Tailwind's px-*/py-* longhand output. */
+   don't create padded pill shapes that extend selection beyond the text glyphs.
+   Uses longhand padding properties to match Tailwind's px / py longhand output. */
 .chat-markdown td code,
 .chat-markdown th code {
   padding-top: 0;
@@ -2421,247 +2421,48 @@ html.dark .apple-tooltip {
   color: rgba(255, 255, 255, 0.85);
 }
 
-/* ── Diff Section (Welcome Page) ─────────────────────────────────────── */
+/* ── Welcome Page Entrance ──────────────────────────────────────────── */
 
-.diff-section {
-  position: relative;
-  z-index: 10;
-  width: 100%;
-  max-width: 720px;
+/* Phase 1: Icon slides up to center */
+@keyframes welcomeSlideUp {
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.diff-wrapper {
-  position: relative;
-  margin: 0 auto;
-  perspective: 1200px;
-  opacity: 0;
-  transform: none;
+/* Phase 2: Horizontal coin-flip spin (rotateY) */
+@keyframes welcomeSpin {
+  to { transform: rotateY(360deg); }
 }
 
-.diff-wrapper.diff-enter {
-  animation: diffFadeForward 0.9s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+/* Phase 3: Icon tilts to -45° (rotateZ) */
+@keyframes welcomeTilt {
+  to { transform: rotate(-45deg); }
 }
 
-.diff-panel {
-  display: grid;
-  transform-origin: bottom;
-  transform: rotateX(14deg) scale(0.92) translateZ(-15px);
-  will-change: transform;
-  mask-image: radial-gradient(90% 95% at 50% 48%, black 55%, transparent 80%);
-  -webkit-mask-image: radial-gradient(90% 95% at 50% 48%, black 55%, transparent 80%);
+/* Phase 3a: Row shifts left so icon makes room for text */
+@keyframes welcomeShiftLeft {
+  to { transform: translateX(0); }
 }
 
-@keyframes diffFadeForward {
-  to { opacity: 1; }
+/* Phase 3b: Text clip-reveals left to right */
+@keyframes welcomeClipReveal {
+  to { clip-path: inset(0 0% 0 0); }
 }
 
-.diff-wrapper.diff-enter .diff-panel {
-  animation: diffPanelForward 0.9s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-}
-
-@keyframes diffPanelForward {
-  to { transform: rotateX(14deg) scale(0.95) translateZ(0); }
-}
-
-.diff-glow,
-.diff-sharp {
-  grid-area: 1 / 1 / -1 / -1;
-}
-
-.diff-glow {
-  filter: blur(3px) brightness(2);
-  opacity: 0.5;
-  pointer-events: none;
-}
-
-.diff-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
-  font-size: 12.5px;
-  line-height: 1.85;
-  background: none;
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.diff-side {
-  overflow-x: auto;
-}
-
-.diff-side:first-child {
-  border-right: none;
-}
-
-.diff-section .diff-side.side-new {
-  mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 25%, black 75%, transparent 100%);
-}
-
-.dl {
-  display: flex;
-  border-left: 3px solid transparent;
-  padding: 0 14px 0 0;
-}
-
-.dl .ln {
-  text-align: right;
-  width: 32px;
-  color: var(--diff-gray-10);
-  user-select: none;
-  -webkit-user-select: none;
-  flex-shrink: 0;
-  padding-right: 12px;
-}
-
-.side-old .dl.hl .ln { color: var(--diff-red); }
-.side-new .dl.hl .ln { color: var(--diff-green); }
-
-.dl .c {
-  white-space: pre;
-  flex: 1;
-}
-
-.side-old .dl.hl {
-  background: var(--diff-red-bg);
-  border-left-color: var(--diff-red);
-}
-
-.dh-r {
-  background: var(--diff-red-span);
-  border-radius: 2px;
-  padding: 1px 0;
-}
-
-.side-new .dl.hl {
-  background: var(--diff-green-bg);
-  border-left-color: var(--diff-green);
-}
-
-.dh-g {
-  background: var(--diff-green-span);
-  border-radius: 2px;
-  padding: 1px 0;
-}
-
-.dh-r .m { color: var(--diff-kw); }
-.dh-g .m { color: var(--diff-str); }
-
-/* Syntax tokens */
-.diff-section .k { color: var(--diff-kw); }
-.diff-section .f { color: var(--diff-fn); }
-.diff-section .s { color: var(--diff-str); }
-.diff-section .n { color: var(--diff-num); }
-.diff-section .v { color: var(--diff-var); }
-.diff-section .o { color: var(--diff-op); }
-.diff-section .m { color: var(--diff-fg2); }
-.diff-section .w { color: var(--diff-fg); }
-
-/* ── Diff scanline animation ── */
-
-.diff-sharp {
-  position: relative;
-  overflow: hidden;
-}
-
-.scanline {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 23px;
-  background: linear-gradient(to bottom, transparent, var(--diff-overlay-medium) 30%, var(--diff-overlay-strong) 50%, var(--diff-overlay-medium) 70%, transparent);
-  z-index: 5;
-  pointer-events: none;
-  opacity: 0;
-  will-change: transform, opacity;
-}
-
-/* Per-side highlight tokens */
-.side-old {
-  --hl-bg: var(--diff-red-bg);
-  --hl-border: var(--diff-red);
-  --hl-span: var(--diff-red-span);
-  --hl-ln: var(--diff-red);
-}
-
-.side-new {
-  --hl-bg: var(--diff-green-bg);
-  --hl-border: var(--diff-green);
-  --hl-span: var(--diff-green-span);
-  --hl-ln: var(--diff-green);
-}
-
-/* Initially hide diff highlights */
-.diff-section .dl.hl {
-  background: transparent;
-  border-left-color: transparent;
-  transition: background-color 0.2s ease, border-left-color 0.2s ease;
-}
-
-.diff-section .dl.hl .ln {
-  color: var(--diff-gray-10);
-  transition: color 0.2s ease;
-}
-
-.diff-section .dh-r,
-.diff-section .dh-g {
-  background: transparent;
-  transition: background-color 0.2s ease;
-}
-
-.diff-section .dh-r .m,
-.diff-section .dh-g .m {
-  color: var(--diff-fg2);
-  transition: color 0.2s ease;
-}
-
-/* Reveal when scanline passes (.scanned added by JS) */
-.diff-section .dl.hl.scanned {
-  background: var(--hl-bg);
-  border-left-color: var(--hl-border);
-}
-
-.diff-section .dl.hl.scanned .ln {
-  color: var(--hl-ln);
-}
-
-.diff-section .dl.hl.scanned .dh-r {
-  background: var(--diff-red-span);
-}
-
-.diff-section .dl.hl.scanned .dh-g {
-  background: var(--diff-green-span);
-}
-
-.diff-section .dl.hl.scanned .dh-r .m {
-  color: var(--diff-kw);
-}
-
-.diff-section .dl.hl.scanned .dh-g .m {
-  color: var(--diff-str);
+/* Phase 4: Tagline fades in */
+@keyframes welcomeFadeIn {
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .diff-wrapper,
-  .diff-wrapper.diff-enter {
-    animation: none;
-    opacity: 1;
+  [style*="welcomeSlideUp"],
+  [style*="welcomeSpin"],
+  [style*="welcomeShiftLeft"],
+  [style*="welcomeClipReveal"],
+  [style*="welcomeFadeIn"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    clip-path: none !important;
   }
-  .diff-panel,
-  .diff-wrapper.diff-enter .diff-panel {
-    animation: none;
-    transform: rotateX(14deg) scale(0.95) translateZ(0);
-  }
-  .scanline { display: none; }
-  .diff-section .dl.hl {
-    background: var(--hl-bg);
-    border-left-color: var(--hl-border);
-    transition: none;
-  }
-  .diff-section .dl.hl .ln { color: var(--hl-ln); transition: none; }
-  .diff-section .dh-r { background: var(--diff-red-span); transition: none; }
-  .diff-section .dh-g { background: var(--diff-green-span); transition: none; }
-  .diff-section .dh-r .m { color: var(--diff-kw); transition: none; }
-  .diff-section .dh-g .m { color: var(--diff-str); transition: none; }
 }
+

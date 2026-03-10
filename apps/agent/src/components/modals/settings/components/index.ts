@@ -1,3 +1,4 @@
+export { AppIconPicker } from './AppIconPicker';
 export { NavItem } from './NavItem';
 export { SectionDivider } from './SectionDivider';
 export { SectionHeader } from './SectionHeader';

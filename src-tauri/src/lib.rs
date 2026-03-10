@@ -28,7 +28,7 @@ use commands::canvas::setup as canvas_setup;
 use commands::canvas::transform as canvas_transform;
 use commands::canvas::PreviewServerState;
 use commands::common::{
-    credentials, dev_monitor, diagnostics, files, git, lsp, providers,
+    credentials, dev_monitor, diagnostics, files, git, icons, lsp, providers,
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
@@ -297,6 +297,8 @@ pub fn run() {
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+            #[cfg(target_os = "macos")]
+            icons::reapply_persisted_icon(app.handle());
             browser::register_browser_large_eval_result_listener(
                 app.handle(),
                 Arc::clone(&browser_result_state_for_events),
@@ -342,6 +344,15 @@ pub fn run() {
                         // The decorum function itself skips hidden child windows
                         // (checks NSWindow.isVisible before calling orderFront:).
                         orbit_plugin_decorum::order_child_windows_front();
+                    });
+
+                    // Re-apply the Dock icon when the system theme changes so the
+                    // correct light/dark rendition is shown automatically.
+                    let theme_app = app.handle().clone();
+                    window.on_window_event(move |event| {
+                        if matches!(event, tauri::WindowEvent::ThemeChanged(_)) {
+                            icons::reapply_persisted_icon(&theme_app);
+                        }
                     });
                 }
             }
@@ -559,6 +570,8 @@ pub fn run() {
             settings::remove_ssh_host,
             settings::clear_ssh_hosts,
             settings::pick_directory,
+            icons::list_app_icons,
+            icons::set_app_icon,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,

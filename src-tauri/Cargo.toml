@@ -33,6 +33,7 @@ orbit-search = { path = "../crates/common/search" }
 orbit-settings = { path = "../crates/common/settings" }
 orbit-conversations = { path = "../crates/common/conversations" }
 orbit-sf-symbols = { path = "../crates/common/sf-symbols" }
+orbit-app-icons = { path = "../crates/common/app-icons" }
 
 # Core dependencies
 tokio = { workspace = true }

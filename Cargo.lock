@@ -3527,6 +3527,7 @@ dependencies = [
  "log",
  "notify",
  "orbit-ai",
+ "orbit-app-icons",
  "orbit-conversations",
  "orbit-core",
  "orbit-fs",
@@ -3563,6 +3564,19 @@ dependencies = [
  "urlencoding",
  "uuid",
  "whoami",
+]
+
+[[package]]
+name = "orbit-app-icons"
+version = "0.0.1"
+dependencies = [
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "serde",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

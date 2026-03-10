@@ -79,7 +79,7 @@
       "minimumSystemVersion": "15.0",
       "signingIdentity": "Developer ID Application: Pranit sharma (QSAMZF2NJ7)",
       "files": {
-        "Resources/Assets.car": "resources/Assets.car"
+        "Resources/app-icons": "icons/app-icons"
       }
     }
   },

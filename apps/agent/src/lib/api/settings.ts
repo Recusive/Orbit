@@ -51,6 +51,7 @@ export interface Settings {
   git: GitSettings;
   windowState: WindowState;
   recentProjects: string[];
+  activeIconId?: string;
 }
 
 // ============================================

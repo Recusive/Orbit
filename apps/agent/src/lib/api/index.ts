@@ -31,6 +31,7 @@ export * from './search';
 
 // Settings operations
 export * from './settings';
+export * from './icons';
 
 // Window operations
 export * from './window';

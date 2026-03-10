@@ -40,13 +40,15 @@ Use this to find the right file. Read the file directly — no links needed.
 - `LIQUID-GLASS.md` — Liquid glass visual effect system
 - `tauri-plugins.md` — Tauri 2 plugins reference
 
-## design/ (5 files)
+## design/ (7 files)
 
+- `APP-ICON-SYSTEM.md` — macOS app icon picker (runtime Dock icon swap via NSImage, theme-aware light/dark renditions, pure PNG approach)
 - `TYPOGRAPHY.md` — Typography system (VS Code-like)
 - `ICON-THEME-SYSTEM.md` — File and folder icon theme system
 - `flash-prevention-guide.md` — Preventing UI flash on load
 - `GEIST-SYSTEM.md` — Orbit color token architecture (Geist model: 10-step scales, semantic bands, Radix mapping)
 - `COLOR-SYSTEM-REFACTOR.md` — File-by-file color refactor plan (patterns A-J, semantic tokens, verification)
+- `DEAD-CSS-REMOVAL-PLAN.md` — Dead CSS removal plan
 
 ## development/ (6 files)
 
@@ -57,7 +59,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `DMG-BUILD-GUIDE.md` — Building macOS distributable
 - `BUNDLING-TECHNICAL-NOTES.md` — Claude CLI bundling internals
 
-## plans/due/ (8 files)
+## plans/due/ (12 entries)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
@@ -71,11 +73,12 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 
-## plans/implemented/ (6 files)
+## plans/implemented/ (7 entries)
 
 - `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
 - `fix-user-bubble-shift-after-send.md` — Fix user bubble sub-pixel shift after send animation
 - `instant-title-generation.md` — Instant title generation
+- `multi-icon-system/` — Multi-icon picker (design doc + implementation plan, shipped v0.0.6)
 - `thinking-block-interleave-and-session-switch-fix.md` — Thinking block interleave and session switch fix
 - `title-divergence-fix.md` — Title divergence fix
 - `title-skeleton-loading.md` — Title skeleton loading state

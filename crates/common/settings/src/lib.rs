@@ -216,6 +216,9 @@ pub struct Settings {
     /// Recent SSH hosts (e.g., "user@hostname" or "user@hostname:port")
     #[serde(default)]
     pub ssh_hosts: Vec<String>,
+    /// Active app icon id (None = default bundled icon, macOS only)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_icon_id: Option<String>,
 }
 
 impl Settings {
@@ -853,6 +856,7 @@ mod tests {
                 String::from("user@server1.example.com"),
                 String::from("admin@192.168.1.1:2222"),
             ],
+            active_icon_id: None,
         };
 
         let json = serde_json::to_string_pretty(&settings).expect("Failed to serialize");
