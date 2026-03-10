@@ -1,0 +1,113 @@
+import { TextAttributes } from "@opentui/core"
+import { useTerminalDimensions } from "@opentui/solid"
+import { useTheme } from "@tui/context/theme"
+import { createContext, useContext,  Show } from "solid-js"
+import { createStore } from "solid-js/store"
+
+
+import { SplitBorder } from "../component/border"
+import { TuiEvent } from "../event"
+
+import type { ParentProps, JSX } from "solid-js"
+import type z from "zod"
+
+export type ToastOptions = z.infer<typeof TuiEvent.ToastShow.properties>
+
+ 
+export function Toast(): JSX.Element {
+  const toast = useToast()
+  const { theme } = useTheme()
+  const dimensions = useTerminalDimensions()
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
+  return (
+    <Show when={toast.currentToast}>
+      {(current) => (
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
+        <box
+          position="absolute"
+          justifyContent="center"
+          alignItems="flex-start"
+          top={2}
+          right={2}
+          maxWidth={Math.min(60, dimensions().width - 6)}
+          paddingLeft={2}
+          paddingRight={2}
+          paddingTop={1}
+          paddingBottom={1}
+          backgroundColor={theme.backgroundPanel}
+          borderColor={theme[current().variant]}
+          border={["left", "right"]}
+          customBorderChars={SplitBorder.customBorderChars}
+        >
+          <Show when={current().title}>
+            <text attributes={TextAttributes.BOLD} marginBottom={1} fg={theme.text}>
+              {current().title}
+            </text>
+          </Show>
+          <text fg={theme.text} wrapMode="word" width="100%">
+            {current().message}
+          </text>
+        </box>
+      )}
+    </Show>
+  )
+}
+
+function init(): ToastContext {
+  const [store, setStore] = createStore({
+    currentToast: null as ToastOptions | null,
+  })
+
+  let timeoutHandle: NodeJS.Timeout | null = null
+
+  const toast = {
+    show(options: ToastOptions) {
+      const parsedOptions = TuiEvent.ToastShow.properties.parse(options)
+      const { duration, ...currentToast } = parsedOptions
+      setStore("currentToast", currentToast)
+      if (timeoutHandle) clearTimeout(timeoutHandle)
+      timeoutHandle = setTimeout(() => {
+        setStore("currentToast", null)
+      }, duration).unref()
+    },
+    error: (err: unknown) => {
+      if (err instanceof Error)
+        { toast.show({
+          variant: "error",
+          message: err.message,
+        }); return; }
+      toast.show({
+        variant: "error",
+        message: "An unknown error has occurred",
+      })
+    },
+    get currentToast(): ToastOptions | null {
+      return store.currentToast
+    },
+  }
+  return toast
+}
+
+export interface ToastContext {
+  show: (options: ToastOptions) => void
+  error: (err: unknown) => void
+  readonly currentToast: ToastOptions | null
+}
+
+const ctx = createContext<ToastContext>()
+
+ 
+export function ToastProvider(props: ParentProps): JSX.Element {
+  const value = init()
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
+  return <ctx.Provider value={value}>{props.children}</ctx.Provider>
+}
+
+export function useToast(): ToastContext {
+  const value = useContext(ctx)
+  if (value === undefined) {
+    throw new Error("useToast must be used within a ToastProvider")
+  }
+  return value
+}
