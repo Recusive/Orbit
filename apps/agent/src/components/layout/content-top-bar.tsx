@@ -19,16 +19,16 @@ import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useVaultContextManager } from '@/features/vault/hooks';
 import { useVaultEditorStore } from '@/features/vault/stores';
-import { useTauri } from '@/hooks/agent/use-tauri';
+import { useConversationList } from '@/hooks/sidebar/use-conversation-list';
+import { useConversationMeta } from '@/hooks/sidebar/use-conversation-meta';
 import { cn } from '@/lib/utils';
 import { CONTENT_CARD, HEIGHTS } from '@/lib/utils/constants';
+import { getConversationUiBridge } from '@/services/conversations';
 import { useBranchDiffStats } from '@/stores/git/git-store';
 import {
   useUIStore,
   useWorkspaceName,
   useHasWorkspace,
-  useActiveConversationTitle,
-  useIsTitleLoading,
   useReviewPanelOpen,
   useVaultOpen,
 } from '@/stores/ui/ui-store';
@@ -228,7 +228,9 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 }) => {
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
-  const conversationTitle = useActiveConversationTitle();
+  const conversations = useConversationList();
+  const conversationMeta = useConversationMeta();
+  const conversationTitle = conversationMeta.title;
   const reviewPanelOpen = useReviewPanelOpen();
   const vaultOpen = useVaultOpen();
 
@@ -244,10 +246,6 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     toggleBottomPanel,
     setTerminalPosition,
     setVaultOpen,
-    conversations,
-    activeConversationId,
-    workspacePath,
-    activeWorktreePath,
     rightSidebarOpen,
     bottomPanelOpen,
     terminalCollapsed,
@@ -259,16 +257,13 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       toggleBottomPanel: s.toggleBottomPanel,
       setTerminalPosition: s.setTerminalPosition,
       setVaultOpen: s.setVaultOpen,
-      conversations: s.conversations,
-      activeConversationId: s.activeConversationId,
-      workspacePath: s.workspacePath,
-      activeWorktreePath: s.activeWorktreePath,
       rightSidebarOpen: s.rightSidebarOpen,
       bottomPanelOpen: s.bottomPanelOpen,
       terminalCollapsed: s.terminalCollapsed,
     }))
   );
-  const isTitleLoading = useIsTitleLoading(activeConversationId);
+  const activeConversationId = conversationMeta.activeSessionId;
+  const isTitleLoading = conversationMeta.isTitleLoading;
 
   const checkOverflow = useCallback((): void => {
     const el = leftSectionRef.current;
@@ -299,29 +294,18 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     };
   }, [sidebarOpen, workspaceName, conversationTitle, isTitleLoading, checkOverflow]);
 
-  const { postMessage } = useTauri();
-
   const handleNewSession = useCallback((): void => {
     setVaultOpen(false);
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
     if (activeConv?.title === 'Untitled' && activeConv.messageCount === 0) {
       return;
     }
-    postMessage({
-      type: 'conversation:create',
-      uuid: crypto.randomUUID(),
-      title: 'Untitled',
-      workspace_path: workspacePath ?? undefined,
-      worktree_path: activeWorktreePath ?? undefined,
-    });
-  }, [
-    conversations,
-    activeConversationId,
-    workspacePath,
-    activeWorktreePath,
-    postMessage,
-    setVaultOpen,
-  ]);
+    void getConversationUiBridge()
+      .create({ title: 'Untitled' })
+      .catch(() => {
+        // Sidebar actions own the user-facing error surface for shared shell creation failures.
+      });
+  }, [activeConversationId, conversations, setVaultOpen]);
 
   // Listen for newSession keyboard shortcut event
   useEffect(() => {

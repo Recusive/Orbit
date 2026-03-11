@@ -57,19 +57,21 @@ import { VaultCreateDialog } from '@/features/vault/components/VaultCreateDialog
 import { VaultDeleteDialog } from '@/features/vault/components/VaultDeleteDialog';
 import { useVaultInitialization } from '@/features/vault/hooks';
 import { useVaultStore } from '@/features/vault/stores';
+import { useConversationList } from '@/hooks/sidebar/use-conversation-list';
 import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
-import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
-import { toConversationSummaries } from '@/lib/mappers';
+import { addRecentProject, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { getConversationUiBridge } from '@/services/conversations';
+import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
+import { useOcActiveSessionId } from '@/stores/opencode';
 import {
   useUIStore,
   useVaultOpen,
   useWorkspaceName,
   useWorkspacePath,
-  useWorkspaceConversations,
   useActiveConversationId,
   useWorktrees,
   useActiveWorktreePath,
@@ -115,6 +117,7 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
+  const activeBackend = useActiveBackend();
 
   // Track whether the scrollable area can scroll further down.
   // The bottom fade mask is only applied when there's more content below,
@@ -224,8 +227,11 @@ export const PrimarySidebar: FC = () => {
   );
   const workspaceName = useWorkspaceName();
   const workspacePath = useWorkspacePath();
-  const conversations = useWorkspaceConversations();
-  const activeConversationId = useActiveConversationId();
+  const conversations = useConversationList();
+  const claudeActiveConversationId = useActiveConversationId();
+  const ocActiveConversationId = useOcActiveSessionId();
+  const activeConversationId =
+    activeBackend === 'claude' ? claudeActiveConversationId : ocActiveConversationId;
   const worktrees = useWorktrees();
   const activeWorktreePath = useActiveWorktreePath();
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
@@ -303,13 +309,15 @@ export const PrimarySidebar: FC = () => {
         await addRecentProject(path);
         useUIStore.getState().initializeWorkspace(path);
         setRootPath(path);
-        const convos = await conversationList(path);
-        useUIStore.getState().setConversations(toConversationSummaries(convos));
+        await getConversationUiBridge(activeBackend).hydrateWorkspace({
+          workspacePath: path,
+          worktreePath: null,
+        });
       } catch (err) {
         logger.error('Failed to open project', err);
       }
     },
-    [setRootPath]
+    [activeBackend, setRootPath]
   );
 
   const handleOpenProject = useCallback(async (): Promise<void> => {

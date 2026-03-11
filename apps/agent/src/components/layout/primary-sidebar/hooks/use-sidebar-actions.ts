@@ -2,18 +2,18 @@
  * useSidebarActions - All sidebar action handlers
  */
 import { createLogger } from '@orbit/common/lib';
-import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
-import { useTauri } from '@/hooks/agent/use-tauri';
-import { conversationDelete, gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
+import { gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
 import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
-import { applyManualSessionTitle, clearSessionTitleState } from '@/services/session';
-import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
+import { getConversationUiBridge } from '@/services/conversations';
+import { clearSessionTitleState } from '@/services/session';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -88,21 +88,18 @@ export const useSidebarActions = ({
   conversations,
   activeConversationId,
   workspacePath,
-  activeWorktreePath,
 }: UseSidebarActionsProps): UseSidebarActionsReturn => {
-  const setLoadingConversation = useUIStore((s) => s.setLoadingConversation);
-  const setConversationTransitioning = useUIStore((s) => s.setConversationTransitioning);
   const setWorktrees = useUIStore((s) => s.setWorktrees);
   const setRepoRootPath = useUIStore((s) => s.setRepoRootPath);
   const switchToWorktree = useUIStore((s) => s.switchToWorktree);
   const removeWorktree = useUIStore((s) => s.removeWorktree);
+  const removeConversation = useUIStore((s) => s.removeConversation);
   const setCreateWorktreeDialogOpen = useUIStore((s) => s.setCreateWorktreeDialogOpen);
   const setEditingConversationId = useUIStore((s) => s.setEditingConversationId);
-  const removeConversation = useUIStore((s) => s.removeConversation);
   const setVaultOpen = useUIStore((s) => s.setVaultOpen);
-  const updateConversationTitle = useUIStore((s) => s.updateConversationTitle);
-  const { postMessage } = useTauri();
+  const activeBackend = useActiveBackend();
   const repoRootPath = useUIStore((s) => s.repoRootPath);
+  const bridge = getConversationUiBridge(activeBackend);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -234,63 +231,22 @@ export const useSidebarActions = ({
     if (activeConv?.title === 'Untitled' && activeConv.messageCount === 0) {
       return;
     }
-    postMessage({
-      type: 'conversation:create',
-      uuid: crypto.randomUUID(),
-      title: 'Untitled',
-      workspace_path: workspacePath ?? undefined,
-      worktree_path: activeWorktreePath ?? undefined,
+    void bridge.create({ title: 'Untitled' }).catch((err: unknown) => {
+      logger.error('Failed to create conversation', err);
+      toast.error('Failed to create conversation');
     });
-  }, [
-    conversations,
-    activeConversationId,
-    workspacePath,
-    activeWorktreePath,
-    postMessage,
-    setVaultOpen,
-  ]);
+  }, [activeConversationId, bridge, conversations, setVaultOpen]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
       // Close vault if open
       setVaultOpen(false);
-      // Skip if already viewing this conversation
       if (sessionId === activeConversationId) {
         return;
       }
-      // Set loading and transitioning states SYNCHRONOUSLY before any async work
-      // This ensures opacity-0 is applied before new content renders
-      setLoadingConversation(true);
-      setConversationTransitioning(true);
-      // Mark load as pending BEFORE posting the message.
-      // This prevents use-chat-messages.ts from sending a duplicate conversation:load
-      // when the sessionId changes in response to conversation:loaded.
-      // See message-buffer-store.ts:pendingLoads for the 30s safety timeout.
-      useMessageBufferStore.getState().markLoadPending(sessionId);
-      // Switch active session IMMEDIATELY so handleConversationLoaded doesn't need to.
-      // This prevents stale conversation:loaded responses (e.g., from Effect 3's initial
-      // mount load) from hijacking activeSessionId back to a previous session when the
-      // user has already navigated away (by creating a new session or clicking another).
-      useChatStore.getState().setActiveSession(sessionId);
-      // PERF: Wrap the network request in startTransition so React can yield to
-      // the browser between the synchronous loading-state paint above and the
-      // heavier conversation data processing. This reduces the click handler
-      // from 159ms blocking to ~20ms (loading state) + deferred data work.
-      startTransition(() => {
-        postMessage({
-          type: 'conversation:load',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
-        });
-      });
+      void bridge.select(sessionId);
     },
-    [
-      activeConversationId,
-      setLoadingConversation,
-      setConversationTransitioning,
-      postMessage,
-      setVaultOpen,
-    ]
+    [activeConversationId, bridge, setVaultOpen]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {
@@ -373,55 +329,45 @@ export const useSidebarActions = ({
    */
   const handleRenameConversation = useCallback(
     (sessionId: string, newTitle: string): void => {
-      const previousTitle = useUIStore
-        .getState()
-        .conversations.find((c) => c.sessionId === sessionId)?.title;
-
       setEditingConversationId(null);
 
-      void applyManualSessionTitle(sessionId, newTitle)
-        .then((written: boolean) => {
-          toast.success(written ? 'Conversation renamed' : 'Conversation renamed (pending save)');
-          if (!written) {
-            logger.debug('Rename deferred: JSONL not found yet', { sessionId });
-          }
+      void bridge
+        .rename(sessionId, newTitle)
+        .then(() => {
+          toast.success('Conversation renamed');
         })
         .catch((err: unknown) => {
-          if (previousTitle !== undefined) {
-            updateConversationTitle(sessionId, previousTitle);
-          }
           logger.error('Failed to persist renamed conversation title', err);
           toast.error('Failed to rename conversation');
         });
     },
-    [setEditingConversationId, updateConversationTitle]
+    [bridge, setEditingConversationId]
   );
 
   /** Conversation delete handler. See integration test warning above. */
   const handleDeleteConversation = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
-        // Optimistic removal
-        removeConversation(sessionId);
+        if (activeBackend === 'claude') {
+          removeConversation(sessionId);
+        }
+
+        await bridge.remove(sessionId);
         setDeleteDialogOpen(false);
         setConversationToDelete(null);
 
-        // Clean up cached session data to prevent memory leaks
-        // (mirrors cleanup in ChatMessageService conversation:deleted handler)
-        useToolStore.getState().clearSessionTools(sessionId);
-        useFileStore.getState().clearSessionFiles(sessionId);
-        clearSessionTitleState(sessionId);
-
-        // Persist to backend
-        await conversationDelete(sessionId);
+        if (activeBackend === 'claude') {
+          useToolStore.getState().clearSessionTools(sessionId);
+          useFileStore.getState().clearSessionFiles(sessionId);
+          clearSessionTitleState(sessionId);
+        }
         toast.success('Conversation deleted');
       } catch (err) {
         logger.error('Failed to delete conversation', err);
         toast.error('Failed to delete conversation');
-        // Note: Could restore conversation here, but for simplicity we don't
       }
     },
-    [removeConversation]
+    [activeBackend, bridge, removeConversation]
   );
 
   // Open delete confirmation dialog

@@ -6,12 +6,14 @@ import type { ComponentType, LazyExoticComponent } from 'react';
 export { AccountSettings } from './AccountSettings';
 export { AgentSettings } from './AgentSettings';
 export { AppearanceSettings } from './AppearanceSettings';
+export { BackendSettings } from './BackendSettings';
 export { BrowserSettings } from './BrowserSettings';
 export { EditorSettings } from './EditorSettings';
 export { FeedbackSettings } from './FeedbackSettings';
 export { GeneralSettings } from './GeneralSettings';
 export { GitSettings } from './GitSettings';
 export { NotificationsSettings } from './NotificationsSettings';
+export { ProvidersSettings } from './ProvidersSettings';
 export { ShortcutsSettings } from './ShortcutsSettings';
 export { SlashCommandsSettings } from './SlashCommandsSettings';
 export { SubagentsSettings } from './SubagentsSettings';
@@ -43,9 +45,11 @@ function lazyWithMinDelay<T extends ComponentType>(
 export const SETTINGS_PAGE_COMPONENTS: Partial<
   Record<SettingsSection, LazyExoticComponent<ComponentType>>
 > = {
+  backend: lazyWithMinDelay(() => import('./BackendSettings')),
   general: lazyWithMinDelay(() => import('./GeneralSettings')),
   appearance: lazyWithMinDelay(() => import('./AppearanceSettings')),
   agent: lazyWithMinDelay(() => import('./AgentSettings')),
+  providers: lazyWithMinDelay(() => import('./ProvidersSettings')),
   shortcuts: lazyWithMinDelay(() => import('./ShortcutsSettings')),
   browser: lazyWithMinDelay(() => import('./BrowserSettings')),
   editor: lazyWithMinDelay(() => import('./EditorSettings')),

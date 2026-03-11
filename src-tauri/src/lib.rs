@@ -6,10 +6,13 @@
 pub mod agent;
 pub mod commands;
 pub mod core;
+/// OpenCode backend process management.
+pub mod opencode;
 pub mod utils;
 
 use std::env;
 use std::path::PathBuf;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use orbit_search::FileIndex;
@@ -32,9 +35,12 @@ use commands::common::{
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
+use commands::opencode::lifecycle as opencode_cmd;
 use commands::vault as vault_cmd;
+use opencode::process::{resolve_opencode_binary_path, OpenCodeProcessState};
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
+use tauri::async_runtime::block_on;
 use tauri::Manager as _;
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -272,6 +278,13 @@ pub fn run() {
 
     // Initialize file index state (empty until workspace is opened)
     let file_index_state: FileIndexState = Arc::new(RwLock::new(Option::<FileIndex>::None));
+    let opencode_binary_path = match resolve_opencode_binary_path() {
+        Ok(path) => Some(path),
+        Err(error) => {
+            log::warn!("{error}");
+            None
+        },
+    };
 
     let result = tauri::Builder::default()
         // Managed state
@@ -281,6 +294,7 @@ pub fn run() {
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(PreviewServerState::new())
+        .manage(OpenCodeProcessState::new(opencode_binary_path))
         .manage(marketplace::MarketplaceCache::new())
         .manage(file_index_state)
         // Plugins
@@ -612,6 +626,9 @@ pub fn run() {
             browser::browser_ensure_runtime,
             browser::browser_get_url,
             browser::browser_get_title,
+            opencode_cmd::opencode_start,
+            opencode_cmd::opencode_stop,
+            opencode_cmd::opencode_status,
             browser::browser_js_callback,
             browser::browser_eval_async,
             browser::browser_wait_for_selector,
@@ -656,6 +673,19 @@ pub fn run() {
                 if let Err(e) = state.shutdown() {
                     log::error!("Failed to shut down agent bridge on exit: {e}");
                 }
+
+                let oc_state = app.state::<OpenCodeProcessState>();
+                let port_value = oc_state.port.lock().take();
+                if let Some(port) = port_value {
+                    block_on(async {
+                        opencode::process::request_dispose(port).await;
+                    });
+                }
+                let child_value = oc_state.process.lock().take();
+                if let Some(mut child) = child_value {
+                    opencode::process::graceful_terminate(&mut child);
+                }
+                oc_state.healthy.store(false, Ordering::SeqCst);
             }
         }),
         Err(e) => log::error!("Error building Tauri application: {e}"),

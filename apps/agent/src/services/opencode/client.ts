@@ -1,0 +1,48 @@
+import { createOrbitClient } from '@opencode-ai/sdk/v2/client';
+
+import type { OrbitClient } from '@opencode-ai/sdk/v2/client';
+
+let client: OrbitClient | null = null;
+let currentPort: number | null = null;
+let currentDirectory: string | null = null;
+
+function buildBaseUrl(port: number): string {
+  return `http://127.0.0.1:${String(port)}`;
+}
+
+export function initClient(port: number, directory: string): OrbitClient {
+  currentPort = port;
+  currentDirectory = directory;
+  client = createOrbitClient({
+    baseUrl: buildBaseUrl(port),
+    directory,
+  });
+  return client;
+}
+
+export function getClient(): OrbitClient {
+  if (!client) {
+    throw new Error('OpenCode client not initialized');
+  }
+  return client;
+}
+
+export function hasClient(): boolean {
+  return client !== null;
+}
+
+export function updateDirectory(directory: string): OrbitClient {
+  if (currentPort === null) {
+    throw new Error('OpenCode client port not initialized');
+  }
+  if (client && currentDirectory === directory) {
+    return client;
+  }
+  return initClient(currentPort, directory);
+}
+
+export function destroyClient(): void {
+  client = null;
+  currentPort = null;
+  currentDirectory = null;
+}

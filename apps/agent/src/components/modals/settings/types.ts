@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 
 export type SettingsSection =
+  | 'backend'
   | 'general'
   | 'appearance'
   | 'agent'
+  | 'providers'
   | 'subagents'
   | 'commands'
   | 'shortcuts'

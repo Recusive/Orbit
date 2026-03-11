@@ -31,6 +31,7 @@ import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
+import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
 import {
@@ -364,6 +365,7 @@ const EditorMode: FC = () => {
 const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
   useAutoUpdate(); // Check for app updates on mount + periodic interval
+  useOpencodeLifecycle();
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
 

@@ -29,6 +29,7 @@
         "@lucide/lab": "^0.1.2",
         "@milkdown/crepe": "^7.18.0",
         "@milkdown/utils": "^7.18.0",
+        "@opencode-ai/sdk": "workspace:*",
         "@orbit/shared-schemas": "workspace:*",
         "@paper-design/shaders-react": "^0.0.71",
         "@pierre/diffs": "^1.0.11",
@@ -161,6 +162,10 @@
         "@sentry/react": "^10.0.0",
         "@tauri-apps/api": "^2.0.0",
       },
+    },
+    "packages/opencode-sdk": {
+      "name": "@opencode-ai/sdk",
+      "version": "1.2.24-local",
     },
     "packages/shared-schemas": {
       "name": "@orbit/shared-schemas",
@@ -581,6 +586,8 @@
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "1.20.1" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
     "@ocavue/utils": ["@ocavue/utils@1.5.0", "", {}, "sha512-zYOKnvUm8IQ86tNCrpUVBT0lEvoKvyf+9pPS7M4VDB8O1o+msaPMsb/xZx/w5hpcuN1dfehJrkY41ZcdGZpyqg=="],
+
+    "@opencode-ai/sdk": ["@opencode-ai/sdk@workspace:packages/opencode-sdk"],
 
     "@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
 
