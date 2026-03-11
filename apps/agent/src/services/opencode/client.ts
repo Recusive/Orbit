@@ -1,6 +1,9 @@
 import { createOrbitClient } from '@opencode-ai/sdk/v2/client';
+import { createLogger } from '@orbit/common/lib';
 
 import type { OrbitClient } from '@opencode-ai/sdk/v2/client';
+
+const logger = createLogger('OcClient');
 
 let client: OrbitClient | null = null;
 let currentPort: number | null = null;
@@ -17,11 +20,13 @@ export function initClient(port: number, directory: string): OrbitClient {
     baseUrl: buildBaseUrl(port),
     directory,
   });
+  logger.info('Client initialized', { port, directory });
   return client;
 }
 
 export function getClient(): OrbitClient {
   if (!client) {
+    logger.warn('getClient called before initialization');
     throw new Error('OpenCode client not initialized');
   }
   return client;
@@ -38,10 +43,13 @@ export function updateDirectory(directory: string): OrbitClient {
   if (client && currentDirectory === directory) {
     return client;
   }
+  const previousDirectory = currentDirectory;
+  logger.info('Client directory updated', { port: currentPort, directory, previousDirectory });
   return initClient(currentPort, directory);
 }
 
 export function destroyClient(): void {
+  logger.info('Client destroyed', { port: currentPort, directory: currentDirectory });
   client = null;
   currentPort = null;
   currentDirectory = null;

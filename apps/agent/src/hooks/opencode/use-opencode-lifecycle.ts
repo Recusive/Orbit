@@ -48,6 +48,7 @@ export function useOpencodeLifecycle(): void {
       startupGenerationRef.current = generation;
       const isStale = (): boolean => startupGenerationRef.current !== generation;
 
+      logger.info('Starting OpenCode', { reason, workspacePath, generation });
       useBackendStore.getState().setSwitchingBackend(true);
 
       try {
@@ -59,25 +60,38 @@ export function useOpencodeLifecycle(): void {
           error: null,
         }));
         if (isStale()) {
+          logger.info('Startup cancelled: stale generation (after status check)', { generation });
           return;
         }
 
+        logger.info('Status check result', {
+          running: status.running,
+          port: status.port,
+          healthy: status.healthy,
+        });
+
         const port = status.running && status.port !== null ? status.port : await opencodeStart();
         if (isStale()) {
+          logger.info('Startup cancelled: stale generation (after start)', { generation });
           return;
         }
+
+        logger.info('Port assigned', { port, source: status.running ? 'existing' : 'started' });
 
         useBackendStore.getState().setOpencodePort(port);
         initClient(port, workspacePath);
         if (isStale()) {
           destroyClient();
+          logger.info('Startup cancelled: stale generation (after client init)', { generation });
           return;
         }
 
+        logger.info('Client initialized, connecting SSE', { port, workspacePath });
         ocSseManager.connect();
         if (isStale()) {
           ocSseManager.disconnect();
           destroyClient();
+          logger.info('Startup cancelled: stale generation (after SSE connect)', { generation });
           return;
         }
 
@@ -85,13 +99,16 @@ export function useOpencodeLifecycle(): void {
         if (isStale()) {
           ocSseManager.disconnect();
           destroyClient();
+          logger.info('Startup cancelled: stale generation (after data load)', { generation });
           return;
         }
 
+        logger.info('Data loaded, restoring selection');
         await getConversationUiBridge('opencode').restoreSelection();
         if (isStale()) {
           ocSseManager.disconnect();
           destroyClient();
+          logger.info('Startup cancelled: stale generation (after restore)', { generation });
           return;
         }
 
@@ -99,8 +116,10 @@ export function useOpencodeLifecycle(): void {
         if (reason !== 'restart') {
           restartAttemptsRef.current = 0;
         }
+        logger.info('Startup complete', { port, workspacePath, reason });
       } catch (error) {
         if (isStale()) {
+          logger.info('Startup error suppressed: stale generation', { generation });
           return;
         }
 
@@ -123,8 +142,10 @@ export function useOpencodeLifecycle(): void {
       startupGenerationRef.current += 1;
 
       if (activeBackend === 'opencode') {
+        logger.info('Backend switched to opencode, cleaning up Claude state');
         cleanupClaudeState();
       } else if (previousBackendRef.current === 'opencode') {
+        logger.info('Backend switched away from opencode, cleaning up');
         cleanupOpenCodeState();
         useBackendStore.getState().setOpencodeHealthy(false);
         useBackendStore.getState().setOpencodePort(null);
@@ -141,6 +162,7 @@ export function useOpencodeLifecycle(): void {
     }
 
     if (!workspacePath) {
+      logger.warn('No workspace path, cleaning up OpenCode state');
       startupGenerationRef.current += 1;
       cleanupOpenCodeState();
       useBackendStore.getState().setOpencodeHealthy(false);

@@ -50,13 +50,16 @@ function mapProviders(response: ProviderListResponses[200]): {
 
 export const ocSessionService = {
   async listSessions(): Promise<OcSession[]> {
+    logger.info('Listing sessions');
     const response = await getClient().session.list(undefined, { throwOnError: true });
     const sessions = response.data ?? [];
     useOcSessionStore.getState().setSessions(sessions);
+    logger.info('Sessions loaded', { count: sessions.length });
     return sessions;
   },
 
   async createSession(input?: { title?: string }): Promise<OcSession> {
+    logger.info('Creating session');
     const response = await getClient().session.create(
       input?.title ? { title: input.title } : undefined,
       { throwOnError: true }
@@ -67,10 +70,12 @@ export const ocSessionService = {
     }
 
     useOcSessionStore.getState().addSession(session);
+    logger.info('Session created', { sessionId: session.id });
     return session;
   },
 
   async deleteSession(sessionId: string): Promise<void> {
+    logger.info('Deleting session', { sessionId });
     await getClient().session.delete({ sessionID: sessionId }, { throwOnError: true });
     useOcSessionStore.getState().removeSession(sessionId);
     useOcMessageStore.getState().clearSession(sessionId);
@@ -92,6 +97,7 @@ export const ocSessionService = {
   },
 
   async validateSession(sessionId: string): Promise<OcSession | null> {
+    logger.info('Validating session', { sessionId });
     const response = await getClient().session.get({ sessionID: sessionId });
     return response.data ?? null;
   },
@@ -101,6 +107,12 @@ export const ocSessionService = {
     text: string,
     options?: OcSendMessageOptions
   ): Promise<void> {
+    logger.info('Sending message', {
+      sessionId,
+      hasModel: Boolean(options?.providerId && options.modelId),
+      agent: options?.agent,
+    });
+
     const model =
       options?.providerId && options.modelId
         ? {
@@ -112,7 +124,10 @@ export const ocSessionService = {
     await getClient().session.promptAsync(
       {
         sessionID: sessionId,
-        messageID: `msg_${crypto.randomUUID().replaceAll('-', '')}`,
+        // Let the backend generate messageID via Identifier.ascending("message")
+        // so IDs are monotonically ordered. Frontend UUIDs break the prompt loop's
+        // ID comparison (lastUser.id < lastAssistant.id) because UUID hex chars
+        // are always lexicographically less than the backend's timestamp-based IDs.
         ...(options?.agent ? { agent: options.agent } : {}),
         ...(model ? { model } : {}),
         parts: [
@@ -124,23 +139,28 @@ export const ocSessionService = {
       },
       { throwOnError: true }
     );
+    logger.info('Message sent (HTTP accepted)', { sessionId });
   },
 
   async abortSession(sessionId: string): Promise<void> {
+    logger.info('Aborting session', { sessionId });
     await getClient().session.abort({ sessionID: sessionId }, { throwOnError: true });
   },
 
   async loadMessages(sessionId: string): Promise<SessionMessagesResponses[200]> {
+    logger.info('Loading messages', { sessionId });
     const response = await getClient().session.messages(
       { sessionID: sessionId },
       { throwOnError: true }
     );
     const messages = response.data ?? [];
     useOcMessageStore.getState().setSessionMessages(sessionId, messages);
+    logger.info('Messages loaded', { sessionId, count: messages.length });
     return messages;
   },
 
   async replyPermission(requestId: string, reply: 'once' | 'always' | 'reject'): Promise<void> {
+    logger.info('Replying to permission', { requestId, reply });
     await getClient().permission.reply(
       {
         requestID: requestId,
@@ -151,6 +171,7 @@ export const ocSessionService = {
   },
 
   async replyQuestion(requestId: string, answers: OcQuestionAnswer[]): Promise<void> {
+    logger.info('Replying to question', { requestId, answerCount: answers.length });
     await getClient().question.reply(
       {
         requestID: requestId,
@@ -161,6 +182,7 @@ export const ocSessionService = {
   },
 
   async rejectQuestion(requestId: string): Promise<void> {
+    logger.info('Rejecting question', { requestId });
     await getClient().question.reject(
       {
         requestID: requestId,
@@ -170,6 +192,7 @@ export const ocSessionService = {
   },
 
   async loadProviders(): Promise<void> {
+    logger.info('Loading providers');
     const providerStore = useOcProviderStore.getState();
     providerStore.setLoading(true);
 
@@ -186,6 +209,10 @@ export const ocSessionService = {
       const mapped = mapProviders(providersResponse.data);
       providerStore.setProviders(mapped);
       providerStore.setAuthMethods(authResponse.data);
+      logger.info('Providers loaded', {
+        count: mapped.providers.length,
+        connected: mapped.connectedProviders.length,
+      });
     } catch (error) {
       logger.error('Failed to load OpenCode providers', error);
       throw error;

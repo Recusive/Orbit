@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useMemo } from 'react';
 import { useShallow } from 'zustand/shallow';
 
@@ -20,6 +21,8 @@ import {
   useOcPermissionStore,
   useOcSessionStore,
 } from '@/stores/opencode';
+
+const logger = createLogger('OcChat');
 
 interface OcRenderedMessage {
   readonly id: string;
@@ -83,14 +86,28 @@ export function useOcChat(): {
 
   const handleSend = useCallback(async (text: string, options?: OcSendMessageOptions) => {
     let activeSessionId = useOcSessionStore.getState().activeSessionId;
+    const willCreateSession = !activeSessionId;
+    logger.info('User sending message', { activeSessionId, willCreateSession });
+
     if (!activeSessionId) {
-      const created = await ocSessionService.createSession();
-      useOcSessionStore.getState().setActiveSessionId(created.id);
-      activeSessionId = created.id;
+      try {
+        const created = await ocSessionService.createSession();
+        useOcSessionStore.getState().setActiveSessionId(created.id);
+        activeSessionId = created.id;
+        logger.info('Created new session for message', { sessionId: activeSessionId });
+      } catch (error) {
+        logger.error('Failed to create session for message', error);
+        throw error;
+      }
     }
 
     if (activeSessionId) {
-      await ocSessionService.sendMessage(activeSessionId, text, options);
+      try {
+        await ocSessionService.sendMessage(activeSessionId, text, options);
+      } catch (error) {
+        logger.error('Failed to send message', error, { sessionId: activeSessionId });
+        throw error;
+      }
     }
   }, []);
 
@@ -100,6 +117,7 @@ export function useOcChat(): {
       return;
     }
 
+    logger.info('User stopping agent', { sessionId: activeSessionId });
     await ocSessionService.abortSession(activeSessionId);
   }, []);
 

@@ -800,6 +800,7 @@ export const SessionRoutes = lazy(() =>
         return stream(c, (): Promise<void> => {
           const sessionID = c.req.valid("param").sessionID
           const body = c.req.valid("json")
+          log.info("prompt_async received", { sessionID, agent: body.agent })
           void SessionPrompt.prompt({ ...body, sessionID })
           return Promise.resolve()
         })

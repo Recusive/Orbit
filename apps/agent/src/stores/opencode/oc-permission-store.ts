@@ -1,6 +1,9 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 
 import type { OcPermissionAsked, OcQuestionRequest } from '@/types/opencode';
+
+const logger = createLogger('OcPermissionStore');
 
 interface OcPermissionState {
   permissions: Record<string, OcPermissionAsked>;
@@ -17,6 +20,7 @@ export const useOcPermissionStore = create<OcPermissionState>((set) => ({
   permissions: {},
   questions: {},
   addPermission: (permission) => {
+    logger.debug('Permission added', { requestId: permission.id, sessionId: permission.sessionID });
     set((state) => ({
       permissions: {
         ...state.permissions,
@@ -25,6 +29,7 @@ export const useOcPermissionStore = create<OcPermissionState>((set) => ({
     }));
   },
   removePermission: (requestId) => {
+    logger.debug('Permission removed', { requestId });
     set((state) => ({
       permissions: Object.fromEntries(
         Object.entries(state.permissions).filter(([id]) => id !== requestId)
@@ -32,6 +37,7 @@ export const useOcPermissionStore = create<OcPermissionState>((set) => ({
     }));
   },
   addQuestion: (question) => {
+    logger.debug('Question added', { requestId: question.id, sessionId: question.sessionID });
     set((state) => ({
       questions: {
         ...state.questions,
@@ -40,6 +46,7 @@ export const useOcPermissionStore = create<OcPermissionState>((set) => ({
     }));
   },
   removeQuestion: (requestId) => {
+    logger.debug('Question removed', { requestId });
     set((state) => ({
       questions: Object.fromEntries(
         Object.entries(state.questions).filter(([id]) => id !== requestId)

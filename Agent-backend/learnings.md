@@ -45,7 +45,11 @@ For server code breakpoints while TUI runs, use `bun dev spawn` (default runs se
 | `--print-logs`      | Print structured logs to stderr              |
 | `--log-level DEBUG` | Set log verbosity (DEBUG, INFO, WARN, ERROR) |
 
-**WARNING:** `-d` is NOT a valid flag. It will crash with `Unknown argument: d` — but the error is swallowed by yargs `.fail()` handler (throws `undefined` because yargs passes `(msg, err)` where `err` is undefined for validation errors).
+**WARNING:** `-d` is NOT a valid flag. It will crash with `Unknown argument: d` — but the error is swallowed by yargs `.fail()` handler.
+
+**WARNING:** `--log-level` requires UPPERCASE values (`DEBUG` not `debug`). Lowercase causes a fatal crash.
+
+**WARNING:** `--print-logs` at INFO level produces 11K+ lines per session due to `service=permission` entries dumping full ruleset JSON arrays. Do NOT use `--print-logs` for routine debugging — use the log files instead.
 
 ### Error Swallowing in index.ts
 
@@ -53,99 +57,79 @@ The top-level catch in `src/index.ts` (line ~166) catches all errors. The `.fail
 
 ---
 
-## Bugs Found & Fixed
+## Server Logging & Debugging (for Orbit frontend integration)
 
-### 1. `ERR_INVALID_URL: fetch() URL is invalid` (when sending a message)
+### Where server logs live
 
-**Root cause:** The `opencode-anthropic-auth` plugin intercepts all `fetch()` calls. The Anthropic provider in `models.dev` has NO `api` URL field (Anthropic's SDK has it hardcoded). The model resolution at `src/provider/provider.ts:751` falls through to `""` (empty string):
+The orbit-server binary writes structured logs to **`~/.local/share/orbit/log/`** (NOT `~/.local/share/opencode/log/` — that's for standalone opencode CLI runs).
 
-```typescript
-url: model.provider?.api ?? provider.api ?? ""
+| File                                        | Source                                                       |
+| ------------------------------------------- | ------------------------------------------------------------ |
+| `~/.local/share/orbit/log/2026-MM-DDT*.log` | Timestamped per server startup — **use this one**            |
+| `~/.local/share/orbit/log/dev.log`          | Standalone `bun dev` runs only, NOT the Tauri-spawned server |
+| `~/.local/share/opencode/log/*.log`         | Old opencode CLI runs (different binary name)                |
+
+**To tail the active server log:**
+
+```bash
+# Always gets the latest timestamped file (new one created per Tauri restart)
+tail -f "$(ls -t ~/.local/share/orbit/log/*.log | head -1)"
 ```
 
-Then `loadBaseURL()` returns `""`, which gets set as `options.baseURL = ""`, overriding `@ai-sdk/anthropic`'s default `https://api.anthropic.com/v1`. The SDK then constructs a URL like `/v1/messages` which is invalid for `fetch()`.
+### Useful grep patterns for server logs
 
-**Fix:** In `loadBaseURL()` (line 106), treat empty string as undefined:
+```bash
+# Session prompt lifecycle (most important for debugging)
+grep "session.prompt\|service=llm\|ERROR\|WARN\|cancel\|exiting" <logfile>
 
-```typescript
-if (typeof raw !== "string" || raw === "") return raw === "" ? undefined : raw
+# Specific session
+grep "ses_XXXXX" <logfile>
+
+# LLM calls (did the server actually call the provider?)
+grep "service=llm" <logfile>
 ```
 
-This lets bundled SDKs (Anthropic, OpenAI, etc.) use their hardcoded default URLs.
+### How Tauri spawns the server
 
-**Stack trace pattern:**
+**File:** `src-tauri/src/commands/opencode/lifecycle.rs` → `src-tauri/src/opencode/process.rs`
 
 ```
-service=session.processor error=fetch() URL is invalid
-stack="TypeError: fetch() URL is invalid
-    at fetch (unknown)
-    at fetch (.../opencode-anthropic-auth/index.mjs:269:38)"
+Command::new(orbit-server-binary)
+  .args(["serve", "--port", &port.to_string()])
+  .stdout(Stdio::piped())
+  .stderr(Stdio::piped())
 ```
 
-### 2. `undefined is not an object (evaluating 'x.keybind')` (dialog-command.tsx)
+- Binary location: `src-tauri/binaries/orbit-server-{target}` (dev) or next to executable (prod)
+- Port: scans TCP 4096-4196 for an available port
+- Health check: pings `http://127.0.0.1:{port}/global/health` (40 retries, 250ms apart)
+- stdout/stderr forwarded to Rust `log::info!/warn!/error!` with `[opencode]` prefix (visible in `bunx tauri dev` terminal)
 
-**Root cause:** During SolidJS reactivity cascades (theme initialization), `registrations().flatMap((x) => x())` produced undefined entries because some registration accessors return undefined before their components fully initialize.
+### CLI flags for the server binary
 
-**Fix:** Added `.filter(Boolean)` before `.map()` in the `entries` memo:
-
-```typescript
-const entries = createMemo(() => {
-  const all = registrations()
-    .flatMap((x) => x())
-    .filter(Boolean)
-  return all.map((x) => ({ ...x, footer: x.keybind ? keybind.print(x.keybind) : undefined }))
-})
+```bash
+./orbit-server serve --help
+# --port <number>         Port to listen on (default: 0 = auto)
+# --print-logs            Print logs to stderr (WARNING: extremely verbose — dumps permission rulesets)
+# --log-level <LEVEL>     DEBUG | INFO | WARN | ERROR (UPPERCASE required)
+# --hostname <string>     Default: 127.0.0.1
 ```
 
-**File:** `src/cli/cmd/tui/component/dialog-command.tsx:56`
+### Server-side prompt loop logging
 
-### 3. `undefined is not an object (evaluating 'status().type')` (prompt/index.tsx)
+The prompt loop in `packages/opencode/src/session/prompt.ts` has structured logging at every decision point:
 
-**Root cause:** On the home screen, `props.sessionID` is `undefined`. The status lookup `sync.data.session_status[props.sessionID ?? ""]` returns `undefined` because `session_status[""]` doesn't exist.
+| Log Message                         | What It Shows                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------- |
+| `prompt`                            | Entry: sessionID, agent, noReply                                                            |
+| `loop`                              | Each iteration: step number, sessionID                                                      |
+| `exiting loop (aborted)`            | Loop exited due to abort signal                                                             |
+| `messages scanned`                  | Message stream state: count, lastUserID, lastAssistantID, lastAssistantFinish, pendingTasks |
+| `exiting loop (assistant finished)` | Normal exit: finish reason, user/assistant ID comparison                                    |
+| `resolveTools (started/completed)`  | Tool resolution timing and tool count                                                       |
+| `llm call (started/completed)`      | LLM invocation: model, provider, message count, result                                      |
 
-**Fix:** Added fallback:
-
-```typescript
-const status = createMemo(() => sync.data.session_status[props.sessionID ?? ""] ?? { type: "idle" as const })
-```
-
-**File:** `src/cli/cmd/tui/component/prompt/index.tsx:81`
-
-### 4. `undefined is not an object (evaluating 'grouped().length')` (dialog-select.tsx)
-
-**Root cause:** In `DialogCommand`, the `ref` for `DialogSelectRef` is set via a callback at render time (line 228), but the `list()` function accesses `ref.filter` during memo evaluation — before the callback runs.
-
-**Fix:** Made `ref` optional and used optional chaining:
-
-```typescript
-let ref: DialogSelectRef<string> | undefined
-const list = (): CommandOption[] => {
-  if (ref?.filter) return props.options
-  return [...props.suggestedOptions, ...props.options]
-}
-```
-
-**File:** `src/cli/cmd/tui/component/dialog-command.tsx:161-163`
-
-### 5. TUI screen blink on stream completion (intermittent, UNRESOLVED)
-
-**Symptom:** When LLM streaming ends, the entire screen briefly goes blank then reappears. Happens intermittently, not every time. The loading bar under the chat input disappears and gets replaced by the response duration — during that transition, the screen flashes.
-
-**Suspected cause:** Race condition between multiple SSE events firing in quick succession when streaming ends:
-
-- `message.updated` (sets `time.completed`)
-- `session.status` (transitions to `idle`)
-- `message.part.updated` (final part update)
-
-The `reconcile()` call in `sync.tsx:229` for `message.updated` triggers re-evaluation of `pending()`, `final()`, `lastAssistant()` memos, plus the `<Show when={status().type !== "idle"}>` in prompt/index.tsx:1082 switches from spinner to empty `<text />`. When these all fire in rapid succession, opentui's terminal renderer may produce a visible flash between frames.
-
-**Key components in the render chain:**
-
-- `sync.tsx:217` — `session.status` event handler
-- `sync.tsx:229` — `message.updated` with `reconcile()`
-- `session/index.tsx:164-166` — `pending` memo (assistant with `time.completed === 0`)
-- `session/index.tsx:1516-1541` — `Switch/Match` for message footer (duration display)
-- `prompt/index.tsx:1082` — `<Show when={status().type !== "idle"}>` (spinner/status bar)
+The `prompt_async` HTTP route in `server/routes/session.ts` also logs `prompt_async received` when a message arrives.
 
 ---
 
@@ -220,3 +204,40 @@ Bundled providers (Anthropic, OpenAI, etc.) have hardcoded URLs in their SDKs. T
 ### Plugin System
 
 `opencode-anthropic-auth@0.0.13` is a built-in plugin loaded from `src/plugin/index.ts:24`. It's installed to `~/.cache/orbit/node_modules/` at runtime. It wraps `fetch()` to inject OAuth tokens and rename tools with `mcp_` prefix.
+
+### Prompt Loop Exit Condition
+
+The main loop in `session/prompt.ts` exits when:
+
+```typescript
+if (
+  lastAssistant?.finish && // assistant has a finish reason
+  !["tool-calls", "unknown"].includes(lastAssistant.finish) && // it's a "real" finish (e.g. "stop")
+  lastUser.id < lastAssistant.id // user message came before assistant
+) {
+  break
+}
+```
+
+This compares ULIDs — `lastUser.id < lastAssistant.id` checks chronological ordering. If the new user message's ULID sorts before the previous assistant message, the loop thinks the assistant already responded.
+
+---
+
+## Frontend Structured Logging
+
+10 files across the OpenCode frontend pipeline have structured logging via `createLogger()`:
+
+| Logger Name          | File                                        | What it logs                                         |
+| -------------------- | ------------------------------------------- | ---------------------------------------------------- |
+| `OcEventCoordinator` | `services/opencode/oc-event-coordinator.ts` | Event dispatch, directory filtering, unhandled types |
+| `OcSseManager`       | `services/opencode/sse-manager.ts`          | SSE connect/disconnect/reconnect, event received     |
+| `OcSessionService`   | `services/opencode/oc-session-service.ts`   | HTTP calls: list/create/delete/send/load sessions    |
+| `OpenCodeLifecycle`  | `hooks/opencode/use-opencode-lifecycle.ts`  | Startup sequence, port assignment, backend switching |
+| `OcClient`           | `services/opencode/client.ts`               | Client init/destroy, directory updates               |
+| `OcSessionStore`     | `stores/opencode/oc-session-store.ts`       | Active session changes, status transitions           |
+| `OcMessageStore`     | `stores/opencode/oc-message-store.ts`       | Message/part upserts, session clears                 |
+| `OcChat`             | `hooks/chat/use-oc-chat.ts`                 | User send/stop actions, session creation             |
+| `OcPermissionStore`  | `stores/opencode/oc-permission-store.ts`    | Permission/question add/remove                       |
+| `OcUiBridge`         | `services/conversations/oc-ui-bridge.ts`    | Session select/restore/create/remove                 |
+
+Check browser DevTools console for these logs. Cross-reference with server log at `~/.local/share/orbit/log/` for the `service=session.prompt` entries.

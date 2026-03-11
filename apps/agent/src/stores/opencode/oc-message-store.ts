@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-dynamic-delete */
 
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 
 import type { OcMessage, OcPart } from '@/types/opencode';
 import type { SessionMessagesResponses } from '@opencode-ai/sdk/v2/client';
+
+const logger = createLogger('OcMessageStore');
 
 interface OcDeltaBuffer {
   readonly field: string;
@@ -90,6 +93,7 @@ function upsertSortedPart(parts: OcPart[], part: OcPart): OcPart[] {
 export const useOcMessageStore = create<OcMessageState>((set) => ({
   sessions: {},
   setSessionMessages: (sessionId, entries) => {
+    logger.debug('Session messages set', { sessionId, messageCount: entries.length });
     set((state) => {
       const session = getOrCreateSession(state.sessions, sessionId);
       session.messagesById = {};
@@ -118,6 +122,11 @@ export const useOcMessageStore = create<OcMessageState>((set) => ({
     });
   },
   upsertMessage: (message) => {
+    logger.debug('Message upserted', {
+      sessionId: message.sessionID,
+      messageId: message.id,
+      role: message.role,
+    });
     set((state) => {
       const session = getOrCreateSession(state.sessions, message.sessionID);
       session.messagesById[message.id] = message;
@@ -131,6 +140,7 @@ export const useOcMessageStore = create<OcMessageState>((set) => ({
     });
   },
   removeMessage: (sessionId, messageId) => {
+    logger.debug('Message removed', { sessionId, messageId });
     set((state) => {
       const session = state.sessions[sessionId];
       if (!session) {
@@ -155,6 +165,12 @@ export const useOcMessageStore = create<OcMessageState>((set) => ({
     });
   },
   upsertPart: (part) => {
+    logger.debug('Part upserted', {
+      sessionId: part.sessionID,
+      messageId: part.messageID,
+      partId: part.id,
+      partType: part.type,
+    });
     set((state) => {
       const session = getOrCreateSession(state.sessions, part.sessionID);
       session.partsById[part.id] = part;
@@ -266,6 +282,7 @@ export const useOcMessageStore = create<OcMessageState>((set) => ({
     });
   },
   clearSession: (sessionId) => {
+    logger.debug('Session cleared', { sessionId });
     set((state) => {
       return {
         sessions: Object.fromEntries(

@@ -1,8 +1,11 @@
+import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/shallow';
 
 import type { OcSession, OcSessionStatus } from '@/types/opencode';
+
+const logger = createLogger('OcSessionStore');
 
 const MAX_SESSIONS = 30;
 const STORAGE_KEY = 'orbit-oc-sessionId';
@@ -43,6 +46,7 @@ export const useOcSessionStore = create<OcSessionState>()(
       sessionStatuses: {},
       sessionErrors: {},
       setSessions: (sessions) => {
+        logger.debug('Sessions bulk loaded', { count: sessions.length });
         set((state) => ({
           ...(() => {
             const trimmedSessions = trimSessions(
@@ -63,6 +67,7 @@ export const useOcSessionStore = create<OcSessionState>()(
         }));
       },
       addSession: (session) => {
+        logger.debug('Session added', { sessionId: session.id });
         set((state) => {
           const trimmedSessions = trimSessions({
             ...state.sessions,
@@ -103,6 +108,7 @@ export const useOcSessionStore = create<OcSessionState>()(
         });
       },
       removeSession: (sessionId) => {
+        logger.debug('Session removed', { sessionId });
         set((state) => {
           return {
             sessions: Object.fromEntries(
@@ -119,9 +125,11 @@ export const useOcSessionStore = create<OcSessionState>()(
         });
       },
       setActiveSessionId: (activeSessionId) => {
+        logger.info('Active session changed', { sessionId: activeSessionId });
         set({ activeSessionId });
       },
       setSessionStatus: (sessionId, status) => {
+        logger.debug('Session status changed', { sessionId, statusType: status.type });
         set((state) => ({
           sessionStatuses: {
             ...state.sessionStatuses,
@@ -130,6 +138,9 @@ export const useOcSessionStore = create<OcSessionState>()(
         }));
       },
       setSessionError: (sessionId, error) => {
+        if (error !== null) {
+          logger.warn('Session error set', { sessionId });
+        }
         set((state) => {
           if (error === null) {
             return {

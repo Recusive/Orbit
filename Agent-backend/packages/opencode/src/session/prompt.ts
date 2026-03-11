@@ -173,6 +173,7 @@ export namespace SessionPrompt {
   export type PromptInput = z.infer<typeof PromptInput>
 
   export const prompt = fn(PromptInput, async (input) => {
+    log.info("prompt", { sessionID: input.sessionID, agent: input.agent, noReply: input.noReply })
     const session = Session.get(input.sessionID)
     await SessionRevert.cleanup(session)
 
@@ -313,7 +314,10 @@ export namespace SessionPrompt {
     for (;;) {
       SessionStatus.set(sessionID, { type: "busy" })
       log.info("loop", { step, sessionID })
-      if (abort.aborted) break
+      if (abort.aborted) {
+        log.info("exiting loop", { sessionID, step, reason: "aborted" })
+        break
+      }
       let msgs = MessageV2.filterCompacted(MessageV2.stream(sessionID))
 
       let lastUser: MessageV2.User | undefined
@@ -334,12 +338,30 @@ export namespace SessionPrompt {
       }
 
       if (!lastUser) throw new Error("No user message found in stream. This should never happen.")
+      log.info("messages scanned", {
+        sessionID,
+        step,
+        messageCount: msgs.length,
+        lastUserID: lastUser.id,
+        lastAssistantID: lastAssistant?.id,
+        lastAssistantFinish: lastAssistant?.finish,
+        lastFinishedID: lastFinished?.id,
+        lastFinishedFinish: lastFinished?.finish,
+        pendingTasks: tasks.length,
+      })
       if (
         lastAssistant?.finish &&
         !["tool-calls", "unknown"].includes(lastAssistant.finish) &&
         lastUser.id < lastAssistant.id
       ) {
-        log.info("exiting loop", { sessionID })
+        log.info("exiting loop", {
+          sessionID,
+          step,
+          reason: "assistant finished",
+          lastAssistantFinish: lastAssistant.finish,
+          lastUserID: lastUser.id,
+          lastAssistantID: lastAssistant.id,
+        })
         break
       }
 
@@ -625,6 +647,7 @@ export namespace SessionPrompt {
       const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
       const bypassAgentCheck = lastUserMsg?.parts.some((p) => p.type === "agent") ?? false
 
+      log.info("resolveTools", { status: "started", sessionID, step, agent: agent.name })
       const tools = await resolveTools({
         agent,
         session,
@@ -634,6 +657,7 @@ export namespace SessionPrompt {
         bypassAgentCheck,
         messages: msgs,
       })
+      log.info("resolveTools", { status: "completed", sessionID, step, toolCount: Object.keys(tools).length })
 
       // Inject StructuredOutput tool if JSON schema mode enabled
       if (lastUser.format?.type === "json_schema") {
@@ -680,6 +704,7 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
+      log.info("llm call", { status: "started", sessionID, step, modelID: model.id, providerID: model.providerID, messageCount: msgs.length, toolCount: Object.keys(tools).length, isLastStep })
       const result = await processor.process({
         user: lastUser,
         agent,
@@ -701,6 +726,7 @@ export namespace SessionPrompt {
         model,
         toolChoice: format.type === "json_schema" ? "required" : undefined,
       })
+      log.info("llm call", { status: "completed", sessionID, step, result, finish: processor.message.finish })
 
       // If structured output was captured, save it and exit immediately
       // This takes priority because the StructuredOutput tool was called successfully
