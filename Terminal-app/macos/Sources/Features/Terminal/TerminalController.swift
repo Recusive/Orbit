@@ -1145,10 +1145,10 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
 
         window.contentView = splitView
 
-        // Activate sidebar mode: permanently hide the titlebar.
-        // Must happen after contentView is set.
+        // Re-apply sidebar titlebar hiding now that contentView is set.
+        // sidebarActive was already set in awakeFromNib (before accessories were added),
+        // but the NSTitlebarContainerView only exists after contentView is assigned.
         if let terminalWindow = window as? TerminalWindow {
-            terminalWindow.sidebarActive = true
             terminalWindow.configureSidebarTitlebar()
         }
 
