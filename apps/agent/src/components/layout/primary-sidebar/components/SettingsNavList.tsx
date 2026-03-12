@@ -62,7 +62,7 @@ export const SettingsNavList: FC = () => {
   const openSettings = useUIStore((state) => state.openSettings);
 
   return (
-    <div className="flex flex-col gap-0.5 py-1.5">
+    <div className="flex flex-col gap-0.5 py-1.5 animate-title-in">
       {NAV_GROUPS.map((group, groupIndex) => (
         <div key={group.label} className={cn('flex flex-col gap-0.5', groupIndex > 0 && 'mt-2')}>
           <div className="flex items-center px-3 py-1 shrink-0">

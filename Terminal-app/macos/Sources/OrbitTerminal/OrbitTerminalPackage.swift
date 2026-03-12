@@ -51,7 +51,7 @@ extension OrbitTerminal {
     /// Returns the mechanism that launched the app. This is based on an env var so
     /// its up to the env var being set in the correct circumstance.
     static var launchSource: LaunchSource {
-        guard let envValue = ProcessInfo.processInfo.environment["ORBIT_TERMINAL_MAC_LAUNCH_SOURCE"] else {
+        guard let envValue = ProcessInfo.processInfo.environment["GHOSTTY_MAC_LAUNCH_SOURCE"] else {
             // We default to the CLI because the app bundle always sets the
             // source. If its unset we assume we're in a CLI environment.
             return .cli
@@ -92,13 +92,13 @@ extension OrbitTerminal {
 
         static func from(_ c: ghostty_action_float_window_e) -> Self? {
             switch c {
-            case ORBIT_TERMINAL_FLOAT_WINDOW_ON:
+            case GHOSTTY_FLOAT_WINDOW_ON:
                 return .on
 
-            case ORBIT_TERMINAL_FLOAT_WINDOW_OFF:
+            case GHOSTTY_FLOAT_WINDOW_OFF:
                 return .off
 
-            case ORBIT_TERMINAL_FLOAT_WINDOW_TOGGLE:
+            case GHOSTTY_FLOAT_WINDOW_TOGGLE:
                 return .toggle
 
             default:
@@ -114,13 +114,13 @@ extension OrbitTerminal {
 
         static func from(_ c: ghostty_action_secure_input_e) -> Self? {
             switch c {
-            case ORBIT_TERMINAL_SECURE_INPUT_ON:
+            case GHOSTTY_SECURE_INPUT_ON:
                 return .on
 
-            case ORBIT_TERMINAL_SECURE_INPUT_OFF:
+            case GHOSTTY_SECURE_INPUT_OFF:
                 return .off
 
-            case ORBIT_TERMINAL_SECURE_INPUT_TOGGLE:
+            case GHOSTTY_SECURE_INPUT_TOGGLE:
                 return .toggle
 
             default:
@@ -136,22 +136,22 @@ extension OrbitTerminal {
         /// Initialize from a OrbitTerminal API enum.
         static func from(direction: ghostty_action_goto_split_e) -> Self? {
             switch direction {
-            case ORBIT_TERMINAL_GOTO_SPLIT_PREVIOUS:
+            case GHOSTTY_GOTO_SPLIT_PREVIOUS:
                 return .previous
 
-            case ORBIT_TERMINAL_GOTO_SPLIT_NEXT:
+            case GHOSTTY_GOTO_SPLIT_NEXT:
                 return .next
 
-            case ORBIT_TERMINAL_GOTO_SPLIT_UP:
+            case GHOSTTY_GOTO_SPLIT_UP:
                 return .up
 
-            case ORBIT_TERMINAL_GOTO_SPLIT_DOWN:
+            case GHOSTTY_GOTO_SPLIT_DOWN:
                 return .down
 
-            case ORBIT_TERMINAL_GOTO_SPLIT_LEFT:
+            case GHOSTTY_GOTO_SPLIT_LEFT:
                 return .left
 
-            case ORBIT_TERMINAL_GOTO_SPLIT_RIGHT:
+            case GHOSTTY_GOTO_SPLIT_RIGHT:
                 return .right
 
             default:
@@ -162,22 +162,22 @@ extension OrbitTerminal {
         func toNative() -> ghostty_action_goto_split_e {
             switch self {
             case .previous:
-                return ORBIT_TERMINAL_GOTO_SPLIT_PREVIOUS
+                return GHOSTTY_GOTO_SPLIT_PREVIOUS
 
             case .next:
-                return ORBIT_TERMINAL_GOTO_SPLIT_NEXT
+                return GHOSTTY_GOTO_SPLIT_NEXT
 
             case .up:
-                return ORBIT_TERMINAL_GOTO_SPLIT_UP
+                return GHOSTTY_GOTO_SPLIT_UP
 
             case .down:
-                return ORBIT_TERMINAL_GOTO_SPLIT_DOWN
+                return GHOSTTY_GOTO_SPLIT_DOWN
 
             case .left:
-                return ORBIT_TERMINAL_GOTO_SPLIT_LEFT
+                return GHOSTTY_GOTO_SPLIT_LEFT
 
             case .right:
-                return ORBIT_TERMINAL_GOTO_SPLIT_RIGHT
+                return GHOSTTY_GOTO_SPLIT_RIGHT
             }
         }
     }
@@ -188,13 +188,13 @@ extension OrbitTerminal {
 
         static func from(direction: ghostty_action_resize_split_direction_e) -> Self? {
             switch direction {
-            case ORBIT_TERMINAL_RESIZE_SPLIT_UP:
+            case GHOSTTY_RESIZE_SPLIT_UP:
                 return .up
-            case ORBIT_TERMINAL_RESIZE_SPLIT_DOWN:
+            case GHOSTTY_RESIZE_SPLIT_DOWN:
                 return .down
-            case ORBIT_TERMINAL_RESIZE_SPLIT_LEFT:
+            case GHOSTTY_RESIZE_SPLIT_LEFT:
                 return .left
-            case ORBIT_TERMINAL_RESIZE_SPLIT_RIGHT:
+            case GHOSTTY_RESIZE_SPLIT_RIGHT:
                 return .right
             default:
                 return nil
@@ -204,13 +204,13 @@ extension OrbitTerminal {
         func toNative() -> ghostty_action_resize_split_direction_e {
             switch self {
             case .up:
-                return ORBIT_TERMINAL_RESIZE_SPLIT_UP
+                return GHOSTTY_RESIZE_SPLIT_UP
             case .down:
-                return ORBIT_TERMINAL_RESIZE_SPLIT_DOWN
+                return GHOSTTY_RESIZE_SPLIT_DOWN
             case .left:
-                return ORBIT_TERMINAL_RESIZE_SPLIT_LEFT
+                return GHOSTTY_RESIZE_SPLIT_LEFT
             case .right:
-                return ORBIT_TERMINAL_RESIZE_SPLIT_RIGHT
+                return GHOSTTY_RESIZE_SPLIT_RIGHT
             }
         }
     }
@@ -279,11 +279,11 @@ extension OrbitTerminal {
 
         static func from(request: ghostty_clipboard_request_e) -> ClipboardRequest? {
             switch request {
-            case ORBIT_TERMINAL_CLIPBOARD_REQUEST_PASTE:
+            case GHOSTTY_CLIPBOARD_REQUEST_PASTE:
                 return .paste
-            case ORBIT_TERMINAL_CLIPBOARD_REQUEST_OSC_52_READ:
+            case GHOSTTY_CLIPBOARD_REQUEST_OSC_52_READ:
                 return .osc_52_read
-            case ORBIT_TERMINAL_CLIPBOARD_REQUEST_OSC_52_WRITE:
+            case GHOSTTY_CLIPBOARD_REQUEST_OSC_52_WRITE:
                 return .osc_52_write(nil)
             default:
                 return nil

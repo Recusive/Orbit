@@ -66,7 +66,7 @@ pub fn init(
         step.addArgs(&.{
             "xcodebuild",
             "-target",
-            "Orbit Terminal",
+            "OrbitTerminal",
             "-configuration",
             xc_config,
         });
@@ -139,11 +139,11 @@ pub fn init(
         disable_save_state.expectExitCode(0);
         disable_save_state.step.dependOn(&build.step);
 
-        const open = RunStep.create(b, "run Ghostty app");
+        const open = RunStep.create(b, "run Orbit Terminal app");
         open.has_side_effects = true;
         open.cwd = b.path("");
         open.addArgs(&.{b.fmt(
-            "{s}/Contents/MacOS/ghostty",
+            "{s}/Contents/MacOS/orbit-terminal",
             .{app_path},
         )});
 
@@ -156,7 +156,7 @@ pub fn init(
         open.setEnvironmentVariable("GHOSTTY_LOG", "stderr,macos");
 
         // Configure how we're launching
-        open.setEnvironmentVariable("GHOSTTY_MAC_LAUNCH_SOURCE", "zig_run");
+        open.setEnvironmentVariable("ORBIT_TERMINAL_MAC_LAUNCH_SOURCE", "zig_run");
 
         if (b.args) |args| {
             open.addArgs(args);

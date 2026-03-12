@@ -20,7 +20,7 @@ struct QuickTerminalRestorableState: TerminalRestorable {
 
     var baseConfig: OrbitTerminal.SurfaceConfiguration? {
         var config = OrbitTerminal.SurfaceConfiguration()
-        config.environmentVariables["ORBIT_TERMINAL_QUICK_TERMINAL"] = "1"
+        config.environmentVariables["GHOSTTY_QUICK_TERMINAL"] = "1"
         return config
     }
 }

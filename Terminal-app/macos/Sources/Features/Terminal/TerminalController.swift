@@ -1467,19 +1467,19 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             guard let selectedWindow = tabGroup.selectedWindow else { return }
             guard let selectedIndex = tabbedWindows.firstIndex(where: { $0 == selectedWindow }) else { return }
 
-            if tabIndex == ORBIT_TERMINAL_GOTO_TAB_PREVIOUS.rawValue {
+            if tabIndex == GHOSTTY_GOTO_TAB_PREVIOUS.rawValue {
                 if selectedIndex == 0 {
                     finalIndex = tabbedWindows.count - 1
                 } else {
                     finalIndex = selectedIndex - 1
                 }
-            } else if tabIndex == ORBIT_TERMINAL_GOTO_TAB_NEXT.rawValue {
+            } else if tabIndex == GHOSTTY_GOTO_TAB_NEXT.rawValue {
                 if selectedIndex == tabbedWindows.count - 1 {
                     finalIndex = 0
                 } else {
                     finalIndex = selectedIndex + 1
                 }
-            } else if tabIndex == ORBIT_TERMINAL_GOTO_TAB_LAST.rawValue {
+            } else if tabIndex == GHOSTTY_GOTO_TAB_LAST.rawValue {
                 finalIndex = tabbedWindows.count - 1
             } else {
                 return

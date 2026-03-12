@@ -27,7 +27,7 @@ class OrbitTerminalCustomConfigCase: XCTestCase {
         true
     }
 
-    static let defaultsSuiteName: String = "ORBIT_TERMINAL_UI_TESTS"
+    static let defaultsSuiteName: String = "GHOSTTY_UI_TESTS"
 
     var configFile: URL?
     override func setUpWithError() throws {
@@ -55,8 +55,8 @@ class OrbitTerminalCustomConfigCase: XCTestCase {
         guard let configFile else {
             return app
         }
-        app.launchEnvironment["ORBIT_TERMINAL_CONFIG_PATH"] = configFile.path
-        app.launchEnvironment["ORBIT_TERMINAL_USER_DEFAULTS_SUITE"] = defaultsSuite
+        app.launchEnvironment["GHOSTTY_CONFIG_PATH"] = configFile.path
+        app.launchEnvironment["GHOSTTY_USER_DEFAULTS_SUITE"] = defaultsSuite
         return app
     }
 }

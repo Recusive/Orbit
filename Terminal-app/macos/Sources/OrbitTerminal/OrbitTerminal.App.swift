@@ -124,7 +124,7 @@ extension OrbitTerminal {
             #if os(macOS)
             let fileURL = URL(fileURLWithPath: str).absoluteString
             var action = ghostty_action_open_url_s()
-            action.kind = ORBIT_TERMINAL_ACTION_OPEN_URL_KIND_TEXT
+            action.kind = GHOSTTY_ACTION_OPEN_URL_KIND_TEXT
             fileURL.withCString { cStr in
                 action.url = cStr
                 action.len = UInt(fileURL.count)
@@ -475,7 +475,7 @@ extension OrbitTerminal {
         static func action(_ app: ghostty_app_t, target: ghostty_target_s, action: ghostty_action_s) -> Bool {
             // Make sure it a target we understand so all our action handlers can assert
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP, ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_APP, GHOSTTY_TARGET_SURFACE:
                 break
 
             default:
@@ -485,186 +485,186 @@ extension OrbitTerminal {
 
             // Action dispatch
             switch action.tag {
-            case ORBIT_TERMINAL_ACTION_QUIT:
+            case GHOSTTY_ACTION_QUIT:
                 quit(app)
 
-            case ORBIT_TERMINAL_ACTION_NEW_WINDOW:
+            case GHOSTTY_ACTION_NEW_WINDOW:
                 newWindow(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_NEW_TAB:
+            case GHOSTTY_ACTION_NEW_TAB:
                 newTab(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_NEW_SPLIT:
+            case GHOSTTY_ACTION_NEW_SPLIT:
                 newSplit(app, target: target, direction: action.action.new_split)
 
-            case ORBIT_TERMINAL_ACTION_CLOSE_TAB:
+            case GHOSTTY_ACTION_CLOSE_TAB:
                 closeTab(app, target: target, mode: action.action.close_tab_mode)
 
-            case ORBIT_TERMINAL_ACTION_CLOSE_WINDOW:
+            case GHOSTTY_ACTION_CLOSE_WINDOW:
                 closeWindow(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_FULLSCREEN:
+            case GHOSTTY_ACTION_TOGGLE_FULLSCREEN:
                 toggleFullscreen(app, target: target, mode: action.action.toggle_fullscreen)
 
-            case ORBIT_TERMINAL_ACTION_MOVE_TAB:
+            case GHOSTTY_ACTION_MOVE_TAB:
                 return moveTab(app, target: target, move: action.action.move_tab)
 
-            case ORBIT_TERMINAL_ACTION_GOTO_TAB:
+            case GHOSTTY_ACTION_GOTO_TAB:
                 return gotoTab(app, target: target, tab: action.action.goto_tab)
 
-            case ORBIT_TERMINAL_ACTION_GOTO_SPLIT:
+            case GHOSTTY_ACTION_GOTO_SPLIT:
                 return gotoSplit(app, target: target, direction: action.action.goto_split)
 
-            case ORBIT_TERMINAL_ACTION_GOTO_WINDOW:
+            case GHOSTTY_ACTION_GOTO_WINDOW:
                 return gotoWindow(app, target: target, direction: action.action.goto_window)
 
-            case ORBIT_TERMINAL_ACTION_RESIZE_SPLIT:
+            case GHOSTTY_ACTION_RESIZE_SPLIT:
                 return resizeSplit(app, target: target, resize: action.action.resize_split)
 
-            case ORBIT_TERMINAL_ACTION_EQUALIZE_SPLITS:
+            case GHOSTTY_ACTION_EQUALIZE_SPLITS:
                 equalizeSplits(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_SPLIT_ZOOM:
+            case GHOSTTY_ACTION_TOGGLE_SPLIT_ZOOM:
                 return toggleSplitZoom(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_INSPECTOR:
+            case GHOSTTY_ACTION_INSPECTOR:
                 controlInspector(app, target: target, mode: action.action.inspector)
 
-            case ORBIT_TERMINAL_ACTION_RENDER_INSPECTOR:
+            case GHOSTTY_ACTION_RENDER_INSPECTOR:
                 renderInspector(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_DESKTOP_NOTIFICATION:
+            case GHOSTTY_ACTION_DESKTOP_NOTIFICATION:
                 showDesktopNotification(app, target: target, n: action.action.desktop_notification)
 
-            case ORBIT_TERMINAL_ACTION_SET_TITLE:
+            case GHOSTTY_ACTION_SET_TITLE:
                 setTitle(app, target: target, v: action.action.set_title)
 
-            case ORBIT_TERMINAL_ACTION_SET_TAB_TITLE:
+            case GHOSTTY_ACTION_SET_TAB_TITLE:
                 return setTabTitle(app, target: target, v: action.action.set_tab_title)
 
-            case ORBIT_TERMINAL_ACTION_PROMPT_TITLE:
+            case GHOSTTY_ACTION_PROMPT_TITLE:
                 return promptTitle(app, target: target, v: action.action.prompt_title)
 
-            case ORBIT_TERMINAL_ACTION_PWD:
+            case GHOSTTY_ACTION_PWD:
                 pwdChanged(app, target: target, v: action.action.pwd)
 
-            case ORBIT_TERMINAL_ACTION_OPEN_CONFIG:
+            case GHOSTTY_ACTION_OPEN_CONFIG:
                 openConfig()
 
-            case ORBIT_TERMINAL_ACTION_FLOAT_WINDOW:
+            case GHOSTTY_ACTION_FLOAT_WINDOW:
                 toggleFloatWindow(app, target: target, mode: action.action.float_window)
 
-            case ORBIT_TERMINAL_ACTION_SECURE_INPUT:
+            case GHOSTTY_ACTION_SECURE_INPUT:
                 toggleSecureInput(app, target: target, mode: action.action.secure_input)
 
-            case ORBIT_TERMINAL_ACTION_MOUSE_SHAPE:
+            case GHOSTTY_ACTION_MOUSE_SHAPE:
                 setMouseShape(app, target: target, shape: action.action.mouse_shape)
 
-            case ORBIT_TERMINAL_ACTION_MOUSE_VISIBILITY:
+            case GHOSTTY_ACTION_MOUSE_VISIBILITY:
                 setMouseVisibility(app, target: target, v: action.action.mouse_visibility)
 
-            case ORBIT_TERMINAL_ACTION_MOUSE_OVER_LINK:
+            case GHOSTTY_ACTION_MOUSE_OVER_LINK:
                 setMouseOverLink(app, target: target, v: action.action.mouse_over_link)
 
-            case ORBIT_TERMINAL_ACTION_INITIAL_SIZE:
+            case GHOSTTY_ACTION_INITIAL_SIZE:
                 setInitialSize(app, target: target, v: action.action.initial_size)
 
-            case ORBIT_TERMINAL_ACTION_RESET_WINDOW_SIZE:
+            case GHOSTTY_ACTION_RESET_WINDOW_SIZE:
                 resetWindowSize(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_CELL_SIZE:
+            case GHOSTTY_ACTION_CELL_SIZE:
                 setCellSize(app, target: target, v: action.action.cell_size)
 
-            case ORBIT_TERMINAL_ACTION_RENDERER_HEALTH:
+            case GHOSTTY_ACTION_RENDERER_HEALTH:
                 rendererHealth(app, target: target, v: action.action.renderer_health)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_COMMAND_PALETTE:
+            case GHOSTTY_ACTION_TOGGLE_COMMAND_PALETTE:
                 toggleCommandPalette(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_MAXIMIZE:
+            case GHOSTTY_ACTION_TOGGLE_MAXIMIZE:
                 toggleMaximize(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_QUICK_TERMINAL:
+            case GHOSTTY_ACTION_TOGGLE_QUICK_TERMINAL:
                 toggleQuickTerminal(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_VISIBILITY:
+            case GHOSTTY_ACTION_TOGGLE_VISIBILITY:
                 toggleVisibility(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_BACKGROUND_OPACITY:
+            case GHOSTTY_ACTION_TOGGLE_BACKGROUND_OPACITY:
                 toggleBackgroundOpacity(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_KEY_SEQUENCE:
+            case GHOSTTY_ACTION_KEY_SEQUENCE:
                 keySequence(app, target: target, v: action.action.key_sequence)
 
-            case ORBIT_TERMINAL_ACTION_KEY_TABLE:
+            case GHOSTTY_ACTION_KEY_TABLE:
                 keyTable(app, target: target, v: action.action.key_table)
 
-            case ORBIT_TERMINAL_ACTION_PROGRESS_REPORT:
+            case GHOSTTY_ACTION_PROGRESS_REPORT:
                 progressReport(app, target: target, v: action.action.progress_report)
 
-            case ORBIT_TERMINAL_ACTION_CONFIG_CHANGE:
+            case GHOSTTY_ACTION_CONFIG_CHANGE:
                 configChange(app, target: target, v: action.action.config_change)
 
-            case ORBIT_TERMINAL_ACTION_RELOAD_CONFIG:
+            case GHOSTTY_ACTION_RELOAD_CONFIG:
                 configReload(app, target: target, v: action.action.reload_config)
 
-            case ORBIT_TERMINAL_ACTION_COLOR_CHANGE:
+            case GHOSTTY_ACTION_COLOR_CHANGE:
                 colorChange(app, target: target, change: action.action.color_change)
 
-            case ORBIT_TERMINAL_ACTION_RING_BELL:
+            case GHOSTTY_ACTION_RING_BELL:
                 ringBell(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_READONLY:
+            case GHOSTTY_ACTION_READONLY:
                 setReadonly(app, target: target, v: action.action.readonly)
 
-            case ORBIT_TERMINAL_ACTION_CHECK_FOR_UPDATES:
+            case GHOSTTY_ACTION_CHECK_FOR_UPDATES:
                 checkForUpdates(app)
 
-            case ORBIT_TERMINAL_ACTION_OPEN_URL:
+            case GHOSTTY_ACTION_OPEN_URL:
                 return openURL(action.action.open_url)
 
-            case ORBIT_TERMINAL_ACTION_UNDO:
+            case GHOSTTY_ACTION_UNDO:
                 return undo(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_REDO:
+            case GHOSTTY_ACTION_REDO:
                 return redo(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_SCROLLBAR:
+            case GHOSTTY_ACTION_SCROLLBAR:
                 scrollbar(app, target: target, v: action.action.scrollbar)
 
-            case ORBIT_TERMINAL_ACTION_CLOSE_ALL_WINDOWS:
+            case GHOSTTY_ACTION_CLOSE_ALL_WINDOWS:
                 closeAllWindows(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_START_SEARCH:
+            case GHOSTTY_ACTION_START_SEARCH:
                 startSearch(app, target: target, v: action.action.start_search)
 
-            case ORBIT_TERMINAL_ACTION_END_SEARCH:
+            case GHOSTTY_ACTION_END_SEARCH:
                 endSearch(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_SEARCH_TOTAL:
+            case GHOSTTY_ACTION_SEARCH_TOTAL:
                 searchTotal(app, target: target, v: action.action.search_total)
 
-            case ORBIT_TERMINAL_ACTION_SEARCH_SELECTED:
+            case GHOSTTY_ACTION_SEARCH_SELECTED:
                 searchSelected(app, target: target, v: action.action.search_selected)
 
-            case ORBIT_TERMINAL_ACTION_COMMAND_FINISHED:
+            case GHOSTTY_ACTION_COMMAND_FINISHED:
                 commandFinished(app, target: target, v: action.action.command_finished)
 
-            case ORBIT_TERMINAL_ACTION_PRESENT_TERMINAL:
+            case GHOSTTY_ACTION_PRESENT_TERMINAL:
                 return presentTerminal(app, target: target)
 
-            case ORBIT_TERMINAL_ACTION_TOGGLE_TAB_OVERVIEW:
+            case GHOSTTY_ACTION_TOGGLE_TAB_OVERVIEW:
                 fallthrough
-            case ORBIT_TERMINAL_ACTION_TOGGLE_WINDOW_DECORATIONS:
+            case GHOSTTY_ACTION_TOGGLE_WINDOW_DECORATIONS:
                 fallthrough
-            case ORBIT_TERMINAL_ACTION_SIZE_LIMIT:
+            case GHOSTTY_ACTION_SIZE_LIMIT:
                 fallthrough
-            case ORBIT_TERMINAL_ACTION_QUIT_TIMER:
+            case GHOSTTY_ACTION_QUIT_TIMER:
                 fallthrough
-            case ORBIT_TERMINAL_ACTION_SHOW_CHILD_EXITED:
+            case GHOSTTY_ACTION_SHOW_CHILD_EXITED:
                 OrbitTerminal.logger.info("known but unimplemented action action=\(action.tag.rawValue)")
                 return false
-            case ORBIT_TERMINAL_ACTION_COPY_TITLE_TO_CLIPBOARD:
+            case GHOSTTY_ACTION_COPY_TITLE_TO_CLIPBOARD:
                 return copyTitleToClipboard(app, target: target)
             default:
                 OrbitTerminal.logger.warning("unknown action action=\(action.tag.rawValue)")
@@ -743,10 +743,10 @@ extension OrbitTerminal {
         private static func undo(_ app: ghostty_app_t, target: ghostty_target_s) -> Bool {
             let undoManager: UndoManager?
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 undoManager = (NSApp.delegate as? AppDelegate)?.undoManager
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
                 undoManager = surfaceView.undoManager
@@ -764,10 +764,10 @@ extension OrbitTerminal {
         private static func redo(_ app: ghostty_app_t, target: ghostty_target_s) -> Bool {
             let undoManager: UndoManager?
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 undoManager = (NSApp.delegate as? AppDelegate)?.undoManager
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
                 undoManager = surfaceView.undoManager
@@ -784,21 +784,21 @@ extension OrbitTerminal {
 
         private static func newWindow(_ app: ghostty_app_t, target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 NotificationCenter.default.post(
                     name: Notification.orbitTerminalNewWindow,
                     object: nil,
                     userInfo: [:]
                 )
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
                     name: Notification.orbitTerminalNewWindow,
                     object: surfaceView,
                     userInfo: [
-                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, ORBIT_TERMINAL_SURFACE_CONTEXT_WINDOW)),
+                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, GHOSTTY_SURFACE_CONTEXT_WINDOW)),
                     ]
                 )
 
@@ -809,14 +809,14 @@ extension OrbitTerminal {
 
         private static func newTab(_ app: ghostty_app_t, target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 NotificationCenter.default.post(
                     name: Notification.orbitTerminalNewTab,
                     object: nil,
                     userInfo: [:]
                 )
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let appState = self.appState(fromView: surfaceView) else { return }
@@ -834,7 +834,7 @@ extension OrbitTerminal {
                     name: Notification.orbitTerminalNewTab,
                     object: surfaceView,
                     userInfo: [
-                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, ORBIT_TERMINAL_SURFACE_CONTEXT_TAB)),
+                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, GHOSTTY_SURFACE_CONTEXT_TAB)),
                     ]
                 )
 
@@ -848,12 +848,12 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             direction: ghostty_action_split_direction_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 // New split does nothing with an app target
                 OrbitTerminal.logger.warning("new split does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -862,7 +862,7 @@ extension OrbitTerminal {
                     object: surfaceView,
                     userInfo: [
                         "direction": direction,
-                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, ORBIT_TERMINAL_SURFACE_CONTEXT_SPLIT)),
+                        Notification.NewSurfaceConfigKey: SurfaceConfiguration(from: ghostty_surface_inherited_config(surface, GHOSTTY_SURFACE_CONTEXT_SPLIT)),
                     ]
                 )
 
@@ -876,10 +876,10 @@ extension OrbitTerminal {
             target: ghostty_target_s
         ) -> Bool {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 return false
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
 
@@ -897,30 +897,30 @@ extension OrbitTerminal {
 
         private static func closeTab(_ app: ghostty_app_t, target: ghostty_target_s, mode: ghostty_action_close_tab_mode_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("close tabs does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
                 switch mode {
-                case ORBIT_TERMINAL_ACTION_CLOSE_TAB_MODE_THIS:
+                case GHOSTTY_ACTION_CLOSE_TAB_MODE_THIS:
                     NotificationCenter.default.post(
                         name: .orbitTerminalCloseTab,
                         object: surfaceView
                     )
                     return
 
-                case ORBIT_TERMINAL_ACTION_CLOSE_TAB_MODE_OTHER:
+                case GHOSTTY_ACTION_CLOSE_TAB_MODE_OTHER:
                     NotificationCenter.default.post(
                         name: .orbitTerminalCloseOtherTabs,
                         object: surfaceView
                     )
                     return
 
-                case ORBIT_TERMINAL_ACTION_CLOSE_TAB_MODE_RIGHT:
+                case GHOSTTY_ACTION_CLOSE_TAB_MODE_RIGHT:
                     NotificationCenter.default.post(
                         name: .orbitTerminalCloseTabsOnTheRight,
                         object: surfaceView
@@ -938,11 +938,11 @@ extension OrbitTerminal {
 
         private static func closeWindow(_ app: ghostty_app_t, target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("close window does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -966,11 +966,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             mode raw: ghostty_action_fullscreen_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle fullscreen does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let mode = FullscreenMode.from(ghostty: raw) else {
@@ -994,11 +994,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle command palette does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1016,11 +1016,11 @@ extension OrbitTerminal {
             target: ghostty_target_s
         ) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle maximize does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1045,14 +1045,14 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 // Technically we could still request app attention here but there
                 // are no known cases where the bell is rang with an app target so
                 // I think its better to warn.
                 OrbitTerminal.logger.warning("ring bell does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1070,18 +1070,18 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_readonly_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("set readonly does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
                     name: .orbitTerminalDidChangeReadonly,
                     object: surfaceView,
                     userInfo: [
-                        SwiftUI.Notification.Name.ReadonlyKey: v == ORBIT_TERMINAL_READONLY_ON,
+                        SwiftUI.Notification.Name.ReadonlyKey: v == GHOSTTY_READONLY_ON,
                     ]
                 )
 
@@ -1095,11 +1095,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             move: ghostty_action_move_tab_s) -> Bool {
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("move tab does nothing with an app target")
                     return false
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
 
@@ -1126,11 +1126,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             tab: ghostty_action_goto_tab_e) -> Bool {
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("goto tab does nothing with an app target")
                     return false
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
 
@@ -1158,11 +1158,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             direction: ghostty_action_goto_split_e) -> Bool {
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("goto split does nothing with an app target")
                     return false
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
                     guard let controller = surfaceView.window?.windowController as? BaseTerminalController else { return false }
@@ -1230,9 +1230,9 @@ extension OrbitTerminal {
 
             let step: Int
             switch direction {
-            case ORBIT_TERMINAL_GOTO_WINDOW_NEXT:
+            case GHOSTTY_GOTO_WINDOW_NEXT:
                 step = 1
-            case ORBIT_TERMINAL_GOTO_WINDOW_PREVIOUS:
+            case GHOSTTY_GOTO_WINDOW_PREVIOUS:
                 step = -1
             default:
                 return false
@@ -1264,11 +1264,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             resize: ghostty_action_resize_split_s) -> Bool {
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("resize split does nothing with an app target")
                     return false
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
                     guard let controller = surfaceView.window?.windowController as? BaseTerminalController else { return false }
@@ -1297,11 +1297,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("equalize splits does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1318,11 +1318,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) -> Bool {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle split zoom does nothing with an app target")
                 return false
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
                 guard let controller = surfaceView.window?.windowController as? BaseTerminalController else { return false }
@@ -1347,11 +1347,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             mode: ghostty_action_inspector_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle inspector does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1370,11 +1370,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             n: ghostty_action_desktop_notification_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("desktop notification does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let title = String(cString: n.title!, encoding: .utf8) else { return }
@@ -1414,11 +1414,11 @@ extension OrbitTerminal {
             v: ghostty_action_command_finished_s
         ) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("command finished does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -1493,11 +1493,11 @@ extension OrbitTerminal {
             guard let mode = SetFloatWIndow.from(mode_raw) else { return }
 
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle float window does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let window = surfaceView.window as? TerminalWindow else { return }
@@ -1527,11 +1527,11 @@ extension OrbitTerminal {
             target: ghostty_target_s
         ) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("toggle background opacity does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface,
                     let surfaceView = self.surfaceView(from: surface),
                     let controller = surfaceView.window?.windowController as? BaseTerminalController else { return }
@@ -1551,11 +1551,11 @@ extension OrbitTerminal {
             guard let mode = SetSecureInput.from(mode_raw) else { return }
 
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
                 appDelegate.setSecureInput(mode)
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let appState = self.appState(fromView: surfaceView) else { return }
@@ -1590,11 +1590,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_set_title_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("set title does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let title = String(cString: v.title!, encoding: .utf8) else { return }
@@ -1611,11 +1611,11 @@ extension OrbitTerminal {
             v: ghostty_action_set_title_s
         ) -> Bool {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("set tab title does nothing with an app target")
                 return false
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let title = String(cString: v.title!, encoding: .utf8) else { return false }
                 let titleOverride = title.isEmpty ? nil : title
                 guard let surface = target.target.surface else { return false }
@@ -1636,7 +1636,7 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) -> Bool {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return false }
                 guard let surfaceView = self.surfaceView(from: surface) else { return false }
                 let title = surfaceView.title
@@ -1659,11 +1659,11 @@ extension OrbitTerminal {
             switch promptTitle {
             case .surface:
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("set title prompt does nothing with an app target")
                     return false
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
                     surfaceView.promptTitle()
@@ -1676,14 +1676,14 @@ extension OrbitTerminal {
 
             case .tab:
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     guard let window = NSApp.mainWindow ?? NSApp.keyWindow,
                           let controller = window.windowController as? BaseTerminalController
                     else { return false }
                     controller.promptTabTitle()
                     return true
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return false }
                     guard let surfaceView = self.surfaceView(from: surface) else { return false }
                     guard let window = surfaceView.window,
@@ -1704,11 +1704,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_pwd_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("pwd change does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let pwd = String(cString: v.pwd!, encoding: .utf8) else { return }
@@ -1724,11 +1724,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             shape: ghostty_action_mouse_shape_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("set mouse shapes nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 surfaceView.setCursorShape(shape)
@@ -1743,18 +1743,18 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_mouse_visibility_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("set mouse shapes nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 switch v {
-                case ORBIT_TERMINAL_MOUSE_VISIBLE:
+                case GHOSTTY_MOUSE_VISIBLE:
                     surfaceView.setCursorVisibility(true)
 
-                case ORBIT_TERMINAL_MOUSE_HIDDEN:
+                case GHOSTTY_MOUSE_HIDDEN:
                     surfaceView.setCursorVisibility(false)
 
                 default:
@@ -1771,11 +1771,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_mouse_over_link_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("mouse over link does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard v.len > 0 else {
@@ -1796,11 +1796,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_initial_size_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("initial size does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 surfaceView.initialSize = NSSize(width: Double(v.width), height: Double(v.height))
@@ -1814,11 +1814,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("reset window size does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1836,11 +1836,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_cell_size_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("mouse over link does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 let backingSize = NSSize(width: Double(v.width), height: Double(v.height))
@@ -1858,11 +1858,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("mouse over link does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1880,11 +1880,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_renderer_health_e) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("mouse over link does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 NotificationCenter.default.post(
@@ -1905,11 +1905,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_key_sequence_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("key sequence does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 if v.active {
@@ -1937,11 +1937,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_key_table_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("key table does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let action = OrbitTerminal.Action.KeyTable(c: v) else { return }
@@ -1962,11 +1962,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_progress_report_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("progress report does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
                 guard let config = (NSApplication.shared.delegate as? AppDelegate)?.ghostty.config else { return }
@@ -1998,11 +1998,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_scrollbar_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("scrollbar does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -2025,11 +2025,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_start_search_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("start_search does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -2055,11 +2055,11 @@ extension OrbitTerminal {
             _ app: ghostty_app_t,
             target: ghostty_target_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("end_search does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -2077,11 +2077,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_search_total_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("search_total does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -2100,11 +2100,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             v: ghostty_action_search_selected_s) {
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 OrbitTerminal.logger.warning("search_selected does nothing with an app target")
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 guard let surfaceView = self.surfaceView(from: surface) else { return }
 
@@ -2128,11 +2128,11 @@ extension OrbitTerminal {
             let ghostty = Unmanaged<App>.fromOpaque(app_ud).takeUnretainedValue()
 
             switch target.tag {
-            case ORBIT_TERMINAL_TARGET_APP:
+            case GHOSTTY_TARGET_APP:
                 ghostty.reloadConfig(soft: v.soft)
                 return
 
-            case ORBIT_TERMINAL_TARGET_SURFACE:
+            case GHOSTTY_TARGET_SURFACE:
                 guard let surface = target.target.surface else { return }
                 ghostty.reloadConfig(surface: surface, soft: v.soft)
 
@@ -2154,7 +2154,7 @@ extension OrbitTerminal {
                 let config = Config(clone: v.config)
 
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     // Notify the world that the app config changed
                     NotificationCenter.default.post(
                         name: .orbitTerminalConfigDidChange,
@@ -2173,7 +2173,7 @@ extension OrbitTerminal {
 
                     return
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return }
                     guard let surfaceView = self.surfaceView(from: surface) else { return }
                     NotificationCenter.default.post(
@@ -2194,11 +2194,11 @@ extension OrbitTerminal {
             target: ghostty_target_s,
             change: ghostty_action_color_change_s) {
                 switch target.tag {
-                case ORBIT_TERMINAL_TARGET_APP:
+                case GHOSTTY_TARGET_APP:
                     OrbitTerminal.logger.warning("color change does nothing with an app target")
                     return
 
-                case ORBIT_TERMINAL_TARGET_SURFACE:
+                case GHOSTTY_TARGET_SURFACE:
                     guard let surface = target.target.surface else { return }
                     guard let surfaceView = self.surfaceView(from: surface) else { return }
                     NotificationCenter.default.post(

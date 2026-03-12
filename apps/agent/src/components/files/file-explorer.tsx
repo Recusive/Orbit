@@ -206,24 +206,23 @@ export const FileExplorer: FC = () => {
   }, [isRootLoading]);
   const showSkeleton = (isRootLoading || skeletonHold) && rootError === null;
 
-  // Blur-reveal: only animate file names when transitioning from skeleton → content
-  // (fresh load / refresh). Prevents frozen blur on plain remount (e.g. Settings → back).
-  const [animateReveal, setAnimateReveal] = useState(false);
-  const wasShowingSkeleton = useRef(false);
+  // Blur-reveal on the container div (not per-item — dozens of filter:blur() chokes the browser).
+  // Starts true so first render has the animation. Re-triggers after skeleton→content transitions.
+  const [animateReveal, setAnimateReveal] = useState(true);
   useEffect(() => {
     if (showSkeleton) {
-      wasShowingSkeleton.current = true;
-    } else if (wasShowingSkeleton.current) {
-      wasShowingSkeleton.current = false;
+      // Prepare: ensure animation is armed for when content appears
       setAnimateReveal(true);
-      const timer = setTimeout(() => {
-        setAnimateReveal(false);
-      }, 500);
-      return () => {
-        clearTimeout(timer);
-      };
+      return undefined;
     }
-    return undefined;
+    // Content visible — trigger reveal and schedule cleanup
+    setAnimateReveal(true);
+    const timer = setTimeout(() => {
+      setAnimateReveal(false);
+    }, 500);
+    return () => {
+      clearTimeout(timer);
+    };
   }, [showSkeleton]);
 
   // Use stable selectors to trigger re-render when tree structure changes
@@ -435,6 +434,7 @@ export const FileExplorer: FC = () => {
           </div>
         ) : (
           <div
+            className={animateReveal ? 'animate-title-in' : undefined}
             style={{
               height: rowVirtualizer.getTotalSize(),
               width: '100%',
@@ -459,7 +459,6 @@ export const FileExplorer: FC = () => {
                   onRetry={handleRetry}
                   onRename={handleRename}
                   onDelete={handleDelete}
-                  animateReveal={animateReveal}
                 />
               );
             })}
@@ -486,7 +485,6 @@ interface FileTreeRowProps {
   readonly onRetry: (path: string) => void;
   readonly onRename: (path: string, newName: string) => void;
   readonly onDelete: (path: string) => void;
-  readonly animateReveal: boolean;
 }
 
 /**
@@ -497,20 +495,7 @@ interface FileTreeRowProps {
  * - Not affected by other rows expanding/selecting
  */
 const FileTreeRow: FC<FileTreeRowProps> = memo(
-  ({
-    path,
-    depth,
-    node,
-    top,
-    height,
-    onToggle,
-    onOpen,
-    onSelect,
-    onRetry,
-    onRename,
-    onDelete,
-    animateReveal,
-  }) => {
+  ({ path, depth, node, top, height, onToggle, onOpen, onSelect, onRetry, onRename, onDelete }) => {
     // Subscribe to only this row's state
     const isExpanded = useFileStore((s) => s.expandedFolders.has(path));
     const isLoading = useFileStore((s) => s.loadingPaths.has(path));
@@ -780,7 +765,6 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           <span
             className={cn(
               'truncate text-left flex-1',
-              animateReveal && 'animate-title-in',
               effectiveGitStatus && GIT_STATUS_STYLES[effectiveGitStatus].fileColor
             )}
           >

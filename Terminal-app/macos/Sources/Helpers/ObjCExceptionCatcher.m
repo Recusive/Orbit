@@ -2,7 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
-BOOL Orbit TerminalAddTabbedWindowSafely(
+BOOL OrbitTerminalAddTabbedWindowSafely(
     id parent,
     id child,
     NSInteger ordered,

@@ -605,10 +605,10 @@ class BaseTerminalController: NSWindowController,
         guard let direction = directionAny as? ghostty_action_split_direction_e else { return }
         let splitDirection: SplitTree<OrbitTerminal.SurfaceView>.NewDirection
         switch direction {
-        case ORBIT_TERMINAL_SPLIT_DIRECTION_RIGHT: splitDirection = .right
-        case ORBIT_TERMINAL_SPLIT_DIRECTION_LEFT: splitDirection = .left
-        case ORBIT_TERMINAL_SPLIT_DIRECTION_DOWN: splitDirection = .down
-        case ORBIT_TERMINAL_SPLIT_DIRECTION_UP: splitDirection = .up
+        case GHOSTTY_SPLIT_DIRECTION_RIGHT: splitDirection = .right
+        case GHOSTTY_SPLIT_DIRECTION_LEFT: splitDirection = .left
+        case GHOSTTY_SPLIT_DIRECTION_DOWN: splitDirection = .down
+        case GHOSTTY_SPLIT_DIRECTION_UP: splitDirection = .up
         default: return
         }
 
@@ -1303,22 +1303,22 @@ class BaseTerminalController: NSWindowController,
 
     @IBAction func splitRight(_ sender: Any) {
         guard let surface = focusedSurface?.surface else { return }
-        ghostty.split(surface: surface, direction: ORBIT_TERMINAL_SPLIT_DIRECTION_RIGHT)
+        ghostty.split(surface: surface, direction: GHOSTTY_SPLIT_DIRECTION_RIGHT)
     }
 
     @IBAction func splitLeft(_ sender: Any) {
         guard let surface = focusedSurface?.surface else { return }
-        ghostty.split(surface: surface, direction: ORBIT_TERMINAL_SPLIT_DIRECTION_LEFT)
+        ghostty.split(surface: surface, direction: GHOSTTY_SPLIT_DIRECTION_LEFT)
     }
 
     @IBAction func splitDown(_ sender: Any) {
         guard let surface = focusedSurface?.surface else { return }
-        ghostty.split(surface: surface, direction: ORBIT_TERMINAL_SPLIT_DIRECTION_DOWN)
+        ghostty.split(surface: surface, direction: GHOSTTY_SPLIT_DIRECTION_DOWN)
     }
 
     @IBAction func splitUp(_ sender: Any) {
         guard let surface = focusedSurface?.surface else { return }
-        ghostty.split(surface: surface, direction: ORBIT_TERMINAL_SPLIT_DIRECTION_UP)
+        ghostty.split(surface: surface, direction: GHOSTTY_SPLIT_DIRECTION_UP)
     }
 
     @IBAction func splitZoom(_ sender: Any) {
@@ -1477,9 +1477,9 @@ extension BaseTerminalController: NSMenuItemValidation {
         let themeAppearance = NSApplication.shared.effectiveAppearance
         let scheme: ghostty_color_scheme_e
         if themeAppearance.isDark {
-            scheme = ORBIT_TERMINAL_COLOR_SCHEME_DARK
+            scheme = GHOSTTY_COLOR_SCHEME_DARK
         } else {
-            scheme = ORBIT_TERMINAL_COLOR_SCHEME_LIGHT
+            scheme = GHOSTTY_COLOR_SCHEME_LIGHT
         }
         guard scheme != appliedColorScheme else {
             return

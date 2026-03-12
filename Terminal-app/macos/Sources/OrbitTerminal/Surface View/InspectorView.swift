@@ -60,13 +60,13 @@ extension OrbitTerminal {
             guard let mode = modeAny as? ghostty_action_inspector_e else { return }
 
             switch mode {
-            case ORBIT_TERMINAL_INSPECTOR_TOGGLE:
+            case GHOSTTY_INSPECTOR_TOGGLE:
                 surfaceView.inspectorVisible = !surfaceView.inspectorVisible
 
-            case ORBIT_TERMINAL_INSPECTOR_SHOW:
+            case GHOSTTY_INSPECTOR_SHOW:
                 surfaceView.inspectorVisible = true
 
-            case ORBIT_TERMINAL_INSPECTOR_HIDE:
+            case GHOSTTY_INSPECTOR_HIDE:
                 surfaceView.inspectorVisible = false
 
             default:
@@ -227,25 +227,25 @@ extension OrbitTerminal {
         override func mouseDown(with event: NSEvent) {
             guard let inspector = self.inspector else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            inspector.mouseButton(ORBIT_TERMINAL_MOUSE_PRESS, button: ORBIT_TERMINAL_MOUSE_LEFT, mods: mods)
+            inspector.mouseButton(GHOSTTY_MOUSE_PRESS, button: GHOSTTY_MOUSE_LEFT, mods: mods)
         }
 
         override func mouseUp(with event: NSEvent) {
             guard let inspector = self.inspector else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            inspector.mouseButton(ORBIT_TERMINAL_MOUSE_RELEASE, button: ORBIT_TERMINAL_MOUSE_LEFT, mods: mods)
+            inspector.mouseButton(GHOSTTY_MOUSE_RELEASE, button: GHOSTTY_MOUSE_LEFT, mods: mods)
         }
 
         override func rightMouseDown(with event: NSEvent) {
             guard let inspector = self.inspector else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            inspector.mouseButton(ORBIT_TERMINAL_MOUSE_PRESS, button: ORBIT_TERMINAL_MOUSE_RIGHT, mods: mods)
+            inspector.mouseButton(GHOSTTY_MOUSE_PRESS, button: GHOSTTY_MOUSE_RIGHT, mods: mods)
         }
 
         override func rightMouseUp(with event: NSEvent) {
             guard let inspector = self.inspector else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            inspector.mouseButton(ORBIT_TERMINAL_MOUSE_RELEASE, button: ORBIT_TERMINAL_MOUSE_RIGHT, mods: mods)
+            inspector.mouseButton(GHOSTTY_MOUSE_RELEASE, button: GHOSTTY_MOUSE_RIGHT, mods: mods)
         }
 
         override func mouseMoved(with event: NSEvent) {
@@ -274,20 +274,20 @@ extension OrbitTerminal {
             }
 
             // Determine our momentum value
-            var momentum: ghostty_input_mouse_momentum_e = ORBIT_TERMINAL_MOUSE_MOMENTUM_NONE
+            var momentum: ghostty_input_mouse_momentum_e = GHOSTTY_MOUSE_MOMENTUM_NONE
             switch event.momentumPhase {
             case .began:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_BEGAN
+                momentum = GHOSTTY_MOUSE_MOMENTUM_BEGAN
             case .stationary:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_STATIONARY
+                momentum = GHOSTTY_MOUSE_MOMENTUM_STATIONARY
             case .changed:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_CHANGED
+                momentum = GHOSTTY_MOUSE_MOMENTUM_CHANGED
             case .ended:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_ENDED
+                momentum = GHOSTTY_MOUSE_MOMENTUM_ENDED
             case .cancelled:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_CANCELLED
+                momentum = GHOSTTY_MOUSE_MOMENTUM_CANCELLED
             case .mayBegin:
-                momentum = ORBIT_TERMINAL_MOUSE_MOMENTUM_MAY_BEGIN
+                momentum = GHOSTTY_MOUSE_MOMENTUM_MAY_BEGIN
             default:
                 break
             }
@@ -299,23 +299,23 @@ extension OrbitTerminal {
         }
 
         override func keyDown(with event: NSEvent) {
-            let action = event.isARepeat ? ORBIT_TERMINAL_ACTION_REPEAT : ORBIT_TERMINAL_ACTION_PRESS
+            let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
             keyAction(action, event: event)
             self.interpretKeyEvents([event])
         }
 
         override func keyUp(with event: NSEvent) {
-            keyAction(ORBIT_TERMINAL_ACTION_RELEASE, event: event)
+            keyAction(GHOSTTY_ACTION_RELEASE, event: event)
         }
 
         override func flagsChanged(with event: NSEvent) {
             let mod: UInt32
             switch event.keyCode {
-            case 0x39: mod = ORBIT_TERMINAL_MODS_CAPS.rawValue
-            case 0x38, 0x3C: mod = ORBIT_TERMINAL_MODS_SHIFT.rawValue
-            case 0x3B, 0x3E: mod = ORBIT_TERMINAL_MODS_CTRL.rawValue
-            case 0x3A, 0x3D: mod = ORBIT_TERMINAL_MODS_ALT.rawValue
-            case 0x37, 0x36: mod = ORBIT_TERMINAL_MODS_SUPER.rawValue
+            case 0x39: mod = GHOSTTY_MODS_CAPS.rawValue
+            case 0x38, 0x3C: mod = GHOSTTY_MODS_SHIFT.rawValue
+            case 0x3B, 0x3E: mod = GHOSTTY_MODS_CTRL.rawValue
+            case 0x3A, 0x3D: mod = GHOSTTY_MODS_ALT.rawValue
+            case 0x37, 0x36: mod = GHOSTTY_MODS_SUPER.rawValue
             default: return
             }
 
@@ -324,8 +324,8 @@ extension OrbitTerminal {
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
 
             // If the key that pressed this is active, its a press, else release
-            var action = ORBIT_TERMINAL_ACTION_RELEASE
-            if mods.rawValue & mod != 0 { action = ORBIT_TERMINAL_ACTION_PRESS }
+            var action = GHOSTTY_ACTION_RELEASE
+            if mods.rawValue & mod != 0 { action = GHOSTTY_ACTION_PRESS }
 
             keyAction(action, event: event)
         }

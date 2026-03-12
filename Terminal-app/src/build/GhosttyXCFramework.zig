@@ -56,8 +56,8 @@ pub fn init(
     // The xcframework wraps our ghostty library so that we can link
     // it to the final app built with Swift.
     const xcframework = XCFrameworkStep.create(b, .{
-        .name = "GhosttyKit",
-        .out_path = "macos/GhosttyKit.xcframework",
+        .name = "OrbitTerminalKit",
+        .out_path = "macos/OrbitTerminalKit.xcframework",
         .libraries = switch (target) {
             .universal => &.{
                 .{

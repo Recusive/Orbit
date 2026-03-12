@@ -19,7 +19,7 @@ extension OrbitTerminal {
     static func keyboardShortcut(for trigger: ghostty_input_trigger_s) -> KeyboardShortcut? {
         let key: KeyEquivalent
         switch trigger.tag {
-        case ORBIT_TERMINAL_TRIGGER_PHYSICAL:
+        case GHOSTTY_TRIGGER_PHYSICAL:
             // Only functional keys can be converted to a KeyboardShortcut. Other physical
             // mappings cannot because KeyboardShortcut in Swift is inherently layout-dependent.
             if let equiv = Self.keyToEquivalent[trigger.key.physical] {
@@ -28,11 +28,11 @@ extension OrbitTerminal {
                 return nil
             }
 
-        case ORBIT_TERMINAL_TRIGGER_UNICODE:
+        case GHOSTTY_TRIGGER_UNICODE:
             guard let scalar = UnicodeScalar(trigger.key.unicode) else { return nil }
             key = KeyEquivalent(Character(scalar))
 
-        case ORBIT_TERMINAL_TRIGGER_CATCH_ALL:
+        case GHOSTTY_TRIGGER_CATCH_ALL:
             // catch_all matches any key, so it can't be represented as a KeyboardShortcut
             return nil
 
@@ -50,30 +50,30 @@ extension OrbitTerminal {
     /// Returns the event modifier flags set for the OrbitTerminal mods enum.
     static func eventModifierFlags(mods: ghostty_input_mods_e) -> NSEvent.ModifierFlags {
         var flags = NSEvent.ModifierFlags(rawValue: 0)
-        if mods.rawValue & ORBIT_TERMINAL_MODS_SHIFT.rawValue != 0 { flags.insert(.shift) }
-        if mods.rawValue & ORBIT_TERMINAL_MODS_CTRL.rawValue != 0 { flags.insert(.control) }
-        if mods.rawValue & ORBIT_TERMINAL_MODS_ALT.rawValue != 0 { flags.insert(.option) }
-        if mods.rawValue & ORBIT_TERMINAL_MODS_SUPER.rawValue != 0 { flags.insert(.command) }
+        if mods.rawValue & GHOSTTY_MODS_SHIFT.rawValue != 0 { flags.insert(.shift) }
+        if mods.rawValue & GHOSTTY_MODS_CTRL.rawValue != 0 { flags.insert(.control) }
+        if mods.rawValue & GHOSTTY_MODS_ALT.rawValue != 0 { flags.insert(.option) }
+        if mods.rawValue & GHOSTTY_MODS_SUPER.rawValue != 0 { flags.insert(.command) }
         return flags
     }
 
     /// Translate event modifier flags to a ghostty mods enum.
     static func ghosttyMods(_ flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
-        var mods: UInt32 = ORBIT_TERMINAL_MODS_NONE.rawValue
+        var mods: UInt32 = GHOSTTY_MODS_NONE.rawValue
 
-        if flags.contains(.shift) { mods |= ORBIT_TERMINAL_MODS_SHIFT.rawValue }
-        if flags.contains(.control) { mods |= ORBIT_TERMINAL_MODS_CTRL.rawValue }
-        if flags.contains(.option) { mods |= ORBIT_TERMINAL_MODS_ALT.rawValue }
-        if flags.contains(.command) { mods |= ORBIT_TERMINAL_MODS_SUPER.rawValue }
-        if flags.contains(.capsLock) { mods |= ORBIT_TERMINAL_MODS_CAPS.rawValue }
+        if flags.contains(.shift) { mods |= GHOSTTY_MODS_SHIFT.rawValue }
+        if flags.contains(.control) { mods |= GHOSTTY_MODS_CTRL.rawValue }
+        if flags.contains(.option) { mods |= GHOSTTY_MODS_ALT.rawValue }
+        if flags.contains(.command) { mods |= GHOSTTY_MODS_SUPER.rawValue }
+        if flags.contains(.capsLock) { mods |= GHOSTTY_MODS_CAPS.rawValue }
 
         // Handle sided input. We can't tell that both are pressed in the
         // OrbitTerminal structure but that's okay -- we don't use that information.
         let rawFlags = flags.rawValue
-        if rawFlags & UInt(NX_DEVICERSHIFTKEYMASK) != 0 { mods |= ORBIT_TERMINAL_MODS_SHIFT_RIGHT.rawValue }
-        if rawFlags & UInt(NX_DEVICERCTLKEYMASK) != 0 { mods |= ORBIT_TERMINAL_MODS_CTRL_RIGHT.rawValue }
-        if rawFlags & UInt(NX_DEVICERALTKEYMASK) != 0 { mods |= ORBIT_TERMINAL_MODS_ALT_RIGHT.rawValue }
-        if rawFlags & UInt(NX_DEVICERCMDKEYMASK) != 0 { mods |= ORBIT_TERMINAL_MODS_SUPER_RIGHT.rawValue }
+        if rawFlags & UInt(NX_DEVICERSHIFTKEYMASK) != 0 { mods |= GHOSTTY_MODS_SHIFT_RIGHT.rawValue }
+        if rawFlags & UInt(NX_DEVICERCTLKEYMASK) != 0 { mods |= GHOSTTY_MODS_CTRL_RIGHT.rawValue }
+        if rawFlags & UInt(NX_DEVICERALTKEYMASK) != 0 { mods |= GHOSTTY_MODS_ALT_RIGHT.rawValue }
+        if rawFlags & UInt(NX_DEVICERCMDKEYMASK) != 0 { mods |= GHOSTTY_MODS_SUPER_RIGHT.rawValue }
 
         return ghostty_input_mods_e(mods)
     }
@@ -83,20 +83,20 @@ extension OrbitTerminal {
     /// mapped to a KeyEquivalent.
     static let keyToEquivalent: [ghostty_input_key_e: KeyEquivalent] = [
         // Function keys
-        ORBIT_TERMINAL_KEY_ARROW_UP: .upArrow,
-        ORBIT_TERMINAL_KEY_ARROW_DOWN: .downArrow,
-        ORBIT_TERMINAL_KEY_ARROW_LEFT: .leftArrow,
-        ORBIT_TERMINAL_KEY_ARROW_RIGHT: .rightArrow,
-        ORBIT_TERMINAL_KEY_HOME: .home,
-        ORBIT_TERMINAL_KEY_END: .end,
-        ORBIT_TERMINAL_KEY_DELETE: .delete,
-        ORBIT_TERMINAL_KEY_PAGE_UP: .pageUp,
-        ORBIT_TERMINAL_KEY_PAGE_DOWN: .pageDown,
-        ORBIT_TERMINAL_KEY_ESCAPE: .escape,
-        ORBIT_TERMINAL_KEY_ENTER: .return,
-        ORBIT_TERMINAL_KEY_TAB: .tab,
-        ORBIT_TERMINAL_KEY_BACKSPACE: .delete,
-        ORBIT_TERMINAL_KEY_SPACE: .space,
+        GHOSTTY_KEY_ARROW_UP: .upArrow,
+        GHOSTTY_KEY_ARROW_DOWN: .downArrow,
+        GHOSTTY_KEY_ARROW_LEFT: .leftArrow,
+        GHOSTTY_KEY_ARROW_RIGHT: .rightArrow,
+        GHOSTTY_KEY_HOME: .home,
+        GHOSTTY_KEY_END: .end,
+        GHOSTTY_KEY_DELETE: .delete,
+        GHOSTTY_KEY_PAGE_UP: .pageUp,
+        GHOSTTY_KEY_PAGE_DOWN: .pageDown,
+        GHOSTTY_KEY_ESCAPE: .escape,
+        GHOSTTY_KEY_ENTER: .return,
+        GHOSTTY_KEY_TAB: .tab,
+        GHOSTTY_KEY_BACKSPACE: .delete,
+        GHOSTTY_KEY_SPACE: .space,
     ]
 }
 
@@ -107,10 +107,10 @@ extension OrbitTerminal.Input {
     struct BindingFlags: OptionSet, Sendable {
         let rawValue: UInt32
 
-        static let consumed = BindingFlags(rawValue: ORBIT_TERMINAL_BINDING_FLAGS_CONSUMED.rawValue)
-        static let all = BindingFlags(rawValue: ORBIT_TERMINAL_BINDING_FLAGS_ALL.rawValue)
-        static let global = BindingFlags(rawValue: ORBIT_TERMINAL_BINDING_FLAGS_GLOBAL.rawValue)
-        static let performable = BindingFlags(rawValue: ORBIT_TERMINAL_BINDING_FLAGS_PERFORMABLE.rawValue)
+        static let consumed = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_CONSUMED.rawValue)
+        static let all = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_ALL.rawValue)
+        static let global = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_GLOBAL.rawValue)
+        static let performable = BindingFlags(rawValue: GHOSTTY_BINDING_FLAGS_PERFORMABLE.rawValue)
 
         init(rawValue: UInt32) {
             self.rawValue = rawValue
@@ -160,9 +160,9 @@ extension OrbitTerminal.Input {
         init?(cValue: ghostty_input_key_s) {
             // Convert action
             switch cValue.action {
-            case ORBIT_TERMINAL_ACTION_PRESS: self.action = .press
-            case ORBIT_TERMINAL_ACTION_RELEASE: self.action = .release
-            case ORBIT_TERMINAL_ACTION_REPEAT: self.action = .repeat
+            case GHOSTTY_ACTION_PRESS: self.action = .press
+            case GHOSTTY_ACTION_RELEASE: self.action = .release
+            case GHOSTTY_ACTION_REPEAT: self.action = .repeat
             default: self.action = .press
             }
 
@@ -232,9 +232,9 @@ extension OrbitTerminal.Input {
 
         var cAction: ghostty_input_action_e {
             switch self {
-            case .release: ORBIT_TERMINAL_ACTION_RELEASE
-            case .press: ORBIT_TERMINAL_ACTION_PRESS
-            case .repeat: ORBIT_TERMINAL_ACTION_REPEAT
+            case .release: GHOSTTY_ACTION_RELEASE
+            case .press: GHOSTTY_ACTION_PRESS
+            case .repeat: GHOSTTY_ACTION_REPEAT
             }
         }
     }
@@ -281,17 +281,17 @@ extension OrbitTerminal.Input {
         init?(state: ghostty_input_mouse_state_e, button: ghostty_input_mouse_button_e, mods: ghostty_input_mods_e) {
             // Convert state
             switch state {
-            case ORBIT_TERMINAL_MOUSE_RELEASE: self.action = .release
-            case ORBIT_TERMINAL_MOUSE_PRESS: self.action = .press
+            case GHOSTTY_MOUSE_RELEASE: self.action = .release
+            case GHOSTTY_MOUSE_PRESS: self.action = .press
             default: return nil
             }
 
             // Convert button
             switch button {
-            case ORBIT_TERMINAL_MOUSE_UNKNOWN: self.button = .unknown
-            case ORBIT_TERMINAL_MOUSE_LEFT: self.button = .left
-            case ORBIT_TERMINAL_MOUSE_RIGHT: self.button = .right
-            case ORBIT_TERMINAL_MOUSE_MIDDLE: self.button = .middle
+            case GHOSTTY_MOUSE_UNKNOWN: self.button = .unknown
+            case GHOSTTY_MOUSE_LEFT: self.button = .left
+            case GHOSTTY_MOUSE_RIGHT: self.button = .right
+            case GHOSTTY_MOUSE_MIDDLE: self.button = .middle
             default: return nil
             }
 
@@ -345,8 +345,8 @@ extension OrbitTerminal.Input {
 
         var cMouseState: ghostty_input_mouse_state_e {
             switch self {
-            case .release: ORBIT_TERMINAL_MOUSE_RELEASE
-            case .press: ORBIT_TERMINAL_MOUSE_PRESS
+            case .release: GHOSTTY_MOUSE_RELEASE
+            case .press: GHOSTTY_MOUSE_PRESS
             }
         }
     }
@@ -381,18 +381,18 @@ extension OrbitTerminal.Input {
 
         var cMouseButton: ghostty_input_mouse_button_e {
             switch self {
-            case .unknown: ORBIT_TERMINAL_MOUSE_UNKNOWN
-            case .left: ORBIT_TERMINAL_MOUSE_LEFT
-            case .right: ORBIT_TERMINAL_MOUSE_RIGHT
-            case .middle: ORBIT_TERMINAL_MOUSE_MIDDLE
-            case .four: ORBIT_TERMINAL_MOUSE_FOUR
-            case .five: ORBIT_TERMINAL_MOUSE_FIVE
-            case .six: ORBIT_TERMINAL_MOUSE_SIX
-            case .seven: ORBIT_TERMINAL_MOUSE_SEVEN
-            case .eight: ORBIT_TERMINAL_MOUSE_EIGHT
-            case .nine: ORBIT_TERMINAL_MOUSE_NINE
-            case .ten: ORBIT_TERMINAL_MOUSE_TEN
-            case .eleven: ORBIT_TERMINAL_MOUSE_ELEVEN
+            case .unknown: GHOSTTY_MOUSE_UNKNOWN
+            case .left: GHOSTTY_MOUSE_LEFT
+            case .right: GHOSTTY_MOUSE_RIGHT
+            case .middle: GHOSTTY_MOUSE_MIDDLE
+            case .four: GHOSTTY_MOUSE_FOUR
+            case .five: GHOSTTY_MOUSE_FIVE
+            case .six: GHOSTTY_MOUSE_SIX
+            case .seven: GHOSTTY_MOUSE_SEVEN
+            case .eight: GHOSTTY_MOUSE_EIGHT
+            case .nine: GHOSTTY_MOUSE_NINE
+            case .ten: GHOSTTY_MOUSE_TEN
+            case .eleven: GHOSTTY_MOUSE_ELEVEN
             }
         }
 
@@ -489,13 +489,13 @@ extension OrbitTerminal.Input {
 
         var cMomentum: ghostty_input_mouse_momentum_e {
             switch self {
-            case .none: ORBIT_TERMINAL_MOUSE_MOMENTUM_NONE
-            case .began: ORBIT_TERMINAL_MOUSE_MOMENTUM_BEGAN
-            case .stationary: ORBIT_TERMINAL_MOUSE_MOMENTUM_STATIONARY
-            case .changed: ORBIT_TERMINAL_MOUSE_MOMENTUM_CHANGED
-            case .ended: ORBIT_TERMINAL_MOUSE_MOMENTUM_ENDED
-            case .cancelled: ORBIT_TERMINAL_MOUSE_MOMENTUM_CANCELLED
-            case .mayBegin: ORBIT_TERMINAL_MOUSE_MOMENTUM_MAY_BEGIN
+            case .none: GHOSTTY_MOUSE_MOMENTUM_NONE
+            case .began: GHOSTTY_MOUSE_MOMENTUM_BEGAN
+            case .stationary: GHOSTTY_MOUSE_MOMENTUM_STATIONARY
+            case .changed: GHOSTTY_MOUSE_MOMENTUM_CHANGED
+            case .ended: GHOSTTY_MOUSE_MOMENTUM_ENDED
+            case .cancelled: GHOSTTY_MOUSE_MOMENTUM_CANCELLED
+            case .mayBegin: GHOSTTY_MOUSE_MOMENTUM_MAY_BEGIN
             }
         }
     }
@@ -541,16 +541,16 @@ extension OrbitTerminal.Input {
     struct Mods: OptionSet {
         let rawValue: UInt32
 
-        static let none = Mods(rawValue: ORBIT_TERMINAL_MODS_NONE.rawValue)
-        static let shift = Mods(rawValue: ORBIT_TERMINAL_MODS_SHIFT.rawValue)
-        static let ctrl = Mods(rawValue: ORBIT_TERMINAL_MODS_CTRL.rawValue)
-        static let alt = Mods(rawValue: ORBIT_TERMINAL_MODS_ALT.rawValue)
-        static let `super` = Mods(rawValue: ORBIT_TERMINAL_MODS_SUPER.rawValue)
-        static let caps = Mods(rawValue: ORBIT_TERMINAL_MODS_CAPS.rawValue)
-        static let shiftRight = Mods(rawValue: ORBIT_TERMINAL_MODS_SHIFT_RIGHT.rawValue)
-        static let ctrlRight = Mods(rawValue: ORBIT_TERMINAL_MODS_CTRL_RIGHT.rawValue)
-        static let altRight = Mods(rawValue: ORBIT_TERMINAL_MODS_ALT_RIGHT.rawValue)
-        static let superRight = Mods(rawValue: ORBIT_TERMINAL_MODS_SUPER_RIGHT.rawValue)
+        static let none = Mods(rawValue: GHOSTTY_MODS_NONE.rawValue)
+        static let shift = Mods(rawValue: GHOSTTY_MODS_SHIFT.rawValue)
+        static let ctrl = Mods(rawValue: GHOSTTY_MODS_CTRL.rawValue)
+        static let alt = Mods(rawValue: GHOSTTY_MODS_ALT.rawValue)
+        static let `super` = Mods(rawValue: GHOSTTY_MODS_SUPER.rawValue)
+        static let caps = Mods(rawValue: GHOSTTY_MODS_CAPS.rawValue)
+        static let shiftRight = Mods(rawValue: GHOSTTY_MODS_SHIFT_RIGHT.rawValue)
+        static let ctrlRight = Mods(rawValue: GHOSTTY_MODS_CTRL_RIGHT.rawValue)
+        static let altRight = Mods(rawValue: GHOSTTY_MODS_ALT_RIGHT.rawValue)
+        static let superRight = Mods(rawValue: GHOSTTY_MODS_SUPER_RIGHT.rawValue)
 
         var cMods: ghostty_input_mods_e {
             ghostty_input_mods_e(rawValue)
@@ -783,195 +783,195 @@ extension OrbitTerminal.Input {
         var cKey: ghostty_input_key_e {
             switch self {
             // Writing System Keys
-            case .backquote: ORBIT_TERMINAL_KEY_BACKQUOTE
-            case .backslash: ORBIT_TERMINAL_KEY_BACKSLASH
-            case .bracketLeft: ORBIT_TERMINAL_KEY_BRACKET_LEFT
-            case .bracketRight: ORBIT_TERMINAL_KEY_BRACKET_RIGHT
-            case .comma: ORBIT_TERMINAL_KEY_COMMA
-            case .digit0: ORBIT_TERMINAL_KEY_DIGIT_0
-            case .digit1: ORBIT_TERMINAL_KEY_DIGIT_1
-            case .digit2: ORBIT_TERMINAL_KEY_DIGIT_2
-            case .digit3: ORBIT_TERMINAL_KEY_DIGIT_3
-            case .digit4: ORBIT_TERMINAL_KEY_DIGIT_4
-            case .digit5: ORBIT_TERMINAL_KEY_DIGIT_5
-            case .digit6: ORBIT_TERMINAL_KEY_DIGIT_6
-            case .digit7: ORBIT_TERMINAL_KEY_DIGIT_7
-            case .digit8: ORBIT_TERMINAL_KEY_DIGIT_8
-            case .digit9: ORBIT_TERMINAL_KEY_DIGIT_9
-            case .equal: ORBIT_TERMINAL_KEY_EQUAL
-            case .intlBackslash: ORBIT_TERMINAL_KEY_INTL_BACKSLASH
-            case .intlRo: ORBIT_TERMINAL_KEY_INTL_RO
-            case .intlYen: ORBIT_TERMINAL_KEY_INTL_YEN
-            case .a: ORBIT_TERMINAL_KEY_A
-            case .b: ORBIT_TERMINAL_KEY_B
-            case .c: ORBIT_TERMINAL_KEY_C
-            case .d: ORBIT_TERMINAL_KEY_D
-            case .e: ORBIT_TERMINAL_KEY_E
-            case .f: ORBIT_TERMINAL_KEY_F
-            case .g: ORBIT_TERMINAL_KEY_G
-            case .h: ORBIT_TERMINAL_KEY_H
-            case .i: ORBIT_TERMINAL_KEY_I
-            case .j: ORBIT_TERMINAL_KEY_J
-            case .k: ORBIT_TERMINAL_KEY_K
-            case .l: ORBIT_TERMINAL_KEY_L
-            case .m: ORBIT_TERMINAL_KEY_M
-            case .n: ORBIT_TERMINAL_KEY_N
-            case .o: ORBIT_TERMINAL_KEY_O
-            case .p: ORBIT_TERMINAL_KEY_P
-            case .q: ORBIT_TERMINAL_KEY_Q
-            case .r: ORBIT_TERMINAL_KEY_R
-            case .s: ORBIT_TERMINAL_KEY_S
-            case .t: ORBIT_TERMINAL_KEY_T
-            case .u: ORBIT_TERMINAL_KEY_U
-            case .v: ORBIT_TERMINAL_KEY_V
-            case .w: ORBIT_TERMINAL_KEY_W
-            case .x: ORBIT_TERMINAL_KEY_X
-            case .y: ORBIT_TERMINAL_KEY_Y
-            case .z: ORBIT_TERMINAL_KEY_Z
-            case .minus: ORBIT_TERMINAL_KEY_MINUS
-            case .period: ORBIT_TERMINAL_KEY_PERIOD
-            case .quote: ORBIT_TERMINAL_KEY_QUOTE
-            case .semicolon: ORBIT_TERMINAL_KEY_SEMICOLON
-            case .slash: ORBIT_TERMINAL_KEY_SLASH
+            case .backquote: GHOSTTY_KEY_BACKQUOTE
+            case .backslash: GHOSTTY_KEY_BACKSLASH
+            case .bracketLeft: GHOSTTY_KEY_BRACKET_LEFT
+            case .bracketRight: GHOSTTY_KEY_BRACKET_RIGHT
+            case .comma: GHOSTTY_KEY_COMMA
+            case .digit0: GHOSTTY_KEY_DIGIT_0
+            case .digit1: GHOSTTY_KEY_DIGIT_1
+            case .digit2: GHOSTTY_KEY_DIGIT_2
+            case .digit3: GHOSTTY_KEY_DIGIT_3
+            case .digit4: GHOSTTY_KEY_DIGIT_4
+            case .digit5: GHOSTTY_KEY_DIGIT_5
+            case .digit6: GHOSTTY_KEY_DIGIT_6
+            case .digit7: GHOSTTY_KEY_DIGIT_7
+            case .digit8: GHOSTTY_KEY_DIGIT_8
+            case .digit9: GHOSTTY_KEY_DIGIT_9
+            case .equal: GHOSTTY_KEY_EQUAL
+            case .intlBackslash: GHOSTTY_KEY_INTL_BACKSLASH
+            case .intlRo: GHOSTTY_KEY_INTL_RO
+            case .intlYen: GHOSTTY_KEY_INTL_YEN
+            case .a: GHOSTTY_KEY_A
+            case .b: GHOSTTY_KEY_B
+            case .c: GHOSTTY_KEY_C
+            case .d: GHOSTTY_KEY_D
+            case .e: GHOSTTY_KEY_E
+            case .f: GHOSTTY_KEY_F
+            case .g: GHOSTTY_KEY_G
+            case .h: GHOSTTY_KEY_H
+            case .i: GHOSTTY_KEY_I
+            case .j: GHOSTTY_KEY_J
+            case .k: GHOSTTY_KEY_K
+            case .l: GHOSTTY_KEY_L
+            case .m: GHOSTTY_KEY_M
+            case .n: GHOSTTY_KEY_N
+            case .o: GHOSTTY_KEY_O
+            case .p: GHOSTTY_KEY_P
+            case .q: GHOSTTY_KEY_Q
+            case .r: GHOSTTY_KEY_R
+            case .s: GHOSTTY_KEY_S
+            case .t: GHOSTTY_KEY_T
+            case .u: GHOSTTY_KEY_U
+            case .v: GHOSTTY_KEY_V
+            case .w: GHOSTTY_KEY_W
+            case .x: GHOSTTY_KEY_X
+            case .y: GHOSTTY_KEY_Y
+            case .z: GHOSTTY_KEY_Z
+            case .minus: GHOSTTY_KEY_MINUS
+            case .period: GHOSTTY_KEY_PERIOD
+            case .quote: GHOSTTY_KEY_QUOTE
+            case .semicolon: GHOSTTY_KEY_SEMICOLON
+            case .slash: GHOSTTY_KEY_SLASH
 
             // Functional Keys
-            case .altLeft: ORBIT_TERMINAL_KEY_ALT_LEFT
-            case .altRight: ORBIT_TERMINAL_KEY_ALT_RIGHT
-            case .backspace: ORBIT_TERMINAL_KEY_BACKSPACE
-            case .capsLock: ORBIT_TERMINAL_KEY_CAPS_LOCK
-            case .contextMenu: ORBIT_TERMINAL_KEY_CONTEXT_MENU
-            case .controlLeft: ORBIT_TERMINAL_KEY_CONTROL_LEFT
-            case .controlRight: ORBIT_TERMINAL_KEY_CONTROL_RIGHT
-            case .enter: ORBIT_TERMINAL_KEY_ENTER
-            case .metaLeft: ORBIT_TERMINAL_KEY_META_LEFT
-            case .metaRight: ORBIT_TERMINAL_KEY_META_RIGHT
-            case .shiftLeft: ORBIT_TERMINAL_KEY_SHIFT_LEFT
-            case .shiftRight: ORBIT_TERMINAL_KEY_SHIFT_RIGHT
-            case .space: ORBIT_TERMINAL_KEY_SPACE
-            case .tab: ORBIT_TERMINAL_KEY_TAB
-            case .convert: ORBIT_TERMINAL_KEY_CONVERT
-            case .kanaMode: ORBIT_TERMINAL_KEY_KANA_MODE
-            case .nonConvert: ORBIT_TERMINAL_KEY_NON_CONVERT
+            case .altLeft: GHOSTTY_KEY_ALT_LEFT
+            case .altRight: GHOSTTY_KEY_ALT_RIGHT
+            case .backspace: GHOSTTY_KEY_BACKSPACE
+            case .capsLock: GHOSTTY_KEY_CAPS_LOCK
+            case .contextMenu: GHOSTTY_KEY_CONTEXT_MENU
+            case .controlLeft: GHOSTTY_KEY_CONTROL_LEFT
+            case .controlRight: GHOSTTY_KEY_CONTROL_RIGHT
+            case .enter: GHOSTTY_KEY_ENTER
+            case .metaLeft: GHOSTTY_KEY_META_LEFT
+            case .metaRight: GHOSTTY_KEY_META_RIGHT
+            case .shiftLeft: GHOSTTY_KEY_SHIFT_LEFT
+            case .shiftRight: GHOSTTY_KEY_SHIFT_RIGHT
+            case .space: GHOSTTY_KEY_SPACE
+            case .tab: GHOSTTY_KEY_TAB
+            case .convert: GHOSTTY_KEY_CONVERT
+            case .kanaMode: GHOSTTY_KEY_KANA_MODE
+            case .nonConvert: GHOSTTY_KEY_NON_CONVERT
 
             // Control Pad Section
-            case .delete: ORBIT_TERMINAL_KEY_DELETE
-            case .end: ORBIT_TERMINAL_KEY_END
-            case .help: ORBIT_TERMINAL_KEY_HELP
-            case .home: ORBIT_TERMINAL_KEY_HOME
-            case .insert: ORBIT_TERMINAL_KEY_INSERT
-            case .pageDown: ORBIT_TERMINAL_KEY_PAGE_DOWN
-            case .pageUp: ORBIT_TERMINAL_KEY_PAGE_UP
+            case .delete: GHOSTTY_KEY_DELETE
+            case .end: GHOSTTY_KEY_END
+            case .help: GHOSTTY_KEY_HELP
+            case .home: GHOSTTY_KEY_HOME
+            case .insert: GHOSTTY_KEY_INSERT
+            case .pageDown: GHOSTTY_KEY_PAGE_DOWN
+            case .pageUp: GHOSTTY_KEY_PAGE_UP
 
             // Arrow Pad Section
-            case .arrowDown: ORBIT_TERMINAL_KEY_ARROW_DOWN
-            case .arrowLeft: ORBIT_TERMINAL_KEY_ARROW_LEFT
-            case .arrowRight: ORBIT_TERMINAL_KEY_ARROW_RIGHT
-            case .arrowUp: ORBIT_TERMINAL_KEY_ARROW_UP
+            case .arrowDown: GHOSTTY_KEY_ARROW_DOWN
+            case .arrowLeft: GHOSTTY_KEY_ARROW_LEFT
+            case .arrowRight: GHOSTTY_KEY_ARROW_RIGHT
+            case .arrowUp: GHOSTTY_KEY_ARROW_UP
 
             // Numpad Section
-            case .numLock: ORBIT_TERMINAL_KEY_NUM_LOCK
-            case .numpad0: ORBIT_TERMINAL_KEY_NUMPAD_0
-            case .numpad1: ORBIT_TERMINAL_KEY_NUMPAD_1
-            case .numpad2: ORBIT_TERMINAL_KEY_NUMPAD_2
-            case .numpad3: ORBIT_TERMINAL_KEY_NUMPAD_3
-            case .numpad4: ORBIT_TERMINAL_KEY_NUMPAD_4
-            case .numpad5: ORBIT_TERMINAL_KEY_NUMPAD_5
-            case .numpad6: ORBIT_TERMINAL_KEY_NUMPAD_6
-            case .numpad7: ORBIT_TERMINAL_KEY_NUMPAD_7
-            case .numpad8: ORBIT_TERMINAL_KEY_NUMPAD_8
-            case .numpad9: ORBIT_TERMINAL_KEY_NUMPAD_9
-            case .numpadAdd: ORBIT_TERMINAL_KEY_NUMPAD_ADD
-            case .numpadBackspace: ORBIT_TERMINAL_KEY_NUMPAD_BACKSPACE
-            case .numpadClear: ORBIT_TERMINAL_KEY_NUMPAD_CLEAR
-            case .numpadClearEntry: ORBIT_TERMINAL_KEY_NUMPAD_CLEAR_ENTRY
-            case .numpadComma: ORBIT_TERMINAL_KEY_NUMPAD_COMMA
-            case .numpadDecimal: ORBIT_TERMINAL_KEY_NUMPAD_DECIMAL
-            case .numpadDivide: ORBIT_TERMINAL_KEY_NUMPAD_DIVIDE
-            case .numpadEnter: ORBIT_TERMINAL_KEY_NUMPAD_ENTER
-            case .numpadEqual: ORBIT_TERMINAL_KEY_NUMPAD_EQUAL
-            case .numpadMemoryAdd: ORBIT_TERMINAL_KEY_NUMPAD_MEMORY_ADD
-            case .numpadMemoryClear: ORBIT_TERMINAL_KEY_NUMPAD_MEMORY_CLEAR
-            case .numpadMemoryRecall: ORBIT_TERMINAL_KEY_NUMPAD_MEMORY_RECALL
-            case .numpadMemoryStore: ORBIT_TERMINAL_KEY_NUMPAD_MEMORY_STORE
-            case .numpadMemorySubtract: ORBIT_TERMINAL_KEY_NUMPAD_MEMORY_SUBTRACT
-            case .numpadMultiply: ORBIT_TERMINAL_KEY_NUMPAD_MULTIPLY
-            case .numpadParenLeft: ORBIT_TERMINAL_KEY_NUMPAD_PAREN_LEFT
-            case .numpadParenRight: ORBIT_TERMINAL_KEY_NUMPAD_PAREN_RIGHT
-            case .numpadSubtract: ORBIT_TERMINAL_KEY_NUMPAD_SUBTRACT
-            case .numpadSeparator: ORBIT_TERMINAL_KEY_NUMPAD_SEPARATOR
-            case .numpadUp: ORBIT_TERMINAL_KEY_NUMPAD_UP
-            case .numpadDown: ORBIT_TERMINAL_KEY_NUMPAD_DOWN
-            case .numpadRight: ORBIT_TERMINAL_KEY_NUMPAD_RIGHT
-            case .numpadLeft: ORBIT_TERMINAL_KEY_NUMPAD_LEFT
-            case .numpadBegin: ORBIT_TERMINAL_KEY_NUMPAD_BEGIN
-            case .numpadHome: ORBIT_TERMINAL_KEY_NUMPAD_HOME
-            case .numpadEnd: ORBIT_TERMINAL_KEY_NUMPAD_END
-            case .numpadInsert: ORBIT_TERMINAL_KEY_NUMPAD_INSERT
-            case .numpadDelete: ORBIT_TERMINAL_KEY_NUMPAD_DELETE
-            case .numpadPageUp: ORBIT_TERMINAL_KEY_NUMPAD_PAGE_UP
-            case .numpadPageDown: ORBIT_TERMINAL_KEY_NUMPAD_PAGE_DOWN
+            case .numLock: GHOSTTY_KEY_NUM_LOCK
+            case .numpad0: GHOSTTY_KEY_NUMPAD_0
+            case .numpad1: GHOSTTY_KEY_NUMPAD_1
+            case .numpad2: GHOSTTY_KEY_NUMPAD_2
+            case .numpad3: GHOSTTY_KEY_NUMPAD_3
+            case .numpad4: GHOSTTY_KEY_NUMPAD_4
+            case .numpad5: GHOSTTY_KEY_NUMPAD_5
+            case .numpad6: GHOSTTY_KEY_NUMPAD_6
+            case .numpad7: GHOSTTY_KEY_NUMPAD_7
+            case .numpad8: GHOSTTY_KEY_NUMPAD_8
+            case .numpad9: GHOSTTY_KEY_NUMPAD_9
+            case .numpadAdd: GHOSTTY_KEY_NUMPAD_ADD
+            case .numpadBackspace: GHOSTTY_KEY_NUMPAD_BACKSPACE
+            case .numpadClear: GHOSTTY_KEY_NUMPAD_CLEAR
+            case .numpadClearEntry: GHOSTTY_KEY_NUMPAD_CLEAR_ENTRY
+            case .numpadComma: GHOSTTY_KEY_NUMPAD_COMMA
+            case .numpadDecimal: GHOSTTY_KEY_NUMPAD_DECIMAL
+            case .numpadDivide: GHOSTTY_KEY_NUMPAD_DIVIDE
+            case .numpadEnter: GHOSTTY_KEY_NUMPAD_ENTER
+            case .numpadEqual: GHOSTTY_KEY_NUMPAD_EQUAL
+            case .numpadMemoryAdd: GHOSTTY_KEY_NUMPAD_MEMORY_ADD
+            case .numpadMemoryClear: GHOSTTY_KEY_NUMPAD_MEMORY_CLEAR
+            case .numpadMemoryRecall: GHOSTTY_KEY_NUMPAD_MEMORY_RECALL
+            case .numpadMemoryStore: GHOSTTY_KEY_NUMPAD_MEMORY_STORE
+            case .numpadMemorySubtract: GHOSTTY_KEY_NUMPAD_MEMORY_SUBTRACT
+            case .numpadMultiply: GHOSTTY_KEY_NUMPAD_MULTIPLY
+            case .numpadParenLeft: GHOSTTY_KEY_NUMPAD_PAREN_LEFT
+            case .numpadParenRight: GHOSTTY_KEY_NUMPAD_PAREN_RIGHT
+            case .numpadSubtract: GHOSTTY_KEY_NUMPAD_SUBTRACT
+            case .numpadSeparator: GHOSTTY_KEY_NUMPAD_SEPARATOR
+            case .numpadUp: GHOSTTY_KEY_NUMPAD_UP
+            case .numpadDown: GHOSTTY_KEY_NUMPAD_DOWN
+            case .numpadRight: GHOSTTY_KEY_NUMPAD_RIGHT
+            case .numpadLeft: GHOSTTY_KEY_NUMPAD_LEFT
+            case .numpadBegin: GHOSTTY_KEY_NUMPAD_BEGIN
+            case .numpadHome: GHOSTTY_KEY_NUMPAD_HOME
+            case .numpadEnd: GHOSTTY_KEY_NUMPAD_END
+            case .numpadInsert: GHOSTTY_KEY_NUMPAD_INSERT
+            case .numpadDelete: GHOSTTY_KEY_NUMPAD_DELETE
+            case .numpadPageUp: GHOSTTY_KEY_NUMPAD_PAGE_UP
+            case .numpadPageDown: GHOSTTY_KEY_NUMPAD_PAGE_DOWN
 
             // Function Section
-            case .escape: ORBIT_TERMINAL_KEY_ESCAPE
-            case .f1: ORBIT_TERMINAL_KEY_F1
-            case .f2: ORBIT_TERMINAL_KEY_F2
-            case .f3: ORBIT_TERMINAL_KEY_F3
-            case .f4: ORBIT_TERMINAL_KEY_F4
-            case .f5: ORBIT_TERMINAL_KEY_F5
-            case .f6: ORBIT_TERMINAL_KEY_F6
-            case .f7: ORBIT_TERMINAL_KEY_F7
-            case .f8: ORBIT_TERMINAL_KEY_F8
-            case .f9: ORBIT_TERMINAL_KEY_F9
-            case .f10: ORBIT_TERMINAL_KEY_F10
-            case .f11: ORBIT_TERMINAL_KEY_F11
-            case .f12: ORBIT_TERMINAL_KEY_F12
-            case .f13: ORBIT_TERMINAL_KEY_F13
-            case .f14: ORBIT_TERMINAL_KEY_F14
-            case .f15: ORBIT_TERMINAL_KEY_F15
-            case .f16: ORBIT_TERMINAL_KEY_F16
-            case .f17: ORBIT_TERMINAL_KEY_F17
-            case .f18: ORBIT_TERMINAL_KEY_F18
-            case .f19: ORBIT_TERMINAL_KEY_F19
-            case .f20: ORBIT_TERMINAL_KEY_F20
-            case .f21: ORBIT_TERMINAL_KEY_F21
-            case .f22: ORBIT_TERMINAL_KEY_F22
-            case .f23: ORBIT_TERMINAL_KEY_F23
-            case .f24: ORBIT_TERMINAL_KEY_F24
-            case .f25: ORBIT_TERMINAL_KEY_F25
-            case .fn: ORBIT_TERMINAL_KEY_FN
-            case .fnLock: ORBIT_TERMINAL_KEY_FN_LOCK
-            case .printScreen: ORBIT_TERMINAL_KEY_PRINT_SCREEN
-            case .scrollLock: ORBIT_TERMINAL_KEY_SCROLL_LOCK
-            case .pause: ORBIT_TERMINAL_KEY_PAUSE
+            case .escape: GHOSTTY_KEY_ESCAPE
+            case .f1: GHOSTTY_KEY_F1
+            case .f2: GHOSTTY_KEY_F2
+            case .f3: GHOSTTY_KEY_F3
+            case .f4: GHOSTTY_KEY_F4
+            case .f5: GHOSTTY_KEY_F5
+            case .f6: GHOSTTY_KEY_F6
+            case .f7: GHOSTTY_KEY_F7
+            case .f8: GHOSTTY_KEY_F8
+            case .f9: GHOSTTY_KEY_F9
+            case .f10: GHOSTTY_KEY_F10
+            case .f11: GHOSTTY_KEY_F11
+            case .f12: GHOSTTY_KEY_F12
+            case .f13: GHOSTTY_KEY_F13
+            case .f14: GHOSTTY_KEY_F14
+            case .f15: GHOSTTY_KEY_F15
+            case .f16: GHOSTTY_KEY_F16
+            case .f17: GHOSTTY_KEY_F17
+            case .f18: GHOSTTY_KEY_F18
+            case .f19: GHOSTTY_KEY_F19
+            case .f20: GHOSTTY_KEY_F20
+            case .f21: GHOSTTY_KEY_F21
+            case .f22: GHOSTTY_KEY_F22
+            case .f23: GHOSTTY_KEY_F23
+            case .f24: GHOSTTY_KEY_F24
+            case .f25: GHOSTTY_KEY_F25
+            case .fn: GHOSTTY_KEY_FN
+            case .fnLock: GHOSTTY_KEY_FN_LOCK
+            case .printScreen: GHOSTTY_KEY_PRINT_SCREEN
+            case .scrollLock: GHOSTTY_KEY_SCROLL_LOCK
+            case .pause: GHOSTTY_KEY_PAUSE
 
             // Media Keys
-            case .browserBack: ORBIT_TERMINAL_KEY_BROWSER_BACK
-            case .browserFavorites: ORBIT_TERMINAL_KEY_BROWSER_FAVORITES
-            case .browserForward: ORBIT_TERMINAL_KEY_BROWSER_FORWARD
-            case .browserHome: ORBIT_TERMINAL_KEY_BROWSER_HOME
-            case .browserRefresh: ORBIT_TERMINAL_KEY_BROWSER_REFRESH
-            case .browserSearch: ORBIT_TERMINAL_KEY_BROWSER_SEARCH
-            case .browserStop: ORBIT_TERMINAL_KEY_BROWSER_STOP
-            case .eject: ORBIT_TERMINAL_KEY_EJECT
-            case .launchApp1: ORBIT_TERMINAL_KEY_LAUNCH_APP_1
-            case .launchApp2: ORBIT_TERMINAL_KEY_LAUNCH_APP_2
-            case .launchMail: ORBIT_TERMINAL_KEY_LAUNCH_MAIL
-            case .mediaPlayPause: ORBIT_TERMINAL_KEY_MEDIA_PLAY_PAUSE
-            case .mediaSelect: ORBIT_TERMINAL_KEY_MEDIA_SELECT
-            case .mediaStop: ORBIT_TERMINAL_KEY_MEDIA_STOP
-            case .mediaTrackNext: ORBIT_TERMINAL_KEY_MEDIA_TRACK_NEXT
-            case .mediaTrackPrevious: ORBIT_TERMINAL_KEY_MEDIA_TRACK_PREVIOUS
-            case .power: ORBIT_TERMINAL_KEY_POWER
-            case .sleep: ORBIT_TERMINAL_KEY_SLEEP
-            case .audioVolumeDown: ORBIT_TERMINAL_KEY_AUDIO_VOLUME_DOWN
-            case .audioVolumeMute: ORBIT_TERMINAL_KEY_AUDIO_VOLUME_MUTE
-            case .audioVolumeUp: ORBIT_TERMINAL_KEY_AUDIO_VOLUME_UP
-            case .wakeUp: ORBIT_TERMINAL_KEY_WAKE_UP
+            case .browserBack: GHOSTTY_KEY_BROWSER_BACK
+            case .browserFavorites: GHOSTTY_KEY_BROWSER_FAVORITES
+            case .browserForward: GHOSTTY_KEY_BROWSER_FORWARD
+            case .browserHome: GHOSTTY_KEY_BROWSER_HOME
+            case .browserRefresh: GHOSTTY_KEY_BROWSER_REFRESH
+            case .browserSearch: GHOSTTY_KEY_BROWSER_SEARCH
+            case .browserStop: GHOSTTY_KEY_BROWSER_STOP
+            case .eject: GHOSTTY_KEY_EJECT
+            case .launchApp1: GHOSTTY_KEY_LAUNCH_APP_1
+            case .launchApp2: GHOSTTY_KEY_LAUNCH_APP_2
+            case .launchMail: GHOSTTY_KEY_LAUNCH_MAIL
+            case .mediaPlayPause: GHOSTTY_KEY_MEDIA_PLAY_PAUSE
+            case .mediaSelect: GHOSTTY_KEY_MEDIA_SELECT
+            case .mediaStop: GHOSTTY_KEY_MEDIA_STOP
+            case .mediaTrackNext: GHOSTTY_KEY_MEDIA_TRACK_NEXT
+            case .mediaTrackPrevious: GHOSTTY_KEY_MEDIA_TRACK_PREVIOUS
+            case .power: GHOSTTY_KEY_POWER
+            case .sleep: GHOSTTY_KEY_SLEEP
+            case .audioVolumeDown: GHOSTTY_KEY_AUDIO_VOLUME_DOWN
+            case .audioVolumeMute: GHOSTTY_KEY_AUDIO_VOLUME_MUTE
+            case .audioVolumeUp: GHOSTTY_KEY_AUDIO_VOLUME_UP
+            case .wakeUp: GHOSTTY_KEY_WAKE_UP
 
             // Legacy, Non-standard, and Special Keys
-            case .copy: ORBIT_TERMINAL_KEY_COPY
-            case .cut: ORBIT_TERMINAL_KEY_CUT
-            case .paste: ORBIT_TERMINAL_KEY_PASTE
+            case .copy: GHOSTTY_KEY_COPY
+            case .cut: GHOSTTY_KEY_CUT
+            case .paste: GHOSTTY_KEY_PASTE
             }
         }
 

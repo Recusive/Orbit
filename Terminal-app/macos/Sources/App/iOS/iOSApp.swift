@@ -6,7 +6,7 @@ struct OrbitTerminal_iOSApp: App {
     @StateObject private var ghostty_app: OrbitTerminal.App
 
     init() {
-        if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != ORBIT_TERMINAL_SUCCESS {
+        if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != GHOSTTY_SUCCESS {
             preconditionFailure("Initialize ghostty backend failed")
         }
         _ghostty_app = StateObject(wrappedValue: OrbitTerminal.App())

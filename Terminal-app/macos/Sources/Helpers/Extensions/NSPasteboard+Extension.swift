@@ -51,10 +51,10 @@ extension NSPasteboard {
     /// The pasteboard for the OrbitTerminal enum type.
     static func ghostty(_ clipboard: ghostty_clipboard_e) -> NSPasteboard? {
         switch clipboard {
-        case ORBIT_TERMINAL_CLIPBOARD_STANDARD:
+        case GHOSTTY_CLIPBOARD_STANDARD:
             return Self.general
 
-        case ORBIT_TERMINAL_CLIPBOARD_SELECTION:
+        case GHOSTTY_CLIPBOARD_SELECTION:
             return Self.ghosttySelection
 
         default:

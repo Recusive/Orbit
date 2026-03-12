@@ -660,7 +660,7 @@ extension OrbitTerminal {
         var waitAfterCommand: Bool = false
 
         /// Context for surface creation
-        var context: ghostty_surface_context_e = ORBIT_TERMINAL_SURFACE_CONTEXT_WINDOW
+        var context: ghostty_surface_context_e = GHOSTTY_SURFACE_CONTEXT_WINDOW
 
         init() {}
 
@@ -692,13 +692,13 @@ extension OrbitTerminal {
             var config = ghostty_surface_config_new()
             config.userdata = Unmanaged.passUnretained(view).toOpaque()
 #if os(macOS)
-            config.platform_tag = ORBIT_TERMINAL_PLATFORM_MACOS
+            config.platform_tag = GHOSTTY_PLATFORM_MACOS
             config.platform = ghostty_platform_u(macos: ghostty_platform_macos_s(
                 nsview: Unmanaged.passUnretained(view).toOpaque()
             ))
             config.scale_factor = NSScreen.main!.backingScaleFactor
 #elseif os(iOS)
-            config.platform_tag = ORBIT_TERMINAL_PLATFORM_IOS
+            config.platform_tag = GHOSTTY_PLATFORM_IOS
             config.platform = ghostty_platform_u(ios: ghostty_platform_ios_s(
                 uiview: Unmanaged.passUnretained(view).toOpaque()
             ))

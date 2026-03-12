@@ -282,13 +282,13 @@ extension OrbitTerminal {
                 var text = ghostty_text_s()
                 let sel = ghostty_selection_s(
                     top_left: ghostty_point_s(
-                        tag: ORBIT_TERMINAL_POINT_SCREEN,
-                        coord: ORBIT_TERMINAL_POINT_COORD_TOP_LEFT,
+                        tag: GHOSTTY_POINT_SCREEN,
+                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
                         x: 0,
                         y: 0),
                     bottom_right: ghostty_point_s(
-                        tag: ORBIT_TERMINAL_POINT_SCREEN,
-                        coord: ORBIT_TERMINAL_POINT_COORD_BOTTOM_RIGHT,
+                        tag: GHOSTTY_POINT_SCREEN,
+                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
                         x: 0,
                         y: 0),
                     rectangle: false)
@@ -302,13 +302,13 @@ extension OrbitTerminal {
                 var text = ghostty_text_s()
                 let sel = ghostty_selection_s(
                     top_left: ghostty_point_s(
-                        tag: ORBIT_TERMINAL_POINT_VIEWPORT,
-                        coord: ORBIT_TERMINAL_POINT_COORD_TOP_LEFT,
+                        tag: GHOSTTY_POINT_VIEWPORT,
+                        coord: GHOSTTY_POINT_COORD_TOP_LEFT,
                         x: 0,
                         y: 0),
                     bottom_right: ghostty_point_s(
-                        tag: ORBIT_TERMINAL_POINT_VIEWPORT,
-                        coord: ORBIT_TERMINAL_POINT_COORD_BOTTOM_RIGHT,
+                        tag: GHOSTTY_POINT_VIEWPORT,
+                        coord: GHOSTTY_POINT_COORD_BOTTOM_RIGHT,
                         x: 0,
                         y: 0),
                     rectangle: false)
@@ -504,49 +504,49 @@ extension OrbitTerminal {
 
         func setCursorShape(_ shape: ghostty_action_mouse_shape_e) {
             switch shape {
-            case ORBIT_TERMINAL_MOUSE_SHAPE_DEFAULT:
+            case GHOSTTY_MOUSE_SHAPE_DEFAULT:
                 pointerStyle = .default
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_TEXT:
+            case GHOSTTY_MOUSE_SHAPE_TEXT:
                 pointerStyle = .horizontalText
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_GRAB:
+            case GHOSTTY_MOUSE_SHAPE_GRAB:
                 pointerStyle = .grabIdle
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_GRABBING:
+            case GHOSTTY_MOUSE_SHAPE_GRABBING:
                 pointerStyle = .grabActive
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_POINTER:
+            case GHOSTTY_MOUSE_SHAPE_POINTER:
                 pointerStyle = .link
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_W_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_W_RESIZE:
                 pointerStyle = .resizeLeft
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_E_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_E_RESIZE:
                 pointerStyle = .resizeRight
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_N_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_N_RESIZE:
                 pointerStyle = .resizeUp
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_S_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_S_RESIZE:
                 pointerStyle = .resizeDown
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_NS_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_NS_RESIZE:
                 pointerStyle = .resizeUpDown
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_EW_RESIZE:
+            case GHOSTTY_MOUSE_SHAPE_EW_RESIZE:
                 pointerStyle = .resizeLeftRight
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_VERTICAL_TEXT:
+            case GHOSTTY_MOUSE_SHAPE_VERTICAL_TEXT:
                 pointerStyle = .verticalText
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_CONTEXT_MENU:
+            case GHOSTTY_MOUSE_SHAPE_CONTEXT_MENU:
                 pointerStyle = .contextMenu
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_CROSSHAIR:
+            case GHOSTTY_MOUSE_SHAPE_CROSSHAIR:
                 pointerStyle = .crosshair
 
-            case ORBIT_TERMINAL_MOUSE_SHAPE_NOT_ALLOWED:
+            case GHOSTTY_MOUSE_SHAPE_NOT_ALLOWED:
                 pointerStyle = .operationNotAllowed
 
             default:
@@ -707,7 +707,7 @@ extension OrbitTerminal {
             guard let healthAny = notification.userInfo?["health"] else { return }
             guard let health = healthAny as? ghostty_action_renderer_health_e else { return }
             DispatchQueue.main.async { [weak self] in
-                self?.healthy = health == ORBIT_TERMINAL_RENDERER_HEALTH_HEALTHY
+                self?.healthy = health == GHOSTTY_RENDERER_HEALTH_HEALTHY
             }
         }
 
@@ -879,7 +879,7 @@ extension OrbitTerminal {
         override func mouseDown(with event: NSEvent) {
             guard let surface = self.surface else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            ghostty_surface_mouse_button(surface, ORBIT_TERMINAL_MOUSE_PRESS, ORBIT_TERMINAL_MOUSE_LEFT, mods)
+            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, mods)
         }
 
         override func mouseUp(with event: NSEvent) {
@@ -896,7 +896,7 @@ extension OrbitTerminal {
             // If we have an active surface, report the event
             guard let surface = self.surface else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
-            ghostty_surface_mouse_button(surface, ORBIT_TERMINAL_MOUSE_RELEASE, ORBIT_TERMINAL_MOUSE_LEFT, mods)
+            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, mods)
 
             // Release pressure
             ghostty_surface_mouse_pressure(surface, 0, 0)
@@ -906,14 +906,14 @@ extension OrbitTerminal {
             guard let surface = self.surface else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
             let button = OrbitTerminal.Input.MouseButton(fromNSEventButtonNumber: event.buttonNumber)
-            ghostty_surface_mouse_button(surface, ORBIT_TERMINAL_MOUSE_PRESS, button.cMouseButton, mods)
+            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, button.cMouseButton, mods)
         }
 
         override func otherMouseUp(with event: NSEvent) {
             guard let surface = self.surface else { return }
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
             let button = OrbitTerminal.Input.MouseButton(fromNSEventButtonNumber: event.buttonNumber)
-            ghostty_surface_mouse_button(surface, ORBIT_TERMINAL_MOUSE_RELEASE, button.cMouseButton, mods)
+            ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, button.cMouseButton, mods)
         }
 
         override func rightMouseDown(with event: NSEvent) {
@@ -922,8 +922,8 @@ extension OrbitTerminal {
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
             if ghostty_surface_mouse_button(
                 surface,
-                ORBIT_TERMINAL_MOUSE_PRESS,
-                ORBIT_TERMINAL_MOUSE_RIGHT,
+                GHOSTTY_MOUSE_PRESS,
+                GHOSTTY_MOUSE_RIGHT,
                 mods
             ) {
                 // Consumed
@@ -940,8 +940,8 @@ extension OrbitTerminal {
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
             if ghostty_surface_mouse_button(
                 surface,
-                ORBIT_TERMINAL_MOUSE_RELEASE,
-                ORBIT_TERMINAL_MOUSE_RIGHT,
+                GHOSTTY_MOUSE_RELEASE,
+                GHOSTTY_MOUSE_RIGHT,
                 mods
             ) {
                 // Handled
@@ -1126,7 +1126,7 @@ extension OrbitTerminal {
                 ) ?? event
             }
 
-            let action = event.isARepeat ? ORBIT_TERMINAL_ACTION_REPEAT : ORBIT_TERMINAL_ACTION_PRESS
+            let action = event.isARepeat ? GHOSTTY_ACTION_REPEAT : GHOSTTY_ACTION_PRESS
 
             // By setting this to non-nil, we note that we're in a keyDown event. From here,
             // we call interpretKeyEvents so that we can handle complex input such as Korean
@@ -1197,7 +1197,7 @@ extension OrbitTerminal {
         }
 
         override func keyUp(with event: NSEvent) {
-            _ = keyAction(ORBIT_TERMINAL_ACTION_RELEASE, event: event)
+            _ = keyAction(GHOSTTY_ACTION_RELEASE, event: event)
         }
 
         /// Records the timestamp of the last event to performKeyEquivalent that we need to save.
@@ -1246,7 +1246,7 @@ extension OrbitTerminal {
 
             // Get information about if this is a binding.
             let bindingFlags = surfaceModel.flatMap { surface in
-                var ghosttyEvent = event.ghosttyKeyEvent(ORBIT_TERMINAL_ACTION_PRESS)
+                var ghosttyEvent = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
                 return (event.characters ?? "").withCString { ptr in
                     ghosttyEvent.text = ptr
                     return surface.keyIsBinding(ghosttyEvent)
@@ -1355,11 +1355,11 @@ extension OrbitTerminal {
         override func flagsChanged(with event: NSEvent) {
             let mod: UInt32
             switch event.keyCode {
-            case 0x39: mod = ORBIT_TERMINAL_MODS_CAPS.rawValue
-            case 0x38, 0x3C: mod = ORBIT_TERMINAL_MODS_SHIFT.rawValue
-            case 0x3B, 0x3E: mod = ORBIT_TERMINAL_MODS_CTRL.rawValue
-            case 0x3A, 0x3D: mod = ORBIT_TERMINAL_MODS_ALT.rawValue
-            case 0x37, 0x36: mod = ORBIT_TERMINAL_MODS_SUPER.rawValue
+            case 0x39: mod = GHOSTTY_MODS_CAPS.rawValue
+            case 0x38, 0x3C: mod = GHOSTTY_MODS_SHIFT.rawValue
+            case 0x3B, 0x3E: mod = GHOSTTY_MODS_CTRL.rawValue
+            case 0x3A, 0x3D: mod = GHOSTTY_MODS_ALT.rawValue
+            case 0x37, 0x36: mod = GHOSTTY_MODS_SUPER.rawValue
             default: return
             }
 
@@ -1371,7 +1371,7 @@ extension OrbitTerminal {
             let mods = OrbitTerminal.ghosttyMods(event.modifierFlags)
 
             // If the key that pressed this is active, its a press, else release.
-            var action = ORBIT_TERMINAL_ACTION_RELEASE
+            var action = GHOSTTY_ACTION_RELEASE
             if mods.rawValue & mod != 0 {
                 // If the key is pressed, its slightly more complicated, because we
                 // want to check if the pressed modifier is the correct side. If the
@@ -1392,7 +1392,7 @@ extension OrbitTerminal {
                 }
 
                 if sidePressed {
-                    action = ORBIT_TERMINAL_ACTION_PRESS
+                    action = GHOSTTY_ACTION_PRESS
                 }
             }
 
@@ -1635,22 +1635,22 @@ extension OrbitTerminal {
 
         @IBAction func splitRight(_ sender: Any) {
             guard let surface = self.surface else { return }
-            ghostty_surface_split(surface, ORBIT_TERMINAL_SPLIT_DIRECTION_RIGHT)
+            ghostty_surface_split(surface, GHOSTTY_SPLIT_DIRECTION_RIGHT)
         }
 
         @IBAction func splitLeft(_ sender: Any) {
             guard let surface = self.surface else { return }
-            ghostty_surface_split(surface, ORBIT_TERMINAL_SPLIT_DIRECTION_LEFT)
+            ghostty_surface_split(surface, GHOSTTY_SPLIT_DIRECTION_LEFT)
         }
 
         @IBAction func splitDown(_ sender: Any) {
             guard let surface = self.surface else { return }
-            ghostty_surface_split(surface, ORBIT_TERMINAL_SPLIT_DIRECTION_DOWN)
+            ghostty_surface_split(surface, GHOSTTY_SPLIT_DIRECTION_DOWN)
         }
 
         @IBAction func splitUp(_ sender: Any) {
             guard let surface = self.surface else { return }
-            ghostty_surface_split(surface, ORBIT_TERMINAL_SPLIT_DIRECTION_UP)
+            ghostty_surface_split(surface, GHOSTTY_SPLIT_DIRECTION_UP)
         }
 
         @objc func resetTerminal(_ sender: Any) {

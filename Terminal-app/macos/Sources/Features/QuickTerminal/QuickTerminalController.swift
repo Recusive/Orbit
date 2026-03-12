@@ -370,7 +370,7 @@ class QuickTerminalController: BaseTerminalController {
                 }
             } else {
                 var config = OrbitTerminal.SurfaceConfiguration()
-                config.environmentVariables["ORBIT_TERMINAL_QUICK_TERMINAL"] = "1"
+                config.environmentVariables["GHOSTTY_QUICK_TERMINAL"] = "1"
 
                 let view = OrbitTerminal.SurfaceView(ghostty_app, baseConfig: config)
                 surfaceTree = SplitTree(view: view)
