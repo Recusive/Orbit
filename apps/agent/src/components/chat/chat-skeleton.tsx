@@ -9,7 +9,7 @@
  */
 import type { FC } from 'react';
 
-import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
 
 /**
  * Static skeleton block definitions.
@@ -38,33 +38,48 @@ const SKELETON_BLOCKS = [
   },
 ] as const;
 
+/** Total skeleton input height: textarea (44px) + controls row (~32px) + padding (8px) */
+const SKELETON_INPUT_HEIGHT = INPUT_SIZES.textareaMinHeight + 32 + 8;
+
 export const ChatSkeleton: FC = () => {
   return (
-    <div
-      className="mx-auto pt-4 px-4 animate-skeleton-in"
-      style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
-      aria-hidden="true"
-      role="presentation"
-    >
-      {SKELETON_BLOCKS.map((block, blockIndex) => (
-        <div
-          key={blockIndex}
-          className={`mb-3 flex ${block.align === 'right' ? 'justify-end' : 'justify-start'}`}
-        >
+    <div className="relative h-full animate-skeleton-in" aria-hidden="true" role="presentation">
+      {/* Message skeletons — same as before */}
+      <div
+        className="mx-auto pt-4 px-4"
+        style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
+      >
+        {SKELETON_BLOCKS.map((block, blockIndex) => (
           <div
-            className={`flex flex-col gap-2 ${block.align === 'right' ? 'items-end' : 'items-start'}`}
-            style={{ width: block.align === 'right' ? '60%' : '100%' }}
+            key={blockIndex}
+            className={`mb-3 flex ${block.align === 'right' ? 'justify-end' : 'justify-start'}`}
           >
-            {block.bars.map((bar, barIndex) => (
-              <div
-                key={barIndex}
-                className={`h-4 rounded-lg bg-muted/60 ${block.align === 'right' ? 'rounded-2xl h-8' : ''}`}
-                style={{ width: bar.width }}
-              />
-            ))}
+            <div
+              className={`flex flex-col gap-2 ${block.align === 'right' ? 'items-end' : 'items-start'}`}
+              style={{ width: block.align === 'right' ? '60%' : '100%' }}
+            >
+              {block.bars.map((bar, barIndex) => (
+                <div
+                  key={barIndex}
+                  className={`h-4 rounded-lg bg-muted/60 ${block.align === 'right' ? 'rounded-2xl h-8' : ''}`}
+                  style={{ width: bar.width }}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
+
+      {/* Input skeleton — absolute bottom, mirrors real ChatInput position */}
+      <div className="absolute bottom-0 inset-x-0 flex justify-center px-4 pb-2">
+        <div
+          className="w-full rounded-[14px] bg-muted/60"
+          style={{
+            maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
+            height: SKELETON_INPUT_HEIGHT,
+          }}
+        />
+      </div>
     </div>
   );
 };

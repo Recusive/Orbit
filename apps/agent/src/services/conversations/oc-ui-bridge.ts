@@ -115,10 +115,6 @@ async function loadSelection(sessionId: string, forceLoad: boolean): Promise<voi
   useUIStore.getState().setConversationTransitioning(true);
   useOcSessionStore.getState().setActiveSessionId(sessionId);
 
-  try {
-    await ocConversationRepo.load(sessionId);
-  } finally {
-    useUIStore.getState().setLoadingConversation(false);
-    useUIStore.getState().setConversationTransitioning(false);
-  }
+  await ocConversationRepo.load(sessionId);
+  // Flags cleared by useLayoutStabilization in OcAgentSurface (same as Claude backend)
 }
