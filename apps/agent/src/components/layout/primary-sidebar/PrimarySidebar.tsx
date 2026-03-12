@@ -526,7 +526,7 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : settingsOpen ? null : (!isEditorMode && activeTab === 'conversations') ||
         (isEditorMode && editorTab === 'sessions') ? (
-        <div className="flex flex-col shrink-0 gap-1 py-1.5">
+        <div className="flex flex-col shrink-0 gap-1 py-1.5 animate-title-in">
           <SidebarItem
             icon={() => (
               <SFSymbol
@@ -720,7 +720,18 @@ export const PrimarySidebar: FC = () => {
       </div>
 
       {/* Utilities — pinned to bottom */}
-      <div className="flex flex-col shrink-0 gap-1 py-1.5">
+      <div
+        key={
+          settingsOpen
+            ? 'settings'
+            : vaultOpen
+              ? 'vault'
+              : isEditorMode
+                ? `editor-${editorTab}`
+                : activeTab
+        }
+        className="flex flex-col shrink-0 gap-1 py-1.5 animate-title-in"
+      >
         {/* Update indicator — visible after user dismisses the update toast */}
         {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
           <SidebarItem

@@ -449,51 +449,57 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
         ) : null}
 
-        {/* Header text — "Settings | Page" when settings is open, otherwise project + chat name */}
-        {settingsOpen ? (
-          <>
-            <span
-              data-tauri-drag-region={false}
-              className="text-base text-lg-text-secondary whitespace-nowrap"
-            >
-              Settings
-            </span>
-            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-            <span
-              data-tauri-drag-region={false}
-              className="text-base text-foreground whitespace-nowrap capitalize"
-            >
-              {settingsSection}
-            </span>
-          </>
-        ) : (
-          <>
-            {workspaceName ? (
+        {/* Header text — "Settings | Page" when settings is open, otherwise project + chat name.
+            Keyed on settingsOpen so the blur-reveal re-triggers when toggling settings. */}
+        <div
+          key={settingsOpen ? 'settings-header' : 'chat-header'}
+          className="flex items-center gap-1.5 min-w-0 animate-title-in"
+        >
+          {settingsOpen ? (
+            <>
               <span
                 data-tauri-drag-region={false}
-                className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                className="text-base text-lg-text-secondary whitespace-nowrap"
               >
-                {workspaceName}
+                Settings
               </span>
-            ) : null}
+              <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+              <span
+                data-tauri-drag-region={false}
+                className="text-base text-foreground whitespace-nowrap capitalize"
+              >
+                {settingsSection}
+              </span>
+            </>
+          ) : (
+            <>
+              {workspaceName ? (
+                <span
+                  data-tauri-drag-region={false}
+                  className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                >
+                  {workspaceName}
+                </span>
+              ) : null}
 
-            {conversationTitle || isTitleLoading ? (
-              <>
-                <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-                {isTitleLoading ? (
-                  <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
-                ) : (
-                  <span
-                    data-tauri-drag-region={false}
-                    className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap animate-title-in"
-                  >
-                    {conversationTitle}
-                  </span>
-                )}
-              </>
-            ) : null}
-          </>
-        )}
+              {conversationTitle || isTitleLoading ? (
+                <>
+                  <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+                  {isTitleLoading ? (
+                    <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
+                  ) : (
+                    <span
+                      data-tauri-drag-region={false}
+                      className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                    >
+                      {conversationTitle}
+                    </span>
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Center spacer — keeps left and right sections pushed apart */}
