@@ -165,6 +165,26 @@ pub(crate) fn set_child_windows_corner_radius(radius: f64) {
     log::debug!("WindowOrder: applied {radius}px corner radius to {applied} child window(s)");
 }
 
+/// Set the alpha (opacity) of a specific `NSWindow`.
+///
+/// Uses `[NSWindow setAlphaValue:]` to make a window transparent (0.0) or
+/// opaque (1.0) without moving it offscreen. Unlike repositioning to
+/// extreme coordinates, this does not confuse the macOS window server
+/// or break Mission Control layouts.
+///
+/// **Must be called from the main thread.**
+pub(crate) fn set_ns_window_alpha(ns_window: *mut std::ffi::c_void, alpha: f64) {
+    if ns_window.is_null() {
+        log::warn!("WindowOrder: set_ns_window_alpha called with null window");
+        return;
+    }
+    let window = ns_window.cast::<AnyObject>();
+    unsafe {
+        let _: () = msg_send![window, setAlphaValue: alpha];
+    }
+    log::debug!("WindowOrder: set NSWindow alpha to {alpha}");
+}
+
 /// Call `orderFront:nil` on every child of the given `NSWindow`.
 fn order_children_of(window: *mut AnyObject) {
     let child_windows: *mut AnyObject = unsafe { msg_send![window, childWindows] };

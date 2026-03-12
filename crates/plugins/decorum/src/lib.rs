@@ -269,6 +269,28 @@ pub fn set_glass_effective_theme(is_dark: bool) {
     let _ = is_dark;
 }
 
+/// Set the alpha (opacity) of a specific `NSWindow`.
+///
+/// Uses `[NSWindow setAlphaValue:]` to make a window transparent (0.0) or
+/// opaque (1.0) without moving it offscreen. This avoids confusing the macOS
+/// window server, which can break Mission Control when windows are moved to
+/// extreme coordinates like (-10000, -10000).
+///
+/// On non-macOS platforms, this is a no-op.
+///
+/// **Must be called from the main thread.**
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(clippy::missing_const_for_fn)]
+pub fn set_ns_window_alpha(ns_window: *mut std::ffi::c_void, alpha: f64) {
+    #[cfg(target_os = "macos")]
+    window_order::set_ns_window_alpha(ns_window, alpha);
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (ns_window, alpha);
+    }
+}
+
 /// Re-order all child windows of the main window to the front.
 ///
 /// This fixes macOS child window z-ordering: when the parent window gains

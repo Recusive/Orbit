@@ -197,6 +197,9 @@ class AppDelegate: NSObject,
             // a desirable behavior to NOT have happen for a terminal, so this is a win.
             // Manual autofill via the `Edit => AutoFill` menu item still work as expected.
             "NSAutoFillHeuristicControllerEnabled": false,
+
+            // Sidebar card border preference
+            "SidebarShowCardBorder": true,
         ])
     }
 
@@ -220,6 +223,9 @@ class AppDelegate: NSObject,
 
         // Start our update checker.
         updateController.startUpdater()
+
+        // Start the IPC server for external control (orbitctl, shell integrations)
+        OrbitTerminalIPCServer.shared.start()
 
         // Register our service provider. This must happen after everything is initialized.
         NSApp.servicesProvider = ServiceProvider()
@@ -427,6 +433,9 @@ class AppDelegate: NSObject,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        // Stop the IPC server and clean up the socket
+        OrbitTerminalIPCServer.shared.stop()
+
         // We have no notifications we want to persist after death,
         // so remove them all now. In the future we may want to be
         // more selective and only remove surface-targeted notifications.

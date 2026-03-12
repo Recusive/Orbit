@@ -2230,6 +2230,16 @@ keybind: Keybinds = .{},
 ///   * `end` - Insert the new tab at the end of the tab list.
 @"window-new-tab-position": WindowNewTabPosition = .current,
 
+/// Comma-separated list of fields to display in the sidebar tab cards.
+/// Available fields: `title`, `directory`, `git-branch`, `status`.
+/// - `title`: the tab title (process name or custom rename)
+/// - `directory`: the working directory (last path component)
+/// - `git-branch`: the current git branch
+/// - `status`: status entries set via `orbitctl set-status`
+///
+/// Default: `title,directory,git-branch,status`
+@"sidebar-fields": ?[:0]const u8 = null,
+
 /// Whether to show the tab bar.
 ///
 /// Valid values:

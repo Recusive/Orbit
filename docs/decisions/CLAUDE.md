@@ -83,6 +83,7 @@ ASCII diagram showing the flow/structure.
 | `CHAT-PANEL-MINIMUM-WIDTH.md`          | Constant 400px chat floor, dynamic activity cap, sidebar auto-collapse, header overflow fade | 2026-02-24 |
 | `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` | Single margin-left slide instead of two-property transition to eliminate desync jank         | 2026-02-24 |
 | `INSTANT-HOVER-SIDEBAR-LISTS.md`       | Instant hover for all list items — removed backdrop-blur, bg transitions, transition-all     | 2026-02-25 |
+| `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md`   | Container-level blur reveal for sidebar view switches — skeleton hold, key-based remount     | 2026-03-12 |
 
 ---
 

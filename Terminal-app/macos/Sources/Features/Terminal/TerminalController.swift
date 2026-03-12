@@ -5,7 +5,7 @@ import Combine
 import OrbitTerminalKit
 
 /// A classic, tabbed terminal experience.
-class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Controller {
+class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Controller, NSSplitViewDelegate {
     override var windowNibName: NSNib.Name? {
         let defaultValue = "Terminal"
 
@@ -45,6 +45,14 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     /// This is the hash value of the last tabGroup.windows array. We use this to detect order
     /// changes in the list.
     private var tabWindowsHash: Int = 0
+
+    // MARK: - Sidebar
+
+    /// The sidebar tab manager for this window's tab group.
+    private(set) var sidebarTabManager: SidebarTabManager?
+
+    /// The hosting view for the sidebar SwiftUI content.
+    private var sidebarHostingView: NSHostingView<SidebarView>?
 
     /// This is set to false by init if the window managed by this controller should not be restorable.
     /// For example, terminals executing custom scripts are not restorable.
@@ -506,6 +514,9 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
             // Update our derived config
             self.derivedConfig = DerivedConfig(config)
 
+            // Update sidebar theme when config changes
+            updateSidebarTheme(config)
+
             // If we have no surfaces in our window (is that possible?) then we update
             // our window appearance based on the root config. If we have surfaces, we
             // don't call this because focused surface changes will trigger appearance updates.
@@ -545,6 +556,62 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
                 }
             }
         }
+
+        // Refresh all sidebars in the tab group
+        refreshAllSidebars()
+    }
+
+    // MARK: - Sidebar Helpers
+
+    /// Update the sidebar theme and fields when the config changes.
+    private func updateSidebarTheme(_ config: OrbitTerminal.Config) {
+        guard let sidebarTabManager else { return }
+        sidebarHostingView?.rootView = SidebarView(
+            tabManager: sidebarTabManager,
+            theme: config.sidebarTheme,
+            fields: config.sidebarFields
+        )
+    }
+
+    /// Refresh all sidebar tab managers in the current tab group.
+    private func refreshAllSidebars() {
+        guard let window else { return }
+        let tabWindows = window.tabbedWindows ?? [window]
+        for w in tabWindows {
+            (w.windowController as? TerminalController)?.sidebarTabManager?.refresh()
+        }
+    }
+
+    /// Synchronize the sidebar width across all tabs in the group.
+    private func syncSidebarWidth() {
+        guard let window, let splitView = window.contentView as? NSSplitView else { return }
+        let savedWidth = UserDefaults.standard.double(forKey: "SidebarWidth")
+        if savedWidth > 0 {
+            splitView.setPosition(min(max(savedWidth, 140), 280), ofDividerAt: 0)
+        }
+    }
+
+    // MARK: - NSSplitViewDelegate
+
+    func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        if dividerIndex == 0 { return 140 }
+        return proposedMinimumPosition
+    }
+
+    func splitView(_ splitView: NSSplitView, constrainMaxCoordinate proposedMaximumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
+        if dividerIndex == 0 { return 280 }
+        return proposedMaximumPosition
+    }
+
+    func splitView(_ splitView: NSSplitView, shouldAdjustSizeOfSubview view: NSView) -> Bool {
+        // Don't resize the sidebar (first subview), only the terminal (second)
+        return view != splitView.subviews.first
+    }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        guard let splitView = notification.object as? NSSplitView,
+              let sidebarView = splitView.subviews.first else { return }
+        UserDefaults.standard.set(sidebarView.frame.width, forKey: "SidebarWidth")
     }
 
     private func fixTabBar() {
@@ -1047,7 +1114,41 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // SwiftUI focus chain.
         container.initialContentSize = focusedSurface?.initialSize
 
-        window.contentView = container
+        // Mark the window as having an active sidebar so the native tab bar is hidden
+        if let terminalWindow = window as? TerminalWindow {
+            terminalWindow.sidebarActive = true
+        }
+
+        // Create the sidebar tab manager and hosting view
+        let bellTriggersAttention = config.bellFeatures.contains(.attention)
+        let tabManager = SidebarTabManager(window: window, bellTriggersAttention: bellTriggersAttention)
+        self.sidebarTabManager = tabManager
+
+        let sidebarView = SidebarView(
+            tabManager: tabManager,
+            theme: config.sidebarTheme,
+            fields: config.sidebarFields
+        )
+        let sidebarHost = NSHostingView(rootView: sidebarView)
+        self.sidebarHostingView = sidebarHost
+
+        // Build NSSplitView: sidebar (left) + terminal (right)
+        let splitView = NSSplitView()
+        splitView.isVertical = true
+        splitView.dividerStyle = .thin
+        splitView.delegate = self
+        splitView.addSubview(sidebarHost)
+        splitView.addSubview(container)
+        splitView.setHoldingPriority(.defaultLow, forSubviewAt: 0)
+        splitView.setHoldingPriority(.defaultHigh, forSubviewAt: 1)
+
+        // Set initial sidebar width from saved preference with explicit frames
+        let savedWidth = UserDefaults.standard.double(forKey: "SidebarWidth")
+        let sidebarWidth = savedWidth > 0 ? min(max(savedWidth, 140), 280) : 200
+        sidebarHost.frame = NSRect(x: 0, y: 0, width: sidebarWidth, height: 400)
+        container.frame = NSRect(x: sidebarWidth, y: 0, width: 600, height: 400)
+
+        window.contentView = splitView
 
         // If we have a default size, we want to apply it.
         if let defaultSize {
@@ -1175,6 +1276,7 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         super.windowDidBecomeKey(notification)
         self.relabelTabs()
         self.fixTabBar()
+        self.syncSidebarWidth()
         terminalViewContainer?.updateGlassTintOverlay(isKeyWindow: true)
     }
 

@@ -137,9 +137,12 @@ class BaseTerminalController: NSWindowController,
 
         super.init(window: nil)
 
-        // Initialize our initial surface.
+        // Initialize our initial surface, injecting IPC environment variables
+        // so shell integrations can communicate with the sidebar via orbitctl.
         guard let ghostty_app = ghostty.app else { preconditionFailure("app must be loaded") }
-        self.surfaceTree = tree ?? .init(view: OrbitTerminal.SurfaceView(ghostty_app, baseConfig: base))
+        var config = base ?? OrbitTerminal.SurfaceConfiguration()
+        config.environmentVariables["ORBIT_TERMINAL_SOCKET"] = "/tmp/orbit-terminal-\(getuid()).sock"
+        self.surfaceTree = tree ?? .init(view: OrbitTerminal.SurfaceView(ghostty_app, baseConfig: config))
 
         // Setup our bell state for the window
         setupBellNotificationPublisher()

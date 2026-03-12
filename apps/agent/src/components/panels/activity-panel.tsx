@@ -15,6 +15,7 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import { useSmoothScroll } from '@/hooks/ui';
 import { lspDidClose } from '@/lib/api';
+import { shouldBrowserBeVisible } from '@/lib/browser-overlay-coordination';
 import { ACTIVITY_PANEL, cn } from '@/lib/utils';
 import { useBrowserIsActive } from '@/stores/browser/browser-store';
 import {
@@ -432,7 +433,7 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
   useEffect(() => {
     if (!canManageBrowser || !isBrowserActive) return;
 
-    const shouldShow = reviewPanelOpen && activeTab === 'browser';
+    const shouldShow = shouldBrowserBeVisible();
 
     postMessage({
       type: shouldShow ? 'browser:show' : 'browser:hide',
