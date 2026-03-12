@@ -124,6 +124,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './apps/agent/src'),
       '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
+      '@opencode-ai/sdk/v2/client': path.resolve(
+        __dirname,
+        './packages/opencode-sdk/src/v2/client.js'
+      ),
+      '@opencode-ai/sdk/v2': path.resolve(__dirname, './packages/opencode-sdk/src/v2/index.js'),
+      '@opencode-ai/sdk': path.resolve(__dirname, './packages/opencode-sdk/src/v2/index.js'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },

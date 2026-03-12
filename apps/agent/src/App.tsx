@@ -19,6 +19,7 @@ import { RootLayout } from '@/components/layout/root-layout';
 import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
 import { TerminalCard } from '@/components/layout/terminal-card';
 import { CrashNotification } from '@/components/modals';
+import { SettingsSkeleton } from '@/components/modals/settings/components';
 import { OnboardingFlow } from '@/components/onboarding';
 import { ActivityPanel } from '@/components/panels';
 import { ErrorBoundary } from '@/components/shared';
@@ -55,6 +56,7 @@ import {
   useBottomPanelHeight,
   useTerminalCollapsed,
   useTerminalPosition,
+  useSettingsOpen,
   useUIStore,
   useVaultOpen,
 } from '@/stores/ui/ui-store';
@@ -97,6 +99,12 @@ const TerminalPanelBoth: FC<TerminalPanelProps> = (props) => (
   </Suspense>
 );
 
+const LazySettingsPage = lazy(() =>
+  import('@/components/modals/settings/SettingsPage').then((m) => ({
+    default: m.SettingsPage,
+  }))
+);
+
 // ============================================
 // Demo View Initialization
 // ============================================
@@ -132,7 +140,7 @@ function applyDemoView(view: string, scenario: string): (() => void) | undefined
     }
 
     case 'showcase': {
-      // Settings dialog open on accounts page showing Claude Code connected
+      // Settings page open on accounts page showing Claude Code connected
       uiStore.openSettings('account');
       break;
     }
@@ -372,6 +380,7 @@ const App: FC = () => {
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
   const vaultOpen = useVaultOpen();
+  const settingsOpen = useSettingsOpen();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
   // Demo mode — must be available before sidebar width calculation
@@ -888,7 +897,7 @@ const App: FC = () => {
                           allows programmatic scrolling even without a scrollbar. */}
                       <div className="flex-1 min-h-0 overflow-clip relative z-0">
                         {/* Gradient fade below header — follows the chat area (skipped in editor mode and vault) */}
-                        {!isWelcome && activeTab !== 'editor' && !vaultOpen ? (
+                        {!isWelcome && activeTab !== 'editor' && !vaultOpen && !settingsOpen ? (
                           <div
                             className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
                             style={{
@@ -897,6 +906,13 @@ const App: FC = () => {
                             }}
                             aria-hidden="true"
                           />
+                        ) : null}
+                        {settingsOpen && !isWelcome ? (
+                          <div className="absolute inset-0 z-20 bg-chat-area">
+                            <Suspense fallback={<SettingsSkeleton />}>
+                              <LazySettingsPage />
+                            </Suspense>
+                          </div>
                         ) : null}
                         {isWelcome ? (
                           <WelcomePage

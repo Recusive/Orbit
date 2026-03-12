@@ -17,12 +17,6 @@ export type SettingsSection =
   | 'account'
   | 'feedback';
 
-export interface SettingsDialogProps {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly defaultSection?: SettingsSection;
-}
-
 export interface NavItemProps {
   readonly icon: ReactNode;
   readonly label: string;

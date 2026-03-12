@@ -275,6 +275,7 @@ const CommandEditor: FC<CommandEditorProps> = ({
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
+            data-settings-child-dialog="true"
             className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-sidebar border-0 shadow-none rounded-[14px] pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();

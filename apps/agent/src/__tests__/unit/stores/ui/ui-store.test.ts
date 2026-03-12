@@ -5,16 +5,7 @@
  * Uses immer middleware and manual localStorage persistence for conversations and worktrees.
  */
 
-import type { SettingsSection } from '@/components/modals/settings';
-import type {
-  ActivityTab,
-  BottomPanelTab,
-  ConversationSummary,
-  HeaderTab,
-  TerminalPosition,
-  WorktreeInfo,
-  WorktreeUIState,
-} from '@/stores/ui/ui-store';
+import type { ConversationSummary, WorktreeInfo, WorktreeUIState } from '@/stores/ui/ui-store';
 
 // Import constants for validation
 import { DEFAULT_UI_STATE, PANEL_SIZES, SIDEBAR } from '@/lib/utils';
@@ -88,37 +79,7 @@ function createMockWorktree(
 
 // Helper to reset the store to initial state
 function resetStore(): void {
-  useUIStore.setState({
-    containerWidth: null,
-    containerHeight: null,
-    workspacePath: null,
-    workspaceName: null,
-    repoRootPath: null,
-    activeConversationId: null,
-    activeConversationTitle: null,
-    isLoadingConversation: false,
-    isConversationTransitioning: false,
-    conversations: [],
-    editingConversationId: null,
-    leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
-    leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
-    reviewPanelWidth: DEFAULT_UI_STATE.reviewPanelWidth,
-    rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
-    bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
-    bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
-    bottomPanelTab: 'terminal' as BottomPanelTab,
-    terminalPosition: 'activity' as TerminalPosition,
-    activityTab: 'file' as ActivityTab,
-    activeTab: 'agent' as HeaderTab,
-    goToLineDialogOpen: false,
-    settingsDialogOpen: false,
-    settingsDialogSection: 'agent' as SettingsSection,
-    worktrees: [],
-    activeWorktreePath: null,
-    createWorktreeDialogOpen: false,
-  });
+  useUIStore.setState(useUIStore.getInitialState(), true);
 }
 
 describe('ui-store', () => {
@@ -175,7 +136,7 @@ describe('ui-store', () => {
     it('should start with dialogs closed', () => {
       const state = useUIStore.getState();
       expect(state.goToLineDialogOpen).toBe(false);
-      expect(state.settingsDialogOpen).toBe(false);
+      expect(state.settingsOpen).toBe(false);
     });
 
     it('should start with empty worktrees', () => {
@@ -835,35 +796,114 @@ describe('ui-store', () => {
       });
     });
 
-    describe('setSettingsDialogOpen', () => {
-      it('should set settings dialog open state', () => {
-        const { setSettingsDialogOpen } = useUIStore.getState();
+    describe('setSettingsOpen', () => {
+      it('should set settings open state', () => {
+        const { setSettingsOpen } = useUIStore.getState();
 
-        setSettingsDialogOpen(true);
-        expect(useUIStore.getState().settingsDialogOpen).toBe(true);
+        setSettingsOpen(true);
+        expect(useUIStore.getState().settingsOpen).toBe(true);
 
-        setSettingsDialogOpen(false);
-        expect(useUIStore.getState().settingsDialogOpen).toBe(false);
+        setSettingsOpen(false);
+        expect(useUIStore.getState().settingsOpen).toBe(false);
+      });
+
+      it('should close vault and expand the sidebar when opening settings', () => {
+        useUIStore.setState({
+          vaultOpen: true,
+          leftSidebarWidth: SIDEBAR.collapsed,
+          lastExpandedSidebarWidth: 320,
+        });
+
+        useUIStore.getState().setSettingsOpen(true);
+
+        const state = useUIStore.getState();
+        expect(state.settingsOpen).toBe(true);
+        expect(state.vaultOpen).toBe(false);
+        expect(state.leftSidebarWidth).toBe(320);
       });
     });
 
     describe('openSettings', () => {
-      it('should open settings dialog with specified section', () => {
+      it('should open settings with specified section', () => {
         const { openSettings } = useUIStore.getState();
 
         openSettings('appearance');
 
         const state = useUIStore.getState();
-        expect(state.settingsDialogOpen).toBe(true);
-        expect(state.settingsDialogSection).toBe('appearance');
+        expect(state.settingsOpen).toBe(true);
+        expect(state.settingsSection).toBe('appearance');
       });
 
-      it('should default to agent section', () => {
+      it('should preserve the current section when no section is provided', () => {
+        useUIStore.setState({ settingsSection: 'providers' });
+
+        useUIStore.getState().openSettings();
+
+        expect(useUIStore.getState().settingsSection).toBe('providers');
+      });
+
+      it('should close vault and expand a collapsed sidebar', () => {
+        useUIStore.setState({
+          vaultOpen: true,
+          leftSidebarWidth: SIDEBAR.collapsed,
+          lastExpandedSidebarWidth: 312,
+        });
+
+        useUIStore.getState().openSettings('appearance');
+
+        const state = useUIStore.getState();
+        expect(state.settingsOpen).toBe(true);
+        expect(state.settingsSection).toBe('appearance');
+        expect(state.vaultOpen).toBe(false);
+        expect(state.leftSidebarWidth).toBe(312);
+      });
+
+      it('should fall back to the default expanded width when no previous sidebar width exists', () => {
+        useUIStore.setState({
+          leftSidebarWidth: SIDEBAR.collapsed,
+          lastExpandedSidebarWidth: SIDEBAR.collapsed,
+        });
+
         const { openSettings } = useUIStore.getState();
 
         openSettings();
 
-        expect(useUIStore.getState().settingsDialogSection).toBe('agent');
+        expect(useUIStore.getState().settingsSection).toBe('agent');
+        expect(useUIStore.getState().leftSidebarWidth).toBe(SIDEBAR.expanded);
+      });
+    });
+
+    describe('closeSecondarySurface', () => {
+      it('should close settings and vault together', () => {
+        useUIStore.setState({ settingsOpen: true, vaultOpen: true });
+
+        useUIStore.getState().closeSecondarySurface();
+
+        const state = useUIStore.getState();
+        expect(state.settingsOpen).toBe(false);
+        expect(state.vaultOpen).toBe(false);
+      });
+    });
+
+    describe('vault/settings mutual exclusivity', () => {
+      it('setVaultOpen(true) should close settings', () => {
+        useUIStore.setState({ settingsOpen: true, vaultOpen: false });
+
+        useUIStore.getState().setVaultOpen(true);
+
+        const state = useUIStore.getState();
+        expect(state.vaultOpen).toBe(true);
+        expect(state.settingsOpen).toBe(false);
+      });
+
+      it('toggleVault should close settings when opening vault', () => {
+        useUIStore.setState({ settingsOpen: true, vaultOpen: false });
+
+        useUIStore.getState().toggleVault();
+
+        const state = useUIStore.getState();
+        expect(state.vaultOpen).toBe(true);
+        expect(state.settingsOpen).toBe(false);
       });
     });
   });

@@ -203,10 +203,10 @@ describe('useSidebarActions', () => {
         );
       });
 
-      it('should close vault when creating new conversation', () => {
-        // Open the vault first
-        useUIStore.setState({ vaultOpen: true });
+      it('should close secondary surfaces when creating new conversation', () => {
+        useUIStore.setState({ vaultOpen: true, settingsOpen: true });
         expect(useUIStore.getState().vaultOpen).toBe(true);
+        expect(useUIStore.getState().settingsOpen).toBe(true);
 
         const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
 
@@ -215,6 +215,7 @@ describe('useSidebarActions', () => {
         });
 
         expect(useUIStore.getState().vaultOpen).toBe(false);
+        expect(useUIStore.getState().settingsOpen).toBe(false);
       });
     });
 
@@ -243,8 +244,8 @@ describe('useSidebarActions', () => {
         expect(mockHandleConversationCreate).not.toHaveBeenCalled();
       });
 
-      it('should still close vault even when skipping creation for Untitled', () => {
-        useUIStore.setState({ vaultOpen: true });
+      it('should still close secondary surfaces even when skipping creation for Untitled', () => {
+        useUIStore.setState({ vaultOpen: true, settingsOpen: true });
 
         const untitledConversation = createMockConversation({
           sessionId: 'untitled-session',
@@ -265,8 +266,9 @@ describe('useSidebarActions', () => {
           result.current.handleStartConversation();
         });
 
-        // Vault should still close
+        // Secondary surfaces should still close
         expect(useUIStore.getState().vaultOpen).toBe(false);
+        expect(useUIStore.getState().settingsOpen).toBe(false);
         // But no message sent
         expect(mockHandleConversationCreate).not.toHaveBeenCalled();
       });
@@ -435,13 +437,14 @@ describe('useSidebarActions', () => {
         expect(mockToastError).toHaveBeenCalledWith('Failed to create conversation');
       });
 
-      it('should still close vault even if postMessage would fail after', () => {
-        // Vault should close BEFORE postMessage is called
-        useUIStore.setState({ vaultOpen: true });
+      it('should still close secondary surfaces even if postMessage would fail after', () => {
+        useUIStore.setState({ vaultOpen: true, settingsOpen: true });
 
         let vaultStateWhenCreateCalled = true;
+        let settingsStateWhenCreateCalled = true;
         mockHandleConversationCreate.mockImplementationOnce(() => {
           vaultStateWhenCreateCalled = useUIStore.getState().vaultOpen;
+          settingsStateWhenCreateCalled = useUIStore.getState().settingsOpen;
           return 'created-session-id';
         });
 
@@ -451,8 +454,9 @@ describe('useSidebarActions', () => {
           result.current.handleStartConversation();
         });
 
-        // Vault should have been closed BEFORE postMessage was called
+        // Secondary surfaces should have been closed BEFORE postMessage was called
         expect(vaultStateWhenCreateCalled).toBe(false);
+        expect(settingsStateWhenCreateCalled).toBe(false);
       });
     });
   });
@@ -488,8 +492,8 @@ describe('useSidebarActions', () => {
       expect(useUIStore.getState().isConversationTransitioning).toBe(true);
     });
 
-    it('should close vault when loading conversation', () => {
-      useUIStore.setState({ vaultOpen: true });
+    it('should close secondary surfaces when loading conversation', () => {
+      useUIStore.setState({ vaultOpen: true, settingsOpen: true });
 
       const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
 
@@ -498,6 +502,7 @@ describe('useSidebarActions', () => {
       });
 
       expect(useUIStore.getState().vaultOpen).toBe(false);
+      expect(useUIStore.getState().settingsOpen).toBe(false);
     });
 
     it('should NOT load conversation if already viewing it', () => {

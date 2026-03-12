@@ -96,7 +96,7 @@ export const useSidebarActions = ({
   const removeConversation = useUIStore((s) => s.removeConversation);
   const setCreateWorktreeDialogOpen = useUIStore((s) => s.setCreateWorktreeDialogOpen);
   const setEditingConversationId = useUIStore((s) => s.setEditingConversationId);
-  const setVaultOpen = useUIStore((s) => s.setVaultOpen);
+  const closeSecondarySurface = useUIStore((s) => s.closeSecondarySurface);
   const activeBackend = useActiveBackend();
   const repoRootPath = useUIStore((s) => s.repoRootPath);
   const bridge = getConversationUiBridge(activeBackend);
@@ -223,8 +223,7 @@ export const useSidebarActions = ({
   }, [loadWorktrees]);
 
   const handleStartConversation = useCallback((): void => {
-    // Close vault if open
-    setVaultOpen(false);
+    closeSecondarySurface();
     // Skip only if current conversation is truly empty.
     // Title alone is not a reliable signal because many persisted sessions stay "Untitled".
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
@@ -235,18 +234,17 @@ export const useSidebarActions = ({
       logger.error('Failed to create conversation', err);
       toast.error('Failed to create conversation');
     });
-  }, [activeConversationId, bridge, conversations, setVaultOpen]);
+  }, [activeConversationId, bridge, closeSecondarySurface, conversations]);
 
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
-      // Close vault if open
-      setVaultOpen(false);
+      closeSecondarySurface();
       if (sessionId === activeConversationId) {
         return;
       }
       void bridge.select(sessionId);
     },
-    [activeConversationId, bridge, setVaultOpen]
+    [activeConversationId, bridge, closeSecondarySurface]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {

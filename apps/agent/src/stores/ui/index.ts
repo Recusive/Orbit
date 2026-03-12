@@ -32,6 +32,8 @@ export {
   useTerminalPosition,
   useActivityTab,
   useBottomPanelTab,
+  useSettingsOpen,
+  useSettingsSection,
 } from './ui-store';
 
 export type {

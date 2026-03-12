@@ -1,2 +1,2 @@
-export { SettingsDialog } from './SettingsDialog';
-export type { SettingsDialogProps, SettingsSection } from './types';
+export { SettingsPage } from './SettingsPage';
+export type { SettingsSection } from './types';

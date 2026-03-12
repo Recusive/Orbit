@@ -6,7 +6,7 @@
  */
 import { useComponentRegistry } from '@canvas/hooks/use-component-registry';
 import { FlaskConical, FolderOpen, Layers, Loader2, Plus, Search, Settings } from 'lucide-react';
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import {
@@ -18,7 +18,6 @@ import {
 } from './components';
 
 import type { CanvasLeftSidebarProps, CanvasSidebarTab } from './types';
-import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { FC } from 'react';
 
 import { BeamAsciiPre } from '@/components/shared';
@@ -42,35 +41,14 @@ function formatComponentLabel(name: string): string {
     .join(' ');
 }
 
-// Lazy load heavy components
-const LazySettingsDialog = lazy(() =>
-  import('@/components/modals/settings/SettingsDialog').then((m) => ({
-    default: m.SettingsDialog,
-  }))
-);
-const SettingsDialog: FC<SettingsDialogProps> = (props) => (
-  <Suspense fallback={null}>
-    <LazySettingsDialog {...props} />
-  </Suspense>
-);
-
 // ============================================
 // Component
 // ============================================
 
 export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onComponentSelect }) => {
-  const {
-    toggleLeftSidebar,
-    settingsDialogOpen,
-    settingsDialogSection,
-    setSettingsDialogOpen,
-    openSettings,
-  } = useUIStore(
+  const { toggleLeftSidebar, openSettings } = useUIStore(
     useShallow((s) => ({
       toggleLeftSidebar: s.toggleLeftSidebar,
-      settingsDialogOpen: s.settingsDialogOpen,
-      settingsDialogSection: s.settingsDialogSection,
-      setSettingsDialogOpen: s.setSettingsDialogOpen,
       openSettings: s.openSettings,
     }))
   );
@@ -364,13 +342,6 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
           }}
         />
       </div>
-
-      {/* Settings Dialog */}
-      <SettingsDialog
-        open={settingsDialogOpen}
-        onOpenChange={setSettingsDialogOpen}
-        defaultSection={settingsDialogSection}
-      />
     </aside>
   );
 };

@@ -50,6 +50,8 @@ export const SETTINGS_PAGE_COMPONENTS: Partial<
   appearance: lazyWithMinDelay(() => import('./AppearanceSettings')),
   agent: lazyWithMinDelay(() => import('./AgentSettings')),
   providers: lazyWithMinDelay(() => import('./ProvidersSettings')),
+  subagents: lazyWithMinDelay(() => import('./SubagentsSettings')),
+  commands: lazyWithMinDelay(() => import('./SlashCommandsSettings')),
   shortcuts: lazyWithMinDelay(() => import('./ShortcutsSettings')),
   browser: lazyWithMinDelay(() => import('./BrowserSettings')),
   editor: lazyWithMinDelay(() => import('./EditorSettings')),

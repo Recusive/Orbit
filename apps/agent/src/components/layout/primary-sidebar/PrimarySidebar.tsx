@@ -27,6 +27,7 @@ import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
 import { PowersSection } from './components/PowersSection';
+import { SettingsNavList } from './components/SettingsNavList';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { VaultNoteList } from './components/VaultNoteList';
@@ -35,7 +36,6 @@ import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { EditorSidebarTab, SidebarTab } from './types';
 import type { ProjectsDialogProps } from '@/components/modals/projects';
-import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { UnifiedDoc } from '@/features/vault/types';
 import type { FC } from 'react';
@@ -69,6 +69,7 @@ import { useFileStore } from '@/stores/file/file-store';
 import { useOcActiveSessionId } from '@/stores/opencode';
 import {
   useUIStore,
+  useSettingsOpen,
   useVaultOpen,
   useWorkspaceName,
   useWorkspacePath,
@@ -80,17 +81,6 @@ import {
 import { useUpdateStore } from '@/stores/ui/update-store';
 
 // Lazy load heavy components
-const LazySettingsDialog = lazy(() =>
-  import('@/components/modals/settings/SettingsDialog').then((m) => ({
-    default: m.SettingsDialog,
-  }))
-);
-const SettingsDialog: FC<SettingsDialogProps> = (props) => (
-  <Suspense fallback={null}>
-    <LazySettingsDialog {...props} />
-  </Suspense>
-);
-
 const LazyProjectsDialog = lazy(() =>
   import('@/components/modals/projects/ProjectsDialog').then((m) => ({
     default: m.ProjectsDialog,
@@ -206,9 +196,7 @@ export const PrimarySidebar: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
-    settingsDialogOpen,
-    settingsDialogSection,
-    setSettingsDialogOpen,
+    setSettingsOpen,
     openSettings,
     toggleWorktreeExpanded,
     editingConversationId,
@@ -216,9 +204,7 @@ export const PrimarySidebar: FC = () => {
   } = useUIStore(
     useShallow((s) => ({
       toggleLeftSidebar: s.toggleLeftSidebar,
-      settingsDialogOpen: s.settingsDialogOpen,
-      settingsDialogSection: s.settingsDialogSection,
-      setSettingsDialogOpen: s.setSettingsDialogOpen,
+      setSettingsOpen: s.setSettingsOpen,
       openSettings: s.openSettings,
       toggleWorktreeExpanded: s.toggleWorktreeExpanded,
       editingConversationId: s.editingConversationId,
@@ -238,6 +224,7 @@ export const PrimarySidebar: FC = () => {
 
   // Vault mode
   const vaultOpen = useVaultOpen();
+  const settingsOpen = useSettingsOpen();
   useVaultInitialization();
   const currentPath = useVaultStore((s) => s.currentPath);
   const createVaultFile = useVaultStore((s) => s.createVaultFile);
@@ -377,7 +364,9 @@ export const PrimarySidebar: FC = () => {
             aria-label="Go back"
             className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
             onClick={() => {
-              if (vaultOpen) {
+              if (settingsOpen) {
+                setSettingsOpen(false);
+              } else if (vaultOpen) {
                 useUIStore.getState().setVaultOpen(false);
               }
             }}
@@ -433,7 +422,7 @@ export const PrimarySidebar: FC = () => {
       ) : null}
 
       {/* Tab heading + toggle (workspace mode only, hidden in vault mode) */}
-      {!isWelcome && !vaultOpen ? (
+      {!isWelcome && !vaultOpen && !settingsOpen ? (
         isEditorMode ? (
           /* Editor mode: Explorer / Source Control / Sessions toggle */
           <div className="flex items-center justify-between px-3 py-1 shrink-0">
@@ -490,7 +479,7 @@ export const PrimarySidebar: FC = () => {
             </Tooltip>
           </div>
         )
-      ) : vaultOpen ? (
+      ) : settingsOpen ? null : vaultOpen ? (
         /* Vault mode: "Notes" heading */
         <div className="flex items-center px-3 py-1 shrink-0">
           <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
@@ -535,7 +524,7 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         </div>
-      ) : (!isEditorMode && activeTab === 'conversations') ||
+      ) : settingsOpen ? null : (!isEditorMode && activeTab === 'conversations') ||
         (isEditorMode && editorTab === 'sessions') ? (
         <div className="flex flex-col shrink-0 gap-1 py-1.5">
           <SidebarItem
@@ -593,7 +582,9 @@ export const PrimarySidebar: FC = () => {
           transition: 'mask-position 200ms ease-out, -webkit-mask-position 200ms ease-out',
         }}
       >
-        {vaultOpen ? (
+        {settingsOpen ? (
+          <SettingsNavList />
+        ) : vaultOpen ? (
           <VaultNoteList
             onRequestCreate={() => {
               setVaultCreateDialogOpen(true);
@@ -747,25 +738,9 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         ) : null}
-        {/* Settings | Feedback — inline row */}
-        <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
+        {settingsOpen ? (
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
-            onClick={() => {
-              openSettings('agent');
-            }}
-          >
-            <SFSymbol
-              name="gear"
-              size={18}
-              weight="medium"
-              fallback={<Settings2 className="h-4 w-4" />}
-            />
-            <span className="text-base whitespace-nowrap">Settings</span>
-          </button>
-          <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-          <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}
@@ -778,15 +753,40 @@ export const PrimarySidebar: FC = () => {
             />
             <span className="text-base whitespace-nowrap">Feedback</span>
           </button>
-        </div>
+        ) : (
+          <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
+            <button
+              className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+              onClick={() => {
+                openSettings('agent');
+              }}
+            >
+              <SFSymbol
+                name="gear"
+                size={18}
+                weight="medium"
+                fallback={<Settings2 className="h-4 w-4" />}
+              />
+              <span className="text-base whitespace-nowrap">Settings</span>
+            </button>
+            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+            <button
+              className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+              onClick={() => {
+                openSettings('feedback');
+              }}
+            >
+              <SFSymbol
+                name="exclamationmark.bubble"
+                size={18}
+                weight="medium"
+                fallback={<FlaskConical className="h-4 w-4" />}
+              />
+              <span className="text-base whitespace-nowrap">Feedback</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Settings Dialog */}
-      <SettingsDialog
-        open={settingsDialogOpen}
-        onOpenChange={setSettingsDialogOpen}
-        defaultSection={settingsDialogSection}
-      />
 
       {/* Create Worktree Dialog */}
       <CreateWorktreeDialog
