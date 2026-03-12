@@ -54,6 +54,7 @@ function resetStore(): void {
     activeSessionId: null,
     sessionStatuses: {},
     sessionErrors: {},
+    pendingSendSessions: {},
   });
   mockStore = {};
   vi.clearAllMocks();
@@ -91,5 +92,22 @@ describe('oc-session-store', () => {
     );
 
     expect(ocConversationRepo.restoreActiveSession()).toBe('session-42');
+  });
+
+  it('tracks pending sends with immutable plain-object updates', () => {
+    const store = useOcSessionStore.getState();
+    const before = useOcSessionStore.getState().pendingSendSessions;
+
+    store.markPendingSend('session-1');
+
+    const afterMark = useOcSessionStore.getState().pendingSendSessions;
+    expect(afterMark).toEqual({ 'session-1': true });
+    expect(afterMark).not.toBe(before);
+
+    store.clearPendingSend('session-1');
+
+    const afterClear = useOcSessionStore.getState().pendingSendSessions;
+    expect(afterClear).toEqual({});
+    expect(afterClear).not.toBe(afterMark);
   });
 });

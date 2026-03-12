@@ -1,3 +1,4 @@
+import { IconImagine } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconImagine';
 import { Check, ChevronDown } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -103,6 +104,7 @@ export const OcThinkingSelector: FC = () => {
                 }}
                 className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
               >
+                <IconImagine size={12} className="shrink-0" />
                 <span className="truncate text-[12px]">Default</span>
                 {value === undefined || value === 'default' ? (
                   <Check className="h-3.5 w-3.5 shrink-0 ml-auto" />
@@ -117,6 +119,7 @@ export const OcThinkingSelector: FC = () => {
                   }}
                   className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
                 >
+                  <IconImagine size={12} className="shrink-0" />
                   <span className="truncate text-[12px]">{format(variant)}</span>
                   {value === variant ? <Check className="h-3.5 w-3.5 shrink-0 ml-auto" /> : null}
                 </CommandItem>

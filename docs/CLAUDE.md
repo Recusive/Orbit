@@ -64,7 +64,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (13 entries)
+## plans/tracked/todo/ (12 entries)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
@@ -80,9 +80,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (13 entries)
+## plans/tracked/done/ (14 entries)
 
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
+- `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI
 - `SETTINGS-DIALOG-TO-PAGE.md` — Convert settings from dialog to inline page (vault pattern)
 - `UNIFIED-OPENCODE-CHAT-UI.md` — Unify OpenCode chat UI into shared chat infrastructure
 - `OPENCODE-MIGRATION-PLAN.md` — Replace agent-bridge with Agent-backend (opencode fork, HTTP + SSE, multi-provider)

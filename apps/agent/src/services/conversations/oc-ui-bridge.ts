@@ -5,6 +5,7 @@ import { ocConversationRepo } from './oc-conversation-repo';
 import type { ConversationListContext, ConversationUiBridge } from '@/types/backend';
 
 import { ocSessionService } from '@/services/opencode';
+import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
 import { useOcMessageStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -52,10 +53,15 @@ export const ocUiBridge: ConversationUiBridge = {
     const activeSession = state.activeSessionId
       ? (state.sessions[state.activeSessionId] ?? null)
       : null;
+    const rawTitle = activeSession?.title ?? null;
+    const title = rawTitle !== null && isDefaultOcTitle(rawTitle) ? 'Untitled' : rawTitle;
     return {
       id: activeSession?.id ?? null,
-      title: activeSession?.title ?? null,
-      isTitleLoading: false,
+      title,
+      isTitleLoading:
+        activeSession?.id !== undefined
+          ? useUIStore.getState().titleLoadingSessions.has(activeSession.id)
+          : false,
     };
   },
 

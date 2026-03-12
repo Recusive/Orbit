@@ -15,6 +15,7 @@ interface OcSessionState {
   activeSessionId: string | null;
   sessionStatuses: Record<string, OcSessionStatus>;
   sessionErrors: Record<string, string>;
+  pendingSendSessions: Record<string, true>;
   setSessions: (sessions: OcSession[]) => void;
   addSession: (session: OcSession) => void;
   updateSession: (session: OcSession) => void;
@@ -22,6 +23,8 @@ interface OcSessionState {
   setActiveSessionId: (sessionId: string | null) => void;
   setSessionStatus: (sessionId: string, status: OcSessionStatus) => void;
   setSessionError: (sessionId: string, error: string | null) => void;
+  markPendingSend: (sessionId: string) => void;
+  clearPendingSend: (sessionId: string) => void;
   clearSessionCaches: (sessionId: string) => void;
   clearAll: () => void;
 }
@@ -45,6 +48,7 @@ export const useOcSessionStore = create<OcSessionState>()(
       activeSessionId: null,
       sessionStatuses: {},
       sessionErrors: {},
+      pendingSendSessions: {},
       setSessions: (sessions) => {
         logger.debug('Sessions bulk loaded', { count: sessions.length });
         set((state) => ({
@@ -62,6 +66,7 @@ export const useOcSessionStore = create<OcSessionState>()(
                   : null,
               sessionStatuses: pruneRecord(state.sessionStatuses, retainedIds),
               sessionErrors: pruneRecord(state.sessionErrors, retainedIds),
+              pendingSendSessions: pruneRecord(state.pendingSendSessions, retainedIds),
             };
           })(),
         }));
@@ -85,6 +90,7 @@ export const useOcSessionStore = create<OcSessionState>()(
                   : null,
             sessionStatuses: pruneRecord(state.sessionStatuses, retainedIds),
             sessionErrors: pruneRecord(state.sessionErrors, retainedIds),
+            pendingSendSessions: pruneRecord(state.pendingSendSessions, retainedIds),
           };
         });
       },
@@ -104,6 +110,7 @@ export const useOcSessionStore = create<OcSessionState>()(
                 : null,
             sessionStatuses: pruneRecord(state.sessionStatuses, retainedIds),
             sessionErrors: pruneRecord(state.sessionErrors, retainedIds),
+            pendingSendSessions: pruneRecord(state.pendingSendSessions, retainedIds),
           };
         });
       },
@@ -119,6 +126,9 @@ export const useOcSessionStore = create<OcSessionState>()(
             ),
             sessionErrors: Object.fromEntries(
               Object.entries(state.sessionErrors).filter(([id]) => id !== sessionId)
+            ),
+            pendingSendSessions: Object.fromEntries(
+              Object.entries(state.pendingSendSessions).filter(([id]) => id !== sessionId)
             ),
             activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId,
           };
@@ -158,6 +168,21 @@ export const useOcSessionStore = create<OcSessionState>()(
           };
         });
       },
+      markPendingSend: (sessionId) => {
+        set((state) => ({
+          pendingSendSessions: {
+            ...state.pendingSendSessions,
+            [sessionId]: true,
+          },
+        }));
+      },
+      clearPendingSend: (sessionId) => {
+        set((state) => ({
+          pendingSendSessions: Object.fromEntries(
+            Object.entries(state.pendingSendSessions).filter(([id]) => id !== sessionId)
+          ),
+        }));
+      },
       clearSessionCaches: (sessionId) => {
         set((state) => {
           return {
@@ -176,6 +201,7 @@ export const useOcSessionStore = create<OcSessionState>()(
           activeSessionId: null,
           sessionStatuses: {},
           sessionErrors: {},
+          pendingSendSessions: {},
         });
       },
     }),

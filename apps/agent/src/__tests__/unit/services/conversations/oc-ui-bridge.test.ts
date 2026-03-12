@@ -48,6 +48,7 @@ async function loadModules(): Promise<LoadedModules> {
     activeSessionId: null,
     sessionStatuses: {},
     sessionErrors: {},
+    pendingSendSessions: {},
   });
   useUIStore.setState(useUIStore.getInitialState(), true);
 
@@ -103,5 +104,32 @@ describe('oc-ui-bridge', () => {
     expect(mockLoadMessages).toHaveBeenCalledWith('session-1');
     expect(useUIStore.getState().isLoadingConversation).toBe(false);
     expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+  });
+
+  it('getActiveMeta normalizes default OC titles and reflects loading state', async () => {
+    const { ocUiBridge, useOcSessionStore, useUIStore } = await loadModules();
+
+    useOcSessionStore.setState((state) => ({
+      ...state,
+      activeSessionId: 'session-1',
+      sessions: {
+        'session-1': {
+          id: 'session-1',
+          slug: 'session-1',
+          projectID: 'project-1',
+          directory: '/workspace',
+          title: 'New session - 2026-03-11T10:30:00.000Z',
+          version: '1',
+          time: { created: 1, updated: 1 },
+        },
+      },
+    }));
+    useUIStore.getState().setTitleLoading('session-1', true);
+
+    expect(ocUiBridge.getActiveMeta()).toEqual({
+      id: 'session-1',
+      title: 'Untitled',
+      isTitleLoading: true,
+    });
   });
 });

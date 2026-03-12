@@ -10,7 +10,7 @@ import { useToolStore } from '@/stores/agent/tool-store';
 import { useActiveBackend, useBackendStore } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
-import { useOcMessageStore, useOcPermissionStore } from '@/stores/opencode';
+import { useOcMessageStore, useOcPermissionStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore, useWorkspacePath } from '@/stores/ui/ui-store';
 
 const logger = createLogger('OpenCodeLifecycle');
@@ -27,6 +27,16 @@ function cleanupClaudeState(): void {
 function cleanupOpenCodeState(): void {
   ocSseManager.disconnect();
   destroyClient();
+  const sessionState = useOcSessionStore.getState();
+  const sessionIds = new Set<string>([
+    ...Object.keys(sessionState.sessions),
+    ...Object.keys(sessionState.pendingSendSessions),
+    ...(sessionState.activeSessionId ? [sessionState.activeSessionId] : []),
+  ]);
+  for (const sessionId of sessionIds) {
+    useUIStore.getState().setTitleLoading(sessionId, false);
+  }
+  useOcSessionStore.setState({ pendingSendSessions: {} });
   useOcPermissionStore.getState().clearAll();
   useOcMessageStore.getState().clearAll();
 }

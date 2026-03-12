@@ -4,6 +4,7 @@ import { ocSessionService } from './oc-session-service';
 
 import type { OcGlobalEvent } from '@/types/opencode';
 
+import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useOcMessageStore, useOcPermissionStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -19,6 +20,13 @@ function isActiveDirectory(directory: string): boolean {
 }
 
 export const ocEventCoordinator = {
+  /**
+   * [warning] TESTED: OpenCode title-loading settlement in this coordinator is
+   *     covered by integration tests.
+   *     If you modify this, run:
+   *     bun run test -- apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
+   *     Test file: apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
+   */
   handleGlobalEvent(event: OcGlobalEvent): void {
     if (!isActiveDirectory(event.directory)) {
       const eventType = (event.payload as { type: string }).type;
@@ -47,6 +55,9 @@ export const ocEventCoordinator = {
           sessionId: payload.properties.info.id,
         });
         useOcSessionStore.getState().updateSession(payload.properties.info);
+        if (!isDefaultOcTitle(payload.properties.info.title)) {
+          useUIStore.getState().setTitleLoading(payload.properties.info.id, false);
+        }
         break;
       case 'session.deleted':
         logger.debug('Event dispatched', {
@@ -55,6 +66,8 @@ export const ocEventCoordinator = {
         });
         useOcSessionStore.getState().removeSession(payload.properties.info.id);
         useOcMessageStore.getState().clearSession(payload.properties.info.id);
+        useUIStore.getState().setTitleLoading(payload.properties.info.id, false);
+        useOcSessionStore.getState().clearPendingSend(payload.properties.info.id);
         break;
       case 'session.status':
         logger.debug('Event dispatched', {
@@ -80,6 +93,8 @@ export const ocEventCoordinator = {
           logger.warn('Session error received', { sessionId: payload.properties.sessionID });
           const errorMessage = JSON.stringify(payload.properties.error.data);
           useOcSessionStore.getState().setSessionError(payload.properties.sessionID, errorMessage);
+          useUIStore.getState().setTitleLoading(payload.properties.sessionID, false);
+          useOcSessionStore.getState().clearPendingSend(payload.properties.sessionID);
         }
         break;
       case 'message.updated':
@@ -90,6 +105,7 @@ export const ocEventCoordinator = {
           role: payload.properties.info.role,
         });
         useOcMessageStore.getState().upsertMessage(payload.properties.info);
+        useOcSessionStore.getState().clearPendingSend(payload.properties.info.sessionID);
         break;
       case 'message.removed':
         logger.debug('Event dispatched', {

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 
+import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
 import { useActiveBackend } from '@/stores/backend';
 import { useOcActiveSession, useOcActiveSessionId } from '@/stores/opencode';
 import {
@@ -21,6 +22,10 @@ export function useConversationMeta(): ConversationMeta {
   const claudeTitleLoading = useIsTitleLoading(claudeActiveSessionId);
   const ocActiveSessionId = useOcActiveSessionId();
   const ocActiveSession = useOcActiveSession();
+  const ocTitleLoading = useIsTitleLoading(ocActiveSessionId);
+  const ocRawTitle = ocActiveSession?.title;
+  const ocDisplayTitle =
+    ocRawTitle === undefined ? null : isDefaultOcTitle(ocRawTitle) ? 'Untitled' : ocRawTitle;
 
   return useMemo(() => {
     if (activeBackend === 'claude') {
@@ -33,8 +38,8 @@ export function useConversationMeta(): ConversationMeta {
 
     return {
       activeSessionId: ocActiveSessionId,
-      title: ocActiveSession?.title ?? null,
-      isTitleLoading: false,
+      title: ocDisplayTitle,
+      isTitleLoading: ocTitleLoading,
     };
   }, [
     activeBackend,
@@ -42,6 +47,7 @@ export function useConversationMeta(): ConversationMeta {
     claudeTitle,
     claudeTitleLoading,
     ocActiveSessionId,
-    ocActiveSession,
+    ocDisplayTitle,
+    ocTitleLoading,
   ]);
 }

@@ -11,6 +11,7 @@ function resetStores(): void {
     activeSessionId: null,
     sessionStatuses: {},
     sessionErrors: {},
+    pendingSendSessions: {},
   });
 }
 

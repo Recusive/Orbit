@@ -72,8 +72,9 @@ export const ocSessionService = {
 
   async createSession(input?: { title?: string }): Promise<OcSession> {
     logger.info('Creating session');
+    const effectiveTitle = input?.title === 'Untitled' ? undefined : input?.title;
     const response = await getClient().session.create(
-      input?.title ? { title: input.title } : undefined,
+      effectiveTitle ? { title: effectiveTitle } : undefined,
       { throwOnError: true }
     );
     const session = response.data;

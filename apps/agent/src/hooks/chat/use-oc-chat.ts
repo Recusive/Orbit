@@ -14,6 +14,10 @@ import type {
 
 import { ocSessionService } from '@/services/opencode/oc-session-service';
 import {
+  countRealUserMessages,
+  willBackendGenerateTitle,
+} from '@/services/opencode/oc-title-utils';
+import {
   useOcActiveSession,
   useOcActiveSessionId,
   useOcActiveSessionStatus,
@@ -21,6 +25,7 @@ import {
   useOcPermissionStore,
   useOcSessionStore,
 } from '@/stores/opencode';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('OcChat');
 
@@ -85,6 +90,13 @@ export function useOcChat(): {
       .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
   }, [sessionState]);
 
+  /**
+   * [warning] TESTED: OpenCode send-time title loading and pending-send wiring in
+   *     this hook are covered by integration tests.
+   *     If you modify this, run:
+   *     bun run test -- apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
+   *     Test file: apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
+   */
   const handleSend = useCallback(async (text: string, options?: OcSendMessageOptions) => {
     let activeSessionId = useOcSessionStore.getState().activeSessionId;
     const willCreateSession = !activeSessionId;
@@ -103,9 +115,38 @@ export function useOcChat(): {
     }
 
     if (activeSessionId) {
+      const currentSession = useOcSessionStore.getState().sessions[activeSessionId];
+      const currentMessages = useOcMessageStore.getState().sessions[activeSessionId];
+      const priorRealUserCount = currentMessages
+        ? countRealUserMessages(
+            currentMessages.messageOrder,
+            currentMessages.messagesById,
+            currentMessages.partsByMessage
+          )
+        : 0;
+
+      if (
+        currentSession &&
+        willBackendGenerateTitle({
+          title: currentSession.title,
+          parentID: currentSession.parentID,
+          realUserMessageCount: priorRealUserCount,
+        })
+      ) {
+        useUIStore.getState().setTitleLoading(activeSessionId, true);
+        const capturedSessionId = activeSessionId;
+        setTimeout(() => {
+          useUIStore.getState().setTitleLoading(capturedSessionId, false);
+        }, 15_000);
+      }
+
+      useOcSessionStore.getState().markPendingSend(activeSessionId);
+
       try {
         await ocSessionService.sendMessage(activeSessionId, text, options);
       } catch (error) {
+        useUIStore.getState().setTitleLoading(activeSessionId, false);
+        useOcSessionStore.getState().clearPendingSend(activeSessionId);
         logger.error('Failed to send message', error, { sessionId: activeSessionId });
         throw error;
       }
