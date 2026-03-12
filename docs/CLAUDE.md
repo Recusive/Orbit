@@ -81,8 +81,9 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (8 entries)
+## plans/tracked/done/ (9 entries)
 
+- `SETTINGS-DIALOG-TO-PAGE.md` — Convert settings from dialog to inline page (vault pattern)
 - `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
 - `fix-user-bubble-shift-after-send.md` — Fix user bubble sub-pixel shift after send animation
 - `instant-title-generation.md` — Instant title generation

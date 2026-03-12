@@ -19,7 +19,6 @@ import { RootLayout } from '@/components/layout/root-layout';
 import { SidebarResizeHandle } from '@/components/layout/sidebar-resize-handle';
 import { TerminalCard } from '@/components/layout/terminal-card';
 import { CrashNotification } from '@/components/modals';
-import { SettingsSkeleton } from '@/components/modals/settings/components';
 import { OnboardingFlow } from '@/components/onboarding';
 import { ActivityPanel } from '@/components/panels';
 import { ErrorBoundary } from '@/components/shared';
@@ -909,7 +908,7 @@ const App: FC = () => {
                         ) : null}
                         {settingsOpen && !isWelcome ? (
                           <div className="absolute inset-0 z-20 bg-chat-area">
-                            <Suspense fallback={<SettingsSkeleton />}>
+                            <Suspense fallback={null}>
                               <LazySettingsPage />
                             </Suspense>
                           </div>

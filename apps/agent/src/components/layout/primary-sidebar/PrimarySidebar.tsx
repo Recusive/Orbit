@@ -738,7 +738,7 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         ) : null}
-        {settingsOpen ? (
+        {isWelcome ? null : settingsOpen ? (
           <button
             className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
