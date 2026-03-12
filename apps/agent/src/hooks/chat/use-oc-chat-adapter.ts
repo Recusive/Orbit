@@ -78,8 +78,30 @@ function appendBlock(content: string, block: string): string {
   return `${content}\n\n${block}`;
 }
 
+/**
+ * OpenCode tools use camelCase parameter names (filePath, oldString, newString)
+ * while the frontend widgets expect snake_case (file_path, old_string, new_string).
+ * This adds snake_case aliases so both naming conventions resolve correctly.
+ */
+const OC_KEY_ALIASES: readonly (readonly [string, string])[] = [
+  ['filePath', 'file_path'],
+  ['oldString', 'old_string'],
+  ['newString', 'new_string'],
+  ['replaceAll', 'replace_all'],
+];
+
+function normalizeToolInput(input: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...input };
+  for (const [camel, snake] of OC_KEY_ALIASES) {
+    if (camel in result && !(snake in result)) {
+      result[snake] = result[camel];
+    }
+  }
+  return result;
+}
+
 function getToolInput(part: Extract<OcPart, { type: 'tool' }>): Record<string, unknown> {
-  const input = { ...part.state.input };
+  const input = normalizeToolInput({ ...part.state.input });
   const meta = 'metadata' in part.state ? part.state.metadata : undefined;
   const todos = meta?.['todos'];
 

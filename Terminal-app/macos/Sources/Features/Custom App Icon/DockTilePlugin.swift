@@ -1,7 +1,7 @@
 import AppKit
 
 class DockTilePlugin: NSObject, NSDockTilePlugIn {
-    // WARNING: An instance of this class is alive as long as Ghostty's icon is
+    // WARNING: An instance of this class is alive as long as OrbitTerminal's icon is
     // in the doc (running or not!), so keep any state and processing to a
     // minimum to respect resource usage.
 
@@ -10,9 +10,9 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
     // Separate defaults based on debug vs release builds so we can test icons
     // without messing up releases.
     #if DEBUG
-    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.mitchellh.ghostty.debug")
+    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.orbit.orbit-terminal.debug")
     #else
-    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.mitchellh.ghostty")
+    private let ghosttyUserDefaults = UserDefaults(suiteName: "com.orbit.orbit-terminal")
     #endif
 
     private var iconChangeObserver: Any?
@@ -25,7 +25,7 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
     /// Determine the enclosing app bundle for the dock tile plugin bundle.
     ///
     /// We intentionally avoid matching a specific bundle name (such as
-    /// "Ghostty.app") so renaming the app in Finder still works.
+    /// "OrbitTerminal.app") so renaming the app in Finder still works.
     static func appBundleURL(for pluginBundleURL: URL) -> URL? {
         var url = pluginBundleURL
         while true {
@@ -45,7 +45,7 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
 
     /// The primary NSDockTilePlugin function.
     func setDockTile(_ dockTile: NSDockTile?) {
-        // If no dock tile or no access to Ghostty defaults, we can't do anything.
+        // If no dock tile or no access to OrbitTerminal defaults, we can't do anything.
         guard let dockTile, let ghosttyUserDefaults else {
             iconChangeObserver = nil
             return
@@ -55,7 +55,7 @@ class DockTilePlugin: NSObject, NSDockTilePlugIn {
         iconDidChange(ghosttyUserDefaults.appIcon, dockTile: dockTile)
 
         // Setup a new observer for when the icon changes so we can update. This message
-        // is sent by the primary Ghostty app.
+        // is sent by the primary OrbitTerminal app.
         iconChangeObserver = DistributedNotificationCenter
             .default()
             .publisher(for: .ghosttyIconDidChange)

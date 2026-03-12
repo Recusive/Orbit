@@ -1,40 +1,40 @@
 import SwiftUI
-import GhosttyKit
+import OrbitTerminalKit
 
 @main
-struct Ghostty_iOSApp: App {
-    @StateObject private var ghostty_app: Ghostty.App
+struct OrbitTerminal_iOSApp: App {
+    @StateObject private var ghostty_app: OrbitTerminal.App
 
     init() {
-        if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != GHOSTTY_SUCCESS {
+        if ghostty_init(UInt(CommandLine.argc), CommandLine.unsafeArgv) != ORBIT_TERMINAL_SUCCESS {
             preconditionFailure("Initialize ghostty backend failed")
         }
-        _ghostty_app = StateObject(wrappedValue: Ghostty.App())
+        _ghostty_app = StateObject(wrappedValue: OrbitTerminal.App())
     }
 
     var body: some Scene {
         WindowGroup {
-            iOS_GhosttyTerminal()
+            iOS_OrbitTerminalTerminal()
                 .environmentObject(ghostty_app)
         }
     }
 }
 
-struct iOS_GhosttyTerminal: View {
-    @EnvironmentObject private var ghostty_app: Ghostty.App
+struct iOS_OrbitTerminalTerminal: View {
+    @EnvironmentObject private var ghostty_app: OrbitTerminal.App
 
     var body: some View {
         ZStack {
             // Make sure that our background color extends to all parts of the screen
             Color(ghostty_app.config.backgroundColor).ignoresSafeArea()
 
-            Ghostty.Terminal()
+            OrbitTerminal.Terminal()
         }
     }
 }
 
-struct iOS_GhosttyInitView: View {
-    @EnvironmentObject private var ghostty_app: Ghostty.App
+struct iOS_OrbitTerminalInitView: View {
+    @EnvironmentObject private var ghostty_app: OrbitTerminal.App
 
     var body: some View {
         VStack {
@@ -42,7 +42,7 @@ struct iOS_GhosttyInitView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(maxHeight: 96)
-            Text("Ghostty")
+            Text("OrbitTerminal")
             Text("State: \(ghostty_app.readiness.rawValue)")
         }
         .padding()

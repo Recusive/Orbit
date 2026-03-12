@@ -1,7 +1,7 @@
 import Foundation
 import Cocoa
 import SwiftUI
-import GhosttyKit
+import OrbitTerminalKit
 
 /// Controller for the "quick" terminal.
 class QuickTerminalController: BaseTerminalController {
@@ -13,7 +13,7 @@ class QuickTerminalController: BaseTerminalController {
     /// The current state of the quick terminal
     private(set) var visible: Bool = false
 
-    /// The previously running application when the terminal is shown. This is NEVER Ghostty.
+    /// The previously running application when the terminal is shown. This is NEVER OrbitTerminal.
     /// If this is set then when the quick terminal is animated out then we will restore this
     /// application to the front.
     private var previousApp: NSRunningApplication?
@@ -27,7 +27,7 @@ class QuickTerminalController: BaseTerminalController {
     /// Non-nil if we have hidden dock state.
     private var hiddenDock: HiddenDock?
 
-    /// The configuration derived from the Ghostty config so we don't need to rely on references.
+    /// The configuration derived from the OrbitTerminal config so we don't need to rely on references.
     private var derivedConfig: DerivedConfig
 
     /// Tracks if we're currently handling a manual resize to prevent recursion
@@ -38,9 +38,9 @@ class QuickTerminalController: BaseTerminalController {
     let restorable: Bool
     private var restorationState: QuickTerminalRestorableState?
 
-    init(_ ghostty: Ghostty.App,
+    init(_ ghostty: OrbitTerminal.App,
          position: QuickTerminalPosition = .top,
-         baseConfig base: Ghostty.SurfaceConfiguration? = nil,
+         baseConfig base: OrbitTerminal.SurfaceConfiguration? = nil,
          restorationState: QuickTerminalRestorableState? = nil,
     ) {
         self.position = position
@@ -68,23 +68,23 @@ class QuickTerminalController: BaseTerminalController {
         center.addObserver(
             self,
             selector: #selector(onToggleFullscreen(notification:)),
-            name: Ghostty.Notification.ghosttyToggleFullscreen,
+            name: OrbitTerminal.Notification.orbitTerminalToggleFullscreen,
             object: nil)
         center.addObserver(
             self,
-            selector: #selector(ghosttyConfigDidChange(_:)),
-            name: .ghosttyConfigDidChange,
+            selector: #selector(orbitTerminalConfigDidChange(_:)),
+            name: .orbitTerminalConfigDidChange,
             object: nil)
         center.addObserver(
             self,
             selector: #selector(closeWindow(_:)),
-            name: .ghosttyCloseWindow,
+            name: .orbitTerminalCloseWindow,
             object: nil
         )
         center.addObserver(
             self,
             selector: #selector(onNewTab),
-            name: Ghostty.Notification.ghosttyNewTab,
+            name: OrbitTerminal.Notification.orbitTerminalNewTab,
             object: nil)
         center.addObserver(
             self,
@@ -252,7 +252,7 @@ class QuickTerminalController: BaseTerminalController {
 
     // MARK: Base Controller Overrides
 
-    override func focusSurface(_ view: Ghostty.SurfaceView) {
+    override func focusSurface(_ view: OrbitTerminal.SurfaceView) {
         if visible {
             // If we're visible, we just focus the surface as normal.
             super.focusSurface(view)
@@ -262,13 +262,13 @@ class QuickTerminalController: BaseTerminalController {
         guard surfaceTree.contains(view) else { return }
         // Set the target surface as focused
         DispatchQueue.main.async {
-            Ghostty.moveFocus(to: view)
+            OrbitTerminal.moveFocus(to: view)
         }
         // Animation completion handler will handle window/app activation
         animateIn()
     }
 
-    override func surfaceTreeDidChange(from: SplitTree<Ghostty.SurfaceView>, to: SplitTree<Ghostty.SurfaceView>) {
+    override func surfaceTreeDidChange(from: SplitTree<OrbitTerminal.SurfaceView>, to: SplitTree<OrbitTerminal.SurfaceView>) {
         super.surfaceTreeDidChange(from: from, to: to)
 
         // If our surface tree is nil then we animate the window out. We
@@ -288,7 +288,7 @@ class QuickTerminalController: BaseTerminalController {
     }
 
     override func closeSurface(
-        _ node: SplitTree<Ghostty.SurfaceView>.Node,
+        _ node: SplitTree<OrbitTerminal.SurfaceView>.Node,
         withConfirmation: Bool = true
     ) {
         // If this isn't the root then we're dealing with a split closure.
@@ -369,10 +369,10 @@ class QuickTerminalController: BaseTerminalController {
                     }
                 }
             } else {
-                var config = Ghostty.SurfaceConfiguration()
-                config.environmentVariables["GHOSTTY_QUICK_TERMINAL"] = "1"
+                var config = OrbitTerminal.SurfaceConfiguration()
+                config.environmentVariables["ORBIT_TERMINAL_QUICK_TERMINAL"] = "1"
 
-                let view = Ghostty.SurfaceView(ghostty_app, baseConfig: config)
+                let view = OrbitTerminal.SurfaceView(ghostty_app, baseConfig: config)
                 surfaceTree = SplitTree(view: view)
                 focusedSurface = view
             }
@@ -493,7 +493,7 @@ class QuickTerminalController: BaseTerminalController {
                     NSApp.activate(ignoringOtherApps: true)
 
                     // This works around a really funky bug where if the terminal is
-                    // shown on a screen that has no other Ghostty windows, it takes
+                    // shown on a screen that has no other OrbitTerminal windows, it takes
                     // a few (variable) event loop ticks until we can actually focus it.
                     // https://github.com/ghostty-org/ghostty/issues/2409
                     //
@@ -626,7 +626,7 @@ class QuickTerminalController: BaseTerminalController {
             window.backgroundColor = .windowBackgroundColor
         }
 
-        terminalViewContainer?.ghosttyConfigDidChange(ghostty.config, preferredBackgroundColor: nil)
+        terminalViewContainer?.orbitTerminalConfigDidChange(ghostty.config, preferredBackgroundColor: nil)
     }
 
     private func showNoNewTabAlert() {
@@ -649,7 +649,7 @@ class QuickTerminalController: BaseTerminalController {
         showNoNewTabAlert()
     }
 
-    @IBAction func toggleGhosttyFullScreen(_ sender: Any) {
+    @IBAction func toggleOrbitTerminalFullScreen(_ sender: Any) {
         guard let surface = focusedSurface?.surface else { return }
         ghostty.toggleFullscreen(surface: surface)
     }
@@ -669,7 +669,7 @@ class QuickTerminalController: BaseTerminalController {
     }
 
     @objc private func onToggleFullscreen(notification: SwiftUI.Notification) {
-        guard let target = notification.object as? Ghostty.SurfaceView else { return }
+        guard let target = notification.object as? OrbitTerminal.SurfaceView else { return }
         guard target == self.focusedSurface else { return }
         onToggleFullscreen()
     }
@@ -696,26 +696,26 @@ class QuickTerminalController: BaseTerminalController {
         toggleFullscreen(mode: mode)
     }
 
-    @objc private func ghosttyConfigDidChange(_ notification: Notification) {
+    @objc private func orbitTerminalConfigDidChange(_ notification: Notification) {
         // We only care if the configuration is a global configuration, not a
         // surface-specific one.
         guard notification.object == nil else { return }
 
         // Get our managed configuration object out
         guard let config = notification.userInfo?[
-            Notification.Name.GhosttyConfigChangeKey
-        ] as? Ghostty.Config else { return }
+            Notification.Name.OrbitTerminalConfigChangeKey
+        ] as? OrbitTerminal.Config else { return }
 
         // Update our derived config
         self.derivedConfig = DerivedConfig(config)
 
         syncAppearance()
 
-        terminalViewContainer?.ghosttyConfigDidChange(config, preferredBackgroundColor: nil)
+        terminalViewContainer?.orbitTerminalConfigDidChange(config, preferredBackgroundColor: nil)
     }
 
     @objc private func onNewTab(notification: SwiftUI.Notification) {
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else { return }
+        guard let surfaceView = notification.object as? OrbitTerminal.SurfaceView else { return }
         guard let window = surfaceView.window else { return }
         guard window.windowController is QuickTerminalController else { return }
         // Tabs aren't supported with Quick Terminals or derivatives
@@ -729,7 +729,7 @@ class QuickTerminalController: BaseTerminalController {
         let quickTerminalSpaceBehavior: QuickTerminalSpaceBehavior
         let quickTerminalSize: QuickTerminalSize
         let backgroundOpacity: Double
-        let backgroundBlur: Ghostty.Config.BackgroundBlur
+        let backgroundBlur: OrbitTerminal.Config.BackgroundBlur
 
         init() {
             self.quickTerminalScreen = .main
@@ -741,7 +741,7 @@ class QuickTerminalController: BaseTerminalController {
             self.backgroundBlur = .disabled
         }
 
-        init(_ config: Ghostty.Config) {
+        init(_ config: OrbitTerminal.Config) {
             self.quickTerminalScreen = config.quickTerminalScreen
             self.quickTerminalAnimationDuration = config.quickTerminalAnimationDuration
             self.quickTerminalAutoHide = config.quickTerminalAutoHide

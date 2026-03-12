@@ -1,12 +1,12 @@
 //
-//  GhosttyTests.swift
-//  GhosttyTests
+//  OrbitTerminalTests.swift
+//  OrbitTerminalTests
 //
 //  Created by Mitchell Hashimoto on 7/9/25.
 //
 
 import Testing
-import GhosttyKit
+import OrbitTerminalKit
 
 extension Tag {
     @Tag static var benchmark: Self

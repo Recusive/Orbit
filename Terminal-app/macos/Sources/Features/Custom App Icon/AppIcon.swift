@@ -1,7 +1,7 @@
 import AppKit
 import System
 
-/// The icon style for the Ghostty App.
+/// The icon style for the OrbitTerminal App.
 enum AppIcon: Equatable, Codable {
     case official
     case blueprint
@@ -14,10 +14,10 @@ enum AppIcon: Equatable, Codable {
     case xray
     /// Save full image data to avoid sandboxing issues
     case custom(_ iconFile: Data)
-    case customStyle(_ icon: ColorizedGhosttyIcon)
+    case customStyle(_ icon: ColorizedOrbitTerminalIcon)
 
 #if !DOCK_TILE_PLUGIN
-    init?(config: Ghostty.Config) {
+    init?(config: OrbitTerminal.Config) {
         switch config.macosIcon {
         case .official:
             return nil
@@ -52,7 +52,7 @@ enum AppIcon: Equatable, Codable {
             else {
                 return nil
             }
-            self = .customStyle(ColorizedGhosttyIcon(screenColors: screenColors, ghostColor: ghostColor, frame: config.macosIconFrame))
+            self = .customStyle(ColorizedOrbitTerminalIcon(screenColors: screenColors, ghostColor: ghostColor, frame: config.macosIconFrame))
         }
     }
 #endif

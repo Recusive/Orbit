@@ -24,5 +24,5 @@ clean:
 	rm -rf \
 		zig-out .zig-cache \
 		macos/build \
-		macos/GhosttyKit.xcframework
+		macos/OrbitTerminalKit.xcframework
 .PHONY: clean

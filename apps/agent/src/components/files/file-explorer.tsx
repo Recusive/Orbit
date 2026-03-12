@@ -7,7 +7,7 @@
 import { createLogger } from '@orbit/common/lib';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { AlertCircle, ChevronRight, FolderOpen, Loader2, RefreshCw, Search } from 'lucide-react';
-import { memo, useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FileStatus } from '@/lib/api';
 import type { FileNode } from '@/types/protocol';
@@ -64,6 +64,9 @@ const ROW_HEIGHT = 24;
 
 /** Overscan - render extra rows above/below viewport for smooth scrolling */
 const OVERSCAN = 10;
+
+/** Minimum time skeleton must be visible before revealing content (prevents flash) */
+const SKELETON_MIN_DISPLAY_MS = 250;
 
 const selectNull = (): null => null;
 
@@ -144,6 +147,33 @@ function flattenTree(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// File Explorer Skeleton
+// ═══════════════════════════════════════════════════════════════
+
+/** Row definitions: [indentLevel, filenameWidthClass] */
+const SKELETON_ROWS: readonly (readonly [number, string])[] = [
+  [0, 'w-24'],
+  [1, 'w-20'],
+  [1, 'w-28'],
+  [1, 'w-16'],
+  [0, 'w-20'],
+  [0, 'w-32'],
+  [1, 'w-24'],
+  [1, 'w-14'],
+] as const;
+
+const FileExplorerSkeleton: FC = () => (
+  <div className="flex flex-col gap-0.5 px-1 pt-1" aria-hidden="true">
+    {SKELETON_ROWS.map(([indent, widthClass], i) => (
+      <div key={i} className="flex items-center h-6" style={{ paddingLeft: indent * 12 + 4 }}>
+        <div className="h-3.5 w-3.5 rounded-sm bg-lg-control animate-pulse shrink-0" />
+        <div className={cn('h-3 rounded-md bg-lg-control animate-pulse ml-2', widthClass)} />
+      </div>
+    ))}
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════════════
 // File Explorer Component
 // ═══════════════════════════════════════════════════════════════
 
@@ -158,6 +188,43 @@ export const FileExplorer: FC = () => {
     openFile,
     retryFolder,
   } = useFileTree();
+
+  // Minimum skeleton display: prevent flash when tree loads faster than the eye can track
+  const [skeletonHold, setSkeletonHold] = useState(false);
+  useEffect(() => {
+    if (isRootLoading) {
+      setSkeletonHold(true);
+      return undefined;
+    }
+    // Data arrived — hold skeleton for remaining minimum display time
+    const timer = setTimeout(() => {
+      setSkeletonHold(false);
+    }, SKELETON_MIN_DISPLAY_MS);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [isRootLoading]);
+  const showSkeleton = (isRootLoading || skeletonHold) && rootError === null;
+
+  // Blur-reveal: only animate file names when transitioning from skeleton → content
+  // (fresh load / refresh). Prevents frozen blur on plain remount (e.g. Settings → back).
+  const [animateReveal, setAnimateReveal] = useState(false);
+  const wasShowingSkeleton = useRef(false);
+  useEffect(() => {
+    if (showSkeleton) {
+      wasShowingSkeleton.current = true;
+    } else if (wasShowingSkeleton.current) {
+      wasShowingSkeleton.current = false;
+      setAnimateReveal(true);
+      const timer = setTimeout(() => {
+        setAnimateReveal(false);
+      }, 500);
+      return () => {
+        clearTimeout(timer);
+      };
+    }
+    return undefined;
+  }, [showSkeleton]);
 
   // Use stable selectors to trigger re-render when tree structure changes
   const treeNodesVersion = useFileStore((s) => Object.keys(s.treeNodes).join(','));
@@ -360,11 +427,8 @@ export const FileExplorer: FC = () => {
               Retry
             </button>
           </div>
-        ) : isRootLoading && flatItems.length === 0 ? (
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            <span className="text-sm">Loading...</span>
-          </div>
+        ) : showSkeleton ? (
+          <FileExplorerSkeleton />
         ) : flatItems.length === 0 ? (
           <div className="flex items-center justify-center py-8 text-muted-foreground">
             <span className="text-sm">No files found</span>
@@ -395,6 +459,7 @@ export const FileExplorer: FC = () => {
                   onRetry={handleRetry}
                   onRename={handleRename}
                   onDelete={handleDelete}
+                  animateReveal={animateReveal}
                 />
               );
             })}
@@ -421,6 +486,7 @@ interface FileTreeRowProps {
   readonly onRetry: (path: string) => void;
   readonly onRename: (path: string, newName: string) => void;
   readonly onDelete: (path: string) => void;
+  readonly animateReveal: boolean;
 }
 
 /**
@@ -431,7 +497,20 @@ interface FileTreeRowProps {
  * - Not affected by other rows expanding/selecting
  */
 const FileTreeRow: FC<FileTreeRowProps> = memo(
-  ({ path, depth, node, top, height, onToggle, onOpen, onSelect, onRetry, onRename, onDelete }) => {
+  ({
+    path,
+    depth,
+    node,
+    top,
+    height,
+    onToggle,
+    onOpen,
+    onSelect,
+    onRetry,
+    onRename,
+    onDelete,
+    animateReveal,
+  }) => {
     // Subscribe to only this row's state
     const isExpanded = useFileStore((s) => s.expandedFolders.has(path));
     const isLoading = useFileStore((s) => s.loadingPaths.has(path));
@@ -701,6 +780,7 @@ const FileTreeRow: FC<FileTreeRowProps> = memo(
           <span
             className={cn(
               'truncate text-left flex-1',
+              animateReveal && 'animate-title-in',
               effectiveGitStatus && GIT_STATUS_STYLES[effectiveGitStatus].fileColor
             )}
           >

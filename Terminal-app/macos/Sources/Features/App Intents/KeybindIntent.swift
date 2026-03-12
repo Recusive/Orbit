@@ -24,11 +24,11 @@ struct KeybindIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ReturnsValue<Bool> {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw OrbitTerminalIntentError.permissionDenied
         }
 
         guard let surface = terminal.surfaceModel else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw OrbitTerminalIntentError.surfaceNotFound
         }
 
         let performed = surface.perform(action: action)

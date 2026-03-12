@@ -49,9 +49,9 @@ extension NSWindow {
         ordered: NSWindow.OrderingMode
     ) -> Bool {
         var error: NSError?
-        let success = GhosttyAddTabbedWindowSafely(self, child, ordered.rawValue, &error)
+        let success = OrbitTerminalAddTabbedWindowSafely(self, child, ordered.rawValue, &error)
         if let error {
-            Ghostty.logger.error("addTabbedWindow failed: \(error.localizedDescription)")
+            OrbitTerminal.logger.error("addTabbedWindow failed: \(error.localizedDescription)")
         }
 
         return success

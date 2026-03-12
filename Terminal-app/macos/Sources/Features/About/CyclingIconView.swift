@@ -1,8 +1,8 @@
 import SwiftUI
-import GhosttyKit
+import OrbitTerminalKit
 import Combine
 
-/// A view that cycles through Ghostty's official icon variants.
+/// A view that cycles through OrbitTerminal's official icon variants.
 struct CyclingIconView: View {
     @EnvironmentObject var viewModel: AboutViewModel
 
@@ -26,12 +26,12 @@ struct CyclingIconView: View {
                 }
             }
         }
-        .accessibilityLabel("Ghostty Application Icon")
+        .accessibilityLabel("OrbitTerminal Application Icon")
         .accessibilityHint("Click to cycle through icon variants")
     }
 
     @ViewBuilder
-    private func iconView(for icon: Ghostty.MacOSIcon?) -> some View {
+    private func iconView(for icon: OrbitTerminal.MacOSIcon?) -> some View {
         let iconImage: Image = switch icon?.assetName {
         case let assetName?: Image(assetName)
         case nil: ghosttyIconImage()

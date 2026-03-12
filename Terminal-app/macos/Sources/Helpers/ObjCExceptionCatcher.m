@@ -2,7 +2,7 @@
 
 #import <AppKit/AppKit.h>
 
-BOOL GhosttyAddTabbedWindowSafely(
+BOOL Orbit TerminalAddTabbedWindowSafely(
     id parent,
     id child,
     NSInteger ordered,
@@ -19,7 +19,7 @@ BOOL GhosttyAddTabbedWindowSafely(
     } @catch (NSException *exception) {
         if (error != NULL) {
             NSString *reason = exception.reason ?: @"Unknown Objective-C exception";
-            *error = [NSError errorWithDomain:@"Ghostty.ObjCException"
+            *error = [NSError errorWithDomain:@"Orbit Terminal.ObjCException"
                                          code:1
                                      userInfo:@{
                                          NSLocalizedDescriptionKey: reason,

@@ -1,12 +1,12 @@
 import AppKit
 
-/// Handler for the `send mouse position` AppleScript command defined in `Ghostty.sdef`.
+/// Handler for the `send mouse position` AppleScript command defined in `OrbitTerminal.sdef`.
 ///
 /// Cocoa scripting instantiates this class because the command's `<cocoa>` element
-/// specifies `class="GhosttyScriptMousePosCommand"`. The runtime calls
+/// specifies `class="OrbitTerminalScriptMousePosCommand"`. The runtime calls
 /// `performDefaultImplementation()` to execute the command.
 @MainActor
-@objc(GhosttyScriptMousePosCommand)
+@objc(OrbitTerminalScriptMousePosCommand)
 final class ScriptMousePosCommand: NSScriptCommand {
     override func performDefaultImplementation() -> Any? {
         guard NSApp.validateScript(command: self) else { return nil }
@@ -41,9 +41,9 @@ final class ScriptMousePosCommand: NSScriptCommand {
             return nil
         }
 
-        let mods: Ghostty.Input.Mods
+        let mods: OrbitTerminal.Input.Mods
         if let modsString = evaluatedArguments?["modifiers"] as? String {
-            guard let parsed = Ghostty.Input.Mods(scriptModifiers: modsString) else {
+            guard let parsed = OrbitTerminal.Input.Mods(scriptModifiers: modsString) else {
                 scriptErrorNumber = errAECoercionFail
                 scriptErrorString = "Unknown modifier in: \(modsString)"
                 return nil
@@ -53,7 +53,7 @@ final class ScriptMousePosCommand: NSScriptCommand {
             mods = []
         }
 
-        let mousePosEvent = Ghostty.Input.MousePosEvent(
+        let mousePosEvent = OrbitTerminal.Input.MousePosEvent(
             x: x,
             y: y,
             mods: mods

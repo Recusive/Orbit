@@ -1,5 +1,5 @@
 import SwiftUI
-import GhosttyKit
+import OrbitTerminalKit
 import os
 
 /// This delegate is notified of actions and property changes regarding the terminal view. This
@@ -7,7 +7,7 @@ import os
 /// titles being set, cell sizes being changed, etc.
 protocol TerminalViewDelegate: AnyObject {
     /// Called when the currently focused surface changed. This can be nil.
-    func focusedSurfaceDidChange(to: Ghostty.SurfaceView?)
+    func focusedSurfaceDidChange(to: OrbitTerminal.SurfaceView?)
 
     /// The URL of the pwd should change.
     func pwdDidChange(to: URL?)
@@ -16,7 +16,7 @@ protocol TerminalViewDelegate: AnyObject {
     func cellSizeDidChange(to: NSSize)
 
     /// Perform an action. At the time of writing this is only triggered by the command palette.
-    func performAction(_ action: String, on: Ghostty.SurfaceView)
+    func performAction(_ action: String, on: OrbitTerminal.SurfaceView)
 
     /// A split tree operation
     func performSplitAction(_ action: TerminalSplitOperation)
@@ -28,7 +28,7 @@ protocol TerminalViewDelegate: AnyObject {
 protocol TerminalViewModel: ObservableObject {
     /// The tree of terminal surfaces (splits) within the view. This is mutated by TerminalView
     /// and children. This should be @Published.
-    var surfaceTree: SplitTree<Ghostty.SurfaceView> { get set }
+    var surfaceTree: SplitTree<OrbitTerminal.SurfaceView> { get set }
 
     /// The command palette state.
     var commandPaletteIsShowing: Bool { get set }
@@ -39,7 +39,7 @@ protocol TerminalViewModel: ObservableObject {
 
 /// The main terminal view. This terminal view supports splits.
 struct TerminalView<ViewModel: TerminalViewModel>: View {
-    @ObservedObject var ghostty: Ghostty.App
+    @ObservedObject var ghostty: OrbitTerminal.App
 
     // The required view model
     @ObservedObject var viewModel: ViewModel
@@ -48,7 +48,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
     weak var delegate: (any TerminalViewDelegate)?
 
     /// The most recently focused surface, equal to `focusedSurface` when it is non-nil.
-    @State private var lastFocusedSurface: Weak<Ghostty.SurfaceView>?
+    @State private var lastFocusedSurface: Weak<OrbitTerminal.SurfaceView>?
 
     // This seems like a crutch after switching from SwiftUI to AppKit lifecycle.
     @FocusState private var focused: Bool
@@ -75,7 +75,7 @@ struct TerminalView<ViewModel: TerminalViewModel>: View {
                 VStack(spacing: 0) {
                     // If we're running in debug mode we show a warning so that users
                     // know that performance will be degraded.
-                    if Ghostty.info.mode == GHOSTTY_BUILD_MODE_DEBUG || Ghostty.info.mode == GHOSTTY_BUILD_MODE_RELEASE_SAFE {
+                    if OrbitTerminal.info.mode == ORBIT_TERMINAL_BUILD_MODE_DEBUG || OrbitTerminal.info.mode == ORBIT_TERMINAL_BUILD_MODE_RELEASE_SAFE {
                         DebugBuildWarningView()
                     }
 
@@ -154,11 +154,11 @@ struct DebugBuildWarningView: View {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundColor(.yellow)
 
-            Text("You're running a debug build of Ghostty! Performance will be degraded.")
+            Text("You're running a debug build of OrbitTerminal! Performance will be degraded.")
                 .padding(.all, 8)
                 .popover(isPresented: $isPopover, arrowEdge: .bottom) {
                     Text("""
-                    Debug builds of Ghostty are very slow and you may experience
+                    Debug builds of OrbitTerminal are very slow and you may experience
                     performance problems. Debug builds are only recommended during
                     development.
                     """)
@@ -171,7 +171,7 @@ struct DebugBuildWarningView: View {
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Debug build warning")
-        .accessibilityValue("Debug builds of Ghostty are very slow and you may experience performance problems. Debug builds are only recommended during development.")
+        .accessibilityValue("Debug builds of OrbitTerminal are very slow and you may experience performance problems. Debug builds are only recommended during development.")
         .accessibilityAddTraits(.isStaticText)
         .onTapGesture {
             isPopover = true

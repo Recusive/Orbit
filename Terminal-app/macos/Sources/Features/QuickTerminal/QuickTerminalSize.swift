@@ -1,6 +1,6 @@
-import GhosttyKit
+import OrbitTerminalKit
 
-/// Represents the Ghostty `quick-terminal-size` configuration. See the documentation for
+/// Represents the OrbitTerminal `quick-terminal-size` configuration. See the documentation for
 /// that for more details on exactly how it works. Some of those docs will be reproduced in various comments
 /// in this file but that is the best source of truth for it.
 ///
@@ -26,11 +26,11 @@ struct QuickTerminalSize {
 
         init?(from cStruct: ghostty_quick_terminal_size_s) {
             switch cStruct.tag {
-            case GHOSTTY_QUICK_TERMINAL_SIZE_NONE:
+            case ORBIT_TERMINAL_QUICK_TERMINAL_SIZE_NONE:
                 return nil
-            case GHOSTTY_QUICK_TERMINAL_SIZE_PERCENTAGE:
+            case ORBIT_TERMINAL_QUICK_TERMINAL_SIZE_PERCENTAGE:
                 self = .percentage(cStruct.value.percentage)
-            case GHOSTTY_QUICK_TERMINAL_SIZE_PIXELS:
+            case ORBIT_TERMINAL_QUICK_TERMINAL_SIZE_PIXELS:
                 self = .pixels(cStruct.value.pixels)
             default:
                 assertionFailure()

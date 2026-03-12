@@ -3,13 +3,13 @@ import SwiftUI
 import UserNotifications
 import OSLog
 import Sparkle
-import GhosttyKit
+import OrbitTerminalKit
 
 class AppDelegate: NSObject,
                     ObservableObject,
                     NSApplicationDelegate,
                     UNUserNotificationCenterDelegate,
-                    GhosttyAppDelegate {
+                    OrbitTerminalAppDelegate {
     // The application logger. We should probably move this at some point to a dedicated
     // class/struct but for now it lives here! 🤷‍♂️
     static let logger = Logger(
@@ -17,7 +17,7 @@ class AppDelegate: NSObject,
         category: String(describing: AppDelegate.self)
     )
 
-    /// Various menu items so that we can programmatically sync the keyboard shortcut with the Ghostty config
+    /// Various menu items so that we can programmatically sync the keyboard shortcut with the OrbitTerminal config
     @IBOutlet private var menuAbout: NSMenuItem?
     @IBOutlet private var menuServices: NSMenu?
     @IBOutlet private var menuCheckForUpdates: NSMenuItem?
@@ -92,11 +92,11 @@ class AppDelegate: NSObject,
     /// seconds since the process was launched.
     private var applicationLaunchTime: TimeInterval = 0
 
-    /// This is the current configuration from the Ghostty configuration that we need.
+    /// This is the current configuration from the OrbitTerminal configuration that we need.
     private var derivedConfig: DerivedConfig = DerivedConfig()
 
     /// The ghostty global state. Only one per process.
-    let ghostty: Ghostty.App
+    let ghostty: OrbitTerminal.App
 
     /// The global undo manager for app-level state such as window restoration.
     lazy var undoManager = ExpiringUndoManager()
@@ -154,7 +154,7 @@ class AppDelegate: NSObject,
     /// The custom app icon image that is currently in use.
     @Published private(set) var appIcon: NSImage?
 
-    /// Ghostty menu items indexed by their normalized shortcut. This avoids traversing
+    /// OrbitTerminal menu items indexed by their normalized shortcut. This avoids traversing
     /// the entire menu tree on every key equivalent event.
     ///
     /// We store a weak reference so this cache can never be the owner of menu items.
@@ -163,9 +163,9 @@ class AppDelegate: NSObject,
 
     override init() {
 #if DEBUG
-        ghostty = Ghostty.App(configPath: ProcessInfo.processInfo.environment["GHOSTTY_CONFIG_PATH"])
+        ghostty = OrbitTerminal.App(configPath: ProcessInfo.processInfo.environment["ORBIT_TERMINAL_CONFIG_PATH"])
 #else
-        ghostty = Ghostty.App()
+        ghostty = OrbitTerminal.App()
 #endif
         super.init()
 
@@ -178,7 +178,7 @@ class AppDelegate: NSObject,
         #if DEBUG
         if
             let suite = UserDefaults.ghosttySuite,
-            let clear = ProcessInfo.processInfo.environment["GHOSTTY_CLEAR_USER_DEFAULTS"],
+            let clear = ProcessInfo.processInfo.environment["ORBIT_TERMINAL_CLEAR_USER_DEFAULTS"],
             (clear as NSString).boolValue {
             UserDefaults.ghostty.removePersistentDomain(forName: suite)
         }
@@ -216,7 +216,7 @@ class AppDelegate: NSObject,
         }
 
         // Initial config loading
-        ghosttyConfigDidChange(config: ghostty.config)
+        orbitTerminalConfigDidChange(config: ghostty.config)
 
         // Start our update checker.
         updateController.startUpdater()
@@ -224,7 +224,7 @@ class AppDelegate: NSObject,
         // Register our service provider. This must happen after everything is initialized.
         NSApp.servicesProvider = ServiceProvider()
 
-        // This registers the Ghostty => Services menu to exist.
+        // This registers the OrbitTerminal => Services menu to exist.
         NSApp.servicesMenu = menuServices
 
         // Setup a local event monitor for app-level keyboard shortcuts. See
@@ -248,14 +248,14 @@ class AppDelegate: NSObject,
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyConfigDidChange(_:)),
-            name: .ghosttyConfigDidChange,
+            selector: #selector(orbitTerminalConfigDidChange(_:)),
+            name: .orbitTerminalConfigDidChange,
             object: nil
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyBellDidRing(_:)),
-            name: .ghosttyBellDidRing,
+            selector: #selector(orbitTerminalBellDidRing(_:)),
+            name: .orbitTerminalBellDidRing,
             object: nil
         )
         NotificationCenter.default.addObserver(
@@ -266,25 +266,25 @@ class AppDelegate: NSObject,
         )
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyNewWindow(_:)),
-            name: Ghostty.Notification.ghosttyNewWindow,
+            selector: #selector(orbitTerminalNewWindow(_:)),
+            name: OrbitTerminal.Notification.orbitTerminalNewWindow,
             object: nil)
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(ghosttyNewTab(_:)),
-            name: Ghostty.Notification.ghosttyNewTab,
+            selector: #selector(orbitTerminalNewTab(_:)),
+            name: OrbitTerminal.Notification.orbitTerminalNewTab,
             object: nil)
 
         // Configure user notifications
         let actions = [
-            UNNotificationAction(identifier: Ghostty.userNotificationActionShow, title: "Show")
+            UNNotificationAction(identifier: OrbitTerminal.userNotificationActionShow, title: "Show")
         ]
 
         let center = UNUserNotificationCenter.current()
 
         center.setNotificationCategories([
             UNNotificationCategory(
-                identifier: Ghostty.userNotificationCategory,
+                identifier: OrbitTerminal.userNotificationCategory,
                 actions: actions,
                 intentIdentifiers: [],
                 options: [.customDismissAction]
@@ -301,9 +301,9 @@ class AppDelegate: NSObject,
             guard let app = self.ghostty.app else { return }
             let scheme: ghostty_color_scheme_e
             if appearance.isDark {
-                scheme = GHOSTTY_COLOR_SCHEME_DARK
+                scheme = ORBIT_TERMINAL_COLOR_SCHEME_DARK
             } else {
-                scheme = GHOSTTY_COLOR_SCHEME_LIGHT
+                scheme = ORBIT_TERMINAL_COLOR_SCHEME_LIGHT
             }
 
             ghostty_app_set_color_scheme(app, scheme)
@@ -315,7 +315,7 @@ class AppDelegate: NSObject,
         // Setup signal handlers
         setupSignals()
 
-        switch Ghostty.launchSource {
+        switch OrbitTerminal.launchSource {
         case .app:
             // Don't have to do anything.
             break
@@ -391,7 +391,7 @@ class AppDelegate: NSObject,
 
         // If the user is shutting down, restarting, or logging out, we don't confirm quit.
         why: if let event = NSAppleEventManager.shared().currentAppleEvent {
-            // If all Ghostty windows are in the background (i.e. you Cmd-Q from the Cmd-Tab
+            // If all OrbitTerminal windows are in the background (i.e. you Cmd-Q from the Cmd-Tab
             // view), then this is null. I don't know why (pun intended) but we have to
             // guard against it.
             guard let keyword = AEKeyword("why?") else { break why }
@@ -412,9 +412,9 @@ class AppDelegate: NSObject,
 
         // We have some visible window. Show an app-wide modal to confirm quitting.
         let alert = NSAlert()
-        alert.messageText = "Quit Ghostty?"
+        alert.messageText = "Quit OrbitTerminal?"
         alert.informativeText = "All terminal sessions will be terminated."
-        alert.addButton(withTitle: "Close Ghostty")
+        alert.addButton(withTitle: "Close OrbitTerminal")
         alert.addButton(withTitle: "Cancel")
         alert.alertStyle = .warning
         switch alert.runModal() {
@@ -457,7 +457,7 @@ class AppDelegate: NSObject,
     }
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {
-        // Ghostty will validate as well but we can avoid creating an entirely new
+        // OrbitTerminal will validate as well but we can avoid creating an entirely new
         // surface by doing our own validation here. We can also show a useful error
         // this way.
 
@@ -469,7 +469,7 @@ class AppDelegate: NSObject,
         var requiresConfirm: Bool = false
 
         // Initialize the surface config which will be used to create the tab or window for the opened file.
-        var config = Ghostty.SurfaceConfiguration()
+        var config = OrbitTerminal.SurfaceConfiguration()
 
         if isDirectory.boolValue {
             // When opening a directory, check the configuration to decide
@@ -488,7 +488,7 @@ class AppDelegate: NSObject,
             // profile/rc files for the shell, which is super important on macOS
             // due to things like Homebrew. Instead, we set the command to
             // `<filename>; exit` which is what Terminal and iTerm2 do.
-            config.initialInput = "\(Ghostty.Shell.quote(filename)); exit\n"
+            config.initialInput = "\(OrbitTerminal.Shell.quote(filename)); exit\n"
 
             // For commands executed directly, we want to ensure we wait after exit
             // because in most cases scripts don't block on exit and we don't want
@@ -505,7 +505,7 @@ class AppDelegate: NSObject,
             // may want to show this as a sheet on the focused window (especially if we're
             // opening a tab). I'm not sure.
             let alert = NSAlert()
-            alert.messageText = "Allow Ghostty to execute \"\(filename)\"?"
+            alert.messageText = "Allow OrbitTerminal to execute \"\(filename)\"?"
             alert.addButton(withTitle: "Allow")
             alert.addButton(withTitle: "Cancel")
             alert.alertStyle = .warning
@@ -547,7 +547,7 @@ class AppDelegate: NSObject,
         let sigusr2 = DispatchSource.makeSignalSource(signal: SIGUSR2, queue: .main)
         sigusr2.setEventHandler { [weak self] in
             guard let self else { return }
-            Ghostty.logger.info("reloading configuration in response to SIGUSR2")
+            OrbitTerminal.logger.info("reloading configuration in response to SIGUSR2")
             self.ghostty.reloadConfig()
         }
 
@@ -592,7 +592,7 @@ class AppDelegate: NSObject,
 
         // If this event as-is would result in a key binding then we send it.
         if let app = ghostty.app {
-            var ghosttyEvent = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
+            var ghosttyEvent = event.ghosttyKeyEvent(ORBIT_TERMINAL_ACTION_PRESS)
             let match = (event.characters ?? "").withCString { ptr in
                 ghosttyEvent.text = ptr
                 if !ghostty_app_key_is_binding(app, ghosttyEvent) {
@@ -602,7 +602,7 @@ class AppDelegate: NSObject,
                 return ghostty_app_key(app, ghosttyEvent)
             }
 
-            // If the key was handled by Ghostty we stop the event chain. If
+            // If the key was handled by OrbitTerminal we stop the event chain. If
             // the key wasn't handled then we let it fall through and continue
             // processing. This is important because some bindings may have no
             // affect at this scope.
@@ -618,15 +618,15 @@ class AppDelegate: NSObject,
         }
 
         // If we reach this point then we try to process the key event
-        // through the Ghostty key mechanism.
+        // through the OrbitTerminal key mechanism.
 
-        // Ghostty must be loaded
+        // OrbitTerminal must be loaded
         guard let ghostty = self.ghostty.app else { return event }
 
         // Build our event input and call ghostty
-        if ghostty_app_key(ghostty, event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)) {
+        if ghostty_app_key(ghostty, event.ghosttyKeyEvent(ORBIT_TERMINAL_ACTION_PRESS)) {
             // The key was used so we want to stop it from going to our Mac app
-            Ghostty.logger.debug("local key event handled event=\(event)")
+            OrbitTerminal.logger.debug("local key event handled event=\(event)")
             return nil
         }
 
@@ -642,19 +642,19 @@ class AppDelegate: NSObject,
         self.menuQuickTerminal?.state = if quickController.visible { .on } else { .off }
     }
 
-    @objc private func ghosttyConfigDidChange(_ notification: Notification) {
+    @objc private func orbitTerminalConfigDidChange(_ notification: Notification) {
         // We only care if the configuration is a global configuration, not a surface one.
         guard notification.object == nil else { return }
 
         // Get our managed configuration object out
         guard let config = notification.userInfo?[
-            Notification.Name.GhosttyConfigChangeKey
-        ] as? Ghostty.Config else { return }
+            Notification.Name.OrbitTerminalConfigChangeKey
+        ] as? OrbitTerminal.Config else { return }
 
-        ghosttyConfigDidChange(config: config)
+        orbitTerminalConfigDidChange(config: config)
     }
 
-    @objc private func ghosttyBellDidRing(_ notification: Notification) {
+    @objc private func orbitTerminalBellDidRing(_ notification: Notification) {
         if ghostty.config.bellFeatures.contains(.system) {
             NSSound.beep()
         }
@@ -717,22 +717,22 @@ class AppDelegate: NSObject,
         }
     }
 
-    @objc private func ghosttyNewWindow(_ notification: Notification) {
-        let configAny = notification.userInfo?[Ghostty.Notification.NewSurfaceConfigKey]
-        let config = configAny as? Ghostty.SurfaceConfiguration
+    @objc private func orbitTerminalNewWindow(_ notification: Notification) {
+        let configAny = notification.userInfo?[OrbitTerminal.Notification.NewSurfaceConfigKey]
+        let config = configAny as? OrbitTerminal.SurfaceConfiguration
         _ = TerminalController.newWindow(ghostty, withBaseConfig: config)
     }
 
-    @objc private func ghosttyNewTab(_ notification: Notification) {
-        guard let surfaceView = notification.object as? Ghostty.SurfaceView else { return }
+    @objc private func orbitTerminalNewTab(_ notification: Notification) {
+        guard let surfaceView = notification.object as? OrbitTerminal.SurfaceView else { return }
         guard let window = surfaceView.window else { return }
 
         // We only want to listen to new tabs if the focused parent is
         // a regular terminal controller.
         guard window.windowController is TerminalController else { return }
 
-        let configAny = notification.userInfo?[Ghostty.Notification.NewSurfaceConfigKey]
-        let config = configAny as? Ghostty.SurfaceConfiguration
+        let configAny = notification.userInfo?[OrbitTerminal.Notification.NewSurfaceConfigKey]
+        let config = configAny as? OrbitTerminal.SurfaceConfiguration
 
         _ = TerminalController.newTab(ghostty, from: window, withBaseConfig: config)
     }
@@ -747,7 +747,7 @@ class AppDelegate: NSObject,
         NSApp.dockTile.display()
     }
 
-    private func ghosttyConfigDidChange(config: Ghostty.Config) {
+    private func orbitTerminalConfigDidChange(config: OrbitTerminal.Config) {
         // Update the config we need to store
         self.derivedConfig = DerivedConfig(config)
 
@@ -775,7 +775,7 @@ class AppDelegate: NSObject,
                 autoUpdate == .download
             /*
              To test `auto-update` easily, uncomment the line below and
-             delete `SUEnableAutomaticChecks` in Ghostty-Info.plist.
+             delete `SUEnableAutomaticChecks` in OrbitTerminal-Info.plist.
 
              Note: When `auto-update = download`, you may need to
              `Clean Build Folder` if a background install has already begun.
@@ -814,7 +814,7 @@ class AppDelegate: NSObject,
         }
 
         // We need to handle our global event tap depending on if there are global
-        // events that we care about in Ghostty.
+        // events that we care about in OrbitTerminal.
         if ghostty_app_has_global_keybinds(ghostty.app!) {
             if timeSinceLaunch > 5 {
                 // If the process has been running for awhile we enable right away
@@ -836,14 +836,14 @@ class AppDelegate: NSObject,
     }
 
     /// Sync the appearance of our app with the theme specified in the config.
-    private func syncAppearance(config: Ghostty.Config) {
+    private func syncAppearance(config: OrbitTerminal.Config) {
         NSApplication.shared.appearance = .init(ghosttyConfig: config)
     }
 
-    private func updateAppIcon(from config: Ghostty.Config) {
+    private func updateAppIcon(from config: OrbitTerminal.Config) {
         // Since this is called after `DockTilePlugin` has been running,
         // clean it up here to trigger a correct update of the current config.
-        UserDefaults.ghostty.removeObject(forKey: "CustomGhosttyIcon")
+        UserDefaults.ghostty.removeObject(forKey: "CustomOrbitTerminalIcon")
         DispatchQueue.global().async {
             UserDefaults.ghostty.appIcon = AppIcon(config: config)
             DistributedNotificationCenter.default()
@@ -908,9 +908,9 @@ class AppDelegate: NSObject,
         withCompletionHandler(options)
     }
 
-    // MARK: - GhosttyAppDelegate
+    // MARK: - OrbitTerminalAppDelegate
 
-    func findSurface(forUUID uuid: UUID) -> Ghostty.SurfaceView? {
+    func findSurface(forUUID uuid: UUID) -> OrbitTerminal.SurfaceView? {
         for c in TerminalController.all {
             for view in c.surfaceTree where view.id == uuid {
                 return view
@@ -922,7 +922,7 @@ class AppDelegate: NSObject,
 
     // MARK: - Global State
 
-    func setSecureInput(_ mode: Ghostty.SetSecureInput) {
+    func setSecureInput(_ mode: OrbitTerminal.SetSecureInput) {
         let input = SecureInput.shared
         switch mode {
         case .on:
@@ -941,7 +941,7 @@ class AppDelegate: NSObject,
     // MARK: - IB Actions
 
     @IBAction func openConfig(_ sender: Any?) {
-        Ghostty.App.openConfig()
+        OrbitTerminal.App.openConfig()
     }
 
     @IBAction func reloadConfig(_ sender: Any?) {
@@ -986,12 +986,12 @@ class AppDelegate: NSObject,
         quickController.toggle()
     }
 
-    /// Toggles visibility of all Ghosty Terminal windows. When hidden, activates Ghostty as the frontmost application
+    /// Toggles visibility of all Ghosty Terminal windows. When hidden, activates OrbitTerminal as the frontmost application
     @IBAction func toggleVisibility(_ sender: Any) {
         // If we have focus, then we hide all windows.
         if NSApp.isActive {
             // Toggle visibility doesn't do anything if the focused window is native
-            // fullscreen. This is only relevant if Ghostty is active.
+            // fullscreen. This is only relevant if OrbitTerminal is active.
             guard let keyWindow = NSApp.keyWindow,
                   !keyWindow.styleMask.contains(.fullScreen) else { return }
 
@@ -1036,7 +1036,7 @@ class AppDelegate: NSObject,
             self.quickTerminalPosition = .top
         }
 
-        init(_ config: Ghostty.Config) {
+        init(_ config: OrbitTerminal.Config) {
             self.initialWindow = config.initialWindow
             self.shouldQuitAfterLastWindowClosed = config.shouldQuitAfterLastWindowClosed
             self.quickTerminalPosition = config.quickTerminalPosition
@@ -1143,8 +1143,8 @@ extension AppDelegate {
         self.menuFindParent?.setImageIfDesired(systemSymbolName: "text.page.badge.magnifyingglass")
     }
 
-    /// Sync all of our menu item keyboard shortcuts with the Ghostty configuration.
-    private func syncMenuShortcuts(_ config: Ghostty.Config) {
+    /// Sync all of our menu item keyboard shortcuts with the OrbitTerminal configuration.
+    private func syncMenuShortcuts(_ config: OrbitTerminal.Config) {
         guard ghostty.readiness == .ready else { return }
 
         // Reset our shortcut index since we're about to rebuild all menu bindings.
@@ -1206,7 +1206,7 @@ extension AppDelegate {
         syncMenuShortcut(config, action: "toggle_secure_input", menuItem: self.menuSecureInput)
 
         // This menu item is NOT synced with the configuration because it disables macOS
-        // global fullscreen keyboard shortcut. The shortcut in the Ghostty config will continue
+        // global fullscreen keyboard shortcut. The shortcut in the OrbitTerminal config will continue
         // to work but it won't be reflected in the menu item.
         //
         // syncMenuShortcut(config, action: "toggle_fullscreen", menuItem: self.menuToggleFullScreen)
@@ -1216,8 +1216,8 @@ extension AppDelegate {
     }
 
     /// Syncs a single menu shortcut for the given action. The action string is the same
-    /// action string used for the Ghostty configuration.
-    private func syncMenuShortcut(_ config: Ghostty.Config, action: String, menuItem: NSMenuItem?) {
+    /// action string used for the OrbitTerminal configuration.
+    private func syncMenuShortcut(_ config: OrbitTerminal.Config, action: String, menuItem: NSMenuItem?) {
         guard let menu = menuItem else { return }
 
         guard let shortcut = config.keyboardShortcut(for: action) else {
@@ -1246,17 +1246,17 @@ extension AppDelegate {
     }
 
     /// Attempts to perform a menu key equivalent only for menu items that represent
-    /// Ghostty keybind actions. This is important because it lets our surface dispatch
+    /// OrbitTerminal keybind actions. This is important because it lets our surface dispatch
     /// bindings through the menu so they flash but also lets our surface override macOS built-ins
     /// like Cmd+H.
-    func performGhosttyBindingMenuKeyEquivalent(with event: NSEvent) -> Bool {
+    func performOrbitTerminalBindingMenuKeyEquivalent(with event: NSEvent) -> Bool {
         // Convert this event into the same normalized lookup key we use when
         // syncing menu shortcuts from configuration.
         guard let key = MenuShortcutKey(event: event) else {
             return false
         }
 
-        // If we don't have an entry for this key combo, no Ghostty-owned
+        // If we don't have an entry for this key combo, no OrbitTerminal-owned
         // menu shortcut exists for this event.
         guard let weakItem = menuItemsByShortcut[key] else {
             return false
@@ -1345,7 +1345,7 @@ extension AppDelegate {
                 let alert = NSAlert()
                 alert.messageText = "Failed to Set Default Terminal"
                 alert.informativeText = """
-                Ghostty could not be set as the default terminal application.
+                OrbitTerminal could not be set as the default terminal application.
 
                 Error: \(error.localizedDescription)
                 """

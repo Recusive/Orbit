@@ -1,14 +1,14 @@
 import AppKit
 
-/// Requests permission for Shortcuts app to interact with Ghostty
+/// Requests permission for Shortcuts app to interact with OrbitTerminal
 ///
 /// This function displays a permission dialog asking the user to allow Shortcuts
-/// to interact with Ghostty. The permission is automatically cached for 10 minutes
+/// to interact with OrbitTerminal. The permission is automatically cached for 10 minutes
 /// if the user selects "Allow", meaning subsequent intent calls won't show the dialog
 /// again during that time period.
 /// 
 /// The permission uses a shared UserDefaults key across all intents, so granting
-/// permission for one intent allows all Ghostty intents to execute without additional
+/// permission for one intent allows all OrbitTerminal intents to execute without additional
 /// prompts for the duration of the cache period.
 /// 
 /// - Returns: `true` if permission is granted, `false` if denied
@@ -19,7 +19,7 @@ import AppKit
 /// @MainActor
 /// func perform() async throws -> some IntentResult {
 ///     guard await requestIntentPermission() else {
-///         throw GhosttyIntentError.permissionDenied
+///         throw OrbitTerminalIntentError.permissionDenied
 ///     }
 ///     // ... continue with intent implementation
 /// }
@@ -44,8 +44,8 @@ func requestIntentPermission() async -> Bool {
             }
 
             PermissionRequest.show(
-                "com.mitchellh.ghostty.shortcutsPermission",
-                message: "Allow Shortcuts to interact with Ghostty?",
+                "com.orbit.orbit-terminal.shortcutsPermission",
+                message: "Allow Shortcuts to interact with OrbitTerminal?",
                 allowDuration: .forever,
                 rememberDuration: nil,
             ) { response in

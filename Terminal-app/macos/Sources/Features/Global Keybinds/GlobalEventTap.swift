@@ -2,7 +2,7 @@ import Cocoa
 import CoreGraphics
 import Carbon
 import OSLog
-import GhosttyKit
+import OrbitTerminalKit
 
 // Manages the event tap to monitor global events, currently only used for
 // global keybindings.
@@ -133,7 +133,7 @@ private func cgEventFlagsChangedHandler(
     // that processes all local events.
     guard !NSApp.isActive else { return result }
 
-    // We need an app delegate to get the Ghostty app instance
+    // We need an app delegate to get the OrbitTerminal app instance
     guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return result }
     guard let ghostty = appDelegate.ghostty.app else { return result }
 
@@ -141,7 +141,7 @@ private func cgEventFlagsChangedHandler(
     guard let event: NSEvent = .init(cgEvent: cgEvent) else { return result }
 
     // Build our event input and call ghostty
-    let key_ev = event.ghosttyKeyEvent(GHOSTTY_ACTION_PRESS)
+    let key_ev = event.ghosttyKeyEvent(ORBIT_TERMINAL_ACTION_PRESS)
     if ghostty_app_key(ghostty, key_ev) {
         GlobalEventTap.logger.info("global key event handled event=\(event)")
         return nil

@@ -1,5 +1,5 @@
 import AppKit
 
 extension Notification.Name {
-    static let ghosttyIconDidChange = Notification.Name("com.mitchellh.ghostty.iconDidChange")
+    static let ghosttyIconDidChange = Notification.Name("com.orbit.orbit-terminal.iconDidChange")
 }

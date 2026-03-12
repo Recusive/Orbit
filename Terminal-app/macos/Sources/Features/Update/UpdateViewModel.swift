@@ -277,7 +277,7 @@ enum UpdateState: Equatable {
         let reply: @Sendable (SPUUserUpdateChoice) -> Void
 
         var releaseNotes: ReleaseNotes? {
-            let currentCommit = Bundle.main.infoDictionary?["GhosttyCommit"] as? String
+            let currentCommit = Bundle.main.infoDictionary?["OrbitTerminalCommit"] as? String
             return ReleaseNotes(displayVersionString: appcastItem.displayVersionString, currentCommit: currentCommit)
         }
     }
@@ -364,7 +364,7 @@ enum UpdateState: Equatable {
     }
 
     struct Installing {
-        /// True if this state is triggered by ``Ghostty/UpdateDriver/updater(_:willInstallUpdateOnQuit:immediateInstallationBlock:)``
+        /// True if this state is triggered by ``OrbitTerminal/UpdateDriver/updater(_:willInstallUpdateOnQuit:immediateInstallationBlock:)``
         var isAutoUpdate = false
         let retryTerminatingApplication: () -> Void
         let dismiss: () -> Void

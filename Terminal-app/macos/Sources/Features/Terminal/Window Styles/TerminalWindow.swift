@@ -1,6 +1,6 @@
 import AppKit
 import SwiftUI
-import GhosttyKit
+import OrbitTerminalKit
 
 /// The base class for all standalone, "normal" terminal windows. This sets the basic
 /// style and configuration of the window based on the app configuration.
@@ -31,7 +31,7 @@ class TerminalWindow: NSWindow {
         return view
     }()
 
-    /// The configuration derived from the Ghostty config so we don't need to rely on references.
+    /// The configuration derived from the OrbitTerminal config so we don't need to rely on references.
     private(set) var derivedConfig: DerivedConfig = .init()
 
     /// Sets up our tab context menu
@@ -460,7 +460,7 @@ class TerminalWindow: NSWindow {
     // MARK: Positioning And Styling
 
     /// This is called by the controller when there is a need to reset the window appearance.
-    func syncAppearance(_ surfaceConfig: Ghostty.SurfaceView.DerivedConfig) {
+    func syncAppearance(_ surfaceConfig: OrbitTerminal.SurfaceView.DerivedConfig) {
         // If our window is not visible, then we do nothing. Some things such as blurring
         // have no effect if the window is not visible. Ultimately, we'll have this called
         // at some point when a surface becomes focused.
@@ -508,7 +508,7 @@ class TerminalWindow: NSWindow {
     /// change the alpha channel again manually.
     var preferredBackgroundColor: NSColor? {
         if let terminalController, !terminalController.surfaceTree.isEmpty {
-            let surface: Ghostty.SurfaceView?
+            let surface: OrbitTerminal.SurfaceView?
 
             // If our focused surface borders the top then we prefer its background color
             if let focusedSurface = terminalController.focusedSurface,
@@ -580,11 +580,11 @@ class TerminalWindow: NSWindow {
 
     struct DerivedConfig {
         let title: String?
-        let backgroundBlur: Ghostty.Config.BackgroundBlur
+        let backgroundBlur: OrbitTerminal.Config.BackgroundBlur
         let backgroundColor: NSColor
         let backgroundOpacity: Double
-        let macosWindowButtons: Ghostty.MacOSWindowButtons
-        let macosTitlebarStyle: Ghostty.Config.MacOSTitlebarStyle
+        let macosWindowButtons: OrbitTerminal.MacOSWindowButtons
+        let macosTitlebarStyle: OrbitTerminal.Config.MacOSTitlebarStyle
         let windowCornerRadius: CGFloat
 
         init() {
@@ -597,7 +597,7 @@ class TerminalWindow: NSWindow {
             self.windowCornerRadius = 16
         }
 
-        init(_ config: Ghostty.Config) {
+        init(_ config: OrbitTerminal.Config) {
             self.title = config.title
             self.backgroundColor = NSColor(config.backgroundColor)
             self.backgroundOpacity = config.backgroundOpacity
@@ -699,11 +699,11 @@ private struct TabColorIndicatorView: View {
 // MARK: - Tab Context Menu
 
 extension TerminalWindow {
-    private static let closeTabsOnRightMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.closeTabsOnTheRightMenuItem")
-    private static let changeTitleMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.changeTitleMenuItem")
-    private static let tabColorSeparatorIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.tabColorSeparator")
+    private static let closeTabsOnRightMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.orbit.orbit-terminal.closeTabsOnTheRightMenuItem")
+    private static let changeTitleMenuItemIdentifier = NSUserInterfaceItemIdentifier("com.orbit.orbit-terminal.changeTitleMenuItem")
+    private static let tabColorSeparatorIdentifier = NSUserInterfaceItemIdentifier("com.orbit.orbit-terminal.tabColorSeparator")
 
-    private static let tabColorPaletteIdentifier = NSUserInterfaceItemIdentifier("com.mitchellh.ghostty.tabColorPalette")
+    private static let tabColorPaletteIdentifier = NSUserInterfaceItemIdentifier("com.orbit.orbit-terminal.tabColorPalette")
 
     func configureTabContextMenuIfNeeded(_ menu: NSMenu) {
         guard isTabContextMenu(menu) else { return }

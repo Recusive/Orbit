@@ -1,6 +1,6 @@
 import AppKit
 import AppIntents
-import GhosttyKit
+import OrbitTerminalKit
 
 struct FocusTerminalIntent: AppIntent {
     static var title: LocalizedStringResource = "Focus Terminal"
@@ -20,11 +20,11 @@ struct FocusTerminalIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult {
         guard await requestIntentPermission() else {
-            throw GhosttyIntentError.permissionDenied
+            throw OrbitTerminalIntentError.permissionDenied
         }
 
         guard let surfaceView = terminal.surfaceView else {
-            throw GhosttyIntentError.surfaceNotFound
+            throw OrbitTerminalIntentError.surfaceNotFound
         }
 
         guard let controller = surfaceView.window?.windowController as? BaseTerminalController else {
