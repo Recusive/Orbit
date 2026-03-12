@@ -312,6 +312,7 @@ export interface ToolState {
     ordinal?: number
   ) => void;
   completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
+  updateToolInput: (id: string, toolInput: Record<string, unknown>) => void;
 
   // Permission management
   addPermissionRequest: (request: PermissionRequest) => void;
@@ -502,6 +503,23 @@ export const useToolStore = create<ToolState>()(
             // Remove from active tools (Reflect.deleteProperty avoids eslint no-dynamic-delete)
             Reflect.deleteProperty(state.activeTools, id);
           }
+        });
+      },
+
+      updateToolInput: (id: string, toolInput: Record<string, unknown>) => {
+        set((state) => {
+          const tool = state.activeTools[id];
+          if (!tool) {
+            return;
+          }
+
+          // getToolInput() rebuilds a fresh object on each adapter recompute, so
+          // compare the serialized payload before persisting and rerendering.
+          if (JSON.stringify(tool.toolInput) === JSON.stringify(toolInput)) {
+            return;
+          }
+
+          state.activeTools[id] = { ...tool, toolInput };
         });
       },
 

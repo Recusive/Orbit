@@ -58,7 +58,7 @@ class TerminalWindow: NSWindow {
         windowController as? TerminalController
     }
 
-    /// Whether this window has a sidebar active. When true, the native tab bar is hidden.
+    /// Whether this window has a sidebar active. When true, the native titlebar and tab bar are hidden.
     var sidebarActive: Bool = false
 
     /// The color assigned to this window's tab. Setting this updates the tab color indicator
@@ -80,6 +80,19 @@ class TerminalWindow: NSWindow {
                 self.viewModel.hasToolbar = self.toolbar != nil
             }
         }
+    }
+
+    /// When sidebar is active, reclaim the titlebar area so content fills the
+    /// entire window frame. Without this, macOS reserves ~28px at the top even
+    /// when the titlebar container is hidden.
+    override var contentLayoutRect: CGRect {
+        if sidebarActive {
+            var rect = super.contentLayoutRect
+            rect.origin.y = 0
+            rect.size.height = self.frame.height
+            return rect
+        }
+        return super.contentLayoutRect
     }
 
     override func awakeFromNib() {
@@ -408,6 +421,12 @@ class TerminalWindow: NSWindow {
             /// Check ``titlebarFont`` down below
             /// to see why we need to check `hasMoreThanOneTabs` here
             titlebarTextField?.usesSingleLineMode = !hasMoreThanOneTabs
+
+            // macOS 15+ automatically reveals the native title view when the
+            // title text changes. Re-apply hidden style to keep it gone.
+            if sidebarActive {
+                configureSidebarTitlebar()
+            }
         }
     }
 
@@ -578,6 +597,43 @@ class TerminalWindow: NSWindow {
         standardWindowButton(.closeButton)?.isHidden = true
         standardWindowButton(.miniaturizeButton)?.isHidden = true
         standardWindowButton(.zoomButton)?.isHidden = true
+    }
+
+    /// Makes the titlebar completely invisible while keeping rounded corners.
+    /// Called once when the sidebar is set up — stays this way permanently.
+    /// Apply (or re-apply) the hidden-titlebar style for sidebar mode.
+    /// Safe to call repeatedly — macOS can undo the hiding on title
+    /// changes or fullscreen transitions, so we re-apply as needed.
+    func configureSidebarTitlebar() {
+        guard sidebarActive else { return }
+
+        // Ensure we have .titled (rounded corners) + .fullSizeContentView
+        // (content extends behind the titlebar area)
+        styleMask.insert(.fullSizeContentView)
+
+        titleVisibility = .hidden
+        titlebarAppearsTransparent = true
+        if #available(macOS 11.0, *) {
+            titlebarSeparatorStyle = .none
+        }
+        toolbar = nil
+
+        // Remove all titlebar accessories that add visible chrome
+        while !titlebarAccessoryViewControllers.isEmpty {
+            removeTitlebarAccessoryViewController(at: 0)
+        }
+
+        // Hide the native traffic light buttons — we have custom SwiftUI ones
+        standardWindowButton(.closeButton)?.isHidden = true
+        standardWindowButton(.miniaturizeButton)?.isHidden = true
+        standardWindowButton(.zoomButton)?.isHidden = true
+
+        // Nuke the entire titlebar container so no background renders.
+        // This mirrors Ghostty's HiddenTitlebarTerminalWindow approach.
+        if let themeFrame = contentView?.superview,
+           let titleBarContainer = themeFrame.firstDescendant(withClassName: "NSTitlebarContainerView") {
+            titleBarContainer.isHidden = true
+        }
     }
 
     deinit {

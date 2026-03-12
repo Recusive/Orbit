@@ -227,6 +227,19 @@ class AppDelegate: NSObject,
         // Start the IPC server for external control (orbitctl, shell integrations)
         OrbitTerminalIPCServer.shared.start()
 
+        // Add "Toggle Sidebar" menu item to the View menu (Cmd+S)
+        if let mainMenu = NSApp.mainMenu,
+           let viewMenu = mainMenu.item(withTitle: "View")?.submenu {
+            viewMenu.addItem(.separator())
+            let sidebarItem = NSMenuItem(
+                title: "Toggle Sidebar",
+                action: #selector(TerminalController.toggleSidebar(_:)),
+                keyEquivalent: "s"
+            )
+            sidebarItem.keyEquivalentModifierMask = .command
+            viewMenu.addItem(sidebarItem)
+        }
+
         // Register our service provider. This must happen after everything is initialized.
         NSApp.servicesProvider = ServiceProvider()
 
@@ -583,6 +596,17 @@ class AppDelegate: NSObject,
     }
 
     private func localEventKeyDown(_ event: NSEvent) -> NSEvent? {
+        // Cmd+S: Toggle sidebar
+        if event.modifierFlags.contains(.command),
+           !event.modifierFlags.contains(.shift),
+           !event.modifierFlags.contains(.option),
+           !event.modifierFlags.contains(.control),
+           event.charactersIgnoringModifiers == "s",
+           let controller = NSApp.keyWindow?.windowController as? TerminalController {
+            controller.toggleSidebar(nil)
+            return nil
+        }
+
         // If the tab overview is visible and escape is pressed, close it.
         // This can't POSSIBLY be right and is probably a FirstResponder problem
         // that we should handle elsewhere in our program. But this works and it

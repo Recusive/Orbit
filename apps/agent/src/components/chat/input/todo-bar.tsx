@@ -55,6 +55,34 @@ function parseTodos(raw: unknown): TodoItem[] {
   return result;
 }
 
+// ─── Selection ───────────────────────────────────────────────────────
+
+/** Whether a tool carries a `todos` key at all — distinguishes "not yet received" from "intentionally empty." */
+function hasTodoPayload(tool: ToolExecution): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(tool.toolInput, 'todos') &&
+    tool.toolInput['todos'] !== undefined
+  );
+}
+
+/**
+ * Resolve which ToolExecution to display in the TodoBar.
+ *
+ * Prefer the latest active tool once it carries a todo payload. Until then,
+ * keep showing the latest completed snapshot to avoid flicker during the
+ * empty-input → populated-input transition window (~100ms).
+ *
+ * `todos: []` is a valid payload (intentional clear) — only the *absence*
+ * of the `todos` key triggers fallback.
+ */
+export function resolveLatestTodoExecution(
+  latestActive: ToolExecution | null,
+  latestCompleted: ToolExecution | null
+): ToolExecution | null {
+  if (latestActive === null) return latestCompleted;
+  return hasTodoPayload(latestActive) ? latestActive : (latestCompleted ?? latestActive);
+}
+
 // ─── Sub-components ──────────────────────────────────────────────────
 
 function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactElement {
@@ -143,7 +171,8 @@ export const TodoBar: FC = memo(function TodoBar() {
   // - completedTools: ordered array, take LAST match (array order is chronological).
   //   After session restore, startedAt is 0 for all tools — timestamp comparison
   //   would always pick the first tool (initial 0/10 state). Array order is correct.
-  // Active tool takes priority over completed (it has the most current state).
+  // Active tool takes priority once its todo payload arrives. Until then,
+  // keep the latest completed snapshot visible to avoid flicker.
   const todoData = useMemo(() => {
     if (sessionId === null) {
       return null;
@@ -177,8 +206,9 @@ export const TodoBar: FC = memo(function TodoBar() {
       }
     }
 
-    // Prefer active (real-time updates) over completed
-    const latest = latestActive ?? latestCompleted;
+    // Prefer active once it carries a todo payload; fall back to completed
+    // to avoid flicker during the empty-input → populated-input transition.
+    const latest = resolveLatestTodoExecution(latestActive, latestCompleted);
     if (latest === null) return null;
 
     const todosInput = latest.toolInput['todos'];
@@ -239,16 +269,22 @@ export const TodoBar: FC = memo(function TodoBar() {
                 aria-hidden="true"
               />
               <span className="text-xs text-lg-text-secondary truncate min-w-0">
-                {inProgressItem.activeForm}
+                {inProgressItem.activeForm || inProgressItem.content}
               </span>
             </>
           ) : null}
 
           <div className="flex-1" />
 
-          {/* Progress circle + percentage — anchored right, before chevron */}
-          <ProgressPie percentage={percentage} />
-          <span className="text-xs tabular-nums text-muted-foreground">{String(percentage)}%</span>
+          {/* Progress circle + percentage — only in collapsed header; expanded has the full bar */}
+          {!isExpanded ? (
+            <>
+              <ProgressPie percentage={percentage} />
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {String(percentage)}%
+              </span>
+            </>
+          ) : null}
 
           {isExpanded ? (
             <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" aria-hidden="true" />
@@ -285,7 +321,9 @@ export const TodoBar: FC = memo(function TodoBar() {
                           todo.status === 'completed' && 'line-through text-lg-text-secondary'
                         )}
                       >
-                        {todo.status === 'in_progress' ? todo.activeForm : todo.content}
+                        {todo.status === 'in_progress'
+                          ? todo.activeForm || todo.content
+                          : todo.content}
                       </span>
                     </div>
                   ))}

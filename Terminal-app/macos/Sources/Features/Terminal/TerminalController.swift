@@ -1114,11 +1114,6 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         // SwiftUI focus chain.
         container.initialContentSize = focusedSurface?.initialSize
 
-        // Mark the window as having an active sidebar so the native tab bar is hidden
-        if let terminalWindow = window as? TerminalWindow {
-            terminalWindow.sidebarActive = true
-        }
-
         // Create the sidebar tab manager and hosting view
         let bellTriggersAttention = config.bellFeatures.contains(.attention)
         let tabManager = SidebarTabManager(window: window, bellTriggersAttention: bellTriggersAttention)
@@ -1149,6 +1144,13 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
         container.frame = NSRect(x: sidebarWidth, y: 0, width: 600, height: 400)
 
         window.contentView = splitView
+
+        // Activate sidebar mode: permanently hide the titlebar.
+        // Must happen after contentView is set.
+        if let terminalWindow = window as? TerminalWindow {
+            terminalWindow.sidebarActive = true
+            terminalWindow.configureSidebarTitlebar()
+        }
 
         // If we have a default size, we want to apply it.
         if let defaultSize {
@@ -1315,6 +1317,33 @@ class TerminalController: BaseTerminalController, TabGroupCloseCoordinator.Contr
     func window(_ window: NSWindow, willEncodeRestorableState state: NSCoder) {
         let data = TerminalRestorableState(from: self)
         data.encode(with: state)
+    }
+
+    // MARK: Sidebar Toggle
+
+    @IBAction func toggleSidebar(_ sender: Any?) {
+        guard let window,
+              let splitView = window.contentView as? NSSplitView,
+              let sidebar = splitView.subviews.first else { return }
+
+        let isCollapsed = sidebar.isHidden
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.2
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+
+            if isCollapsed {
+                sidebar.isHidden = false
+                let savedWidth = UserDefaults.standard.double(forKey: "SidebarWidth")
+                let targetWidth = savedWidth > 0 ? min(max(savedWidth, 140), 280) : 200
+                splitView.animator().setPosition(targetWidth, ofDividerAt: 0)
+            } else {
+                splitView.animator().setPosition(0, ofDividerAt: 0)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    sidebar.isHidden = true
+                }
+            }
+        }
     }
 
     // MARK: First Responder

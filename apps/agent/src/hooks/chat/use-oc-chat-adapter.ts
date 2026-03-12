@@ -55,6 +55,11 @@ interface SyncActions {
       ? F
       : never
     : never;
+  updateToolInput: typeof useToolStore.getState extends () => infer T
+    ? T extends { updateToolInput: infer F }
+      ? F
+      : never
+    : never;
 }
 
 interface OcRewindTarget {
@@ -401,6 +406,12 @@ function seedSessionTools(sessionId: string): Map<string, ToolStatus> {
   return next;
 }
 
+/**
+ * [warning] TESTED: OpenCode tool syncing in this helper is covered by unit tests.
+ *     If you modify this, run:
+ *     bun run test -- apps/agent/src/__tests__/unit/hooks/chat/use-oc-chat-adapter.test.ts
+ *     Test file: apps/agent/src/__tests__/unit/hooks/chat/use-oc-chat-adapter.test.ts
+ */
 export function syncOcTools(
   messages: AdaptedOcMessage[],
   synced: Map<string, ToolStatus>,
@@ -428,11 +439,15 @@ export function syncOcTools(
         if (tool.status === 'success' || tool.status === 'error') {
           actions.completeTool(tool.id, tool.toolOutput, tool.status === 'success');
         }
-      } else if (
-        (prev === 'pending' || prev === 'running') &&
-        (tool.status === 'success' || tool.status === 'error')
-      ) {
-        actions.completeTool(tool.id, tool.toolOutput, tool.status === 'success');
+      } else {
+        actions.updateToolInput(tool.id, tool.toolInput);
+
+        if (
+          (prev === 'pending' || prev === 'running') &&
+          (tool.status === 'success' || tool.status === 'error')
+        ) {
+          actions.completeTool(tool.id, tool.toolOutput, tool.status === 'success');
+        }
       }
 
       next.set(tool.id, tool.status);
@@ -597,6 +612,7 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
     syncedRef.current = syncOcTools(adapted, syncedRef.current, {
       startTool: actions.startTool,
       completeTool: actions.completeTool,
+      updateToolInput: actions.updateToolInput,
     });
   }, [adapted]);
 

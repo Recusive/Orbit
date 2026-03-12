@@ -69,7 +69,15 @@ struct SidebarView: View {
     @State private var dropTargetTabID: ObjectIdentifier?
 
     var body: some View {
-        ScrollView {
+        VStack(spacing: 0) {
+            // Traffic lights
+            TrafficLightsView()
+                .padding(.leading, 7)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            ScrollView {
             LazyVStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(tabManager.tabs.enumerated()), id: \.element.id) { index, tab in
                     SidebarTabCard(tab: tab, theme: theme, fields: fields, showCardBorder: showCardBorder)
@@ -142,10 +150,61 @@ struct SidebarView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.top, 8)
+            .padding(.top, 4)
+        }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.background)
+    }
+}
+
+// MARK: - TrafficLightsView
+
+/// Custom traffic light buttons (close, minimize, zoom) for the sidebar.
+/// Used when the native titlebar is removed.
+private struct TrafficLightsView: View {
+    @State private var isHovering = false
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TrafficLightButton(color: Color(nsColor: .systemRed), hoverSymbol: "xmark", isHovering: isHovering) {
+                NSApp.keyWindow?.close()
+            }
+            TrafficLightButton(color: Color(nsColor: .systemYellow), hoverSymbol: "minus", isHovering: isHovering) {
+                NSApp.keyWindow?.miniaturize(nil)
+            }
+            TrafficLightButton(color: Color(nsColor: .systemGreen), hoverSymbol: "plus", isHovering: isHovering) {
+                NSApp.keyWindow?.zoom(nil)
+            }
+        }
+        .onHover { hovering in
+            isHovering = hovering
+        }
+    }
+}
+
+private struct TrafficLightButton: View {
+    let color: Color
+    let hoverSymbol: String
+    let isHovering: Bool
+    let action: () -> Void
+
+    private let size: CGFloat = 12
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(color)
+                    .frame(width: size, height: size)
+                if isHovering {
+                    Image(systemName: hoverSymbol)
+                        .font(.system(size: 6, weight: .bold))
+                        .foregroundColor(Color(white: 0.2))
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
 

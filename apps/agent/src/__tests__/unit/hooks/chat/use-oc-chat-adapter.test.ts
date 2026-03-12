@@ -278,6 +278,7 @@ describe('useOcChatAdapter helpers', () => {
   it('diffs tool sync so repeated renders do not replay start events', () => {
     const startTool = vi.fn();
     const completeTool = vi.fn();
+    const updateToolInput = vi.fn();
     const running = makeTool();
     const success = makeTool({ status: 'success', success: true, toolOutput: 'done' });
 
@@ -289,11 +290,12 @@ describe('useOcChatAdapter helpers', () => {
         },
       ],
       new Map(),
-      { startTool, completeTool }
+      { startTool, completeTool, updateToolInput }
     );
 
     expect(startTool).toHaveBeenCalledTimes(1);
     expect(completeTool).not.toHaveBeenCalled();
+    expect(updateToolInput).not.toHaveBeenCalled();
 
     synced = syncOcTools(
       [
@@ -303,10 +305,11 @@ describe('useOcChatAdapter helpers', () => {
         },
       ],
       synced,
-      { startTool, completeTool }
+      { startTool, completeTool, updateToolInput }
     );
 
     expect(startTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).toHaveBeenCalledWith('tool-1', running.toolInput);
 
     syncOcTools(
       [
@@ -316,15 +319,17 @@ describe('useOcChatAdapter helpers', () => {
         },
       ],
       synced,
-      { startTool, completeTool }
+      { startTool, completeTool, updateToolInput }
     );
 
     expect(completeTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).toHaveBeenCalledTimes(2);
   });
 
   it('starts and completes fast-finished tools in one pass', () => {
     const startTool = vi.fn();
     const completeTool = vi.fn();
+    const updateToolInput = vi.fn();
 
     syncOcTools(
       [
@@ -334,11 +339,127 @@ describe('useOcChatAdapter helpers', () => {
         },
       ],
       new Map(),
-      { startTool, completeTool }
+      { startTool, completeTool, updateToolInput }
     );
 
     expect(startTool).toHaveBeenCalledTimes(1);
     expect(completeTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).not.toHaveBeenCalled();
+  });
+
+  it('updates tool input when a tracked tool stays running', () => {
+    const startTool = vi.fn();
+    const completeTool = vi.fn();
+    const updateToolInput = vi.fn();
+
+    const synced = syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [makeTool({ toolInput: {} })],
+        },
+      ],
+      new Map(),
+      { startTool, completeTool, updateToolInput }
+    );
+
+    expect(startTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).not.toHaveBeenCalled();
+
+    const todosInput = {
+      todos: [{ id: '1', content: 'Test', status: 'pending' }],
+    };
+
+    syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [makeTool({ toolInput: todosInput })],
+        },
+      ],
+      synced,
+      { startTool, completeTool, updateToolInput }
+    );
+
+    expect(startTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).toHaveBeenCalledWith('tool-1', todosInput);
+    expect(completeTool).not.toHaveBeenCalled();
+  });
+
+  it('preserves updated input through completion', () => {
+    const startTool = vi.fn();
+    const completeTool = vi.fn();
+    const updateToolInput = vi.fn();
+
+    let synced = syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [makeTool({ toolInput: {} })],
+        },
+      ],
+      new Map(),
+      { startTool, completeTool, updateToolInput }
+    );
+
+    const todosInput = {
+      todos: [{ id: '1', content: 'Done', status: 'completed' }],
+    };
+
+    synced = syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [makeTool({ toolInput: todosInput })],
+        },
+      ],
+      synced,
+      { startTool, completeTool, updateToolInput }
+    );
+
+    syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [
+            makeTool({ status: 'success', success: true, toolOutput: 'ok', toolInput: todosInput }),
+          ],
+        },
+      ],
+      synced,
+      { startTool, completeTool, updateToolInput }
+    );
+
+    expect(updateToolInput).toHaveBeenCalledTimes(2);
+    expect(completeTool).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call updateToolInput when a completed tool is first seen', () => {
+    const startTool = vi.fn();
+    const completeTool = vi.fn();
+    const updateToolInput = vi.fn();
+
+    syncOcTools(
+      [
+        {
+          chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          tools: [
+            makeTool({
+              status: 'success',
+              success: true,
+              toolOutput: 'ok',
+              toolInput: { todos: [] },
+            }),
+          ],
+        },
+      ],
+      new Map(),
+      { startTool, completeTool, updateToolInput }
+    );
+
+    expect(startTool).toHaveBeenCalledTimes(1);
+    expect(completeTool).toHaveBeenCalledTimes(1);
+    expect(updateToolInput).not.toHaveBeenCalled();
   });
 });
 
