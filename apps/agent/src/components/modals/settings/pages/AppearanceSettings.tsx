@@ -70,21 +70,22 @@ export const AppearanceSettings: FC = () => {
 
   return (
     <div>
-      {isMac() ? (
-        <>
-          <SectionHeader title="App Icon">Choose your Orbit dock icon</SectionHeader>
-
-          <div className="mb-2">
-            <AppIconPicker />
-          </div>
-
-          <SectionDivider />
-        </>
-      ) : null}
-
       <SectionHeader title="Theme">Customize the look of the application</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
+        {isMac() ? (
+          <div className="flex items-center justify-between py-3.5">
+            <div className="flex-1 pr-4">
+              <div className="text-base font-medium">App Icon</div>
+              <div className="text-sm text-muted-foreground/80 mt-1">
+                Choose your Orbit dock icon
+              </div>
+            </div>
+            <div className="shrink-0">
+              <AppIconPicker />
+            </div>
+          </div>
+        ) : null}
         <SettingItem label="Color Theme" description="Choose your preferred color theme">
           <Select value={theme} onValueChange={handleThemeChange}>
             <SelectTrigger className="w-32 h-8 text-sm">

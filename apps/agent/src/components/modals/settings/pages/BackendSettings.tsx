@@ -24,13 +24,13 @@ interface BackendOption {
 const BACKENDS: readonly BackendOption[] = [
   {
     id: 'claude',
-    name: 'Claude Agent SDK',
-    description: 'Agent-bridge sidecar with Claude-oriented session flow',
+    name: 'Engine v1',
+    description: 'Single-provider agent with built-in tool execution',
   },
   {
     id: 'opencode',
-    name: 'OpenCode Engine',
-    description: 'HTTP + SSE backend with provider-backed model routing',
+    name: 'Engine v2',
+    description: 'Multi-provider agent with flexible model routing',
   },
 ];
 
@@ -48,14 +48,14 @@ export const BackendSettings: FC = () => {
         setStatusError(status.error);
       })
       .catch(() => {
-        setStatusError('Unable to read OpenCode status');
+        setStatusError('Unable to read engine status');
       });
   }, [activeBackend]);
 
   return (
     <div>
-      <SectionHeader title="Backend">
-        Switching backends swaps the active session model, storage, and tool semantics.
+      <SectionHeader title="Engine">
+        Switching engines changes the active session model, storage, and tool behavior.
       </SectionHeader>
 
       {/* Backend cards */}
@@ -115,8 +115,8 @@ export const BackendSettings: FC = () => {
 
       <SectionDivider />
 
-      <SectionHeader title="OpenCode Health">
-        OpenCode runs as a managed sidecar process when the backend is active.
+      <SectionHeader title="Engine Health">
+        The active engine runs as a managed process alongside the app.
       </SectionHeader>
 
       {/* Status card */}

@@ -31,7 +31,7 @@ function tr(props: string[], ms: number, delay = 0): string {
 
 const SHELF_STYLE: React.CSSProperties = {
   background: 'var(--orbit-background-100)',
-  border: '1px solid var(--orbit-alpha-200)',
+  border: '1px solid var(--orbit-alpha-100)',
   boxShadow: 'inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.15)',
 };
 
@@ -122,7 +122,7 @@ const DockIcon: FC<{
 const SKELETON_COUNT = 4;
 
 const DockSkeleton: FC = () => (
-  <div className="flex flex-col items-center pb-2 pt-4">
+  <div className="flex flex-col items-center">
     <div className="flex items-end gap-1 rounded-[16px] p-2" style={SHELF_STYLE}>
       {Array.from({ length: SKELETON_COUNT }, (_, i) => (
         <div
@@ -209,37 +209,39 @@ export const AppIconPicker: FC = () => {
   if (icons.length === 0) return null;
 
   return (
-    <div className="flex flex-col items-center pb-2 pt-4">
+    <div className="flex flex-col items-center">
       {/* The Dock shelf */}
-      <div className="flex items-end gap-1 overflow-visible rounded-[16px] p-2" style={SHELF_STYLE}>
-        {icons.map((icon, i) => (
-          <DockIcon
-            key={icon.id}
-            icon={icon}
-            isActive={icon.id === activeId}
-            index={i}
-            isReady={isReady}
-            onSelect={handleSelect}
-          />
-        ))}
-      </div>
-
-      {/* Active indicator dots — below the shelf */}
-      <div className="mx-px flex items-center gap-1 px-2 pt-1.5">
-        {icons.map((icon) => (
-          <div key={icon.id} className="flex justify-center" style={{ width: ICON_PX }}>
-            <div
-              className="rounded-full bg-foreground/70"
-              style={{
-                width: 4,
-                height: 4,
-                opacity: icon.id === activeId ? 1 : 0,
-                transform: icon.id === activeId ? 'scale(1)' : 'scale(0)',
-                transition: tr(['opacity', 'transform'], 200),
-              }}
+      <div className="overflow-visible rounded-[16px] px-2 pt-2 pb-1.5" style={SHELF_STYLE}>
+        <div className="flex items-end gap-1 overflow-visible">
+          {icons.map((icon, i) => (
+            <DockIcon
+              key={icon.id}
+              icon={icon}
+              isActive={icon.id === activeId}
+              index={i}
+              isReady={isReady}
+              onSelect={handleSelect}
             />
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Active indicator dots */}
+        <div className="flex items-center gap-1 pt-1.5">
+          {icons.map((icon) => (
+            <div key={icon.id} className="flex justify-center" style={{ width: ICON_PX }}>
+              <div
+                className="rounded-full bg-foreground/70"
+                style={{
+                  width: 4,
+                  height: 4,
+                  opacity: icon.id === activeId ? 1 : 0,
+                  transform: icon.id === activeId ? 'scale(1)' : 'scale(0)',
+                  transition: tr(['opacity', 'transform'], 200),
+                }}
+              />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

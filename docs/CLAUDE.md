@@ -67,7 +67,6 @@ Use this to find the right file. Read the file directly — no links needed.
 ## plans/tracked/todo/ (13 entries)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
-- `OPENCODE-MIGRATION-PLAN.md` — Replace agent-bridge with Agent-backend (opencode fork, HTTP + SSE, multi-provider)
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
@@ -81,9 +80,13 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (9 entries)
+## plans/tracked/done/ (13 entries)
 
+- `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
 - `SETTINGS-DIALOG-TO-PAGE.md` — Convert settings from dialog to inline page (vault pattern)
+- `UNIFIED-OPENCODE-CHAT-UI.md` — Unify OpenCode chat UI into shared chat infrastructure
+- `OPENCODE-MIGRATION-PLAN.md` — Replace agent-bridge with Agent-backend (opencode fork, HTTP + SSE, multi-provider)
+- `TUI-FULL-BLEED-LAYOUT.md` — TUI full bleed layout
 - `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
 - `fix-user-bubble-shift-after-send.md` — Fix user bubble sub-pixel shift after send animation
 - `instant-title-generation.md` — Instant title generation
