@@ -1,6 +1,5 @@
 # Orbit Terminal — Design Spec
 
-> **Date:** 2026-03-10
 > **Status:** Approved
 > **Platform:** macOS (v1)
 

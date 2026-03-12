@@ -82,7 +82,7 @@ export function Logo(): JSX.Element {
           // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <box flexDirection="row" gap={1}>
-              <box flexDirection="row">{renderLine(line, theme.textMuted, false)}</box>
+              <box flexDirection="row">{renderLine(line, theme.text, false)}</box>
               <box flexDirection="row">{renderLine(logo.right[index()], theme.text, true)}</box>
             </box>
           )

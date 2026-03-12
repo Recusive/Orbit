@@ -8,6 +8,7 @@
 import { memo, useEffect, useMemo } from 'react';
 
 import { InputControls } from './InputControls';
+import { OcQuestionCard } from './OcQuestionCard';
 import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
 import { MentionPopover } from './mention-popover';
@@ -35,8 +36,11 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   usage,
   maxTokens,
   permissions = [],
+  questions,
   onPermissionApprove,
   onPermissionDeny,
+  onQuestionReply,
+  onQuestionReject,
   onSend,
   onStop,
   onModeChange,
@@ -120,6 +124,11 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active.closest('[data-oc-question]') !== null) {
+        return;
+      }
+
       const firstPermission = regularPermissions[0];
       if (firstPermission === undefined) return;
 
@@ -128,6 +137,18 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         e.preventDefault();
         e.stopPropagation();
         onPermissionApprove(firstPermission.requestId);
+      }
+      // Cmd/Ctrl+Enter always allows when supported
+      else if (
+        e.key === 'Enter' &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        firstPermission.supportsAlwaysAllow
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionApprove(firstPermission.requestId, true);
       }
       // ESC denies the first permission (matches the button label)
       else if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -181,6 +202,22 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                     onApprove={onPermissionApprove}
                     onDeny={onPermissionDeny}
                     isLast={index === regularPermissions.length - 1}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {questions !== undefined &&
+            questions.length > 0 &&
+            onQuestionReply !== undefined &&
+            onQuestionReject !== undefined ? (
+              <div className="space-y-2 px-1 pb-1">
+                {questions.map((question) => (
+                  <OcQuestionCard
+                    key={question.id}
+                    question={question}
+                    onReply={onQuestionReply}
+                    onReject={onQuestionReject}
                   />
                 ))}
               </div>

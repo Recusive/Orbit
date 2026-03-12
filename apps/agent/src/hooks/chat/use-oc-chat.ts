@@ -34,6 +34,7 @@ interface OcRenderedMessage {
 export function useOcChat(): {
   sessionId: string | null;
   activeSessionTitle: string | null;
+  revertMessageId: string | null;
   messages: OcRenderedMessage[];
   permissions: OcPermissionAsked[];
   questions: OcQuestionRequest[];
@@ -142,6 +143,7 @@ export function useOcChat(): {
   return {
     sessionId,
     activeSessionTitle: activeSession?.title ?? null,
+    revertMessageId: activeSession?.revert?.messageID ?? null,
     messages,
     permissions,
     questions,

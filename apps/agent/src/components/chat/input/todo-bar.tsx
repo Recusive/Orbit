@@ -17,6 +17,9 @@ import type { FC, ReactElement } from 'react';
 
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, cn } from '@/lib/utils';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useActiveBackend } from '@/stores/backend';
+import { useActiveSessionId } from '@/stores/chat';
+import { useOcActiveSessionId } from '@/stores/opencode';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -120,6 +123,10 @@ const EXPAND_TRANSITION_NONE = { duration: 0 };
 export const TodoBar: FC = memo(function TodoBar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
+  const activeBackend = useActiveBackend();
+  const claudeSessionId = useActiveSessionId();
+  const ocSessionId = useOcActiveSessionId();
+  const sessionId = activeBackend === 'claude' ? claudeSessionId : ocSessionId;
 
   // Subscribe to ToolStore — useShallow prevents rerenders from unrelated mutations
   const { activeTools, completedTools } = useToolStore(
@@ -138,11 +145,24 @@ export const TodoBar: FC = memo(function TodoBar() {
   //   would always pick the first tool (initial 0/10 state). Array order is correct.
   // Active tool takes priority over completed (it has the most current state).
   const todoData = useMemo(() => {
+    if (sessionId === null) {
+      return null;
+    }
+
+    const matchesSession = (tool: ToolExecution): boolean => {
+      if (activeBackend === 'claude') {
+        return tool.sessionId === undefined || tool.sessionId === sessionId;
+      }
+
+      return tool.sessionId === sessionId;
+    };
+
     let latestActive: ToolExecution | null = null;
     let latestCompleted: ToolExecution | null = null;
 
     for (const tool of Object.values(activeTools)) {
-      if (tool.toolName.toLowerCase() === 'todowrite') {
+      const name = tool.toolName.toLowerCase();
+      if ((name === 'todowrite' || name === 'todoread') && matchesSession(tool)) {
         if (latestActive === null || tool.startedAt > latestActive.startedAt) {
           latestActive = tool;
         }
@@ -151,7 +171,8 @@ export const TodoBar: FC = memo(function TodoBar() {
 
     // Last completed todowrite has the most recent state (array is chronological)
     for (const tool of completedTools) {
-      if (tool.toolName.toLowerCase() === 'todowrite') {
+      const name = tool.toolName.toLowerCase();
+      if ((name === 'todowrite' || name === 'todoread') && matchesSession(tool)) {
         latestCompleted = tool;
       }
     }
@@ -165,7 +186,7 @@ export const TodoBar: FC = memo(function TodoBar() {
       todos: parseTodos(todosInput),
       isRunning: latest.status === 'running' || latest.status === 'pending',
     };
-  }, [activeTools, completedTools]);
+  }, [activeBackend, activeTools, completedTools, sessionId]);
 
   // Don't render when there are no todos
   if (todoData === null || todoData.todos.length === 0) return null;

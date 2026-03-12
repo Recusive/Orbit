@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 
 interface MessageActionsProps {
   readonly isHovered?: boolean;
+  readonly showRewind?: boolean;
   readonly rewindDisabled?: boolean;
   readonly turnDurationMs?: number | undefined;
   readonly onCopy?: () => void;
@@ -73,6 +74,7 @@ const SentryIcon: FC<{ readonly className?: string }> = ({ className }) => (
 
 export const MessageActions: FC<MessageActionsProps> = ({
   isHovered = false,
+  showRewind = true,
   rewindDisabled = false,
   turnDurationMs,
   onCopy,
@@ -114,18 +116,20 @@ export const MessageActions: FC<MessageActionsProps> = ({
         >
           <SentryIcon className="h-3.5 w-3.5" />
         </ActionButton>
-        <ActionButton
-          label={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
-          className={
-            rewindDisabled
-              ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground/70'
-              : undefined
-          }
-          disabled={rewindDisabled}
-          onClick={onRewind}
-        >
-          <Rewind className="h-3.5 w-3.5" aria-hidden="true" />
-        </ActionButton>
+        {showRewind ? (
+          <ActionButton
+            label={rewindDisabled ? 'Cannot rewind last message' : 'Rewind'}
+            className={
+              rewindDisabled
+                ? 'opacity-50 cursor-not-allowed hover:bg-transparent hover:text-muted-foreground/70'
+                : undefined
+            }
+            disabled={rewindDisabled}
+            onClick={onRewind}
+          >
+            <Rewind className="h-3.5 w-3.5" aria-hidden="true" />
+          </ActionButton>
+        ) : null}
       </div>
       {turnDurationMs !== undefined && turnDurationMs > 0 ? (
         <span className="flex items-center gap-1 text-xs tabular-nums text-lg-text-secondary">

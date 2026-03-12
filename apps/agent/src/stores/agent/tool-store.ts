@@ -249,6 +249,8 @@ export interface PermissionRequest {
   toolName: string;
   toolInput: Record<string, unknown>;
   createdAt: number;
+  patterns?: string[] | undefined;
+  supportsAlwaysAllow?: boolean | undefined;
 }
 
 // Cached session data (usage + tools)

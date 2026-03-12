@@ -79,6 +79,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `kanban-ticket-board.md` — Kanban ticket board
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
+- `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
 ## plans/tracked/done/ (8 entries)
 

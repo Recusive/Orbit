@@ -6,6 +6,7 @@ import type { OcProviderInfo } from '@/stores/opencode';
 import type { OcProviderAuthAuthorization, OcQuestionAnswer, OcSession } from '@/types/opencode';
 import type { ProviderListResponses, SessionMessagesResponses } from '@opencode-ai/sdk/v2/client';
 
+import { useToolStore } from '@/stores/agent/tool-store';
 import {
   useOcMessageStore,
   useOcPermissionStore,
@@ -19,6 +20,7 @@ export interface OcSendMessageOptions {
   readonly providerId?: string;
   readonly modelId?: string;
   readonly agent?: string;
+  readonly variant?: string;
 }
 
 function mapProviders(response: ProviderListResponses[200]): {
@@ -32,15 +34,25 @@ function mapProviders(response: ProviderListResponses[200]): {
       name: provider.name,
       env: provider.env,
       models: Object.fromEntries(
-        Object.values(provider.models as Record<string, { id: string; name: string }>).map(
-          (model) => [
-            model.id,
+        Object.values(
+          provider.models as Record<
+            string,
             {
-              id: model.id,
-              name: model.name,
-            },
-          ]
-        )
+              id: string;
+              name: string;
+              reasoning: boolean;
+              variants?: Record<string, Record<string, unknown>>;
+            }
+          >
+        ).map((model) => [
+          model.id,
+          {
+            id: model.id,
+            name: model.name,
+            ...(model.reasoning ? { reasoning: true } : {}),
+            ...(model.variants ? { variants: model.variants } : {}),
+          },
+        ])
       ),
     })),
     connectedProviders: response.connected,
@@ -80,6 +92,7 @@ export const ocSessionService = {
     useOcSessionStore.getState().removeSession(sessionId);
     useOcMessageStore.getState().clearSession(sessionId);
     useOcPermissionStore.getState().clearSession(sessionId);
+    useToolStore.getState().clearSessionTools(sessionId);
   },
 
   async updateSessionTitle(sessionId: string, title: string): Promise<void> {
@@ -111,6 +124,7 @@ export const ocSessionService = {
       sessionId,
       hasModel: Boolean(options?.providerId && options.modelId),
       agent: options?.agent,
+      variant: options?.variant,
     });
 
     const model =
@@ -130,6 +144,7 @@ export const ocSessionService = {
         // are always lexicographically less than the backend's timestamp-based IDs.
         ...(options?.agent ? { agent: options.agent } : {}),
         ...(model ? { model } : {}),
+        ...(options?.variant ? { variant: options.variant } : {}),
         parts: [
           {
             type: 'text',
@@ -145,6 +160,24 @@ export const ocSessionService = {
   async abortSession(sessionId: string): Promise<void> {
     logger.info('Aborting session', { sessionId });
     await getClient().session.abort({ sessionID: sessionId }, { throwOnError: true });
+  },
+
+  async revertSession(sessionId: string, messageId: string): Promise<OcSession> {
+    logger.info('Reverting session', { sessionId, messageId });
+    const response = await getClient().session.revert(
+      {
+        sessionID: sessionId,
+        messageID: messageId,
+      },
+      { throwOnError: true }
+    );
+    const session = response.data;
+    if (!session) {
+      throw new Error('OpenCode returned no session from revert');
+    }
+
+    useOcSessionStore.getState().updateSession(session);
+    return session;
   },
 
   async loadMessages(sessionId: string): Promise<SessionMessagesResponses[200]> {

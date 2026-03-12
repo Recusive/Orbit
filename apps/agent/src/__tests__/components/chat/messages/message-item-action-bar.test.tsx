@@ -3,6 +3,10 @@ import { render, screen } from '@testing-library/react';
 import type { ChatMessage, MessageItemProps } from '@/components/chat/messages/types';
 import type { ReactNode } from 'react';
 
+const { mockMessageActions } = vi.hoisted(() => ({
+  mockMessageActions: vi.fn(() => <div data-testid="message-actions" />),
+}));
+
 vi.mock('@streamdown/code', () => ({
   code: {},
 }));
@@ -20,7 +24,7 @@ vi.mock('@/components/chat/messages/ToolWidgetRenderer', () => ({
 }));
 
 vi.mock('@/components/chat/messages/message-actions', () => ({
-  MessageActions: () => <div data-testid="message-actions" />,
+  MessageActions: mockMessageActions,
 }));
 
 vi.mock('@/components/chat/messages/feedback-dialog', () => ({
@@ -28,6 +32,7 @@ vi.mock('@/components/chat/messages/feedback-dialog', () => ({
 }));
 
 import { MessageItem } from '@/components/chat/messages/MessageItem';
+import { useBackendStore } from '@/stores/backend/backend-store';
 
 function makeAssistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -59,6 +64,11 @@ function renderMessageItem(overrides: Partial<MessageItemProps> = {}): void {
 }
 
 describe('MessageItem action bar visibility', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useBackendStore.setState({ activeBackend: 'claude' });
+  });
+
   it('hides actions for the active last message while agent is running', () => {
     renderMessageItem({
       isAgentRunning: true,
@@ -84,5 +94,20 @@ describe('MessageItem action bar visibility', () => {
     });
 
     expect(screen.getByTestId('message-actions')).toBeInTheDocument();
+  });
+
+  it('keeps rewind enabled for the latest OpenCode assistant response', () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+
+    renderMessageItem({
+      isAgentRunning: false,
+      isLastAssistantMessage: true,
+      message: makeAssistantMessage({ parentUuid: 'user-1' }),
+    });
+
+    expect(mockMessageActions).toHaveBeenCalledWith(
+      expect.objectContaining({ rewindDisabled: false, showRewind: true }),
+      undefined
+    );
   });
 });

@@ -31,7 +31,7 @@ export const CLAUDE_CAPABILITIES: BackendCapabilities = {
 };
 
 export const OPENCODE_CAPABILITIES: BackendCapabilities = {
-  rewind: false,
+  rewind: true,
   planMode: true,
   acceptMode: false,
   thinkingMode: false,

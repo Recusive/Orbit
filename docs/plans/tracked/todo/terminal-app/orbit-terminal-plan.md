@@ -8,7 +8,7 @@
 
 **Tech Stack:** Swift/SwiftUI/AppKit, libghostty (Zig, untouched), Ghostty Xcode project, URLSession + EventSource for HTTP+SSE
 
-**Spec:** `docs/specs/2026-03-10-orbit-terminal-design.md`
+**Spec:** `docs/plans/tracked/todo/terminal-app/orbit-terminal-design.md`
 
 **Source Repos:**
 

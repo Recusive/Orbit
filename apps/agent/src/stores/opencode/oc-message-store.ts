@@ -2,6 +2,7 @@
 
 import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 
 import type { OcMessage, OcPart } from '@/types/opencode';
 import type { SessionMessagesResponses } from '@opencode-ai/sdk/v2/client';
@@ -90,208 +91,163 @@ function upsertSortedPart(parts: OcPart[], part: OcPart): OcPart[] {
   return next;
 }
 
-export const useOcMessageStore = create<OcMessageState>((set) => ({
-  sessions: {},
-  setSessionMessages: (sessionId, entries) => {
-    logger.debug('Session messages set', { sessionId, messageCount: entries.length });
-    set((state) => {
-      const session = getOrCreateSession(state.sessions, sessionId);
-      session.messagesById = {};
-      session.messageOrder = [];
-      session.partsByMessage = {};
-      session.partsById = {};
-      session.deltaBufferByPart = {};
+export const useOcMessageStore = create<OcMessageState>()(
+  immer((set) => ({
+    sessions: {},
+    setSessionMessages: (sessionId, entries) => {
+      logger.debug('Session messages set', { sessionId, messageCount: entries.length });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, sessionId);
+        session.messagesById = {};
+        session.messageOrder = [];
+        session.partsByMessage = {};
+        session.partsById = {};
+        session.deltaBufferByPart = {};
 
-      for (const entry of entries) {
-        session.messagesById[entry.info.id] = entry.info;
-        session.partsByMessage[entry.info.id] = entry.parts
-          .slice()
-          .sort((left, right) => left.id.localeCompare(right.id));
+        for (const entry of entries) {
+          session.messagesById[entry.info.id] = entry.info;
+          session.partsByMessage[entry.info.id] = entry.parts
+            .slice()
+            .sort((left, right) => left.id.localeCompare(right.id));
 
-        for (const part of entry.parts) {
-          session.partsById[part.id] = part;
+          for (const part of entry.parts) {
+            session.partsById[part.id] = part;
+          }
         }
-      }
-      session.messageOrder = orderMessageIds(session.messagesById);
 
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  upsertMessage: (message) => {
-    logger.debug('Message upserted', {
-      sessionId: message.sessionID,
-      messageId: message.id,
-      role: message.role,
-    });
-    set((state) => {
-      const session = getOrCreateSession(state.sessions, message.sessionID);
-      session.messagesById[message.id] = message;
-      session.messageOrder = orderMessageIds(session.messagesById);
+        session.messageOrder = orderMessageIds(session.messagesById);
+      });
+    },
+    upsertMessage: (message) => {
+      logger.debug('Message upserted', {
+        sessionId: message.sessionID,
+        messageId: message.id,
+        role: message.role,
+      });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, message.sessionID);
+        session.messagesById[message.id] = message;
+        session.messageOrder = orderMessageIds(session.messagesById);
+      });
+    },
+    removeMessage: (sessionId, messageId) => {
+      logger.debug('Message removed', { sessionId, messageId });
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) {
+          return;
+        }
 
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  removeMessage: (sessionId, messageId) => {
-    logger.debug('Message removed', { sessionId, messageId });
-    set((state) => {
-      const session = state.sessions[sessionId];
-      if (!session) {
-        return state;
-      }
+        delete session.messagesById[messageId];
+        session.messageOrder = session.messageOrder.filter((id) => id !== messageId);
+        const parts = session.partsByMessage[messageId] ?? [];
+        delete session.partsByMessage[messageId];
 
-      delete session.messagesById[messageId];
-      session.messageOrder = session.messageOrder.filter((id) => id !== messageId);
-      const parts = session.partsByMessage[messageId] ?? [];
-      delete session.partsByMessage[messageId];
+        for (const part of parts) {
+          delete session.partsById[part.id];
+          delete session.deltaBufferByPart[part.id];
+        }
+      });
+    },
+    upsertPart: (part) => {
+      logger.debug('Part upserted', {
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        partType: part.type,
+      });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, part.sessionID);
+        session.partsById[part.id] = part;
+        session.partsByMessage[part.messageID] = upsertSortedPart(
+          session.partsByMessage[part.messageID] ?? [],
+          part
+        );
+      });
+    },
+    removePart: (sessionId, partId) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        const part = session?.partsById[partId];
+        if (!session || !part) {
+          return;
+        }
 
-      for (const part of parts) {
-        delete session.partsById[part.id];
-        delete session.deltaBufferByPart[part.id];
-      }
-
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  upsertPart: (part) => {
-    logger.debug('Part upserted', {
-      sessionId: part.sessionID,
-      messageId: part.messageID,
-      partId: part.id,
-      partType: part.type,
-    });
-    set((state) => {
-      const session = getOrCreateSession(state.sessions, part.sessionID);
-      session.partsById[part.id] = part;
-      session.partsByMessage[part.messageID] = upsertSortedPart(
-        session.partsByMessage[part.messageID] ?? [],
-        part
-      );
-
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  removePart: (sessionId, partId) => {
-    set((state) => {
-      const session = state.sessions[sessionId];
-      const part = session?.partsById[partId];
-      if (!session || !part) {
-        return state;
-      }
-
-      delete session.partsById[partId];
-      delete session.deltaBufferByPart[partId];
-      session.partsByMessage[part.messageID] =
-        session.partsByMessage[part.messageID]?.filter((candidate) => candidate.id !== partId) ??
-        [];
-
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  appendDelta: (sessionId, messageId, partId, field, delta) => {
-    set((state) => {
-      const session = getOrCreateSession(state.sessions, sessionId);
-      const part = session.partsById[partId];
-
-      if (!part) {
-        session.deltaBufferByPart[partId] = [
-          ...(session.deltaBufferByPart[partId] ?? []),
-          { field, delta },
-        ];
-        return {
-          sessions: {
-            ...state.sessions,
-          },
-        };
-      }
-
-      const currentField =
-        ((part as unknown as Record<string, unknown>)[field] as string | undefined) ?? '';
-      const updatedPart = {
-        ...part,
-        [field]: currentField + delta,
-      } as OcPart;
-
-      session.partsById[partId] = updatedPart;
-      session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
-        (candidate) => (candidate.id === partId ? updatedPart : candidate)
-      );
-
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  flushDeltaBuffer: (sessionId, messageId, partId) => {
-    set((state) => {
-      const session = state.sessions[sessionId];
-      if (!session) {
-        return state;
-      }
-
-      const buffered = session.deltaBufferByPart[partId];
-      if (!buffered || buffered.length === 0) {
-        return state;
-      }
-
-      delete session.deltaBufferByPart[partId];
-      for (const entry of buffered) {
+        delete session.partsById[partId];
+        delete session.deltaBufferByPart[partId];
+        session.partsByMessage[part.messageID] =
+          session.partsByMessage[part.messageID]?.filter((candidate) => candidate.id !== partId) ??
+          [];
+      });
+    },
+    appendDelta: (sessionId, messageId, partId, field, delta) => {
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, sessionId);
         const part = session.partsById[partId];
+
         if (!part) {
-          continue;
+          session.deltaBufferByPart[partId] = [
+            ...(session.deltaBufferByPart[partId] ?? []),
+            { field, delta },
+          ];
+          return;
         }
 
         const currentField =
-          ((part as unknown as Record<string, unknown>)[entry.field] as string | undefined) ?? '';
+          ((part as unknown as Record<string, unknown>)[field] as string | undefined) ?? '';
         const updatedPart = {
           ...part,
-          [entry.field]: currentField + entry.delta,
+          [field]: currentField + delta,
         } as OcPart;
+
         session.partsById[partId] = updatedPart;
         session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
           (candidate) => (candidate.id === partId ? updatedPart : candidate)
         );
-      }
+      });
+    },
+    flushDeltaBuffer: (sessionId, messageId, partId) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) {
+          return;
+        }
 
-      return {
-        sessions: {
-          ...state.sessions,
-        },
-      };
-    });
-  },
-  clearSession: (sessionId) => {
-    logger.debug('Session cleared', { sessionId });
-    set((state) => {
-      return {
-        sessions: Object.fromEntries(
-          Object.entries(state.sessions).filter(([id]) => id !== sessionId)
-        ),
-      };
-    });
-  },
-  clearAll: () => {
-    set({ sessions: {} });
-  },
-}));
+        const buffered = session.deltaBufferByPart[partId];
+        if (!buffered || buffered.length === 0) {
+          return;
+        }
+
+        delete session.deltaBufferByPart[partId];
+        for (const entry of buffered) {
+          const part = session.partsById[partId];
+          if (!part) {
+            continue;
+          }
+
+          const currentField =
+            ((part as unknown as Record<string, unknown>)[entry.field] as string | undefined) ?? '';
+          const updatedPart = {
+            ...part,
+            [entry.field]: currentField + entry.delta,
+          } as OcPart;
+          session.partsById[partId] = updatedPart;
+          session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
+            (candidate) => (candidate.id === partId ? updatedPart : candidate)
+          );
+        }
+      });
+    },
+    clearSession: (sessionId) => {
+      logger.debug('Session cleared', { sessionId });
+      set((state) => {
+        delete state.sessions[sessionId];
+      });
+    },
+    clearAll: () => {
+      set((state) => {
+        state.sessions = {};
+      });
+    },
+  }))
+);

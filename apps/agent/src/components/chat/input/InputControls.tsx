@@ -1,6 +1,8 @@
 import { ArrowUp, Image, Square } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
 
+import { OcModelSelector, OcThinkingSelector } from '../oc-control-bar';
+
 import { EffortLevelButton } from './EffortLevelButton';
 import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
@@ -23,6 +25,30 @@ import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useContainerWidth } from '@/hooks/ui';
 import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
+import { useActiveBackend } from '@/stores/backend';
+import { useOcProviderStore } from '@/stores/opencode';
+import { getCapabilities } from '@/types/backend';
+
+type OcAgent = 'build' | 'plan' | 'explore';
+
+function formatOcAgent(agent: OcAgent): string {
+  return agent.charAt(0).toUpperCase() + agent.slice(1);
+}
+
+function getNextOcAgent(agent: OcAgent): OcAgent {
+  return agent === 'build' ? 'plan' : agent === 'plan' ? 'explore' : 'build';
+}
+
+function getOcAgentTextClass(agent: OcAgent): string {
+  switch (agent) {
+    case 'build':
+      return 'text-primary hover:text-primary';
+    case 'plan':
+      return 'text-mode-plan hover:text-mode-plan';
+    case 'explore':
+      return 'text-[#d85ba8] hover:text-[#d85ba8]';
+  }
+}
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
@@ -50,9 +76,35 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   getActiveDots,
   getEffortInfo,
 }) {
+  const activeBackend = useActiveBackend();
+  const capabilities = getCapabilities(activeBackend);
+  const ocAgent = useOcProviderStore((state) => state.selectedAgent);
+  const setOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
+  const ocProviders = useOcProviderStore((state) => state.providers);
+  const ocProviderId = useOcProviderStore((state) => state.selectedProviderId);
+  const ocModelId = useOcProviderStore((state) => state.selectedModelId);
   const isAdaptiveModel = model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
+  const showModePicker = activeBackend === 'claude';
+  const showOcAgentPicker = activeBackend === 'opencode';
+  const showOcModelSelector = activeBackend === 'opencode';
+  const ocProvider = ocProviders.find((item) => item.id === ocProviderId) ?? ocProviders[0];
+  const ocModel = ocProvider
+    ? ((ocModelId ? ocProvider.models[ocModelId] : undefined) ??
+      Object.values(ocProvider.models)[0])
+    : undefined;
+  const showOcThinkingSelector = Object.keys(ocModel?.variants ?? {}).length > 0;
+  const showModelSelector = capabilities.modelSelector === 'claude-models';
+  const showOcModelSeparator = showOcAgentPicker && showOcModelSelector;
+  const showOcThinkingSeparator = showOcAgentPicker && showOcThinkingSelector;
+  const showEffortControl = capabilities.effortLevel && isAdaptiveModel;
+  const showThinkingControl = capabilities.thinkingMode && !isAdaptiveModel;
+  const showCompactMenu = showEffortControl || showThinkingControl;
+  const shouldShowContext = maxTokens > 0;
+  const cycleOcAgent = (): void => {
+    setOcAgent(getNextOcAgent(ocAgent));
+  };
 
   // Width is 0 before first measurement; avoid entering compact mode prematurely
   const hasMeasured = width > 0;
@@ -72,33 +124,69 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
       {/* Left Controls - Mode & Model Pickers */}
       <div className="flex items-center gap-0.5">
         {/* Mode Picker */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={cycleInputMode}
-              aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
-              className={cn(
-                `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-                inputMode === 'default' &&
-                  'bg-lg-control text-foreground hover:bg-lg-control-hover',
-                inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
-                inputMode === 'accept' &&
-                  'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
-              )}
-            >
-              <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="flex items-center gap-1.5">
-            <span className="leading-none">Input mode</span>
-            <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
-              <span className="text-[13px] leading-none">⇧</span> Tab
-            </Kbd>
-          </TooltipContent>
-        </Tooltip>
+        {showModePicker ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={cycleInputMode}
+                aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
+                className={cn(
+                  `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                  inputMode === 'default' &&
+                    'bg-lg-control text-foreground hover:bg-lg-control-hover',
+                  inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
+                  inputMode === 'accept' &&
+                    'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
+                )}
+              >
+                <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="flex items-center gap-1.5">
+              <span className="leading-none">Input mode</span>
+              <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
+                <span className="text-[13px] leading-none">⇧</span> Tab
+              </Kbd>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
         {/* Model Picker */}
-        <ModelSelector onModelChange={onModelChange} />
+        {showModelSelector ? <ModelSelector onModelChange={onModelChange} /> : null}
+        {showOcModelSelector ? <OcModelSelector /> : null}
+        {showOcModelSeparator ? (
+          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
+        ) : null}
+        {showOcThinkingSelector ? <OcThinkingSelector /> : null}
+        {showOcThinkingSeparator ? (
+          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
+        ) : null}
+        {showOcAgentPicker ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={cycleOcAgent}
+                aria-label={`Agent mode: ${formatOcAgent(ocAgent)}. Click to change.`}
+                className={cn(
+                  `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
+                  'bg-transparent hover:bg-lg-control-hover',
+                  getOcAgentTextClass(ocAgent),
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                )}
+              >
+                <span className="max-w-[120px] truncate text-sm font-medium">
+                  {formatOcAgent(ocAgent)}
+                </span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent className="flex items-center gap-1.5">
+              <span className="leading-none">Agent mode</span>
+              <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
+                <span className="text-[13px] leading-none">⇧</span> Tab
+              </Kbd>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
       </div>
 
       {/* Right Controls - Action Buttons */}
@@ -108,15 +196,17 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           // Order: Menu → Image → Context → Send
           <>
             {/* More Actions Dropdown - contains Thinking/Effort */}
-            <MoreActionsMenu
-              model={model}
-              cycleThinkingMode={cycleThinkingMode}
-              thinkingMode={thinkingMode}
-              getThinkingInfo={getThinkingInfo}
-              cycleEffortLevel={cycleEffortLevel}
-              effortLevel={effortLevel}
-              getEffortInfo={getEffortInfo}
-            />
+            {showCompactMenu ? (
+              <MoreActionsMenu
+                model={model}
+                cycleThinkingMode={cycleThinkingMode}
+                thinkingMode={thinkingMode}
+                getThinkingInfo={getThinkingInfo}
+                cycleEffortLevel={cycleEffortLevel}
+                effortLevel={effortLevel}
+                getEffortInfo={getEffortInfo}
+              />
+            ) : null}
 
             {/* Image Button - stays visible in compact mode */}
             <Tooltip>
@@ -143,7 +233,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
           // Expanded mode: all buttons inline
           <>
             {/* Thinking Mode / Effort Level Button — conditional on model */}
-            {isAdaptiveModel ? (
+            {showEffortControl ? (
               <EffortLevelButton
                 effortLevel={effortLevel}
                 effortHoverOpen={effortHoverOpen}
@@ -151,7 +241,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 cycleEffortLevel={cycleEffortLevel}
                 getEffortInfo={getEffortInfo}
               />
-            ) : (
+            ) : showThinkingControl ? (
               <ThinkingModeButton
                 thinkingMode={thinkingMode}
                 thinkingHoverOpen={thinkingHoverOpen}
@@ -160,7 +250,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 getThinkingInfo={getThinkingInfo}
                 getActiveDots={getActiveDots}
               />
-            )}
+            ) : null}
 
             {/* Image Button */}
             <Tooltip>
@@ -196,24 +286,26 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         />
 
         {/* Context Usage */}
-        <Context
-          maxTokens={maxTokens}
-          usedTokens={usage.inputTokens + usage.outputTokens}
-          usage={{
-            promptTokens: usage.inputTokens,
-            completionTokens: usage.outputTokens,
-            totalTokens: usage.inputTokens + usage.outputTokens,
-          }}
-        >
-          <ContextTrigger />
-          <ContextContent>
-            <ContextContentHeader />
-            <ContextContentBody>
-              <ContextInputUsage />
-              <ContextOutputUsage />
-            </ContextContentBody>
-          </ContextContent>
-        </Context>
+        {shouldShowContext ? (
+          <Context
+            maxTokens={maxTokens}
+            usedTokens={usage.inputTokens + usage.outputTokens}
+            usage={{
+              promptTokens: usage.inputTokens,
+              completionTokens: usage.outputTokens,
+              totalTokens: usage.inputTokens + usage.outputTokens,
+            }}
+          >
+            <ContextTrigger />
+            <ContextContent>
+              <ContextContentHeader />
+              <ContextContentBody>
+                <ContextInputUsage />
+                <ContextOutputUsage />
+              </ContextContentBody>
+            </ContextContent>
+          </Context>
+        ) : null}
 
         {/* Send/Stop Button */}
         <Tooltip>

@@ -9,6 +9,7 @@ import {
   BashToolWidget,
   BrowserToolWidget,
   EditToolWidget,
+  GenericToolWidget,
   GlobToolWidget,
   GrepToolWidget,
   PlanToolWidget,
@@ -48,6 +49,14 @@ function getStatusProps(tool: ToolExecution): {
     success: tool.status === 'error' ? false : tool.success,
     output: typeof tool.toolOutput === 'string' ? tool.toolOutput : undefined,
   };
+}
+
+function hasEditShape(tool: ToolExecution): boolean {
+  return (
+    typeof tool.toolInput['file_path'] === 'string' &&
+    typeof tool.toolInput['old_string'] === 'string' &&
+    typeof tool.toolInput['new_string'] === 'string'
+  );
 }
 
 export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
@@ -97,6 +106,29 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
           isRunning={statusProps.isRunning}
           success={statusProps.success}
           onOpenFile={onOpenFile}
+        />
+      );
+
+    case 'multiedit':
+      if (hasEditShape(tool)) {
+        return (
+          <EditToolWidget
+            filePath={getStringInput(tool, 'file_path', 'unknown')}
+            oldString={getStringInput(tool, 'old_string', '')}
+            newString={getStringInput(tool, 'new_string', '')}
+            isRunning={statusProps.isRunning}
+            success={statusProps.success}
+            onOpenFile={onOpenFile}
+          />
+        );
+      }
+      return (
+        <GenericToolWidget
+          toolName={tool.toolName}
+          toolInput={tool.toolInput}
+          toolOutput={tool.toolOutput}
+          isRunning={statusProps.isRunning}
+          success={statusProps.success}
         />
       );
 
@@ -150,6 +182,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       );
 
     case 'todowrite':
+    case 'todoread':
       // Todos are rendered in the persistent TodoBar above the input box.
       // No inline widget needed — prevents repetitive todo snapshots in the stream.
       return null;
@@ -239,6 +272,14 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
           />
         );
       }
-      return null;
+      return (
+        <GenericToolWidget
+          toolName={tool.toolName}
+          toolInput={tool.toolInput}
+          toolOutput={tool.toolOutput}
+          isRunning={statusProps.isRunning}
+          success={statusProps.success}
+        />
+      );
   }
 };

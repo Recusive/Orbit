@@ -32,6 +32,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   sessionId,
   queuedMessage,
   pendingPermissions,
+  questions,
   inputMode,
   thinkingMode,
   effortLevel,
@@ -50,6 +51,9 @@ export const ChatContent: FC<ChatContentProps> = ({
   onModelChange,
   onPermissionApprove,
   onPermissionDeny,
+  onQuestionReply,
+  onQuestionReject,
+  extraControls,
 }) => {
   const vaultOpen = useVaultOpen();
   const isEmptyState = messages.length === 0 && !isLoadingConversation;
@@ -71,6 +75,9 @@ export const ChatContent: FC<ChatContentProps> = ({
     onThinkingModeChange,
     onEffortChange: onEffortLevelChange,
     onModelChange,
+    ...(questions !== undefined ? { questions } : {}),
+    ...(onQuestionReply !== undefined ? { onQuestionReply } : {}),
+    ...(onQuestionReject !== undefined ? { onQuestionReject } : {}),
   } as const;
 
   return (
@@ -96,6 +103,7 @@ export const ChatContent: FC<ChatContentProps> = ({
           className="flex-1 flex flex-col justify-center"
           style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }}
         >
+          {extraControls}
           <ChatInput {...inputProps} />
         </div>
       ) : (
@@ -117,6 +125,7 @@ export const ChatContent: FC<ChatContentProps> = ({
           {/* Floating input container — transparent with soft fade at top */}
           <div className="absolute bottom-0 inset-x-0 z-20 pb-2 chat-input-frost">
             <TodoBar />
+            {extraControls}
             <ChatInput {...inputProps} />
           </div>
         </div>

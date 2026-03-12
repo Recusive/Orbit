@@ -29,6 +29,11 @@ interface ChatActionsDeps {
   postMessage: (message: WebviewMessage) => void;
 }
 
+interface ChatOpenHandlers {
+  handleOpenFile: (path: string) => void;
+  handleOpenUrl: (url: string) => void;
+}
+
 interface ChatActionsReturn {
   handleSend: (
     text: string,
@@ -55,6 +60,7 @@ interface ChatActionsReturn {
 
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   const { postMessage } = deps;
+  const { handleOpenFile, handleOpenUrl } = createChatOpenHandlers(deps);
 
   /**
    * [warning] TESTED: Send-time title generation in this action creator is covered by
@@ -551,30 +557,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     }
   };
 
-  const handleOpenFile = (path: string): void => {
-    const fileViewerStore = useFileViewerStore.getState();
-    fileViewerStore.openFile(path);
-
-    const uiState = useUIStore.getState();
-    if (!uiState.reviewPanelOpen) {
-      uiState.toggleReviewPanel();
-    }
-
-    postMessage({
-      type: 'file:read',
-      uuid: crypto.randomUUID(),
-      path,
-    });
-  };
-
-  const handleOpenUrl = (url: string): void => {
-    postMessage({
-      type: 'url:open',
-      uuid: crypto.randomUUID(),
-      url,
-    });
-  };
-
   const handleModeChange = (mode: 'default' | 'plan' | 'accept'): void => {
     useToolStore.getState().setInputMode(mode);
     const sessionId = useChatStore.getState().activeSessionId ?? '';
@@ -639,5 +621,38 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     handleThinkingModeChange,
     handleEffortLevelChange,
     handleModelChange,
+  };
+}
+
+export function createChatOpenHandlers(deps: ChatActionsDeps): ChatOpenHandlers {
+  const { postMessage } = deps;
+
+  const handleOpenFile = (path: string): void => {
+    const fileViewerStore = useFileViewerStore.getState();
+    fileViewerStore.openFile(path);
+
+    const uiState = useUIStore.getState();
+    if (!uiState.reviewPanelOpen) {
+      uiState.toggleReviewPanel();
+    }
+
+    postMessage({
+      type: 'file:read',
+      uuid: crypto.randomUUID(),
+      path,
+    });
+  };
+
+  const handleOpenUrl = (url: string): void => {
+    postMessage({
+      type: 'url:open',
+      uuid: crypto.randomUUID(),
+      url,
+    });
+  };
+
+  return {
+    handleOpenFile,
+    handleOpenUrl,
   };
 }

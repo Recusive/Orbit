@@ -3,7 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { UseChatInputOptions } from '@/components/chat/input/types';
 
 import { useChatInput } from '@/components/chat/input/use-chat-input';
+import { useBackendStore } from '@/stores/backend/backend-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
+import { useOcProviderStore } from '@/stores/opencode';
 
 vi.mock('@/stores/agent', () => {
   const fetchCommands = vi.fn(() => Promise.resolve());
@@ -61,6 +63,8 @@ function createOptions(overrides: Partial<UseChatInputOptions> = {}): UseChatInp
 describe('useChatInput pending file chips', () => {
   beforeEach(() => {
     usePendingContextStore.setState({ pending: [] });
+    useBackendStore.setState({ activeBackend: 'claude' });
+    useOcProviderStore.setState({ selectedAgent: 'build' });
     vi.clearAllMocks();
   });
 
@@ -149,5 +153,48 @@ describe('useChatInput pending file chips', () => {
         expect.objectContaining({ type: 'folder', path: '/repo/src' }),
       ])
     );
+  });
+
+  it('cycles OpenCode agent mode on Shift+Tab', () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    const onModeChange = vi.fn();
+    const { result } = renderHook(() => useChatInput(createOptions({ onModeChange })));
+    const preventDefault = vi.fn();
+
+    act(() => {
+      result.current.handleKeyDown({
+        key: 'Tab',
+        shiftKey: true,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault,
+      } as unknown as React.KeyboardEvent);
+    });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(useOcProviderStore.getState().selectedAgent).toBe('plan');
+  });
+
+  it('wraps OpenCode agent mode from explore back to build on Shift+Tab', () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    useOcProviderStore.setState({ selectedAgent: 'explore' });
+    const { result } = renderHook(() => useChatInput(createOptions()));
+    const preventDefault = vi.fn();
+
+    act(() => {
+      result.current.handleKeyDown({
+        key: 'Tab',
+        shiftKey: true,
+        metaKey: false,
+        ctrlKey: false,
+        altKey: false,
+        preventDefault,
+      } as unknown as React.KeyboardEvent);
+    });
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(useOcProviderStore.getState().selectedAgent).toBe('build');
   });
 });

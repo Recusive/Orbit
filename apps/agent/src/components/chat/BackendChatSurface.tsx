@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
 
-import { OcChatController } from './opencode';
+import { OcAgentSurface } from './OcAgentSurface';
 
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
@@ -220,7 +220,7 @@ export const BackendChatSurface: FC<BackendChatSurfaceProps> = ({ surface }) => 
   const activeBackend = useActiveBackend();
 
   if (activeBackend === 'opencode') {
-    return <OcChatController surface={surface} />;
+    return <OcAgentSurface />;
   }
 
   if (surface === 'agent') {

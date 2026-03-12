@@ -25,7 +25,9 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING } from '@/lib/utils';
+import { useActiveBackend } from '@/stores/backend';
 import { useUIStore } from '@/stores/ui/ui-store';
+import { getCapabilities } from '@/types/backend';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
 const USER_MESSAGE_MAX_HEIGHT = 200;
@@ -248,6 +250,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   onOpenUrl,
   onFeedback,
 }) {
+  const activeBackend = useActiveBackend();
+  const supportsRewind = getCapabilities(activeBackend).rewind;
+  const rewindDisabled =
+    !supportsRewind ||
+    isAgentRunning ||
+    (activeBackend === 'claude'
+      ? isLastAssistantMessage
+      : message.parentUuid === undefined || message.parentUuid === null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [messageHovered, setMessageHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -432,7 +442,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             <>
               <MessageActions
                 isHovered={messageHovered}
-                rewindDisabled={isLastAssistantMessage || isAgentRunning}
+                showRewind={supportsRewind}
+                rewindDisabled={rewindDisabled}
                 turnDurationMs={message.turnDurationMs}
                 onCopy={() => {
                   void navigator.clipboard.writeText(message.content);

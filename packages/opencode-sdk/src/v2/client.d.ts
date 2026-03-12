@@ -693,7 +693,10 @@ export interface SseResponse<T> {
 
 export interface OrbitClient {
   global: {
-    event(options?: { signal?: AbortSignal; throwOnError?: boolean }): Promise<SseResponse<GlobalEvent>>;
+    event(options?: {
+      signal?: AbortSignal;
+      throwOnError?: boolean;
+    }): Promise<SseResponse<GlobalEvent>>;
   };
   session: {
     list(
@@ -710,6 +713,10 @@ export interface OrbitClient {
     ): Promise<ApiResponse<Session>>;
     get(
       parameters: { sessionID: string },
+      options?: { throwOnError?: boolean }
+    ): Promise<ApiResponse<Session>>;
+    fork(
+      parameters: { sessionID: string; directory?: string; workspace?: string; messageID?: string },
       options?: { throwOnError?: boolean }
     ): Promise<ApiResponse<Session>>;
     delete(
@@ -735,6 +742,20 @@ export interface OrbitClient {
       parameters: { sessionID: string },
       options?: { throwOnError?: boolean }
     ): Promise<ApiResponse<boolean>>;
+    revert(
+      parameters: {
+        sessionID: string;
+        directory?: string;
+        workspace?: string;
+        messageID?: string;
+        partID?: string;
+      },
+      options?: { throwOnError?: boolean }
+    ): Promise<ApiResponse<Session>>;
+    unrevert(
+      parameters: { sessionID: string; directory?: string; workspace?: string },
+      options?: { throwOnError?: boolean }
+    ): Promise<ApiResponse<Session>>;
   };
   permission: {
     reply(

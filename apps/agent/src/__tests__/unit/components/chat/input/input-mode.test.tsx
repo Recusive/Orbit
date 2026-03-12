@@ -26,6 +26,8 @@ import type { ReactNode } from 'react';
 import { InputControls } from '@/components/chat/input/InputControls';
 import { INPUT_MODE_LABELS } from '@/components/chat/input/constants';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { useBackendStore } from '@/stores/backend/backend-store';
+import { useOcProviderStore } from '@/stores/opencode/oc-provider-store';
 
 /**
  * Wrapper component that provides required context for InputControls.
@@ -79,6 +81,10 @@ function createDefaultProps(overrides: Partial<InputControlsProps> = {}): InputC
  */
 function getModePickerButton(): HTMLElement {
   return screen.getByRole('button', { name: /Input mode:.*Click to change/i });
+}
+
+function getOcAgentButton(): HTMLElement {
+  return screen.getByRole('button', { name: /Agent mode:.*Click to change/i });
 }
 
 // =============================================================================
@@ -151,6 +157,37 @@ describe('cycleInputMode logic', () => {
 // =============================================================================
 
 describe('InputControls Mode Picker Button', () => {
+  beforeEach(() => {
+    useBackendStore.setState({ activeBackend: 'claude' });
+    useOcProviderStore.setState({
+      providers: [
+        {
+          id: 'anthropic',
+          name: 'Anthropic',
+          env: [],
+          models: {
+            'claude-sonnet-4-5': {
+              id: 'claude-sonnet-4-5',
+              name: 'Claude Sonnet 4.5',
+              reasoning: true,
+              variants: {
+                high: {},
+                max: {},
+              },
+            },
+          },
+        },
+      ],
+      connectedProviders: ['anthropic'],
+      defaultModels: { anthropic: 'claude-sonnet-4-5' },
+      authMethods: {},
+      selectedProviderId: 'anthropic',
+      selectedModelId: 'claude-sonnet-4-5',
+      selectedAgent: 'build',
+      isLoading: false,
+    });
+  });
+
   describe('rendering', () => {
     it('should render the mode picker button', () => {
       render(<InputControls {...createDefaultProps()} />, { wrapper: TestWrapper });
@@ -184,6 +221,68 @@ describe('InputControls Mode Picker Button', () => {
 
       const button = getModePickerButton();
       expect(within(button).getByText('Accept')).toBeInTheDocument();
+    });
+  });
+
+  describe('backend capabilities', () => {
+    it('shows the OpenCode agent picker as a single cycling button inside the input box', async () => {
+      useBackendStore.setState({ activeBackend: 'opencode' });
+      useOcProviderStore.setState({ selectedAgent: 'explore' });
+      const user = userEvent.setup();
+
+      render(<InputControls {...createDefaultProps()} />, { wrapper: TestWrapper });
+
+      expect(screen.queryByRole('button', { name: /Input mode:/i })).not.toBeInTheDocument();
+      expect(screen.queryByText('Sonnet 4.6')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Build' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Plan' })).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'OpenCode thinking selector' })
+      ).toBeInTheDocument();
+      expect(within(getOcAgentButton()).getByText('Explore')).toBeInTheDocument();
+      expect(getOcAgentButton()).toHaveClass('bg-transparent');
+      expect(getOcAgentButton()).toHaveClass('text-[#d85ba8]');
+      expect(screen.getByRole('button', { name: 'OpenCode model selector' })).toBeInTheDocument();
+
+      await user.click(getOcAgentButton());
+
+      expect(within(getOcAgentButton()).getByText('Build')).toBeInTheDocument();
+      expect(getOcAgentButton()).toHaveClass('text-primary');
+      expect(useOcProviderStore.getState().selectedAgent).toBe('build');
+    });
+
+    it('opens the provider dialog from the OpenCode model picker', async () => {
+      useBackendStore.setState({ activeBackend: 'opencode' });
+      const user = userEvent.setup();
+
+      render(<InputControls {...createDefaultProps()} />, { wrapper: TestWrapper });
+
+      await user.click(screen.getByRole('button', { name: 'OpenCode model selector' }));
+      await user.click(screen.getByRole('menuitem', { name: 'Connect a provider' }));
+
+      expect(screen.getByText('Providers')).toBeInTheDocument();
+      expect(screen.getByText('Anthropic')).toBeInTheDocument();
+    });
+
+    it('lets OpenCode choose a model-specific thinking level', async () => {
+      useBackendStore.setState({ activeBackend: 'opencode' });
+      const user = userEvent.setup();
+
+      render(<InputControls {...createDefaultProps()} />, { wrapper: TestWrapper });
+
+      expect(screen.getByRole('button', { name: 'OpenCode thinking selector' })).toHaveTextContent(
+        'Default'
+      );
+
+      await user.click(screen.getByRole('button', { name: 'OpenCode thinking selector' }));
+      await user.click(screen.getByRole('menuitemradio', { name: 'Max' }));
+
+      expect(useOcProviderStore.getState().variantSelections['anthropic/claude-sonnet-4-5']).toBe(
+        'max'
+      );
+      expect(screen.getByRole('button', { name: 'OpenCode thinking selector' })).toHaveTextContent(
+        'Max'
+      );
     });
   });
 

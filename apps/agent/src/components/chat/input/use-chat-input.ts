@@ -18,11 +18,14 @@ import type { InputMode } from '@/types/protocol';
 import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
+import { useActiveBackend } from '@/stores/backend';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
+import { useOcProviderStore } from '@/stores/opencode';
 
 const logger = createLogger('ChatInput');
+const OPENCODE_AGENTS = ['build', 'plan', 'explore'] as const;
 
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
@@ -36,6 +39,9 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onThinkingModeChange,
     onEffortChange,
   } = options;
+  const activeBackend = useActiveBackend();
+  const selectedOcAgent = useOcProviderStore((state) => state.selectedAgent);
+  const setSelectedOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
 
   // Core input state
   const [inputText, setInputText] = useState('');
@@ -497,13 +503,22 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         return;
       }
 
-      // Shift+Tab cycles input mode when focus is inside the chat input.
+      // Shift+Tab cycles the active backend mode when focus is inside the chat input.
       // Scoped here to preserve native reverse-tab navigation elsewhere.
       if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
-        const nextMode: InputMode =
-          inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
-        onModeChange(nextMode);
+
+        if (activeBackend === 'claude') {
+          const nextMode: InputMode =
+            inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
+          onModeChange(nextMode);
+        } else {
+          const currentIndex = OPENCODE_AGENTS.indexOf(selectedOcAgent);
+          const nextIndex = (currentIndex + 1) % OPENCODE_AGENTS.length;
+          const nextAgent = OPENCODE_AGENTS[nextIndex] ?? 'build';
+          setSelectedOcAgent(nextAgent);
+        }
+
         return;
       }
 
@@ -513,7 +528,17 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         handleSend();
       }
     },
-    [popover, slashCommands, handleSlashSelect, handleSend, inputMode, onModeChange]
+    [
+      activeBackend,
+      popover,
+      slashCommands,
+      handleSlashSelect,
+      handleSend,
+      inputMode,
+      onModeChange,
+      selectedOcAgent,
+      setSelectedOcAgent,
+    ]
   );
 
   // Paste handler

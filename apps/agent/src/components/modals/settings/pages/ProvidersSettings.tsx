@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { SectionDivider, SectionHeader } from '../components';
 
+import type { OcProviderAuthMethod } from '@/types/opencode';
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -73,7 +74,9 @@ export const ProvidersSettings: FC = () => {
         ) : null}
 
         {catalog.map((provider) => {
-          const providerMethods = authMethods[provider.id] ?? [];
+          const providerMethods: OcProviderAuthMethod[] = authMethods[provider.id] ?? [
+            { type: 'api', label: 'API key' },
+          ];
           const isConnected = connectedProviders.includes(provider.id);
           const defaultModelId = defaultModels[provider.id];
 

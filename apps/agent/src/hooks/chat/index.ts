@@ -3,3 +3,4 @@
  */
 
 export { useChatMessages } from './use-chat-messages';
+export { useOcChatAdapter } from './use-oc-chat-adapter';

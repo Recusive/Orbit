@@ -5,6 +5,12 @@ import type { OcProviderAuthMethod } from '@/types/opencode';
 export interface OcProviderModel {
   readonly id: string;
   readonly name: string;
+  readonly reasoning?: boolean;
+  readonly variants?: Record<string, Record<string, unknown>>;
+}
+
+function modelKey(providerId: string, modelId: string): string {
+  return `${providerId}/${modelId}`;
 }
 
 export interface OcProviderInfo {
@@ -19,6 +25,7 @@ interface OcProviderState {
   connectedProviders: string[];
   defaultModels: Record<string, string>;
   authMethods: Record<string, OcProviderAuthMethod[]>;
+  variantSelections: Record<string, string | undefined>;
   selectedProviderId: string | null;
   selectedModelId: string | null;
   selectedAgent: 'build' | 'plan' | 'explore';
@@ -32,6 +39,7 @@ interface OcProviderState {
   setAuthMethods: (authMethods: Record<string, OcProviderAuthMethod[]>) => void;
   setSelectedProviderId: (providerId: string) => void;
   setSelectedModelId: (modelId: string | null) => void;
+  setSelectedVariant: (providerId: string, modelId: string, variant: string | undefined) => void;
   setSelectedAgent: (agent: 'build' | 'plan' | 'explore') => void;
   clear: () => void;
 }
@@ -41,6 +49,7 @@ export const useOcProviderStore = create<OcProviderState>((set) => ({
   connectedProviders: [],
   defaultModels: {},
   authMethods: {},
+  variantSelections: {},
   selectedProviderId: null,
   selectedModelId: null,
   selectedAgent: 'build',
@@ -54,9 +63,15 @@ export const useOcProviderStore = create<OcProviderState>((set) => ({
         providers.find((provider) => provider.id === state.selectedProviderId) ??
         providers.find((provider) => connectedProviders.includes(provider.id)) ??
         providers[0];
-      const fallbackModelId = fallbackProvider
-        ? (defaultModels[fallbackProvider.id] ?? Object.keys(fallbackProvider.models)[0] ?? null)
-        : null;
+      const currentModelStillExists =
+        fallbackProvider?.id === state.selectedProviderId &&
+        state.selectedModelId !== null &&
+        fallbackProvider.models[state.selectedModelId] !== undefined;
+      const fallbackModelId = currentModelStillExists
+        ? state.selectedModelId
+        : fallbackProvider
+          ? (defaultModels[fallbackProvider.id] ?? Object.keys(fallbackProvider.models)[0] ?? null)
+          : null;
 
       return {
         providers,
@@ -84,6 +99,14 @@ export const useOcProviderStore = create<OcProviderState>((set) => ({
   setSelectedModelId: (selectedModelId) => {
     set({ selectedModelId });
   },
+  setSelectedVariant: (providerId, modelId, variant) => {
+    set((state) => ({
+      variantSelections: {
+        ...state.variantSelections,
+        [modelKey(providerId, modelId)]: variant,
+      },
+    }));
+  },
   setSelectedAgent: (selectedAgent) => {
     set({ selectedAgent });
   },
@@ -93,6 +116,7 @@ export const useOcProviderStore = create<OcProviderState>((set) => ({
       connectedProviders: [],
       defaultModels: {},
       authMethods: {},
+      variantSelections: {},
       selectedProviderId: null,
       selectedModelId: null,
       selectedAgent: 'build',
