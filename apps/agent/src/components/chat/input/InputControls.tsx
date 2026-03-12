@@ -168,7 +168,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 onClick={cycleOcAgent}
                 aria-label={`Agent mode: ${formatOcAgent(ocAgent)}. Click to change.`}
                 className={cn(
-                  `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
+                  `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
                   'bg-transparent hover:bg-lg-control-hover',
                   getOcAgentTextClass(ocAgent),
                   'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'

@@ -179,7 +179,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
       </div>
 
       {/* Scrollable content */}
-      <div ref={mergedScrollRef} className="flex-1 overflow-y-auto overscroll-y-contain">
+      <div
+        ref={mergedScrollRef}
+        className="flex-1 overflow-y-scroll overscroll-y-contain [scrollbar-gutter:stable_both-edges]"
+      >
         {/* Operation Error Banner */}
         {operationError ? <OperationError message={operationError} /> : null}
 
@@ -208,6 +211,9 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
           onPush={handlePush}
           isPushing={isPushing}
         />
+
+        {/* Section divider */}
+        <div className="mx-3 my-1.5 h-px bg-foreground/5" />
 
         {/* Changes List */}
         <ChangesList

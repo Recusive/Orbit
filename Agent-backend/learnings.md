@@ -157,6 +157,35 @@ to:
 
 **Rule:** Let SolidJS handle function-vs-element dispatch. Just pass it through in JSX.
 
+### `Dynamic` as function call vs JSX — subtree recreation bug
+
+**File:** `src/cli/cmd/tui/routes/session/index.tsx`
+
+Calling `Dynamic` as a function inside JSX has **catastrophically different** reactivity behavior than using it as JSX:
+
+```tsx
+// BAD — function call: SolidJS wraps in reactive computation.
+// ANY signal read inside re-executes the ENTIRE call, destroying + recreating the component.
+{
+  ;(Dynamic as Function)({
+    last: index() === props.parts.length - 1, // reactive!
+    component: component(),
+    part,
+    message: props.message,
+  })
+}
+
+// GOOD — JSX: SolidJS creates granular reactive bindings per prop.
+// Only the `component` prop changing triggers component replacement.
+;<Dynamic component={component()} last={someSignal()} part={part} message={props.message} />
+```
+
+**What happened:** Every time `parts.length` changed during streaming (new tool call part added), `index() === props.parts.length - 1` re-evaluated for ALL parts. Since Dynamic was called as a function, this destroyed and recreated **every** `<markdown>` element and all its internal `CodeRenderable` children. New CodeRenderables start with `_shouldRenderTextBuffer = false` (text invisible) until async tree-sitter highlighting completes → **screen flash** (text blanks out then reappears).
+
+**Fix:** Removed the unused `last` prop from the Dynamic call. No reactive signals read = no re-execution = no recreation = no flash. Took 8+ conversations to trace.
+
+**Rule:** Never read signals inside a `Dynamic(...)` function call unless you want the entire subtree destroyed and recreated on every signal change. Use JSX `<Dynamic>` for granular prop updates.
+
 ### `createMemo`/`createSignal`/`createStore` must be in reactive scope
 
 These primitives MUST be called during component initialization (inside the component function body or inside `createSimpleContext.init()`). Moving them outside breaks SolidJS ownership tracking.

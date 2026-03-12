@@ -2,6 +2,7 @@ import path from "path"
 
 import {
   addDefaultParsers,
+  CodeRenderable,
   MacOSScrollAccel,
 
   TextAttributes,
@@ -77,6 +78,23 @@ import type { Tool } from "@/tool/tool"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { WriteTool } from "@/tool/write"
 import type { AssistantMessage, Part, ToolPart, UserMessage, TextPart, ReasoningPart } from "@opencode-ai/sdk/v2"
+import { Flag } from "@/flag/flag"
+
+// Monkey-patch CodeRenderable to prevent flash-of-invisible-text on re-highlighting.
+// MarkdownRenderable hardcodes drawUnstyledText=false on child CodeRenderables.
+// When a re-highlight triggers (syntaxStyle change, content update), the original
+// ensureVisibleTextBeforeHighlight() can set _shouldRenderTextBuffer=false, hiding
+// already-visible styled text until async tree-sitter completes — causing a flash.
+// This patch: if text is already visible, skip the method entirely to preserve the
+// current styled/concealed content. Initial renders (text not yet visible) run
+// the original logic unchanged.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- patching internal opentui prototype
+const CodeProto = CodeRenderable.prototype as any
+const _origEnsureVisible = CodeProto.ensureVisibleTextBeforeHighlight
+CodeProto.ensureVisibleTextBeforeHighlight = function () {
+  if (this._shouldRenderTextBuffer) return
+  _origEnsureVisible.call(this)
+}
 import type {ScrollAcceleration,
   ScrollBoxRenderable,
   MouseEvent as OpentuiMouseEvent} from "@opentui/core";
@@ -85,7 +103,6 @@ import type { DialogContext } from "@tui/ui/dialog"
 import type { JSX } from "solid-js"
 
 import { UI } from "@/cli/ui.ts"
-import { Flag } from "@/flag/flag"
 import { Global } from "@/global"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Filesystem } from "@/util/filesystem"
@@ -1474,7 +1491,7 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
   return (
     <>
       <For each={props.parts}>
-        {(part, index) => {
+        {(part) => {
           const component = createMemo(() => PART_MAPPING[part.type as keyof typeof PART_MAPPING])
           // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
           return (
@@ -1482,7 +1499,6 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
               { }
               {/* Dynamic component dispatch: part type is discriminated by PART_MAPPING lookup */}
               {(Dynamic as (props: Record<string, unknown>) => JSX.Element)({
-                last: index() === props.parts.length - 1,
                 component: component(),
                 part,
                 message: props.message,
@@ -1549,7 +1565,7 @@ const PART_MAPPING = {
   reasoning: ReasoningPart,
 }
 
-function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }): JSX.Element {
+function ReasoningPart(props: { part: ReasoningPart; message: AssistantMessage }): JSX.Element {
   const { theme, subtleSyntax } = useTheme()
   const ctx = use()
   const content = createMemo(() => {
@@ -1571,7 +1587,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
       >
         <code
           filetype="markdown"
-          drawUnstyledText={false}
+          drawUnstyledText={true}
           streaming={true}
           syntaxStyle={subtleSyntax()}
           content={"_Thinking:_ " + content()}
@@ -1583,7 +1599,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
   )
 }
 
-function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }): JSX.Element {
+function TextPart(props: { part: TextPart; message: AssistantMessage }): JSX.Element {
   const ctx = use()
   const { theme, syntax } = useTheme()
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
@@ -1618,7 +1634,7 @@ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMess
 
 // Pending messages moved to individual tool pending functions
 
-function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMessage }): JSX.Element {
+function ToolPart(props: { part: ToolPart; message: AssistantMessage }): JSX.Element {
   const ctx = use()
   const sync = useSync()
 

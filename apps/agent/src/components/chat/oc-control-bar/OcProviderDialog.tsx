@@ -1,9 +1,16 @@
-import { CheckCircle2, Circle } from 'lucide-react';
+import { Plug, X } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 
 import type { FC } from 'react';
 
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContentGlass, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogClose,
+  DialogContentGlass,
+  DialogDescription,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 import { useOcProviderStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -23,6 +30,19 @@ function showProviders(
   });
 }
 
+function getScrollMask(canScrollUp: boolean, canScrollDown: boolean): string {
+  if (canScrollUp && canScrollDown) {
+    return 'linear-gradient(to bottom, transparent, black 6px, black calc(100% - 6px), transparent)';
+  }
+  if (canScrollUp) {
+    return 'linear-gradient(to bottom, transparent, black 6px)';
+  }
+  if (canScrollDown) {
+    return 'linear-gradient(to bottom, black calc(100% - 6px), transparent)';
+  }
+  return 'none';
+}
+
 export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange }) => {
   const providers = useOcProviderStore((state) => state.providers);
   const connected = useOcProviderStore((state) => state.connectedProviders);
@@ -30,99 +50,157 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
   const setSelectedProviderId = useOcProviderStore((state) => state.setSelectedProviderId);
   const isLoading = useOcProviderStore((state) => state.isLoading);
   const openSettings = useUIStore((state) => state.openSettings);
+  const smoothScrollRef = useSmoothScroll(0.08);
+  const scrollElRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [canScrollDown, setCanScrollDown] = useState(false);
+
+  const updateScrollState = useCallback((): void => {
+    const el = scrollElRef.current;
+    if (el === null) return;
+    setCanScrollUp(el.scrollTop > 1);
+    setCanScrollDown(el.scrollTop + el.clientHeight < el.scrollHeight - 1);
+  }, []);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContentGlass className="w-[420px] gap-0 overflow-hidden p-0 glass-surface [&>.absolute]:hidden">
-        <div className="border-b border-foreground/10 px-5 py-4">
-          <DialogTitle className="text-base">Providers</DialogTitle>
-          <DialogDescription className="mt-1 text-sm">
-            Choose a connected provider or open provider settings to add another one.
-          </DialogDescription>
-        </div>
+        <div className="relative flex flex-col gap-4 px-4 pb-4 pt-5">
+          {/* Close button */}
+          <DialogClose className="absolute right-4 top-4 z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Close</span>
+          </DialogClose>
 
-        <div className="max-h-[380px] overflow-y-auto px-4 py-4">
-          {isLoading ? (
-            <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-sm text-muted-foreground">
-              Loading provider metadata...
+          {/* Icon + Title + Description */}
+          <div className="flex flex-col items-start gap-2.5">
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
+              <Plug className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
-          ) : providers.length === 0 ? (
-            <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-sm text-muted-foreground">
-              No providers available yet.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {providers.map((provider) => {
-                const isConnected = connected.includes(provider.id);
-                const isSelected = provider.id === selectedProviderId;
+            <DialogTitle className="liquid-glass-title">Providers</DialogTitle>
+            <DialogDescription className="liquid-glass-desc">
+              Choose a connected provider or open settings to add another one.
+            </DialogDescription>
+          </div>
 
-                return (
-                  <div
-                    key={provider.id}
-                    className={cn(
-                      'flex items-center justify-between gap-3 rounded-xl border px-3 py-3',
-                      isSelected
-                        ? 'border-foreground/15 bg-foreground/5'
-                        : 'border-border/60 bg-card/50'
-                    )}
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        {isConnected ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-success" />
-                        ) : (
-                          <Circle className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                        )}
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {provider.name}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {Object.keys(provider.models).length} models ·{' '}
-                        {isConnected ? 'Connected' : 'Not connected'}
-                      </div>
-                    </div>
-
-                    {isConnected ? (
-                      <Button
-                        size="sm"
-                        variant={isSelected ? 'default' : 'outline'}
-                        disabled={isSelected}
-                        onClick={() => {
-                          setSelectedProviderId(provider.id);
-                          onOpenChange(false);
-                        }}
-                      >
-                        {isSelected ? 'Selected' : 'Use provider'}
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          showProviders(openSettings, onOpenChange);
-                        }}
-                      >
-                        Open settings
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="border-t border-foreground/10 px-4 py-3">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              showProviders(openSettings, onOpenChange);
+          {/* Provider list */}
+          <div
+            ref={(node) => {
+              scrollElRef.current = node;
+              if (typeof smoothScrollRef === 'function') {
+                smoothScrollRef(node);
+              }
+              if (node !== null) {
+                queueMicrotask(updateScrollState);
+              }
+            }}
+            onScroll={updateScrollState}
+            className="max-h-[320px] overflow-y-auto overscroll-y-contain -mx-1 px-1"
+            style={{
+              WebkitMaskImage: getScrollMask(canScrollUp, canScrollDown),
+              maskImage: getScrollMask(canScrollUp, canScrollDown),
             }}
           >
-            Manage providers
-          </Button>
+            {isLoading ? (
+              <div className="rounded-[9px] px-3 py-3 liquid-glass-textarea text-sm text-muted-foreground">
+                Loading provider metadata...
+              </div>
+            ) : providers.length === 0 ? (
+              <div className="rounded-[9px] px-3 py-3 liquid-glass-textarea text-sm text-muted-foreground">
+                No providers available yet.
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {providers.map((provider) => {
+                  const isConnected = connected.includes(provider.id);
+                  const isSelected = provider.id === selectedProviderId;
+                  const modelCount = Object.keys(provider.models).length;
+
+                  return (
+                    <div
+                      key={provider.id}
+                      className={cn(
+                        'flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors',
+                        isSelected
+                          ? 'bg-foreground/5 ring-1 ring-foreground/8'
+                          : 'hover:bg-foreground/3'
+                      )}
+                    >
+                      {/* Status dot */}
+                      <div
+                        className={cn(
+                          'h-2 w-2 shrink-0 rounded-full',
+                          isConnected ? 'bg-success' : 'bg-muted-foreground/25'
+                        )}
+                      />
+
+                      {/* Provider info */}
+                      <div className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-foreground">
+                          {provider.name}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground mt-0.5">
+                          {modelCount} {modelCount === 1 ? 'model' : 'models'}
+                        </span>
+                      </div>
+
+                      {/* Action */}
+                      {isConnected ? (
+                        isSelected ? (
+                          <span className="shrink-0 inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-medium text-success">
+                            Active
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedProviderId(provider.id);
+                              onOpenChange(false);
+                            }}
+                            className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-control-fill-hover active:scale-[0.97]"
+                          >
+                            Use
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            showProviders(openSettings, onOpenChange);
+                          }}
+                          className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-control-fill-hover hover:text-foreground active:scale-[0.97]"
+                        >
+                          Setup
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Buttons */}
+          <div className="flex w-full items-center gap-2 pt-1">
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => {
+                onOpenChange(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="liquid-glass-btn liquid-glass-btn-primary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"
+              onClick={() => {
+                showProviders(openSettings, onOpenChange);
+              }}
+            >
+              Manage Providers
+            </button>
+          </div>
         </div>
       </DialogContentGlass>
     </Dialog>

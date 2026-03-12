@@ -1,95 +1,180 @@
-import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { IconPlusLarge } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconPlusLarge';
+import { Check, ChevronDown, Search } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { OcProviderDialog } from './OcProviderDialog';
 
 import type { FC } from 'react';
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { cn, TRANSITION_CLASSES } from '@/lib/utils';
+import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useSmoothScroll } from '@/hooks/ui';
+import { CHAT_WIDTH, cn, TRANSITION_CLASSES } from '@/lib/utils';
 import { useOcProviderStore } from '@/stores/opencode';
 
 export const OcModelSelector: FC = () => {
+  const [open, setOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [cmdkValue, setCmdkValue] = useState('');
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const smoothScrollRef = useSmoothScroll(0.08);
+
   const providers = useOcProviderStore((state) => state.providers);
   const providerId = useOcProviderStore((state) => state.selectedProviderId);
   const modelId = useOcProviderStore((state) => state.selectedModelId);
   const setModelId = useOcProviderStore((state) => state.setSelectedModelId);
   const selectedProvider = providers.find((provider) => provider.id === providerId) ?? providers[0];
-  const models = selectedProvider ? Object.values(selectedProvider.models) : [];
+  const models = useMemo(
+    () => (selectedProvider ? Object.values(selectedProvider.models) : []),
+    [selectedProvider]
+  );
   const selectedModel = models.find((model) => model.id === modelId) ?? models[0];
+
+  const normalizedQuery = query.trim().toLowerCase();
+  const visibleModels = useMemo(() => {
+    return models.filter((model) => {
+      if (normalizedQuery.length === 0) return true;
+      return model.name.toLowerCase().includes(normalizedQuery);
+    });
+  }, [models, normalizedQuery]);
+
+  const handleClose = useCallback((): void => {
+    setOpen(false);
+    setQuery('');
+  }, []);
+
+  const handleModelSelect = useCallback(
+    (id: string): void => {
+      setModelId(id);
+      handleClose();
+    },
+    [setModelId, handleClose]
+  );
+
+  const handleConnectProvider = useCallback((): void => {
+    handleClose();
+    setDialogOpen(true);
+  }, [handleClose]);
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
           <button
             aria-label="OpenCode model selector"
             className={cn(
-              'h-7 px-2.5 flex items-center gap-1.5 rounded-[9px]',
+              'h-7 px-2.5 flex items-center gap-1.5 rounded-full',
               'bg-transparent text-muted-foreground',
               TRANSITION_CLASSES.button,
               'hover:bg-lg-control-hover hover:text-foreground',
               'active:scale-[0.98]',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+              open && 'bg-lg-control text-foreground'
             )}
           >
             <span className="max-w-[180px] truncate text-sm font-medium">
               {selectedModel?.name ?? 'Select model'}
             </span>
-            <ChevronDown className="h-3 w-3 text-lg-text-secondary" />
+            <ChevronDown
+              className={cn(
+                'h-3 w-3 text-lg-text-secondary transition-transform duration-150',
+                open && 'rotate-180'
+              )}
+            />
           </button>
-        </DropdownMenuTrigger>
+        </PopoverTrigger>
 
-        <DropdownMenuContent align="start" className="w-[260px]">
-          <DropdownMenuLabel className="pb-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-            Provider
-          </DropdownMenuLabel>
-          <div className="px-2 pb-2 pt-1 text-sm font-medium text-foreground">
-            {selectedProvider?.name ?? 'No provider selected'}
-          </div>
+        <PopoverContent
+          align="start"
+          className="p-0"
+          style={{ width: CHAT_WIDTH.dropdown }}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+          }}
+        >
+          <Command
+            shouldFilter={false}
+            value={cmdkValue}
+            onValueChange={setCmdkValue}
+            disablePointerSelection
+            className="bg-transparent"
+          >
+            {/* Search bar */}
+            <div className="flex items-center px-1.5 pt-1.5 pb-0.5">
+              <div className="relative flex-1">
+                <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
+                <input
+                  ref={searchInputRef}
+                  autoFocus
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleClose();
+                    }
+                  }}
+                  placeholder="Search models"
+                  className="w-full h-7 rounded-[7px] bg-control-fill pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-control-fill-hover"
+                  aria-label="Search models"
+                />
+              </div>
+            </div>
 
-          <DropdownMenuSeparator />
+            {/* Scrollable model list with mask overlay */}
+            <CommandList
+              ref={smoothScrollRef}
+              className="max-h-52 overflow-y-auto overscroll-y-contain pb-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)]"
+            >
+              {visibleModels.length === 0 ? (
+                <div className="px-2.5 py-4 text-center text-[12px] text-muted-foreground/50">
+                  No models found.
+                </div>
+              ) : (
+                <CommandGroup heading="Models">
+                  {visibleModels.map((model) => (
+                    <CommandItem
+                      key={model.id}
+                      value={model.id}
+                      onSelect={() => {
+                        handleModelSelect(model.id);
+                      }}
+                      className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
+                    >
+                      <span className="truncate text-[12px]">{model.name}</span>
+                      {modelId === model.id ? (
+                        <Check className="h-3.5 w-3.5 shrink-0 ml-auto" />
+                      ) : null}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
 
-          {models.length > 0 ? (
-            <DropdownMenuRadioGroup
-              {...(modelId ? { value: modelId } : {})}
-              onValueChange={(value) => {
-                setModelId(value);
+            {/* Sticky footer — outside scroll container */}
+            <div className="mx-2.5 h-px bg-foreground/5" />
+            <div
+              className="p-1"
+              onMouseEnter={() => {
+                setCmdkValue('');
               }}
             >
-              {models.map((model) => (
-                <DropdownMenuRadioItem key={model.id} value={model.id}>
-                  {model.name}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          ) : (
-            <div className="px-2 py-3 text-sm text-muted-foreground">
-              Connect a provider to choose a model.
+              <button
+                type="button"
+                onClick={handleConnectProvider}
+                className="group relative flex w-full cursor-default select-none items-center gap-1.5 min-w-0 rounded-[9px] px-2.5 py-1.5 text-foreground hover:bg-foreground/8"
+              >
+                <IconPlusLarge className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-[12px]">Connect a provider</span>
+              </button>
             </div>
-          )}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem
-            onSelect={() => {
-              setDialogOpen(true);
-            }}
-          >
-            Connect a provider
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
       <OcProviderDialog open={dialogOpen} onOpenChange={setDialogOpen} />
     </>

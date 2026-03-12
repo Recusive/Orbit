@@ -102,12 +102,12 @@
       "light": "lightStep6"
     },
     "diffAdded": {
-      "dark": "#4fd6be",
-      "light": "#1e725c"
+      "dark": "#4ec990",
+      "light": "#1a8a4a"
     },
     "diffRemoved": {
-      "dark": "#c53b53",
-      "light": "#c53b53"
+      "dark": "#e06c75",
+      "light": "#d1383d"
     },
     "diffContext": {
       "dark": "#828bb8",
@@ -118,19 +118,19 @@
       "light": "#7086b5"
     },
     "diffHighlightAdded": {
-      "dark": "#b8db87",
-      "light": "#4db380"
+      "dark": "#6edd9a",
+      "light": "#2ba55e"
     },
     "diffHighlightRemoved": {
-      "dark": "#e26a75",
-      "light": "#f52a65"
+      "dark": "#f47a83",
+      "light": "#e5484d"
     },
     "diffAddedBg": {
-      "dark": "#20303b",
-      "light": "#d5e5d5"
+      "dark": "#1a3329",
+      "light": "#ddf4e4"
     },
     "diffRemovedBg": {
-      "dark": "#37222c",
+      "dark": "#3d2228",
       "light": "#f7d8db"
     },
     "diffContextBg": {
@@ -142,11 +142,11 @@
       "light": "lightStep3"
     },
     "diffAddedLineNumberBg": {
-      "dark": "#1b2b34",
-      "light": "#c5d5c5"
+      "dark": "#152e22",
+      "light": "#c8edcf"
     },
     "diffRemovedLineNumberBg": {
-      "dark": "#2d1f26",
+      "dark": "#332025",
       "light": "#e7c8cb"
     },
     "markdownText": {
