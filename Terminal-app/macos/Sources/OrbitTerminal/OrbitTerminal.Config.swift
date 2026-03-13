@@ -733,65 +733,6 @@ extension OrbitTerminal {
             _ = ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8)))
             return v
         }
-
-        // MARK: - Sidebar
-
-        /// Terminal background as NSColor, used for sidebar theme derivation.
-        var backgroundNSColor: NSColor {
-            var color: ghostty_config_color_s = .init()
-            let key = "background"
-            if ghostty_config_get(config, &color, key, UInt(key.lengthOfBytes(using: .utf8))) {
-                return NSColor(
-                    red: CGFloat(color.r) / 255,
-                    green: CGFloat(color.g) / 255,
-                    blue: CGFloat(color.b) / 255,
-                    alpha: 1
-                )
-            }
-            return .windowBackgroundColor
-        }
-
-        /// Terminal foreground as NSColor, used for sidebar theme derivation.
-        var foregroundNSColor: NSColor {
-            var color: ghostty_config_color_s = .init()
-            let key = "foreground"
-            if ghostty_config_get(config, &color, key, UInt(key.lengthOfBytes(using: .utf8))) {
-                return NSColor(
-                    red: CGFloat(color.r) / 255,
-                    green: CGFloat(color.g) / 255,
-                    blue: CGFloat(color.b) / 255,
-                    alpha: 1
-                )
-            }
-            return .labelColor
-        }
-
-        /// The sidebar theme derived from terminal colors.
-        var sidebarTheme: SidebarTheme {
-            return SidebarTheme.from(background: backgroundNSColor, foreground: foregroundNSColor)
-        }
-
-        /// The set of fields to display in sidebar tab cards.
-        /// Reads `sidebar-fields` config key (comma-separated), defaults to all fields.
-        var sidebarFields: Set<SidebarField> {
-            guard let config = self.config else { return SidebarField.defaultFields }
-            var v: UnsafePointer<Int8>?
-            let key = "sidebar-fields"
-            guard ghostty_config_get(config, &v, key, UInt(key.lengthOfBytes(using: .utf8))) else {
-                return SidebarField.defaultFields
-            }
-            guard let ptr = v else { return SidebarField.defaultFields }
-            let str = String(cString: ptr)
-
-            var fields: Set<SidebarField> = []
-            for component in str.split(separator: ",") {
-                let trimmed = component.trimmingCharacters(in: .whitespaces)
-                if let field = SidebarField(rawValue: trimmed) {
-                    fields.insert(field)
-                }
-            }
-            return fields.isEmpty ? SidebarField.defaultFields : fields
-        }
     }
 }
 

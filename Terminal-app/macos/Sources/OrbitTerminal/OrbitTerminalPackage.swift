@@ -374,12 +374,6 @@ extension Notification.Name {
 
     /// Focus the search field
     static let orbitTerminalSearchFocus = Notification.Name("com.orbit.orbit-terminal.searchFocus")
-
-    /// Desktop notification fired (OSC 9/99, command completion)
-    static let orbitTerminalDesktopNotificationDidFire = Notification.Name("com.orbit.orbit-terminal.desktopNotificationDidFire")
-
-    /// IPC notification (tab.notify command from orbitctl)
-    static let orbitTerminalIPCNotification = Notification.Name("com.orbit.orbit-terminal.ipcNotification")
 }
 
 // NOTE: I am moving all of these to Notification.Name extensions over time. This

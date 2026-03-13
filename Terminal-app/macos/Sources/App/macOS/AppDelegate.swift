@@ -197,9 +197,6 @@ class AppDelegate: NSObject,
             // a desirable behavior to NOT have happen for a terminal, so this is a win.
             // Manual autofill via the `Edit => AutoFill` menu item still work as expected.
             "NSAutoFillHeuristicControllerEnabled": false,
-
-            // Sidebar card border preference
-            "SidebarShowCardBorder": true,
         ])
     }
 
@@ -223,22 +220,6 @@ class AppDelegate: NSObject,
 
         // Start our update checker.
         updateController.startUpdater()
-
-        // Start the IPC server for external control (orbitctl, shell integrations)
-        OrbitTerminalIPCServer.shared.start()
-
-        // Add "Toggle Sidebar" menu item to the View menu (Cmd+S)
-        if let mainMenu = NSApp.mainMenu,
-           let viewMenu = mainMenu.item(withTitle: "View")?.submenu {
-            viewMenu.addItem(.separator())
-            let sidebarItem = NSMenuItem(
-                title: "Toggle Sidebar",
-                action: #selector(TerminalController.toggleSidebar(_:)),
-                keyEquivalent: "s"
-            )
-            sidebarItem.keyEquivalentModifierMask = .command
-            viewMenu.addItem(sidebarItem)
-        }
 
         // Register our service provider. This must happen after everything is initialized.
         NSApp.servicesProvider = ServiceProvider()
@@ -446,9 +427,6 @@ class AppDelegate: NSObject,
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Stop the IPC server and clean up the socket
-        OrbitTerminalIPCServer.shared.stop()
-
         // We have no notifications we want to persist after death,
         // so remove them all now. In the future we may want to be
         // more selective and only remove surface-targeted notifications.
@@ -596,17 +574,6 @@ class AppDelegate: NSObject,
     }
 
     private func localEventKeyDown(_ event: NSEvent) -> NSEvent? {
-        // Cmd+S: Toggle sidebar
-        if event.modifierFlags.contains(.command),
-           !event.modifierFlags.contains(.shift),
-           !event.modifierFlags.contains(.option),
-           !event.modifierFlags.contains(.control),
-           event.charactersIgnoringModifiers == "s",
-           let controller = NSApp.keyWindow?.windowController as? TerminalController {
-            controller.toggleSidebar(nil)
-            return nil
-        }
-
         // If the tab overview is visible and escape is pressed, close it.
         // This can't POSSIBLY be right and is probably a FirstResponder problem
         // that we should handle elsewhere in our program. But this works and it
