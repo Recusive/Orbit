@@ -1098,6 +1098,15 @@ export namespace Provider {
     return state().then((state) => state.providers)
   }
 
+  /**
+   * Invalidates the cached provider state so the next `list()` call
+   * re-reads auth.json and rebuilds the provider map from scratch.
+   * Called after any auth mutation (API key save, OAuth callback, auth removal).
+   */
+  export function reset(): void {
+    state.reset()
+  }
+
   async function getSDK(model: Model): Promise<SDK> {
     try {
       using _ = log.time("getSDK", {

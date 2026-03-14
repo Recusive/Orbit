@@ -13,8 +13,8 @@ export namespace State {
     root: () => string,
     init: () => S,
     dispose?: (state: Awaited<S>) => Promise<void>,
-  ): () => S {
-    return () => {
+  ): (() => S) & { reset(): void } {
+    const fn = (): S => {
       const key = root()
       let entries = recordsByKey.get(key)
       if (!entries) {
@@ -30,6 +30,18 @@ export namespace State {
       })
       return state
     }
+    // Cache invalidation only (not resource disposal).
+    // Clears this specific init from ALL directory-keyed caches so the
+    // next call re-runs init() with fresh data.
+    fn.reset = (): void => {
+      for (const [key, entries] of recordsByKey) {
+        entries.delete(init)
+        if (entries.size === 0) {
+          recordsByKey.delete(key)
+        }
+      }
+    }
+    return fn
   }
 
   export async function dispose(key: string): Promise<void> {

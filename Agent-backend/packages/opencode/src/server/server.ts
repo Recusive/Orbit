@@ -159,6 +159,7 @@ export namespace Server {
           const providerID = c.req.valid("param").providerID
           const info = c.req.valid("json")
           await Auth.set(providerID, info)
+          Provider.reset()
           return c.json(true)
         },
       )
@@ -189,6 +190,7 @@ export namespace Server {
         async (c) => {
           const providerID = c.req.valid("param").providerID
           await Auth.remove(providerID)
+          Provider.reset()
           return c.json(true)
         },
       )

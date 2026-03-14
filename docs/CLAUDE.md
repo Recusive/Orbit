@@ -81,7 +81,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (18 entries)
+## plans/tracked/done/ (20 entries)
 
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
 - `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI
@@ -101,6 +101,8 @@ Use this to find the right file. Read the file directly — no links needed.
 - `fix-opencode-todobar-realtime.md` — Fix OpenCode TodoBar not showing in real-time (updateToolInput action)
 - `fix-todobar-flicker-consecutive-calls.md` — Fix TodoBar flicker on consecutive TodoWrite calls (payload-aware selection)
 - `opencode-session-restore-speed.md` — OpenCode session restore speed (pre-warm, skip validate, skeleton on mount)
+- `fix-provider-api-key-flow.md` — Fix provider API key → model selection end-to-end flow
+- `fix-provider-cache-invalidation.md` — Fix provider not showing connected after API key save (backend cache invalidation)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

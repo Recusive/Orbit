@@ -3,6 +3,7 @@ import { map, filter, pipe, fromEntries, mapValues } from "remeda"
 import z from "zod"
 
 import { Plugin } from "../plugin"
+import { Provider } from "./provider"
 
 import type { AuthOuathResult } from "@opencode-ai/plugin"
 
@@ -116,6 +117,7 @@ export namespace ProviderAuth {
           }
           await Auth.set(input.providerID, info)
         }
+        Provider.reset()
         return
       }
 
@@ -133,6 +135,7 @@ export namespace ProviderAuth {
         type: "api",
         key: input.key,
       })
+      Provider.reset()
     },
   )
 

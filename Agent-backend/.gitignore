@@ -28,3 +28,6 @@ opencode-dev
 logs/
 *.bun-build
 tsconfig.tsbuildinfo
+
+# Upstream sync (clone + reference snapshots — large, not needed in repo)
+upstream/repo/
