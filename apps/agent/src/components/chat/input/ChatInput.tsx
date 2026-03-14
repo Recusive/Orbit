@@ -173,7 +173,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   return (
     <div className="flex justify-center px-4 pb-1 shrink-0 relative">
       <div
-        className={getInputBoxClasses()}
+        className={`${getInputBoxClasses()} relative`}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
         {/* AskUserQuestion Modal — full overlay replacing the entire input box content */}
@@ -284,13 +284,12 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               anchorRef={inputRef}
             />
 
-            {/* Slash Command Popover */}
+            {/* Slash Command Popover — absolutely positioned inside the input box */}
             <SlashCommandPopover
               open={popover.slashOpen}
               onOpenChange={popover.setSlashOpen}
               query={popover.slashQuery}
               onSelect={handleSlashSelect}
-              anchorRef={inputRef}
               selectedIndex={popover.slashSelectedIndex}
               commands={slashCommands}
             />
