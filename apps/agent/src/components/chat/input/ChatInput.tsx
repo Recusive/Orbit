@@ -28,6 +28,42 @@ function isAskUserQuestion(toolName: string): boolean {
   return toolName.toLowerCase() === 'askuserquestion';
 }
 
+interface TextSegment {
+  readonly text: string;
+  readonly isCommand: boolean;
+}
+
+/** Parse text into segments, marking /<known-command> tokens for blue highlighting. */
+function parseCommandSegments(text: string, knownNames: ReadonlySet<string>): TextSegment[] {
+  if (text.length === 0 || knownNames.size === 0) return [{ text, isCommand: false }];
+
+  const segments: TextSegment[] = [];
+  // Match /<word> tokens preceded by start-of-string or whitespace
+  const pattern = /(?:^|(?<=\s))\/([\w-]+)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(text)) !== null) {
+    const name = match[1];
+    if (name === undefined || !knownNames.has(name)) continue;
+
+    // Text before this match
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), isCommand: false });
+    }
+    // The command token
+    segments.push({ text: match[0], isCommand: true });
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Remaining text after last match
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), isCommand: false });
+  }
+
+  return segments.length > 0 ? segments : [{ text, isCommand: false }];
+}
+
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   inputMode,
   thinkingMode,
@@ -53,10 +89,12 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   const {
     // State
+    inputText,
     attachedContext,
     slashCommands,
     isInputEmpty,
     slashGhostText,
+    leadingCommand,
     // Refs
     inputRef,
     imageInputRef,
@@ -113,6 +151,24 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
+
+  // Build known command names for multi-command highlighting.
+  // Includes popover-selected command (explicit state, flicker-free) + all known commands from store.
+  const knownCommandNames = useMemo((): ReadonlySet<string> => {
+    const names = new Set<string>();
+    if (leadingCommand !== null) names.add(leadingCommand);
+    for (const cmd of slashCommands) {
+      if (cmd.kind !== 'skill') names.add(cmd.name);
+    }
+    return names;
+  }, [leadingCommand, slashCommands]);
+
+  // Parse input text into segments for the colored overlay
+  const commandSegments = useMemo(
+    () => parseCommandSegments(inputText, knownCommandNames),
+    [inputText, knownCommandNames]
+  );
+  const hasAnyCommand = commandSegments.some((seg) => seg.isCommand);
 
   // Global keyboard shortcuts for regular permission modals.
   // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
@@ -239,7 +295,8 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               </ContextChips>
             ) : null}
 
-            {/* Input Area — relative wrapper for ghost text overlay */}
+            {/* Input Area — text is always transparent, overlay renders the visible text.
+                This avoids all WebKit cursor issues with styled inline elements. */}
             <div className="relative">
               <div
                 ref={inputRef}
@@ -248,6 +305,11 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                 style={{
                   minHeight: INPUT_SIZES.textareaMinHeight,
                   maxHeight: INPUT_SIZES.textareaMaxHeight,
+                  // Only make text transparent when commands are detected.
+                  // When no command, contentEditable renders text normally — no overlay needed.
+                  ...(hasAnyCommand
+                    ? { color: 'transparent', caretColor: 'var(--foreground)' }
+                    : {}),
                 }}
                 contentEditable
                 suppressContentEditableWarning
@@ -256,7 +318,37 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                 onInput={handleInputChange}
                 onKeyDown={handleKeyDown}
                 onPaste={handlePaste}
+                onScroll={(e) => {
+                  // Sync overlay scroll with contentEditable scroll
+                  const overlay = e.currentTarget.nextElementSibling;
+                  if (overlay instanceof HTMLElement) {
+                    overlay.scrollTop = e.currentTarget.scrollTop;
+                  }
+                }}
               />
+
+              {/* Command highlight overlay — renders all text with known /commands in blue.
+                  ContentEditable text is transparent when commands are present, so this overlay
+                  provides the visible text. Same font/padding = pixel-perfect alignment. */}
+              {hasAnyCommand ? (
+                <div
+                  aria-hidden
+                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word overflow-hidden"
+                  style={{
+                    minHeight: INPUT_SIZES.textareaMinHeight,
+                    maxHeight: INPUT_SIZES.textareaMaxHeight,
+                  }}
+                >
+                  {commandSegments.map((seg, i) => (
+                    <span
+                      key={`${String(i)}-${seg.text.slice(0, 8)}`}
+                      className={seg.isCommand ? 'text-git-untracked' : 'text-foreground'}
+                    >
+                      {seg.text}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
 
               {/* Ghost autocomplete text — mirrors input position, typed portion is invisible */}
               {slashGhostText.length > 0 ? (
@@ -268,7 +360,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                     maxHeight: INPUT_SIZES.textareaMaxHeight,
                   }}
                 >
-                  <span className="invisible">{inputRef.current?.textContent ?? ''}</span>
+                  <span className="invisible">{inputText}</span>
                   <span className="text-muted-foreground/40">{slashGhostText}</span>
                 </div>
               ) : null}

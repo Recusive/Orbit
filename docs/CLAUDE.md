@@ -82,7 +82,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (21 entries)
+## plans/tracked/done/ (24 entries)
 
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
 - `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI
@@ -105,6 +105,9 @@ Use this to find the right file. Read the file directly — no links needed.
 - `fix-provider-api-key-flow.md` — Fix provider API key → model selection end-to-end flow
 - `fix-provider-cache-invalidation.md` — Fix provider not showing connected after API key save (backend cache invalidation)
 - `rename-opencode-ai-to-orbit.md` — Rename @opencode-ai/_ packages to @orbit.build/_ (npm scope, imports, config migration)
+- `slash-command-code-badges.md` — Slash command inline code badges (iterated through 5 audit rounds, superseded by overlay approach)
+- `slash-command-chips.md` — Slash command context chips (abandoned — user wanted inline, not chips above input)
+- `slash-command-syntax-highlighting.md` — Slash command syntax highlighting via text overlay (shipped)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

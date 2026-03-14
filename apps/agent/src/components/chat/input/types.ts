@@ -112,6 +112,8 @@ export interface UseChatInputReturn {
   isInputEmpty: boolean;
   /** Untyped suffix of the top matching slash command (e.g., "mit" when typing "/com" → "commit") */
   slashGhostText: string;
+  /** Name of a known leading slash command (e.g., "compact") for visual highlighting, or null */
+  leadingCommand: string | null;
   // Refs
   inputRef: React.RefObject<HTMLDivElement | null>;
   imageInputRef: React.RefObject<HTMLInputElement | null>;

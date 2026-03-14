@@ -27,6 +27,94 @@ import { useOcProviderStore } from '@/stores/opencode';
 const logger = createLogger('ChatInput');
 const OPENCODE_AGENTS = ['build', 'plan', 'explore'] as const;
 
+function getTextOffset(container: HTMLElement, node: Node, offset: number): number {
+  const range = document.createRange();
+  range.setStart(container, 0);
+  range.setEnd(node, offset);
+  return range.toString().length;
+}
+
+function getSelectionOffsets(container: HTMLElement): { start: number; end: number } {
+  const selection = window.getSelection();
+  if (selection === null || selection.rangeCount === 0) {
+    return { start: 0, end: 0 };
+  }
+
+  const range = selection.getRangeAt(0);
+  return {
+    start: getTextOffset(container, range.startContainer, range.startOffset),
+    end: getTextOffset(container, range.endContainer, range.endOffset),
+  };
+}
+
+export function getCursorOffset(container: HTMLElement): number {
+  const selection = window.getSelection();
+  if (selection === null || selection.rangeCount === 0) return 0;
+  const range = selection.getRangeAt(0);
+  return getTextOffset(container, range.startContainer, range.startOffset);
+}
+
+export function setCursorAtTextOffset(container: HTMLElement, offset: number): void {
+  const selection = window.getSelection();
+  if (selection === null) return;
+  const activeSelection = selection;
+
+  let remaining = offset;
+
+  function placeRange(boundary: 'before' | 'after', node: Node): void {
+    const range = document.createRange();
+    if (boundary === 'before') {
+      range.setStartBefore(node);
+    } else {
+      range.setStartAfter(node);
+    }
+    range.collapse(true);
+    activeSelection.removeAllRanges();
+    activeSelection.addRange(range);
+  }
+
+  function walk(parent: Node): boolean {
+    for (const child of parent.childNodes) {
+      if (child instanceof HTMLBRElement) {
+        if (remaining === 0) {
+          placeRange('before', child);
+          return true;
+        }
+        remaining -= 1;
+        continue;
+      }
+
+      if (child.nodeType === Node.TEXT_NODE) {
+        const len = child.textContent?.length ?? 0;
+        if (remaining <= len) {
+          const range = document.createRange();
+          range.setStart(child, remaining);
+          range.collapse(true);
+          activeSelection.removeAllRanges();
+          activeSelection.addRange(range);
+          return true;
+        }
+        remaining -= len;
+        continue;
+      }
+
+      if (child instanceof HTMLElement && walk(child)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (walk(container)) return;
+
+  const range = document.createRange();
+  range.selectNodeContents(container);
+  range.collapse(false);
+  activeSelection.removeAllRanges();
+  activeSelection.addRange(range);
+}
+
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
     inputMode,
@@ -46,6 +134,9 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Core input state
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
+  // Leading command set explicitly on popover selection — NOT derived from text.
+  // Explicit state is stable: set on select, cleared when text changes.
+  const [leadingCommand, setLeadingCommand] = useState<string | null>(null);
 
   // Slash commands + skills from centralized store (prevents duplicate IPC calls)
   const slashCommands = useSlashCommands();
@@ -150,43 +241,52 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Input change handler - detects @ mentions and / commands
   const handleInputChange = useCallback(
     (e: React.SyntheticEvent<HTMLDivElement>): void => {
-      const text = e.currentTarget.textContent || '';
+      const container = e.currentTarget;
+      const text = container.textContent || '';
       setInputText(text);
 
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const cursorPos = range.startOffset;
-        const beforeCursor = text.slice(0, cursorPos);
+      // Clear leading command highlight if the text no longer starts with it
+      if (leadingCommand !== null) {
+        const token = `/${leadingCommand}`;
+        const afterToken = text[token.length];
+        const stillValid =
+          text.startsWith(token) && (afterToken === undefined || /\s/.test(afterToken));
+        if (!stillValid) {
+          setLeadingCommand(null);
+        }
+      }
 
-        // Detect / slash command — triggers after any whitespace or at start of input.
-        // Find the last "/" before cursor that's either at position 0 or preceded by a space.
-        const lastSlashIndex = beforeCursor.lastIndexOf('/');
-        if (
-          lastSlashIndex !== -1 &&
-          (lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ')
-        ) {
-          const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
-          if (!afterSlash.includes(' ')) {
-            // Only keep the popover open if there are matching commands (or query is empty → show all).
-            // When nothing matches the user is likely typing a URL or path, not a slash command.
-            if (afterSlash === '' || getFilteredCommandsCount(afterSlash, slashCommands) > 0) {
-              popover.setSlashQuery(afterSlash);
-              popover.setSlashStartIndex(lastSlashIndex);
-              popover.setSlashOpen(true);
-              // Close mention if open
-              if (popover.mentionOpen) {
-                popover.setMentionOpen(false);
-                popover.setMentionQuery('');
-              }
-              return;
-            } else {
-              // No matches — dismiss the popover silently
-              popover.closeSlashPopover();
+      const cursorPos = getCursorOffset(container);
+      const beforeCursor = text.slice(0, cursorPos);
+      let handledPopover = false;
+
+      // Detect / slash command — triggers after any whitespace or at start of input.
+      // Find the last "/" before cursor that's either at position 0 or preceded by a space.
+      const lastSlashIndex = beforeCursor.lastIndexOf('/');
+      if (
+        lastSlashIndex !== -1 &&
+        (lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ')
+      ) {
+        const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
+        if (!afterSlash.includes(' ')) {
+          // Only keep the popover open if there are matching commands (or query is empty → show all).
+          // When nothing matches the user is likely typing a URL or path, not a slash command.
+          if (afterSlash === '' || getFilteredCommandsCount(afterSlash, slashCommands) > 0) {
+            popover.setSlashQuery(afterSlash);
+            popover.setSlashStartIndex(lastSlashIndex);
+            popover.setSlashOpen(true);
+            if (popover.mentionOpen) {
+              popover.setMentionOpen(false);
+              popover.setMentionQuery('');
             }
+            handledPopover = true;
+          } else {
+            popover.closeSlashPopover();
           }
         }
+      }
 
+      if (!handledPopover) {
         // Detect @ mention
         const lastAtIndex = beforeCursor.lastIndexOf('@');
         if (lastAtIndex !== -1) {
@@ -194,26 +294,25 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
           if (!afterAt.includes(' ')) {
             popover.setMentionQuery(afterAt);
             popover.setMentionOpen(true);
-            // Close slash if open
             if (popover.slashOpen) {
               popover.setSlashOpen(false);
               popover.setSlashQuery('');
             }
-            return;
+            handledPopover = true;
           }
         }
       }
 
-      if (popover.mentionOpen) {
+      if (!handledPopover && popover.mentionOpen) {
         popover.setMentionOpen(false);
         popover.setMentionQuery('');
       }
-      if (popover.slashOpen) {
+      if (!handledPopover && popover.slashOpen) {
         popover.setSlashOpen(false);
         popover.setSlashQuery('');
       }
     },
-    [popover, slashCommands]
+    [popover, slashCommands, leadingCommand]
   );
 
   // Send message handler
@@ -253,6 +352,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
     // Clear input immediately
     setInputText('');
+    setLeadingCommand(null);
     if (inputRef.current) {
       inputRef.current.textContent = '';
     }
@@ -352,18 +452,16 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
       // Remove the @query from input
       if (inputRef.current) {
-        const text = inputRef.current.textContent || '';
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          const cursorPos = range.startOffset;
-          const beforeCursor = text.slice(0, cursorPos);
-          const lastAtIndex = beforeCursor.lastIndexOf('@');
-          if (lastAtIndex !== -1) {
-            const newText = text.slice(0, lastAtIndex) + text.slice(cursorPos);
-            inputRef.current.textContent = newText;
-            setInputText(newText);
-          }
+        const cursorPos = getCursorOffset(inputRef.current);
+        const text = inputRef.current.textContent;
+        const beforeCursor = text.slice(0, cursorPos);
+        const lastAtIndex = beforeCursor.lastIndexOf('@');
+
+        if (lastAtIndex !== -1) {
+          const newText = text.slice(0, lastAtIndex) + text.slice(cursorPos);
+          inputRef.current.textContent = newText;
+          setInputText(newText);
+          setCursorAtTextOffset(inputRef.current, lastAtIndex);
         }
       }
 
@@ -380,11 +478,10 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
       const currentText = inputRef.current.textContent;
       const start = popover.slashStartIndex;
-      // The token to replace: from "/" through the end of the query (no space after yet)
-      const tokenEnd = start + 1 + popover.slashQuery.length; // +1 for the "/" character
+      const tokenEnd = start + 1 + popover.slashQuery.length;
 
       if (command.kind === 'skill') {
-        // Skills become context chips — remove the /query token from text
+        // Skills become context chips — remove /query token from text
         const skillContext: ContextItem = {
           id: crypto.randomUUID(),
           type: 'skill',
@@ -398,25 +495,32 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
           return [...prev, skillContext];
         });
 
-        // Remove the /query token, trimming any trailing space
         const before = currentText.slice(0, start);
         const after = currentText.slice(tokenEnd).replace(/^ /, '');
         const newText = (before + after).trim();
         inputRef.current.textContent = newText;
         setInputText(newText);
       } else {
-        // Regular commands: replace /query with /command-name + space
+        // Regular commands: replace /query with /command + space as plain text.
+        // The visual badge is rendered as a CSS overlay in ChatInput.tsx (like ghost text),
+        // not as a DOM element inside the contentEditable. This avoids ALL WebKit cursor
+        // issues — typed text never merges with the command because there's no styled
+        // element in the DOM for the browser to extend.
         const before = currentText.slice(0, start);
         const after = currentText.slice(tokenEnd);
         const replacement = `/${command.name} `;
         const newText = before + replacement + after;
         inputRef.current.textContent = newText;
         setInputText(newText);
+        // Set the leading command for blue highlighting (explicit state, not derived)
+        if (start === 0) {
+          setLeadingCommand(command.name);
+        }
 
-        // Place cursor right after the inserted command + space
+        // Place cursor after the command + space
         const cursorPos = start + replacement.length;
         const textNode = inputRef.current.firstChild;
-        if (textNode) {
+        if (textNode !== null) {
           const range = document.createRange();
           const sel = window.getSelection();
           range.setStart(textNode, Math.min(cursorPos, textNode.textContent?.length ?? 0));
@@ -541,21 +645,19 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     ]
   );
 
-  // Paste handler
+  // Paste handler — plain text paste with cursor restoration
   const handlePaste = useCallback((e: React.ClipboardEvent): void => {
+    const container = inputRef.current;
+    if (container === null) return;
     e.preventDefault();
     const pastedText = e.clipboardData.getData('text/plain');
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(document.createTextNode(pastedText));
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
-    const newText = inputRef.current?.textContent ?? '';
+    const currentText = container.textContent;
+    const { start, end } = getSelectionOffsets(container);
+    const newText = currentText.slice(0, start) + pastedText + currentText.slice(end);
+    const cursorPos = start + pastedText.length;
+    container.textContent = newText;
     setInputText(newText);
+    setCursorAtTextOffset(container, cursorPos);
   }, []);
 
   // Mode cycling handlers
@@ -630,6 +732,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     slashCommands,
     isInputEmpty,
     slashGhostText,
+    leadingCommand,
     // Refs
     inputRef,
     imageInputRef,
