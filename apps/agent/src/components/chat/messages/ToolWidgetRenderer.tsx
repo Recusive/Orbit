@@ -8,6 +8,7 @@ import {
   AskUserQuestionWidget,
   BashToolWidget,
   BrowserToolWidget,
+  CodeSearchToolWidget,
   EditToolWidget,
   GenericToolWidget,
   GlobToolWidget,
@@ -210,6 +211,16 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
         />
       );
 
+    case 'codesearch':
+      return (
+        <CodeSearchToolWidget
+          query={getStringInput(tool, 'query', '')}
+          output={statusProps.output}
+          isRunning={statusProps.isRunning}
+          success={statusProps.success}
+        />
+      );
+
     case 'task':
       return (
         <TaskToolWidget
@@ -223,6 +234,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
         />
       );
 
+    case 'question':
     case 'askuserquestion': {
       const questionsInput = tool.toolInput['questions'];
       const rawQuestions = Array.isArray(questionsInput)

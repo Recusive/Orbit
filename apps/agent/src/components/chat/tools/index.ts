@@ -1,6 +1,7 @@
 export { AskUserQuestionWidget } from './ask-user-question-widget';
 export { BashToolWidget } from './bash-tool-widget';
 export { BrowserToolWidget } from './browser-tool-widget';
+export { CodeSearchToolWidget } from './code-search-tool-widget';
 export { EditToolWidget } from './edit-tool-widget';
 export { GenericToolWidget } from './generic-tool-widget';
 export { GlobToolWidget } from './glob-tool-widget';

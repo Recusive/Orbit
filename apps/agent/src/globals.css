@@ -24,6 +24,7 @@
      Tailwind v4 uses --text-* for font-size utilities */
   --text-xs: 10px; /* Small counts */
   --text-sm: 11px; /* Secondary labels, metadata, status */
+  --text-md: 12px; /* Control bar pills, tertiary labels */
   --text-base: 13px; /* Primary body, chat text, tabs, labels */
   --text-lg: 14px; /* H3, command center, emphasized text */
   --text-xl: 16px; /* H2, icons, multi-editor tabs */

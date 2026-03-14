@@ -67,12 +67,11 @@ export const OcThinkingSelector: FC = () => {
             'bg-transparent text-muted-foreground',
             TRANSITION_CLASSES.button,
             'hover:bg-lg-control-hover hover:text-foreground',
-            'active:scale-[0.98]',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
             open && 'bg-lg-control text-foreground'
           )}
         >
-          <span className="max-w-[120px] truncate text-sm font-medium">
+          <span className="max-w-[120px] truncate text-md font-medium">
             {value !== undefined ? format(value) : 'Default'}
           </span>
           <ChevronDown
@@ -105,7 +104,7 @@ export const OcThinkingSelector: FC = () => {
                 className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
               >
                 <IconImagine size={12} className="shrink-0" />
-                <span className="truncate text-[12px]">Default</span>
+                <span className="truncate text-md">Default</span>
                 {value === undefined || value === 'default' ? (
                   <Check className="h-3.5 w-3.5 shrink-0 ml-auto" />
                 ) : null}
@@ -120,7 +119,7 @@ export const OcThinkingSelector: FC = () => {
                   className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
                 >
                   <IconImagine size={12} className="shrink-0" />
-                  <span className="truncate text-[12px]">{format(variant)}</span>
+                  <span className="truncate text-md">{format(variant)}</span>
                   {value === variant ? <Check className="h-3.5 w-3.5 shrink-0 ml-auto" /> : null}
                 </CommandItem>
               ))}

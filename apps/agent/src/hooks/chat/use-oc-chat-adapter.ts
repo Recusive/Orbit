@@ -117,6 +117,23 @@ function getToolInput(part: Extract<OcPart, { type: 'tool' }>): Record<string, u
     };
   }
 
+  // Map OpenCode question answers into the format AskUserQuestionWidget expects
+  if (part.tool === 'question') {
+    const metaAnswers = meta?.['answers'];
+    const questions = input['questions'];
+    if (Array.isArray(metaAnswers) && Array.isArray(questions)) {
+      const answersMap: Record<string, string> = {};
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i] as Record<string, unknown> | undefined;
+        const a = metaAnswers[i] as string[] | undefined;
+        if (q !== undefined && typeof q['question'] === 'string' && Array.isArray(a)) {
+          answersMap[q['question']] = a.join(', ');
+        }
+      }
+      return { ...input, answers: answersMap };
+    }
+  }
+
   return input;
 }
 
@@ -266,14 +283,8 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
       case 'step-start':
         break;
 
-      case 'step-finish': {
-        const tokens = part.tokens.total ?? part.tokens.input + part.tokens.output;
-        content = appendBlock(
-          content,
-          `---\n*Step finished (${part.reason}, ${String(tokens)} tokens)*`
-        );
+      case 'step-finish':
         break;
-      }
 
       case 'compaction':
         content = appendBlock(content, '---\n*Context compacted*');

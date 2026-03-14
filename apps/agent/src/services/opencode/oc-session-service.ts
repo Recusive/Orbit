@@ -42,6 +42,7 @@ function mapProviders(response: ProviderListResponses[200]): {
               name: string;
               reasoning: boolean;
               variants?: Record<string, Record<string, unknown>>;
+              limit?: { context: number; input?: number; output: number };
             }
           >
         ).map((model) => [
@@ -51,6 +52,7 @@ function mapProviders(response: ProviderListResponses[200]): {
             name: model.name,
             ...(model.reasoning ? { reasoning: true } : {}),
             ...(model.variants ? { variants: model.variants } : {}),
+            ...(model.limit ? { limit: model.limit } : {}),
           },
         ])
       ),

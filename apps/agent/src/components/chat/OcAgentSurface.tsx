@@ -5,6 +5,7 @@ import type { FC } from 'react';
 import { ChatContent } from '@/components/layout/chat-area/ChatContent';
 import { useLayoutStabilization } from '@/components/layout/chat-area/use-layout-stabilization';
 import { useOcChatAdapter } from '@/hooks/chat/use-oc-chat-adapter';
+import { useOcSelectedModelContextLimit } from '@/stores/opencode';
 import {
   useIsConversationTransitioning,
   useIsLoadingConversation,
@@ -17,6 +18,7 @@ const EMPTY_SESSION_ID = 'opencode-pending';
 export const OcAgentSurface: FC = () => {
   const isLoadingConversation = useIsLoadingConversation();
   const isTransitioning = useIsConversationTransitioning();
+  const maxTokens = useOcSelectedModelContextLimit();
   const {
     sessionId,
     messages,
@@ -66,7 +68,7 @@ export const OcAgentSurface: FC = () => {
         thinkingMode="off"
         effortLevel="medium"
         sessionUsage={sessionUsage}
-        maxTokens={0}
+        maxTokens={maxTokens}
         onSend={handleSend}
         onStop={handleStop}
         onRewind={handleRewind}

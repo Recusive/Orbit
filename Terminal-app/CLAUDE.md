@@ -1,6 +1,6 @@
 # CLAUDE.md - Orbit Terminal (Ghostty Fork)
 
-> Native macOS terminal app. Ghostty fork with SwiftUI sidebar, IPC, and custom window chrome.
+> Native macOS terminal app built on Ghostty. GPU-accelerated Metal rendering, Zig core, Swift/AppKit shell.
 > Part of the three-tier product line: CLI (`orbit`) -> Orbit Terminal (this) -> Orbit Editor (Tauri IDE).
 
 ---
@@ -8,19 +8,44 @@
 ## Quick Reference
 
 ```bash
-# Build & run (Xcode)
+# Debug build & run (Xcode only — fast iteration)
+cd Terminal-app
 xcodebuild -project macos/OrbitTerminal.xcodeproj -scheme OrbitTerminal -configuration Debug build
 open ~/Library/Developer/Xcode/DerivedData/OrbitTerminal-*/Build/Products/Debug/OrbitTerminal.app
 
-# Build Ghostty core (Zig) — only needed when changing src/ or pkg/
+# Production build (Zig + Xcode — full app, no debug banner)
+cd Terminal-app
+zig build -Doptimize=ReleaseFast -Demit-macos-app=true
+open zig-out/OrbitTerminal.app
+
+# Zig core only (no macOS app bundle)
 zig build
-zig build -Demit-macos-app=false   # Faster: skip macOS app bundle
+zig build -Demit-macos-app=false   # Faster: skip app bundle
 
 # Tests
 zig build test                              # Zig core tests
 zig build test -Dtest-filter=SearchTests    # Targeted Zig test
-# Swift tests run via Xcode Test navigator
+# Swift tests: run via Xcode Test navigator
+
+# Clean everything
+rm -rf zig-out .zig-cache macos/build
 ```
+
+---
+
+## Two Build Systems
+
+| Build              | Command                                                  | Output                                    | Use                                  |
+| ------------------ | -------------------------------------------------------- | ----------------------------------------- | ------------------------------------ |
+| **Xcode Debug**    | `xcodebuild ... -configuration Debug`                    | `DerivedData/.../Debug/OrbitTerminal.app` | Fast iteration, has debug banner     |
+| **Zig Production** | `zig build -Doptimize=ReleaseFast -Demit-macos-app=true` | `zig-out/OrbitTerminal.app`               | Full production app, no debug banner |
+
+The Zig build invokes `xcodebuild` internally (see `src/build/GhosttyXcodebuild.zig`). It builds to `macos/build/ReleaseLocal/`, then copies to `zig-out/`. The Xcode configuration used depends on the Zig optimize flag:
+
+- `Debug` → Xcode `Debug`
+- `ReleaseFast/ReleaseSmall/ReleaseSafe` → Xcode `ReleaseLocal`
+
+**Production build requires `po/` locale files.** These were removed during cleanup. Restore with: `git checkout 93f953dd -- Terminal-app/po/`
 
 ---
 
@@ -30,25 +55,21 @@ zig build test -Dtest-filter=SearchTests    # Targeted Zig test
 ┌─────────────────────────────────────────────────────────┐
 │  Orbit Terminal (macOS App)                              │
 │                                                          │
-│  ┌──────────┐  ┌──────────────────────────────────────┐ │
-│  │ SwiftUI  │  │ Ghostty Core (libghostty)             │ │
-│  │ Sidebar  │  │ GPU-accelerated Metal terminal        │ │
-│  │          │  │ VT100 emulation, rendering, input     │ │
-│  │ Tab list │  │ Compiled from Zig → xcframework       │ │
-│  │ Git info │  │                                        │ │
-│  │ Status   │  │ Sources: src/ + pkg/macos/            │ │
-│  └──────────┘  └──────────────────────────────────────┘ │
-│       ↕ SidebarTabManager observes NSWindow.tabGroup     │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ Ghostty Core (libghostty)                           │ │
+│  │ GPU-accelerated Metal terminal rendering            │ │
+│  │ VT100 emulation, input handling, config             │ │
+│  │ Compiled from Zig → OrbitTerminalKit.xcframework    │ │
+│  │ Sources: src/ + pkg/macos/                          │ │
+│  └────────────────────────────────────────────────────┘ │
 │                                                          │
-│  IPC: /tmp/orbit-terminal-{uid}.sock (JSON over Unix)   │
-│  CLI: orbitctl tab.rename / tab.focus / ...              │
+│  ┌────────────────────────────────────────────────────┐ │
+│  │ Swift/AppKit Shell                                  │ │
+│  │ Window management, tabs, splits, settings, menus    │ │
+│  │ Sources: macos/Sources/                             │ │
+│  └────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
-
-**Two build systems:**
-
-- **Zig** compiles Ghostty core -> `OrbitTerminalKit.xcframework` + `GhosttyKit.xcframework`
-- **Xcode** assembles the macOS app from Swift sources + frameworks
 
 ---
 
@@ -64,22 +85,18 @@ Terminal-app/
 │   │   │   └── main.swift
 │   │   ├── Features/
 │   │   │   ├── Terminal/
-│   │   │   │   ├── TerminalController.swift    # Window controller, sidebar setup
+│   │   │   │   ├── TerminalController.swift    # Window controller
 │   │   │   │   ├── TerminalView.swift          # Main terminal SwiftUI view
-│   │   │   │   ├── Sidebar/
-│   │   │   │   │   ├── SidebarView.swift       # SwiftUI sidebar + traffic lights
-│   │   │   │   │   └── SidebarTabManager.swift # Tab state from NSWindow.tabGroup
-│   │   │   │   ├── IPC/
-│   │   │   │   │   ├── OrbitTerminalIPCServer.swift  # Unix socket server
-│   │   │   │   │   └── TabMetadataStore.swift        # Per-tab metadata
 │   │   │   │   ├── Window Styles/
-│   │   │   │   │   ├── TerminalWindow.swift          # Base window (sidebar mode)
-│   │   │   │   │   ├── HiddenTitlebarTerminalWindow.swift  # Reference: titlebar hiding
-│   │   │   │   │   └── TitlebarTabs*.swift           # Ventura/Tahoe tab styles
+│   │   │   │   │   ├── TerminalWindow.swift              # Base window class
+│   │   │   │   │   ├── HiddenTitlebarTerminalWindow.swift # Hidden titlebar style
+│   │   │   │   │   ├── TransparentTitlebarTerminalWindow.swift
+│   │   │   │   │   └── TitlebarTabs*.swift               # Ventura/Tahoe tab styles
 │   │   │   │   └── Splits/                    # Split pane tree
 │   │   │   ├── QuickTerminal/                 # Dropdown terminal (like Quake)
 │   │   │   ├── Settings/                      # Preferences UI
 │   │   │   ├── Update/                        # Sparkle auto-update
+│   │   │   ├── Custom App Icon/               # Dynamic icon compositing + DockTilePlugin
 │   │   │   └── Command Palette/               # Fuzzy command search
 │   │   ├── Helpers/
 │   │   │   ├── Extensions/                    # 28+ NS*/OS extensions
@@ -89,112 +106,97 @@ Terminal-app/
 │   │       ├── OrbitTerminal.Config.swift     # Config parsing (39KB)
 │   │       ├── OrbitTerminal.Input.swift      # Keyboard/mouse (45KB)
 │   │       └── Surface View/                  # Metal rendering
-│   └── Tests/                                 # XCTest + XCUITest
+│   ├── Tests/                                 # XCTest + XCUITest
+│   └── Assets.xcassets/                       # Asset catalog (icons, colors)
 │
-├── src/                                # Ghostty core (Zig) — DO NOT TOUCH casually
+├── images/
+│   ├── OrbitTerminal.icon/             # Icon Composer project (macOS 26 Liquid Glass)
+│   │   ├── icon.json                   # Layer definitions (compositing recipe)
+│   │   └── Assets/                     # Layer PNGs (ghost, screen, bevel, gloss)
+│   └── icons/                          # Flat icon PNGs (16-2048px, used by Zig build)
+│
+├── src/                                # Ghostty core (Zig) — treat as upstream
 ├── pkg/                                # Platform bindings (Zig)
-├── cli/orbitctl                        # CLI tool for IPC
 ├── build.zig                           # Zig build config
+├── build.zig.zon                       # Zig dependencies
 └── Makefile                            # GLAD updates, clean
 ```
 
 ---
 
-## Key Systems
+## App Icon System (3 layers)
 
-### Sidebar (SwiftUI in AppKit)
+The icon has three independent pipelines — all must be updated to change the app icon:
 
-The sidebar replaces native macOS tabs with a custom SwiftUI panel:
+| Layer             | Source                                             | Used By                                        |
+| ----------------- | -------------------------------------------------- | ---------------------------------------------- |
+| **Icon Composer** | `images/OrbitTerminal.icon/` (icon.json + Assets/) | macOS 26 Liquid Glass icon (primary on Tahoe)  |
+| **Flat PNGs**     | `images/icons/icon_*.png` (12 files, 16-2048px)    | Zig build fallback, pre-Tahoe .icns generation |
+| **Asset Catalog** | `macos/Assets.xcassets/AppIconImage.imageset/`     | In-app display (settings, about, error views)  |
 
-- **SidebarTabManager** (`@MainActor ObservableObject`) observes `NSWindow.tabGroup.windows`
-- Refreshes on window focus changes, bell notifications, 100ms timer
-- Each tab card shows: title, directory, git branch, status entries, color accent
-- Drag-and-drop reordering via `DropDelegate`
-- Custom traffic lights (close/minimize/zoom) since native titlebar is hidden
+**DockTilePlugin** (`macos/Sources/Features/Custom App Icon/DockTilePlugin.swift`) overrides the Dock icon at runtime:
 
-**Layout:** `NSSplitView` with sidebar (left) + terminal container (right), set as `window.contentView`.
+- macOS 26+ non-DEBUG: reads icon from `NSWorkspace`, falls back to `AppIconImage` from plugin bundle
+- macOS 26+ DEBUG: uses `BlueprintImage` from `Alternate Icons/`
+- Pre-Tahoe: uses `AppIconImage` directly, calls `NSWorkspace.shared.setIcon()` to persist
 
-### Window Chrome (Titlebar Hiding)
+**To change the icon:** Replace assets in all three locations, clean all build dirs (`rm -rf zig-out .zig-cache macos/build`), and `killall Dock` to clear runtime cache.
 
-Sidebar mode hides the native titlebar while keeping rounded corners:
+---
 
-- `sidebarActive = true` set in `awakeFromNib` BEFORE accessories are added
-- `.fullSizeContentView` applied in `awakeFromNib` (must happen before layout)
-- `addTitlebarAccessoryViewController` override blocks ALL accessories when sidebar is active
-- `NSTitlebarContainerView` hidden + frame zeroed in `configureSidebarTitlebar()`
-- `contentLayoutRect` overridden to fill full window frame
-- Custom SwiftUI `TrafficLightsView` provides close/minimize/zoom buttons
+## Window Styles
 
-**Reference:** `HiddenTitlebarTerminalWindow.swift` — Ghostty's proven titlebar hiding approach.
+Each titlebar style has its own XIB file + NSWindow subclass:
 
-### IPC Server (Unix Socket)
+| Style          | XIB                               | Window Class                        | Notes                                                        |
+| -------------- | --------------------------------- | ----------------------------------- | ------------------------------------------------------------ |
+| Native         | `Terminal.xib`                    | `TerminalWindow`                    | Standard titlebar + native tabs                              |
+| Hidden         | `TerminalHiddenTitlebar.xib`      | `HiddenTitlebarTerminalWindow`      | No titlebar, no traffic lights, `.tabbingMode = .disallowed` |
+| Transparent    | `TerminalTransparentTitlebar.xib` | `TransparentTitlebarTerminalWindow` | Transparent titlebar area                                    |
+| Tabs (Ventura) | `TerminalTabsTitlebarVentura.xib` | `TitlebarTabsVenturaTerminalWindow` | Tabs in titlebar                                             |
+| Tabs (Tahoe)   | `TerminalTabsTitlebarTahoe.xib`   | `TitlebarTabsTahoeTerminalWindow`   | macOS 26+ tabs                                               |
 
-```
-Socket: /tmp/orbit-terminal-{uid}.sock
-Protocol: newline-delimited JSON
-CLI: orbitctl <method> [params...]
+Selected in `TerminalController.windowNibName` based on `config.macosTitlebarStyle`.
 
-Methods: tab.rename, tab.focus, tab.metadata, etc.
-```
+**Key pattern for titlebar hiding** (from `HiddenTitlebarTerminalWindow`):
 
-### Keyboard Shortcut: Cmd+S
-
-Sidebar toggle intercepted in `AppDelegate.localEventKeyDown` (before Ghostty's `performKeyEquivalent`).
+- Keep `.titled` in style mask (rounded corners)
+- Add `.fullSizeContentView` (content extends behind titlebar)
+- Hide `standardWindowButton`s + `NSTitlebarContainerView`
+- Override `contentLayoutRect` to fill full window frame
+- Re-apply in `title.didSet` (macOS 15+ re-reveals on title change)
 
 ---
 
 ## Conventions
 
-- **Swift style:** SwiftUI for sidebar/settings, AppKit for window management
 - **Ghostty core:** Zig code in `src/` — treat as upstream, minimize changes
-- **Window subclasses:** Each titlebar style has its own XIB + window subclass
-- **Tab state:** `SidebarTabManager` is the source of truth for tab metadata
+- **Swift shell:** `macos/Sources/` — where customization happens
 - **Config:** `~/.config/orbit-terminal/config.toml` (Ghostty format)
-- **Frameworks:** Pre-built `.xcframework` bundles checked into `macos/`
-
----
-
-## Common Tasks
-
-### Adding a sidebar feature
-
-1. Add state to `SidebarTabManager.TabItem`
-2. Update `SidebarTabCard` in `SidebarView.swift`
-3. If IPC-driven, add method to `OrbitTerminalIPCServer.swift`
-
-### Modifying window chrome
-
-1. Study `HiddenTitlebarTerminalWindow.swift` for patterns
-2. Changes go in `TerminalWindow.swift` (base class) or dedicated subclass
-3. Test: kill app -> build -> launch (titlebar state caches between runs)
-
-### Adding a keyboard shortcut
-
-1. Add to `AppDelegate.localEventKeyDown` for app-wide shortcuts
-2. Or add `NSMenuItem` to the View menu in `applicationDidFinishLaunching`
-3. Note: Ghostty's terminal surface intercepts Cmd+key via `performKeyEquivalent`
+- **Frameworks:** Pre-built `.xcframework` bundles in `macos/`
+- **Keyboard shortcuts:** Ghostty's terminal surface intercepts Cmd+key via `performKeyEquivalent` before the menu system — use `AppDelegate.localEventKeyDown` (NSEvent local monitor) to intercept first
 
 ---
 
 ## Debugging
 
 ```bash
-# Kill and rebuild
+# Kill and rebuild (debug)
 pkill -f OrbitTerminal; sleep 1
+cd Terminal-app
 xcodebuild -project macos/OrbitTerminal.xcodeproj -scheme OrbitTerminal -configuration Debug build
+open ~/Library/Developer/Xcode/DerivedData/OrbitTerminal-*/Build/Products/Debug/OrbitTerminal.app
 
 # View hierarchy debugging (in Xcode)
 # Debug -> View Debugging -> Capture View Hierarchy
-
-# IPC testing
-echo '{"method":"tab.rename","params":{"title":"Test"}}' | nc -U /tmp/orbit-terminal-$(id -u).sock
 ```
 
 ### Common Issues
 
-| Issue                   | Cause                                | Fix                                                       |
-| ----------------------- | ------------------------------------ | --------------------------------------------------------- |
-| Titlebar reappears      | macOS re-shows on title changes      | `configureSidebarTitlebar()` re-applied in `title.didSet` |
-| Accessories in titlebar | Added before `sidebarActive` set     | Must set `sidebarActive` at top of `awakeFromNib`         |
-| Sidebar not visible     | `addSubview` vs `addArrangedSubview` | Use `addSubview` with explicit frames for NSSplitView     |
-| Cmd+key not working     | Terminal surface consumes event      | Intercept in `AppDelegate.localEventKeyDown`              |
+| Issue                                   | Cause                                                           | Fix                                                                            |
+| --------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Debug banner showing                    | libghostty xcframework compiled in debug mode                   | Use `zig build -Doptimize=ReleaseFast` for production                          |
+| Release build crash (Sparkle)           | Code signing mismatch on Sparkle.framework                      | Build with `ENABLE_HARDENED_RUNTIME=NO` or re-sign framework                   |
+| Zig build fails "po/\*.po FileNotFound" | Locale files removed during cleanup                             | `git checkout 93f953dd -- Terminal-app/po/`                                    |
+| Icon not changing                       | 3 icon pipelines + DockTilePlugin runtime override + Dock cache | Replace all 3 sources, `rm -rf zig-out .zig-cache macos/build`, `killall Dock` |
+| Cmd+key not working                     | Terminal surface consumes event                                 | Intercept in `AppDelegate.localEventKeyDown`                                   |

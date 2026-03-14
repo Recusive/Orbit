@@ -1,4 +1,6 @@
-import { ArrowUp, Image, Square } from 'lucide-react';
+import { IconHammer2 } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconHammer2';
+import { IconMap } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconMap';
+import { ArrowUp, Image, Square, Telescope } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
 
 import { OcModelSelector, OcThinkingSelector } from '../oc-control-bar';
@@ -42,11 +44,11 @@ function getNextOcAgent(agent: OcAgent): OcAgent {
 function getOcAgentTextClass(agent: OcAgent): string {
   switch (agent) {
     case 'build':
-      return 'text-primary hover:text-primary';
+      return 'text-primary hover:text-primary hover:bg-primary/10';
     case 'plan':
-      return 'text-mode-plan hover:text-mode-plan';
+      return 'text-mode-plan hover:text-mode-plan hover:bg-mode-plan/10';
     case 'explore':
-      return 'text-[#d85ba8] hover:text-[#d85ba8]';
+      return 'text-[#d85ba8] hover:text-[#d85ba8] hover:bg-[#d85ba8]/10';
   }
 }
 
@@ -94,7 +96,8 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
     ? ((ocModelId ? ocProvider.models[ocModelId] : undefined) ??
       Object.values(ocProvider.models)[0])
     : undefined;
-  const showOcThinkingSelector = Object.keys(ocModel?.variants ?? {}).length > 0;
+  const showOcThinkingSelector =
+    activeBackend === 'opencode' && Object.keys(ocModel?.variants ?? {}).length > 0;
   const showModelSelector = capabilities.modelSelector === 'claude-models';
   const showOcModelSeparator = showOcAgentPicker && showOcModelSelector;
   const showOcThinkingSeparator = showOcAgentPicker && showOcThinkingSelector;
@@ -123,6 +126,11 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
     <div ref={containerRef} className="flex w-full items-center justify-between gap-1 px-1 pb-1">
       {/* Left Controls - Mode & Model Pickers */}
       <div className="flex items-center gap-0.5">
+        {/* Model Picker */}
+        {showModelSelector ? <ModelSelector onModelChange={onModelChange} /> : null}
+        {showModePicker && showModelSelector ? (
+          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
+        ) : null}
         {/* Mode Picker */}
         {showModePicker ? (
           <Tooltip>
@@ -131,28 +139,26 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 onClick={cycleInputMode}
                 aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
                 className={cn(
-                  `h-7 px-2.5 flex items-center gap-1.5 rounded-[9px] ${TRANSITION_CLASSES.button}`,
+                  `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
                   'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
                   inputMode === 'default' &&
-                    'bg-lg-control text-foreground hover:bg-lg-control-hover',
+                    'bg-transparent text-muted-foreground hover:bg-lg-control-hover hover:text-foreground',
                   inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
                   inputMode === 'accept' &&
                     'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
                 )}
               >
-                <span className="text-sm font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+                <span className="text-md font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
               </button>
             </TooltipTrigger>
             <TooltipContent className="flex items-center gap-1.5">
               <span className="leading-none">Input mode</span>
-              <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
-                <span className="text-[13px] leading-none">⇧</span> Tab
+              <Kbd className="h-[18px] !text-[11px] px-1.5 rounded-[5px] border-transparent bg-white/5 text-inherit">
+                Shift + Tab
               </Kbd>
             </TooltipContent>
           </Tooltip>
         ) : null}
-        {/* Model Picker */}
-        {showModelSelector ? <ModelSelector onModelChange={onModelChange} /> : null}
         {showOcModelSelector ? <OcModelSelector /> : null}
         {showOcModelSeparator ? (
           <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
@@ -169,20 +175,27 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 aria-label={`Agent mode: ${formatOcAgent(ocAgent)}. Click to change.`}
                 className={cn(
                   `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
-                  'bg-transparent hover:bg-lg-control-hover',
+                  'bg-transparent',
                   getOcAgentTextClass(ocAgent),
                   'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                 )}
               >
-                <span className="max-w-[120px] truncate text-sm font-medium">
+                {ocAgent === 'build' ? (
+                  <IconHammer2 size={14} aria-hidden="true" />
+                ) : ocAgent === 'plan' ? (
+                  <IconMap size={14} aria-hidden="true" />
+                ) : (
+                  <Telescope className="h-3.5 w-3.5" aria-hidden="true" />
+                )}
+                <span className="max-w-[120px] truncate text-md font-medium">
                   {formatOcAgent(ocAgent)}
                 </span>
               </button>
             </TooltipTrigger>
             <TooltipContent className="flex items-center gap-1.5">
               <span className="leading-none">Agent mode</span>
-              <Kbd className="h-[18px] !text-[11px] px-1 rounded-[9px] border-transparent bg-transparent text-inherit">
-                <span className="text-[13px] leading-none">⇧</span> Tab
+              <Kbd className="h-[18px] !text-[11px] px-1.5 rounded-[5px] border-transparent bg-white/5 text-inherit">
+                Shift + Tab
               </Kbd>
             </TooltipContent>
           </Tooltip>

@@ -73,7 +73,7 @@ export const OcModelSelector: FC = () => {
               open && 'bg-lg-control text-foreground'
             )}
           >
-            <span className="max-w-[180px] truncate text-sm font-medium">
+            <span className="max-w-[180px] truncate text-md font-medium">
               {selectedModel?.name ?? 'Select model'}
             </span>
             <ChevronDown

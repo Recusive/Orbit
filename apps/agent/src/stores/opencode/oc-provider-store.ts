@@ -7,6 +7,11 @@ export interface OcProviderModel {
   readonly name: string;
   readonly reasoning?: boolean;
   readonly variants?: Record<string, Record<string, unknown>>;
+  readonly limit?: {
+    readonly context: number;
+    readonly input?: number;
+    readonly output: number;
+  };
 }
 
 function modelKey(providerId: string, modelId: string): string {
@@ -124,3 +129,17 @@ export const useOcProviderStore = create<OcProviderState>((set) => ({
     });
   },
 }));
+
+/**
+ * Returns the context window size (in tokens) for the currently selected
+ * OpenCode model, or 0 if no model is selected or limit data is unavailable.
+ */
+export const useOcSelectedModelContextLimit = (): number =>
+  useOcProviderStore((state) => {
+    if (state.selectedProviderId === null || state.selectedModelId === null) {
+      return 0;
+    }
+    const provider = state.providers.find((p) => p.id === state.selectedProviderId);
+    const model = provider?.models[state.selectedModelId];
+    return model?.limit?.context ?? 0;
+  });
