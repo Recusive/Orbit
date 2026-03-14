@@ -1,9 +1,13 @@
 import type { ConversationListContext, ConversationSummary } from './conversation-repository';
 
+export interface RestoreSelectionInput {
+  readonly listedSessionIds?: Set<string>;
+}
+
 export interface ConversationUiBridge {
   getActiveSessionId(): string | null;
   select(sessionId: string): Promise<void>;
-  restoreSelection(): Promise<void>;
+  restoreSelection(input?: RestoreSelectionInput): Promise<void>;
   getActiveMeta(): {
     id: string | null;
     title: string | null;

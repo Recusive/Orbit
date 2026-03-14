@@ -1,8 +1,13 @@
 import { createLogger } from '@orbit/common/lib';
+import { toast } from 'sonner';
 
 import { ocConversationRepo } from './oc-conversation-repo';
 
-import type { ConversationListContext, ConversationUiBridge } from '@/types/backend';
+import type {
+  ConversationListContext,
+  ConversationUiBridge,
+  RestoreSelectionInput,
+} from '@/types/backend';
 
 import { ocSessionService } from '@/services/opencode';
 import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
@@ -10,6 +15,15 @@ import { useOcMessageStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('OcUiBridge');
+
+function clearPersistedOcSelection(): void {
+  useOcSessionStore.getState().setActiveSessionId(null);
+  try {
+    localStorage.removeItem(ocConversationRepo.getActiveSessionKey());
+  } catch {
+    // ignore storage failures
+  }
+}
 
 export const ocUiBridge: ConversationUiBridge = {
   getActiveSessionId(): string | null {
@@ -21,7 +35,7 @@ export const ocUiBridge: ConversationUiBridge = {
     await loadSelection(sessionId, false);
   },
 
-  async restoreSelection(): Promise<void> {
+  async restoreSelection(input?: RestoreSelectionInput): Promise<void> {
     const sessionId = ocConversationRepo.restoreActiveSession();
     if (!sessionId) {
       logger.info('No session to restore');
@@ -30,21 +44,35 @@ export const ocUiBridge: ConversationUiBridge = {
 
     logger.info('Restoring session selection', { sessionId });
     try {
-      const session = await ocSessionService.validateSession(sessionId);
-      if (!session) {
-        logger.warn('Restored session no longer valid', { sessionId });
-        useOcSessionStore.getState().setActiveSessionId(null);
-        try {
-          localStorage.removeItem(ocConversationRepo.getActiveSessionKey());
-        } catch {
-          // ignore storage failures
+      if (input?.listedSessionIds && !input.listedSessionIds.has(sessionId)) {
+        const session = await ocSessionService.validateSession(sessionId);
+        if (!session) {
+          logger.warn('Restored session not in list and not on server, clearing', { sessionId });
+          clearPersistedOcSelection();
+          return;
         }
-        return;
+
+        useOcSessionStore.getState().addSession(session);
       }
 
       await loadSelection(sessionId, true);
-    } catch {
+    } catch (error) {
+      useUIStore.getState().setLoadingConversation(false);
+      useUIStore.getState().setConversationTransitioning(false);
+
+      const validation = await ocSessionService
+        .validateSession(sessionId)
+        .catch(() => 'unknown' as const);
+      if (validation === null) {
+        logger.warn('Restored session confirmed deleted, clearing', { sessionId });
+        clearPersistedOcSelection();
+        return;
+      }
+
       useOcSessionStore.getState().setActiveSessionId(null);
+      logger.error('Restore selection failed', error, { sessionId });
+      logger.warn('Restore failed (transient), cleared selection', { sessionId });
+      toast.error('Could not restore your last session');
     }
   },
 

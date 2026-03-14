@@ -47,6 +47,64 @@ export function useOpencodeLifecycle(): void {
   const previousBackendRef = useRef(activeBackend);
   const restartAttemptsRef = useRef(0);
   const startupGenerationRef = useRef(0);
+  const preWarmRef = useRef<Promise<void> | null>(null);
+  const preWarmGenerationRef = useRef(0);
+
+  useEffect(() => {
+    if (activeBackend !== 'opencode') {
+      preWarmRef.current = null;
+      preWarmGenerationRef.current += 1;
+      return;
+    }
+
+    if (workspacePath) {
+      return;
+    }
+
+    if (useOcSessionStore.getState().activeSessionId === null) {
+      return;
+    }
+
+    const generation = preWarmGenerationRef.current + 1;
+    preWarmGenerationRef.current = generation;
+    const isStale = (): boolean => preWarmGenerationRef.current !== generation;
+
+    const promise = (async () => {
+      try {
+        const status = await opencodeStatus().catch(() => ({
+          running: false,
+          port: null,
+          healthy: false,
+          binaryPath: null,
+          error: null,
+        }));
+        if (isStale()) {
+          return;
+        }
+
+        if (status.running && status.port !== null) {
+          useBackendStore.getState().setOpencodePort(status.port);
+          return;
+        }
+
+        const port = await opencodeStart();
+        if (isStale()) {
+          return;
+        }
+
+        useBackendStore.getState().setOpencodePort(port);
+        logger.info('Pre-warmed OpenCode process', { port });
+      } catch (error) {
+        if (isStale()) {
+          return;
+        }
+
+        logger.error('Pre-warm failed, will retry on workspace init', error);
+      }
+    })();
+
+    preWarmRef.current = promise;
+  }, [activeBackend, workspacePath]);
 
   const runStartup = useCallback(
     async (reason: 'activate' | 'workspace' | 'restart'): Promise<void> => {
@@ -62,6 +120,17 @@ export function useOpencodeLifecycle(): void {
       useBackendStore.getState().setSwitchingBackend(true);
 
       try {
+        if (preWarmRef.current) {
+          await preWarmRef.current.catch(() => undefined);
+          preWarmRef.current = null;
+          if (isStale()) {
+            logger.info('Startup cancelled: stale generation (after pre-warm wait)', {
+              generation,
+            });
+            return;
+          }
+        }
+
         const status = await opencodeStatus().catch(() => ({
           running: false,
           port: null,
@@ -105,7 +174,12 @@ export function useOpencodeLifecycle(): void {
           return;
         }
 
-        await Promise.all([ocSessionService.listSessions(), ocSessionService.loadProviders()]);
+        const [sessions] = await Promise.all([
+          ocSessionService.listSessions(),
+          ocSessionService.loadProviders().catch((error: unknown) => {
+            logger.error('Failed to load providers (non-fatal)', error);
+          }),
+        ]);
         if (isStale()) {
           ocSseManager.disconnect();
           destroyClient();
@@ -113,8 +187,11 @@ export function useOpencodeLifecycle(): void {
           return;
         }
 
+        useBackendStore.getState().setOpencodeHealthy(true);
         logger.info('Data loaded, restoring selection');
-        await getConversationUiBridge('opencode').restoreSelection();
+        await getConversationUiBridge('opencode').restoreSelection({
+          listedSessionIds: new Set(sessions.map((session) => session.id)),
+        });
         if (isStale()) {
           ocSseManager.disconnect();
           destroyClient();
@@ -122,7 +199,6 @@ export function useOpencodeLifecycle(): void {
           return;
         }
 
-        useBackendStore.getState().setOpencodeHealthy(true);
         if (reason !== 'restart') {
           restartAttemptsRef.current = 0;
         }
