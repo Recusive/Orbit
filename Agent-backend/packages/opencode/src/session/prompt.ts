@@ -2027,14 +2027,28 @@ NOTE: At any point in time through this workflow you should feel free to ask the
     })
     const text = await result.text.catch((err: unknown) => { log.error("failed to generate title", { error: err }); })
     if (text) {
-      const cleaned = text
+      const raw = text
         .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
         .split("\n")
         .map((line) => line.trim())
         .find((line) => line.length > 0)
-      if (!cleaned) return
+      if (!raw) return
 
-      const title = cleaned.length > 100 ? cleaned.substring(0, 97) + "..." : cleaned
+      // Clean up common LLM artifacts (quotes, "Title:" prefix, trailing period)
+      let title = raw
+        .replace(/^["']|["']$/g, "")
+        .replace(/^Title:\s*/i, "")
+        .replace(/\.$/, "")
+        .trim()
+
+      // Hard limit: 50 characters with smart word-boundary truncation
+      const maxChars = 50
+      if (title.length > maxChars) {
+        const truncated = title.slice(0, maxChars)
+        const lastSpace = truncated.lastIndexOf(" ")
+        title = lastSpace > maxChars * 0.4 ? truncated.slice(0, lastSpace) : truncated
+      }
+
       Session.setTitle({ sessionID: input.session.id, title })
     }
   }
