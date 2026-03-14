@@ -7,7 +7,6 @@ import { DialogSelect } from "../ui/dialog-select"
 import type { DialogSelectRef } from "../ui/dialog-select"
 import type { JSX } from "solid-js"
 
-
 export function DialogThemeList(): JSX.Element {
   const theme = useTheme()
   const options = Object.keys(theme.all())

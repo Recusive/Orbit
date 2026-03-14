@@ -1,4 +1,4 @@
-import { Prompt  } from "@tui/component/prompt"
+import { Prompt } from "@tui/component/prompt"
 import { useRouteData } from "@tui/context/route"
 import { useTheme } from "@tui/context/theme"
 import { createEffect, createMemo, Match, on, onMount, Show, Switch } from "solid-js"
@@ -14,7 +14,7 @@ import { usePromptRef } from "../context/prompt"
 import { useSync } from "../context/sync"
 import { Toast } from "../ui/toast"
 
-import type {PromptRef} from "@tui/component/prompt";
+import type { PromptRef } from "@tui/component/prompt"
 import type { JSX } from "solid-js"
 
 import { Installation } from "@/installation"

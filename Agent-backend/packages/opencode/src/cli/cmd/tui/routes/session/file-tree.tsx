@@ -102,7 +102,10 @@ function FileNode(props: { node: TreeNode; depth: number; onFileOpen?: (path: st
           }
         }}
       >
-        {"  ".repeat(props.depth)}{icon()}{props.node.name}{props.node.isDir ? "/" : ""}
+        {"  ".repeat(props.depth)}
+        {icon()}
+        {props.node.name}
+        {props.node.isDir ? "/" : ""}
       </text>
       <Show when={expanded() && props.node.isDir}>
         <For each={children()}>

@@ -14,8 +14,12 @@ const ctx = {
   agent: "build",
   abort: new AbortController().signal,
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
+  ask: async () => {
+    /* noop */
+  },
 }
 
 const MB = 1024 * 1024
@@ -34,14 +38,18 @@ describe("memory: abort controller leak", () => {
         const tool = await WebFetchTool.init()
 
         // Warm up
-        await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => { /* noop */ })
+        await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {
+          /* noop */
+        })
 
         Bun.gc(true)
         const baseline = getHeapMB()
 
         // Run many fetches
         for (let i = 0; i < ITERATIONS; i++) {
-          await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => { /* noop */ })
+          await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {
+            /* noop */
+          })
         }
 
         Bun.gc(true)
@@ -101,7 +109,9 @@ describe("memory: abort controller leak", () => {
 
     // Cleanup after measuring
     timers.forEach(clearTimeout)
-    controllers.forEach((c) => { c.abort(); })
+    controllers.forEach((c) => {
+      c.abort()
+    })
     closureMap.clear()
 
     // Test NEW pattern: bind
@@ -131,7 +141,9 @@ describe("memory: abort controller leak", () => {
 
     // Cleanup after measuring
     timers2.forEach(clearTimeout)
-    controllers2.forEach((c) => { c.abort(); })
+    controllers2.forEach((c) => {
+      c.abort()
+    })
     handlers2.length = 0
 
     // eslint-disable-next-line no-console

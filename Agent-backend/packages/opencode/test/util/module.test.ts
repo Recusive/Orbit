@@ -1,6 +1,6 @@
 import path from "path"
 
-import { Module } from "@opencode-ai/util/module"
+import { Module } from "@orbit.build/util/module"
 import { describe, expect, test } from "bun:test"
 
 import { Filesystem } from "../../src/util/filesystem"

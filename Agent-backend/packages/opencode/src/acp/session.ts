@@ -1,8 +1,8 @@
-import { RequestError  } from "@agentclientprotocol/sdk"
+import { RequestError } from "@agentclientprotocol/sdk"
 
 import type { ACPSessionState } from "./types"
-import type {McpServer} from "@agentclientprotocol/sdk";
-import type { OpencodeClient } from "@opencode-ai/sdk/v2"
+import type { McpServer } from "@agentclientprotocol/sdk"
+import type { OpencodeClient } from "@orbit.build/sdk/v2"
 
 import { Log } from "@/util/log"
 

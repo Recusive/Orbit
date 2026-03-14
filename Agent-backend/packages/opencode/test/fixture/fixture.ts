@@ -38,7 +38,9 @@ interface TmpDirOptions<T> {
   init?: (dir: string) => Promise<T>
   dispose?: (dir: string) => Promise<T>
 }
-export async function tmpdir<T>(options?: TmpDirOptions<T>): Promise<{ [Symbol.asyncDispose]: () => Promise<void>; path: string; extra: T }> {
+export async function tmpdir<T>(
+  options?: TmpDirOptions<T>,
+): Promise<{ [Symbol.asyncDispose]: () => Promise<void>; path: string; extra: T }> {
   const dirpath = sanitizePath(path.join(os.tmpdir(), "opencode-test-" + Math.random().toString(36).slice(2)))
   await fs.mkdir(dirpath, { recursive: true })
   if (options?.git) {

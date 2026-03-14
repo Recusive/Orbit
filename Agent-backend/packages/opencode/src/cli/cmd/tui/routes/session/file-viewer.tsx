@@ -80,13 +80,17 @@ export function FileViewer(props: {
                 >
                   <text
                     fg={active() ? theme.text : theme.textMuted}
-                    onMouseDown={() => { props.onSelectTab(tab); }}
+                    onMouseDown={() => {
+                      props.onSelectTab(tab)
+                    }}
                   >
                     {active() ? <b>{name}</b> : name}
                   </text>
                   <text
                     fg={theme.textMuted}
-                    onMouseDown={() => { props.onCloseTab(tab); }}
+                    onMouseDown={() => {
+                      props.onCloseTab(tab)
+                    }}
                   >
                     ✕
                   </text>
@@ -112,13 +116,7 @@ export function FileViewer(props: {
             {(c) => (
               // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <line_number fg={theme.textMuted} minWidth={4} paddingRight={1}>
-                <code
-                  conceal={false}
-                  fg={theme.text}
-                  filetype={ft()}
-                  syntaxStyle={syntax()}
-                  content={c()}
-                />
+                <code conceal={false} fg={theme.text} filetype={ft()} syntaxStyle={syntax()} content={c()} />
               </line_number>
             )}
           </Show>

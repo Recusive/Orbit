@@ -169,7 +169,9 @@ describe("Project.fromDirectory with worktrees", () => {
       await $`git worktree remove ${worktreePath}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {
+          /* noop */
+        })
     }
   })
 
@@ -194,11 +196,15 @@ describe("Project.fromDirectory with worktrees", () => {
       await $`git worktree remove ${worktree1}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {
+          /* noop */
+        })
       await $`git worktree remove ${worktree2}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {
+          /* noop */
+        })
     }
   })
 })

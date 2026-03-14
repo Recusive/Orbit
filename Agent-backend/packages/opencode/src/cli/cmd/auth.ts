@@ -17,8 +17,7 @@ import { UI } from "../ui"
 
 import { cmd } from "./cmd"
 
-import type { Hooks } from "@opencode-ai/plugin"
-
+import type { Hooks } from "@orbit.build/plugin"
 
 type PluginAuth = NonNullable<Hooks["auth"]>
 

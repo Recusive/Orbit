@@ -19,9 +19,6 @@ import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Snapshot } from "@/snapshot"
 
-
-
-
 const log = Log.create({ service: "server" })
 
 export const SessionRoutes = lazy(() =>

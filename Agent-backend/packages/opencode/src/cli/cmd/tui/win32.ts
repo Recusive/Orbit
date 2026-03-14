@@ -5,12 +5,14 @@ type Kernel32 = ReturnType<typeof kernel>
 const STD_INPUT_HANDLE = -10
 const ENABLE_PROCESSED_INPUT = 0x0001
 
-const kernel = (): ReturnType<typeof dlopen<{
-  GetStdHandle: { args: ["i32"]; returns: "ptr" }
-  GetConsoleMode: { args: ["ptr", "ptr"]; returns: "i32" }
-  SetConsoleMode: { args: ["ptr", "u32"]; returns: "i32" }
-  FlushConsoleInputBuffer: { args: ["ptr"]; returns: "i32" }
-}>> =>
+const kernel = (): ReturnType<
+  typeof dlopen<{
+    GetStdHandle: { args: ["i32"]; returns: "ptr" }
+    GetConsoleMode: { args: ["ptr", "ptr"]; returns: "i32" }
+    SetConsoleMode: { args: ["ptr", "u32"]; returns: "i32" }
+    FlushConsoleInputBuffer: { args: ["ptr"]; returns: "i32" }
+  }>
+> =>
   dlopen("kernel32.dll", {
     GetStdHandle: { args: ["i32"], returns: "ptr" },
     GetConsoleMode: { args: ["ptr", "ptr"], returns: "i32" },

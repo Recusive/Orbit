@@ -3,7 +3,7 @@ import fs from "fs/promises"
 import { text } from "node:stream/consumers"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { ZipReader, BlobReader, BlobWriter } from "@zip.js/zip.js"
 import z from "zod"
 

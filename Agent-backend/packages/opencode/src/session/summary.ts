@@ -4,7 +4,6 @@ import { Session } from "."
 
 import type { MessageV2 } from "./message-v2"
 
-
 import { Bus } from "@/bus"
 import { Identifier } from "@/id/id"
 import { Snapshot } from "@/snapshot"

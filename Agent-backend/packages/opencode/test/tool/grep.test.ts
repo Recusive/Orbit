@@ -13,8 +13,12 @@ const ctx = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
+  ask: async () => {
+    /* noop */
+  },
 }
 
 const projectRoot = path.join(__dirname, "../..")

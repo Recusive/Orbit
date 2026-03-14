@@ -22,32 +22,58 @@ void mock.module("@/util/rpc", () => ({
   Rpc: {
     client: () => ({
       call: () => ({ url: "http://127.0.0.1" }),
-      on: () => { /* noop */ },
+      on: () => {
+        /* noop */
+      },
     }),
   },
 }))
 
 void mock.module("@/cli/ui", () => ({
   UI: {
-    error: () => { /* noop */ },
+    error: () => {
+      /* noop */
+    },
   },
 }))
 
 void mock.module("@/util/log", () => ({
   Log: {
-    init: async () => { /* noop */ },
+    init: async () => {
+      /* noop */
+    },
     create: () => ({
-      error: () => { /* noop */ },
-      info: () => { /* noop */ },
-      warn: () => { /* noop */ },
-      debug: () => { /* noop */ },
-      time: () => ({ stop: () => { /* noop */ } }),
+      error: () => {
+        /* noop */
+      },
+      info: () => {
+        /* noop */
+      },
+      warn: () => {
+        /* noop */
+      },
+      debug: () => {
+        /* noop */
+      },
+      time: () => ({
+        stop: () => {
+          /* noop */
+        },
+      }),
     }),
     Default: {
-      error: () => { /* noop */ },
-      info: () => { /* noop */ },
-      warn: () => { /* noop */ },
-      debug: () => { /* noop */ },
+      error: () => {
+        /* noop */
+      },
+      info: () => {
+        /* noop */
+      },
+      warn: () => {
+        /* noop */
+      },
+      debug: () => {
+        /* noop */
+      },
     },
   },
 }))
@@ -66,7 +92,9 @@ void mock.module("@/cli/network", () => ({
 }))
 
 void mock.module("../../../src/cli/cmd/tui/win32", () => ({
-  win32DisableProcessedInput: () => { /* noop */ },
+  win32DisableProcessedInput: () => {
+    /* noop */
+  },
   win32InstallCtrlCGuard: () => undefined,
 }))
 
@@ -128,8 +156,12 @@ describe("tui thread", () => {
       onerror = null
       onmessage = null
       onmessageerror = null
-      postMessage(): void { /* noop */ }
-      terminate(): void { /* noop */ }
+      postMessage(): void {
+        /* noop */
+      }
+      terminate(): void {
+        /* noop */
+      }
     } as unknown as typeof Worker
 
     try {

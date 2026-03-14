@@ -12,7 +12,7 @@
       "dependsOn": ["^build"],
       "outputs": []
     },
-    "@opencode-ai/app#test": {
+    "@orbit.build/app#test": {
       "dependsOn": ["^build"],
       "outputs": []
     }

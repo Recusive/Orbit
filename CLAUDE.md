@@ -174,7 +174,7 @@ Orbit/
 │   │   │   │   └── permission/     # Tool permission system
 │   │   │   └── script/build.ts     # Standalone binary builder
 │   │   ├── sdk/js/                 # Auto-generated TypeScript SDK client
-│   │   ├── plugin/                 # Plugin SDK (@opencode-ai/plugin)
+│   │   ├── plugin/                 # Plugin SDK (@orbit.build/plugin)
 │   │   └── util/                   # Shared utilities
 │   └── learnings.md                # Debugging reference and architecture notes
 │
@@ -568,6 +568,17 @@ The OpenCode engine has been partially rebranded to Orbit:
 - Data directory: `~/.local/share/orbit/` (server mode) or `~/.local/share/opencode/` (standalone CLI)
 - Log files: `~/.local/share/orbit/log/` (Tauri-spawned) or `~/.local/share/opencode/log/` (standalone)
   </binary_names>
+
+<npm_packages>
+Two packages are published to npm under the `@orbit.build` scope (account: `orbit-ai`, npmjs.com):
+
+| Package               | Version | Purpose                                                            |
+| --------------------- | ------- | ------------------------------------------------------------------ |
+| `@orbit.build/sdk`    | 0.0.5   | Auto-generated API client (typed fetch wrapper, zero runtime deps) |
+| `@orbit.build/plugin` | 0.0.5   | Plugin extension API (TypeScript types + Zod tool factory)         |
+
+The engine writes `@orbit.build/plugin` into user `.orbit/package.json` files and runs `bun install`. Both must exist on npm for user installs to work. SDK must be published before plugin (dependency). License: UNLICENSED (proprietary). See `docs/development/NPM-PUBLISH-GUIDE.md` for publish workflow.
+</npm_packages>
 
 <tauri_integration>
 The build script (`scripts/build-opencode.ts`) compiles the engine to a standalone binary and copies it to `src-tauri/binaries/orbit-server-{target-triple}`. Tauri spawns it as a sidecar process:

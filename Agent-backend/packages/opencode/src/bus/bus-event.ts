@@ -3,12 +3,14 @@ import z from "zod"
 import type { ZodType } from "zod"
 
 export namespace BusEvent {
-
   export type Definition = ReturnType<typeof define>
 
   const registry = new Map<string, Definition>()
 
-  export function define<Type extends string, Properties extends ZodType>(type: Type, properties: Properties): {
+  export function define<Type extends string, Properties extends ZodType>(
+    type: Type,
+    properties: Properties,
+  ): {
     type: Type
     properties: Properties
   } {

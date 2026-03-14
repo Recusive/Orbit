@@ -2,7 +2,6 @@ import path from "path"
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 
-
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
 import { ProviderTransform } from "../../src/provider/transform"
@@ -187,7 +186,10 @@ function createChatStream(text: string): ReadableStream<Uint8Array> {
   })
 }
 
-async function loadFixture(providerID: string, modelID: string): Promise<{ provider: ModelsDev.Provider; model: ModelsDev.Model }> {
+async function loadFixture(
+  providerID: string,
+  modelID: string,
+): Promise<{ provider: ModelsDev.Provider; model: ModelsDev.Model }> {
   const fixturePath = path.join(import.meta.dir, "../tool/fixtures/models-api.json")
   const data = await Filesystem.readJson<Record<string, ModelsDev.Provider>>(fixturePath)
   const provider = data[providerID] as ModelsDev.Provider | undefined

@@ -54,11 +54,17 @@ export namespace Permission {
 
   const state = Instance.state(
     () => {
-      const pending: Record<string, Record<string, {
+      const pending: Record<
+        string,
+        Record<
+          string,
+          {
             info: Info
             resolve: () => void
             reject: (e: Error) => void
-          }>> = {}
+          }
+        >
+      > = {}
 
       const approved: Record<string, Record<string, boolean>> = {}
 
@@ -77,7 +83,10 @@ export namespace Permission {
     },
   )
 
-  export function pending(): Record<string, Record<string, { info: Info; resolve: () => void; reject: (e: Error) => void }>> {
+  export function pending(): Record<
+    string,
+    Record<string, { info: Info; resolve: () => void; reject: (e: Error) => void }>
+  > {
     return state().pending
   }
 
@@ -126,9 +135,13 @@ export namespace Permission {
     }
 
     switch (
-      await Plugin.trigger("permission.ask", { ...info, title: info.message }, {
-        status: "ask",
-      }).then((x) => x.status)
+      await Plugin.trigger(
+        "permission.ask",
+        { ...info, title: info.message },
+        {
+          status: "ask",
+        },
+      ).then((x) => x.status)
     ) {
       case "deny":
         throw new RejectedError(info.sessionID, info.id, info.callID, info.metadata)
@@ -158,9 +171,10 @@ export namespace Permission {
     log.info("response", input)
     const { pending, approved } = state()
     const sessionPending = input.sessionID in pending ? pending[input.sessionID] : undefined
-    const match = sessionPending !== undefined && input.permissionID in sessionPending
-      ? sessionPending[input.permissionID]
-      : undefined
+    const match =
+      sessionPending !== undefined && input.permissionID in sessionPending
+        ? sessionPending[input.permissionID]
+        : undefined
     if (match === undefined) return
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- keyed by permission ID
     delete pending[input.sessionID][input.permissionID]

@@ -12,7 +12,7 @@
 
 Orbit currently uses a single AI backend — **agent-bridge**, a compiled Bun sidecar wrapping the Claude Agent SDK. All AI operations (sessions, messages, tools, permissions) flow through stdin/stdout NDJSON between Tauri (Rust) and agent-bridge.
 
-We're adding **Agent-backend** (OpenCode engine) as a second, completely separate AI backend. OpenCode is a full AI engine with 20+ LLM providers, SQLite sessions, 24 built-in tools, and an HTTP+SSE server. It ships an auto-generated TypeScript SDK (`@opencode-ai/sdk` v1.2.24, zero runtime deps).
+We're adding **Agent-backend** (OpenCode engine) as a second, completely separate AI backend. OpenCode is a full AI engine with 20+ LLM providers, SQLite sessions, 24 built-in tools, and an HTTP+SSE server. It ships an auto-generated TypeScript SDK (`@orbit.build/sdk` v1.2.24, zero runtime deps).
 
 **The two backends share nothing.** When the user switches backends in settings, the entire experience changes — sessions, tools, permissions, model selection, everything. No mid-conversation switching.
 
@@ -37,7 +37,7 @@ Frontend (React)
 │
 ├── Backend Mode: "opencode" ────────────────────────────────────────────
 │   OcChatController + new stores/services
-│   → HTTP+SSE via @opencode-ai/sdk/v2 → Agent-backend server
+│   → HTTP+SSE via @orbit.build/sdk/v2 → Agent-backend server
 │   → SQLite sessions managed by Agent-backend
 │
 ├── Shared Shell (backend-agnostic) ─────────────────────────────────────
@@ -62,7 +62,7 @@ src-tauri/src/opencode/process.rs
 | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **C1: ChatInput/ChatArea not backend-agnostic**              | Separate `ClaudeChatController` and `OcChatController` with backend-specific composer, permissions, and model controls. Shared layout shell only. (Phase 3)                                                                   |
 | **C2: Conversation/sidebar/title source of truth undefined** | `ConversationRepository` interface with Claude (JSONL) and OpenCode (SDK HTTP) implementations. Sidebar reads from active repository. (Phase 4)                                                                               |
-| **C3: SDK contract wrong**                                   | Pinned to `@opencode-ai/sdk/v2`. Events are `{ directory, payload: Event }`. Delta is `message.part.delta` (separate event). Permissions use `permission.asked`. All 45 event types mapped. (Phase 2)                         |
+| **C3: SDK contract wrong**                                   | Pinned to `@orbit.build/sdk/v2`. Events are `{ directory, payload: Event }`. Delta is `message.part.delta` (separate event). Permissions use `permission.asked`. All 45 event types mapped. (Phase 2)                         |
 | **C4: Build path not executable**                            | `file:` dependency for SDK. Deterministic `scripts/build-opencode.ts` that resolves `dist/opencode-darwin-arm64/bin/opencode`, renames to `orbit-server-{target}`. Network-dependent `models.dev` fetch documented. (Phase 9) |
 
 | Audit Edge Case                                                  | How Addressed                                                                                                                                                                                           |
@@ -220,14 +220,14 @@ const OPENCODE_CAPABILITIES: BackendCapabilities = {
 
 ## Phase 2: SDK Client + SSE Service (Correct v2 Contract)
 
-**Goal:** Frontend service layer wrapping `@opencode-ai/sdk/v2` with correct event envelope handling.
+**Goal:** Frontend service layer wrapping `@orbit.build/sdk/v2` with correct event envelope handling.
 
 ### Pinned SDK Contract
 
 ```typescript
 // Import from v2, NOT v1
-import { createOrbitClient } from '@opencode-ai/sdk/v2/client';
-import type { GlobalEvent, Event, Part, Session, Message } from '@opencode-ai/sdk/v2';
+import { createOrbitClient } from '@orbit.build/sdk/v2/client';
+import type { GlobalEvent, Event, Part, Session, Message } from '@orbit.build/sdk/v2';
 
 // GlobalEvent is { directory: string, payload: Event }
 // Event is discriminated union on payload.type (45 event types)
@@ -239,7 +239,7 @@ import type { GlobalEvent, Event, Part, Session, Message } from '@opencode-ai/sd
 
 | File                                                       | Purpose                                                                                                                                                                                                                                                                                                                                                                                     |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/types/opencode/index.ts`                   | Re-exports from `@opencode-ai/sdk/v2`. Aliases: `OcSession` (Session), `OcMessage` (Message), `OcPart` (Part), `OcUserMessage` (UserMessage), `OcAssistantMessage` (AssistantMessage), `OcToolPart` (ToolPart), `OcTextPart` (TextPart), `OcPermissionAsked` (EventPermissionAsked properties), `OcSessionStatus` (SessionStatus). Single import point — SDK upgrades touch only this file. |
+| `apps/agent/src/types/opencode/index.ts`                   | Re-exports from `@orbit.build/sdk/v2`. Aliases: `OcSession` (Session), `OcMessage` (Message), `OcPart` (Part), `OcUserMessage` (UserMessage), `OcAssistantMessage` (AssistantMessage), `OcToolPart` (ToolPart), `OcTextPart` (TextPart), `OcPermissionAsked` (EventPermissionAsked properties), `OcSessionStatus` (SessionStatus). Single import point — SDK upgrades touch only this file. |
 | `apps/agent/src/services/opencode/client.ts`               | Module singleton: `initClient(port, directory)`, `getClient()`, `destroyClient()`, `updateDirectory(directory)`. Uses `createOrbitClient({ baseUrl, directory })` from v2.                                                                                                                                                                                                                  |
 | `apps/agent/src/services/opencode/sse-manager.ts`          | SSE connection via `sdk.event.subscribe({}, { signal })` → async iterable. Generation counter for stale event discard. Reconnect with exponential backoff (1s→2s→4s→8s, max 30s). On each event: filter by `event.directory`, dispatch `event.payload` to coordinator.                                                                                                                      |
 | `apps/agent/src/services/opencode/oc-event-coordinator.ts` | Module singleton (mirrors `ChatMessageService` pattern). Owns cross-store orchestration — not just message mutations. Dispatcher on `event.payload.type`. See dispatch table below.                                                                                                                                                                                                         |
@@ -389,7 +389,7 @@ flushDeltaBuffer(partId): void {
 
 | File                  | Change                                                                      |
 | --------------------- | --------------------------------------------------------------------------- |
-| `package.json` (root) | Add `"@opencode-ai/sdk": "file:./Agent-backend/packages/sdk/js"` dependency |
+| `package.json` (root) | Add `"@orbit.build/sdk": "file:./Agent-backend/packages/sdk/js"` dependency |
 
 ### Verification
 
@@ -1089,7 +1089,7 @@ The upstream build script uses `MODELS_DEV_API_JSON` env var (NOT a `--skip-mode
 - `src-tauri/src/lib.rs` — register opencode module + commands + `OpenCodeProcessState` managed state (separate from SessionManager, uses `parking_lot::Mutex`), shutdown in `RunEvent::Exit`
 - `src-tauri/src/commands/mod.rs` — add `pub mod opencode`
 - `src-tauri/tauri.conf.json` — add `"binaries/orbit-server"` to `externalBin`
-- `package.json` (root) — add `@opencode-ai/sdk` file dep, `build:opencode` scripts, wire into `dev`/`build`/`ci`
+- `package.json` (root) — add `@orbit.build/sdk` file dep, `build:opencode` scripts, wire into `dev`/`build`/`ci`
 - `apps/agent/src/components/layout/chat-area/ChatArea.tsx` — replace inline chat with `<BackendChatSurface surface="agent" />`
 - `apps/agent/src/components/layout/content-top-bar.tsx` — title via `useConversationMeta()`, `handleNewSession` via `bridge.create()` (Audit 5 C5)
 - `apps/agent/src/components/layout/primary-sidebar/` — use `useConversationList()` hook
@@ -1239,7 +1239,7 @@ All files explored during planning. Read these for full context before reviewing
 
 **SDK v2 (pinned contract)**
 
-- `Agent-backend/packages/sdk/js/package.json` — `@opencode-ai/sdk` v1.2.24, zero deps, ES module
+- `Agent-backend/packages/sdk/js/package.json` — `@orbit.build/sdk` v1.2.24, zero deps, ES module
 - `Agent-backend/packages/sdk/js/src/v2/client.ts` — `createOrbitClient()` v2 factory, directory + workspace headers
 - `Agent-backend/packages/sdk/js/src/v2/gen/types.gen.ts` — **Authoritative types:** `GlobalEvent = { directory, payload: Event }`, 45-member `Event` union, `Session`, `Message = UserMessage | AssistantMessage`, 12-member `Part` union, `ToolState` discriminated union, `SessionStatus`, `EventMessagePartDelta` (separate from Updated), `EventPermissionAsked`
 - `Agent-backend/packages/sdk/js/src/v2/index.ts` — v2 exports
@@ -1316,7 +1316,7 @@ These files contain Claude-specific logic and are LEFT UNTOUCHED. Listed for ref
 
 ### Root Config — To Be Modified
 
-- `package.json` — Add `@opencode-ai/sdk` file dep, `build:opencode` scripts, wire into `dev`/`build`/`ci`
+- `package.json` — Add `@orbit.build/sdk` file dep, `build:opencode` scripts, wire into `dev`/`build`/`ci`
 
 ### Agent Bridge — Unchanged
 

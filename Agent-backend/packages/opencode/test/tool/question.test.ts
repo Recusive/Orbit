@@ -10,8 +10,12 @@ const ctx = {
   agent: "test-agent",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
+  ask: async () => {
+    /* noop */
+  },
 }
 
 describe("tool.question", () => {

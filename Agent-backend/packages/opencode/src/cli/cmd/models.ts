@@ -9,7 +9,6 @@ import { cmd } from "./cmd"
 
 import type { Argv } from "yargs"
 
-
 export const ModelsCommand = cmd({
   command: "models [provider]",
   describe: "list all available models",

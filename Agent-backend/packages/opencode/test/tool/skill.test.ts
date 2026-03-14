@@ -17,7 +17,9 @@ const baseCtx: Omit<Tool.Context, "ask"> = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
 }
 
 describe("tool.skill", () => {

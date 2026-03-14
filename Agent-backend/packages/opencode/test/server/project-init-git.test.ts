@@ -26,7 +26,8 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> => Instance.reload(input)
+    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> =>
+      Instance.reload(input)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -46,9 +47,11 @@ describe("project.initGit endpoint", () => {
       })
       expect(reloadSpy).toHaveBeenCalledTimes(1)
       expect(reloadSpy.mock.calls[0]?.[0]?.init).toBe(InstanceBootstrap)
-      expect(seen.some((evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed")).toBe(
-        true,
-      )
+      expect(
+        seen.some(
+          (evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed",
+        ),
+      ).toBe(true)
       expect(Filesystem.exists(path.join(tmp.path, ".git", "opencode"))).toBe(false)
 
       const current = await app.request("/project/current", {
@@ -82,7 +85,8 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> => Instance.reload(input)
+    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> =>
+      Instance.reload(input)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -99,7 +103,9 @@ describe("project.initGit endpoint", () => {
         worktree: tmp.path,
       })
       expect(
-        seen.filter((evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed").length,
+        seen.filter(
+          (evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed",
+        ).length,
       ).toBe(0)
       expect(reloadSpy).toHaveBeenCalledTimes(0)
 

@@ -1,6 +1,6 @@
 import { SessionShareTable } from "./share.sql"
 
-import type * as SDK from "@opencode-ai/sdk/v2"
+import type * as SDK from "@orbit.build/sdk/v2"
 
 import { Bus } from "@/bus"
 import { Config } from "@/config/config"
@@ -9,7 +9,6 @@ import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
 import { Database, eq } from "@/storage/db"
 import { Log } from "@/util/log"
-
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
@@ -40,10 +39,7 @@ export namespace ShareNext {
       if (evt.properties.info.role === "user") {
         const userMsg = evt.properties.info as SDK.UserMessage
         void (async () => {
-          const model = await Provider.getModel(
-            userMsg.model.providerID,
-            userMsg.model.modelID,
-          )
+          const model = await Provider.getModel(userMsg.model.providerID, userMsg.model.modelID)
           sync(evt.properties.info.sessionID, [
             {
               type: "model",
@@ -84,8 +80,7 @@ export namespace ShareNext {
       .then((x) => x.json())
       .then((x) => x as { id: string; url: string; secret: string })
     Database.use((db) => {
-      db
-        .insert(SessionShareTable)
+      db.insert(SessionShareTable)
         .values({ session_id: sessionID, id: result.id, secret: result.secret, url: result.url })
         .onConflictDoUpdate({
           target: SessionShareTable.session_id,

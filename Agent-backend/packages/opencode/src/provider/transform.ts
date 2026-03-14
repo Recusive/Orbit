@@ -226,7 +226,8 @@ export namespace ProviderTransform {
 
         // Check for empty base64 image data
         if (part.type === "image") {
-          const imageStr = typeof part.image === "string" ? part.image : part.image instanceof URL ? part.image.href : ""
+          const imageStr =
+            typeof part.image === "string" ? part.image : part.image instanceof URL ? part.image.href : ""
           if (imageStr.startsWith("data:")) {
             const match = /^data:([^;]+);base64,(.*)$/.exec(imageStr)
             if (match?.[2].length === 0) {
@@ -238,9 +239,14 @@ export namespace ProviderTransform {
           }
         }
 
-        const imageAsString = part.type === "image"
-          ? (typeof part.image === "string" ? part.image : part.image instanceof URL ? part.image.href : "")
-          : ""
+        const imageAsString =
+          part.type === "image"
+            ? typeof part.image === "string"
+              ? part.image
+              : part.image instanceof URL
+                ? part.image.href
+                : ""
+            : ""
         const mime = part.type === "image" ? imageAsString.split(";")[0].replace("data:", "") : part.mediaType
         const filename = part.type === "file" ? part.filename : undefined
         const modality = mimeToModality(mime)
@@ -258,7 +264,11 @@ export namespace ProviderTransform {
     })
   }
 
-  export function message(msgs: ModelMessage[], model: Provider.Model, options: Record<string, unknown>): ModelMessage[] {
+  export function message(
+    msgs: ModelMessage[],
+    model: Provider.Model,
+    options: Record<string, unknown>,
+  ): ModelMessage[] {
     msgs = unsupportedParts(msgs, model)
     msgs = normalizeMessages(msgs, model, options)
     if (
@@ -740,10 +750,7 @@ export namespace ProviderTransform {
       }
     }
 
-    if (
-      input.model.providerID === "openai" ||
-      input.providerOptions?.setCacheKey !== undefined
-    ) {
+    if (input.model.providerID === "openai" || input.providerOptions?.setCacheKey !== undefined) {
       result.promptCacheKey = input.sessionID
     }
 
@@ -975,11 +982,7 @@ export namespace ProviderTransform {
         }
 
         // Filter required array to only include fields that exist in properties
-        if (
-          result.type === "object" &&
-          isPlainObject(result.properties) &&
-          Array.isArray(result.required)
-        ) {
+        if (result.type === "object" && isPlainObject(result.properties) && Array.isArray(result.required)) {
           result.required = (result.required as string[]).filter(
             (field: string) => field in (result.properties as Record<string, unknown>),
           )

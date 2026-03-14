@@ -1,5 +1,5 @@
 import type { BunShell } from "./shell"
-import type {ToolDefinition} from "./tool";
+import type { ToolDefinition } from "./tool"
 import type {
   Event,
   createOpencodeClient,
@@ -12,8 +12,7 @@ import type {
   Part,
   Auth,
   Config,
-} from "@opencode-ai/sdk"
-
+} from "@orbit.build/sdk"
 
 export * from "./tool"
 
@@ -41,7 +40,8 @@ export interface AuthHook {
     | {
         type: "oauth"
         label: string
-        prompts?: (| {
+        prompts?: (
+          | {
               type: "text"
               key: string
               message: string
@@ -59,13 +59,15 @@ export interface AuthHook {
                 hint?: string
               }[]
               condition?: (inputs: Record<string, string>) => boolean
-            })[]
+            }
+        )[]
         authorize(inputs?: Record<string, string>): Promise<AuthOuathResult>
       }
     | {
         type: "api"
         label: string
-        prompts?: (| {
+        prompts?: (
+          | {
               type: "text"
               key: string
               message: string
@@ -83,7 +85,8 @@ export interface AuthHook {
                 hint?: string
               }[]
               condition?: (inputs: Record<string, string>) => boolean
-            })[]
+            }
+        )[]
         authorize?(inputs?: Record<string, string>): Promise<
           | {
               type: "success"

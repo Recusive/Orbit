@@ -1,7 +1,7 @@
 import { buffer } from "node:stream/consumers"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
 
 import { Flag } from "../flag/flag"
@@ -10,7 +10,6 @@ import { Log } from "../util/log"
 import { BusEvent } from "@/bus/bus-event"
 import { iife } from "@/util/iife"
 import { Process } from "@/util/process"
-
 
 declare global {
   const OPENCODE_VERSION: string

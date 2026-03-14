@@ -1,33 +1,6 @@
 import { pathToFileURL } from "url"
 
-import {
-  RequestError
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-} from "@agentclientprotocol/sdk"
+import { RequestError } from "@agentclientprotocol/sdk"
 import { LoadAPIKeyError } from "ai"
 import { applyPatch } from "diff"
 import { z } from "zod"
@@ -42,16 +15,49 @@ import { ACPSessionManager } from "./session"
 
 import type { ACPConfig } from "./types"
 import type { Config } from "@/config/config"
-import type {Agent as ACPAgent, AgentSideConnection, AuthenticateRequest, AuthMethod, CancelNotification, ForkSessionRequest, ForkSessionResponse, InitializeRequest, InitializeResponse, ListSessionsRequest, ListSessionsResponse, LoadSessionRequest, NewSessionRequest, PermissionOption, PlanEntry, PromptRequest, ResumeSessionRequest, ResumeSessionResponse, Role, SessionInfo, SetSessionModelRequest, SetSessionModeRequest, SetSessionModeResponse, ToolCallContent, ToolKind, Usage} from "@agentclientprotocol/sdk";
-import type { AssistantMessage, Event, OpencodeClient, SessionMessageResponse, ToolPart } from "@opencode-ai/sdk/v2"
+import type {
+  Agent as ACPAgent,
+  AgentSideConnection,
+  AuthenticateRequest,
+  AuthMethod,
+  CancelNotification,
+  ForkSessionRequest,
+  ForkSessionResponse,
+  InitializeRequest,
+  InitializeResponse,
+  ListSessionsRequest,
+  ListSessionsResponse,
+  LoadSessionRequest,
+  NewSessionRequest,
+  PermissionOption,
+  PlanEntry,
+  PromptRequest,
+  ResumeSessionRequest,
+  ResumeSessionResponse,
+  Role,
+  SessionInfo,
+  SetSessionModelRequest,
+  SetSessionModeRequest,
+  SetSessionModeResponse,
+  ToolCallContent,
+  ToolKind,
+  Usage,
+} from "@agentclientprotocol/sdk"
+import type { AssistantMessage, Event, OpencodeClient, SessionMessageResponse, ToolPart } from "@orbit.build/sdk/v2"
 
 import { Installation } from "@/installation"
 import { MessageV2 } from "@/session/message-v2"
 import { Todo } from "@/session/todo"
 
-
-interface ModeOption { id: string; name: string; description?: string }
-interface ModelOption { modelId: string; name: string }
+interface ModeOption {
+  id: string
+  name: string
+  description?: string
+}
+interface ModelOption {
+  modelId: string
+  name: string
+}
 
 interface ProviderModelInfo {
   variants?: Record<string, Record<string, unknown>>
@@ -983,11 +989,8 @@ export namespace ACP {
           }
         } else if (part.type === "text") {
           if (part.text !== "") {
-            const audience: Role[] | undefined = part.synthetic === true
-              ? ["assistant"]
-              : part.ignored === true
-                ? ["user"]
-                : undefined
+            const audience: Role[] | undefined =
+              part.synthetic === true ? ["assistant"] : part.ignored === true ? ["user"] : undefined
             await this.connection
               .sessionUpdate({
                 sessionId,
@@ -1335,8 +1338,10 @@ export namespace ACP {
       }
       const agent = session.modeId ?? (await AgentModule.defaultAgent())
 
-      const parts: (| { type: "text"; text: string; synthetic?: boolean; ignored?: boolean }
-        | { type: "file"; url: string; filename: string; mime: string })[] = []
+      const parts: (
+        | { type: "text"; text: string; synthetic?: boolean; ignored?: boolean }
+        | { type: "file"; url: string; filename: string; mime: string }
+      )[] = []
       for (const part of params.prompt) {
         switch (part.type) {
           case "text": {
@@ -1390,7 +1395,13 @@ export namespace ACP {
                 type: "text",
                 text: resource.text,
               })
-            } else if ("blob" in resource && resource.blob !== "" && resource.mimeType !== null && resource.mimeType !== undefined && resource.mimeType !== "") {
+            } else if (
+              "blob" in resource &&
+              resource.blob !== "" &&
+              resource.mimeType !== null &&
+              resource.mimeType !== undefined &&
+              resource.mimeType !== ""
+            ) {
               // Binary resource (PDFs, etc.): store as file part with data URL
               const parsedResource = parseUri(resource.uri)
               const filename = parsedResource.type === "file" ? parsedResource.filename : "file"
@@ -1430,11 +1441,7 @@ export namespace ACP {
 
       const buildUsage = (msg: AssistantMessage): Usage => ({
         totalTokens:
-          msg.tokens.input +
-          msg.tokens.output +
-          msg.tokens.reasoning +
-          msg.tokens.cache.read +
-          msg.tokens.cache.write,
+          msg.tokens.input + msg.tokens.output + msg.tokens.reasoning + msg.tokens.cache.read + msg.tokens.cache.write,
         inputTokens: msg.tokens.input,
         outputTokens: msg.tokens.output,
         thoughtTokens: msg.tokens.reasoning !== 0 ? msg.tokens.reasoning : undefined,
@@ -1569,10 +1576,7 @@ export namespace ACP {
     }
   }
 
-  async function defaultModel(
-    config: ACPConfig,
-    cwd?: string,
-  ): Promise<{ providerID: string; modelID: string }> {
+  async function defaultModel(config: ACPConfig, cwd?: string): Promise<{ providerID: string; modelID: string }> {
     const sdk = config.sdk
     const configured = config.defaultModel
     if (configured !== undefined) return configured

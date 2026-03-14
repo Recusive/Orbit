@@ -2,7 +2,7 @@
 
 import { fileURLToPath } from "url"
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import { $ } from "bun"
 
 // Highlights template for release notes:

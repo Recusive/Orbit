@@ -1,12 +1,8 @@
 import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
 
-import { NamedError } from "@opencode-ai/util/error"
-import {
-  createMessageConnection,
-  StreamMessageReader,
-  StreamMessageWriter,
-} from "vscode-jsonrpc/node"
+import { NamedError } from "@orbit.build/util/error"
+import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node"
 import z from "zod"
 
 import { Instance } from "../project/instance"
@@ -237,9 +233,7 @@ export namespace LSPClient {
       },
       async waitForDiagnostics(diagInput: { path: string }): Promise<void> {
         const normalizedPath = Filesystem.normalizePath(
-          path.isAbsolute(diagInput.path)
-            ? diagInput.path
-            : path.resolve(Instance.directory, diagInput.path),
+          path.isAbsolute(diagInput.path) ? diagInput.path : path.resolve(Instance.directory, diagInput.path),
         )
         log.info("waiting for diagnostics", { path: normalizedPath })
         let unsub: (() => void) | undefined

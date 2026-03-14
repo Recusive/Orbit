@@ -9,7 +9,6 @@ import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 
-
 import { BusEvent } from "@/bus/bus-event"
 
 export namespace Command {

@@ -1,4 +1,4 @@
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 import { useRoute } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { useDialog } from "@tui/ui/dialog"
@@ -11,9 +11,8 @@ import { useToast } from "../ui/toast"
 
 import { DialogSessionList } from "./workspace/dialog-session-list"
 
-import type { Session } from "@opencode-ai/sdk/v2"
+import type { Session } from "@orbit.build/sdk/v2"
 import type { JSX } from "solid-js"
-
 
 async function openWorkspace(input: {
   dialog: ReturnType<typeof useDialog>

@@ -9,8 +9,6 @@ import { UI } from "../ui"
 
 import { cmd } from "./cmd"
 
-
-
 import type { Argv } from "yargs"
 
 const QueryCommand = cmd({

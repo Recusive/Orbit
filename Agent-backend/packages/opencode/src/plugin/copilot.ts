@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises"
 
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
+import type { Hooks, PluginInput } from "@orbit.build/plugin"
 
 import { Installation } from "@/installation"
 import { iife } from "@/util/iife"
@@ -42,17 +42,14 @@ interface ContentPart {
 
 function hasImageInMessages(messages: CopilotMessage[]): boolean {
   return messages.some(
-    (msg) =>
-      Array.isArray(msg.content) &&
-      (msg.content as ContentPart[]).some((part) => part.type === "image_url"),
+    (msg) => Array.isArray(msg.content) && (msg.content as ContentPart[]).some((part) => part.type === "image_url"),
   )
 }
 
 function hasImageInInput(items: CopilotResponseInput[]): boolean {
   return items.some(
     (item) =>
-      Array.isArray(item.content) &&
-      (item.content as ContentPart[]).some((part) => part.type === "input_image"),
+      Array.isArray(item.content) && (item.content as ContentPart[]).some((part) => part.type === "input_image"),
   )
 }
 

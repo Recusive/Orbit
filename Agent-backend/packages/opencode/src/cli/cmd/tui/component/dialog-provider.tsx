@@ -15,10 +15,8 @@ import { useToast } from "../ui/toast"
 
 import { DialogModel } from "./dialog-model"
 
-import type { ProviderAuthAuthorization } from "@opencode-ai/sdk/v2"
+import type { ProviderAuthAuthorization } from "@orbit.build/sdk/v2"
 import type { Accessor, JSX } from "solid-js"
-
-
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -29,13 +27,15 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   google: 5,
 }
 
-export function createDialogProviderOptions(): Accessor<{
-  title: string
-  value: string
-  description: string | undefined
-  category: string
-  onSelect: () => Promise<void>
-}[]> {
+export function createDialogProviderOptions(): Accessor<
+  {
+    title: string
+    value: string
+    description: string | undefined
+    category: string
+    onSelect: () => Promise<void>
+  }[]
+> {
   const sync = useSync()
   const dialog = useDialog()
   const sdk = useSDK()
@@ -73,11 +73,15 @@ export function createDialogProviderOptions(): Accessor<{
                         title: x.label,
                         value: idx,
                       }))}
-                      onSelect={(option) => { resolve(option.value); }}
+                      onSelect={(option) => {
+                        resolve(option.value)
+                      }}
                     />
                   )
                 },
-                () => { resolve(null); },
+                () => {
+                  resolve(null)
+                },
               )
             })
           }
@@ -94,7 +98,12 @@ export function createDialogProviderOptions(): Accessor<{
               dialog.replace(() => {
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
-                  <CodeMethod providerID={provider.id} title={method.label} index={codeIndex} authorization={codeAuth} />
+                  <CodeMethod
+                    providerID={provider.id}
+                    title={method.label}
+                    index={codeIndex}
+                    authorization={codeAuth}
+                  />
                 )
               })
             }
@@ -104,14 +113,20 @@ export function createDialogProviderOptions(): Accessor<{
               dialog.replace(() => {
                 // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
-                  <AutoMethod providerID={provider.id} title={method.label} index={autoIndex} authorization={autoAuth} />
+                  <AutoMethod
+                    providerID={provider.id}
+                    title={method.label}
+                    index={autoIndex}
+                    authorization={autoAuth}
+                  />
                 )
               })
             }
           }
           if (method.type === "api") {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />); return;
+            dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />)
+            return
           }
         },
       })),
@@ -141,9 +156,11 @@ function AutoMethod(props: AutoMethodProps): JSX.Element {
 
   useKeyboard((evt) => {
     if (evt.name === "c" && !evt.ctrl && !evt.meta) {
-      const code = (/[A-Z0-9]{4}-[A-Z0-9]{4,5}/.exec(props.authorization.instructions))?.[0] ?? props.authorization.url
+      const code = /[A-Z0-9]{4}-[A-Z0-9]{4,5}/.exec(props.authorization.instructions)?.[0] ?? props.authorization.url
       Clipboard.copy(code)
-        .then(() => { toast.show({ message: "Copied to clipboard", variant: "info" }); })
+        .then(() => {
+          toast.show({ message: "Copied to clipboard", variant: "info" })
+        })
         .catch(toast.error)
     }
   })
@@ -170,7 +187,12 @@ function AutoMethod(props: AutoMethodProps): JSX.Element {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -253,32 +275,34 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
       title={props.title}
       placeholder="API key"
       description={
-        (({
-          opencode: (() => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                key.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
-              </text>
-            </box>
-          )) as () => JSX.Element,
-          "opencode-go": (() => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
-                with generous usage limits.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go
-              </text>
-            </box>
-          )) as () => JSX.Element,
-        } as Record<string, (() => JSX.Element) | undefined>)[props.providerID] ?? undefined)
+        (
+          {
+            opencode: (() => (
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
+                  key.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                </text>
+              </box>
+            )) as () => JSX.Element,
+            "opencode-go": (() => (
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding
+                  models with generous usage limits.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go
+                </text>
+              </box>
+            )) as () => JSX.Element,
+          } as Record<string, (() => JSX.Element) | undefined>
+        )[props.providerID] ?? undefined
       }
       onConfirm={(value) => {
         if (!value) return

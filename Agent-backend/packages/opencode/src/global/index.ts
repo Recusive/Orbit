@@ -4,7 +4,6 @@ import path from "path"
 
 import { xdgData, xdgCache, xdgConfig, xdgState } from "xdg-basedir"
 
-
 import { Filesystem } from "../util/filesystem"
 
 const app = "orbit"

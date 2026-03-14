@@ -6,7 +6,10 @@ import type { JSX } from "solid-js"
 const themeCount = Object.keys(DEFAULT_THEMES).filter((key) => key !== "opencode").length
 const themeTip = `Use {highlight}/themes{/highlight} or {highlight}Ctrl+X T{/highlight} to switch between ${String(themeCount)} built-in themes`
 
-interface TipPart { text: string; highlight: boolean }
+interface TipPart {
+  text: string
+  highlight: boolean
+}
 
 function parse(tip: string): TipPart[] {
   const parts: TipPart[] = []

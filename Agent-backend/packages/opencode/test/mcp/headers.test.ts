@@ -80,7 +80,9 @@ test("headers are passed to transports when oauth is enabled (default)", async (
           Authorization: "Bearer test-token",
           "X-Custom-Header": "custom-value",
         },
-      }).catch(() => { /* noop */ })
+      }).catch(() => {
+        /* noop */
+      })
 
       // Both transports should have been created with headers
       expect(transportCalls.length).toBeGreaterThanOrEqual(1)
@@ -113,7 +115,9 @@ test("headers are passed to transports when oauth is explicitly disabled", async
         headers: {
           Authorization: "Bearer test-token",
         },
-      }).catch(() => { /* noop */ })
+      }).catch(() => {
+        /* noop */
+      })
 
       expect(transportCalls.length).toBeGreaterThanOrEqual(1)
 
@@ -140,7 +144,9 @@ test("no requestInit when headers are not provided", async () => {
       await MCP.add("test-server-no-headers", {
         type: "remote",
         url: "https://example.com/mcp",
-      }).catch(() => { /* noop */ })
+      }).catch(() => {
+        /* noop */
+      })
 
       expect(transportCalls.length).toBeGreaterThanOrEqual(1)
 

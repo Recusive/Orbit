@@ -175,7 +175,9 @@ export namespace LSP {
       }
     },
     (s: LSPState) => {
-      s.clients.forEach((client) => { client.shutdown() })
+      s.clients.forEach((client) => {
+        client.shutdown()
+      })
       return Promise.resolve()
     },
   )

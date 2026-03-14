@@ -5,8 +5,8 @@ import { tui } from "./app"
 import { win32DisableProcessedInput, win32InstallCtrlCGuard } from "./win32"
 
 import type { EventSource } from "./context/sdk"
-import type {rpc} from "./worker";
-import type { Event as _Event } from "@opencode-ai/sdk/v2"
+import type { rpc } from "./worker"
+import type { Event as _Event } from "@orbit.build/sdk/v2"
 
 import { cmd } from "@/cli/cmd/cmd"
 import { withNetworkOptions, resolveNetworkOptions } from "@/cli/network"
@@ -198,7 +198,9 @@ export const TuiThreadCommand = cmd({
           }
 
       setTimeout(() => {
-        client.call("checkUpgrade", { directory: cwd }).catch(() => { /* noop */ })
+        client.call("checkUpgrade", { directory: cwd }).catch(() => {
+          /* noop */
+        })
       }, 1000).unref()
 
       try {

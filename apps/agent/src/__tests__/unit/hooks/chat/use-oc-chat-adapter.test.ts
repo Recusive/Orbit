@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
 import type { ToolExecution } from '@/stores/agent/tool-store';
-import type { QuestionRequest } from '@opencode-ai/sdk/v2/client';
+import type { QuestionRequest } from '@orbit.build/sdk/v2/client';
 
 const { mockUseOcChat, mockOpenFile, mockOpenUrl, mockAbortSession, mockRevertSession } =
   vi.hoisted(() => ({

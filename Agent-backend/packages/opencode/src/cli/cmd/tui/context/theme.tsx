@@ -1,6 +1,6 @@
 import path from "path"
 
-import { SyntaxStyle, RGBA  } from "@opentui/core"
+import { SyntaxStyle, RGBA } from "@opentui/core"
 import { useRenderer } from "@opentui/solid"
 import { createEffect, createMemo, onMount } from "solid-js"
 import { createStore, produce } from "solid-js/store"
@@ -45,7 +45,7 @@ import vesper from "./theme/vesper.json" with { type: "json" }
 import zenburn from "./theme/zenburn.json" with { type: "json" }
 import { useTuiConfig } from "./tui-config"
 
-import type {TerminalColors} from "@opentui/core";
+import type { TerminalColors } from "@opentui/core"
 
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
@@ -653,7 +653,12 @@ function generateSubtleSyntax(theme: Theme): SyntaxStyle {
   )
 }
 
-function getSyntaxRules(theme: Theme): { scope: string[]; style: { foreground: RGBA; italic?: boolean; bold?: boolean; underline?: boolean; background?: RGBA } }[] {
+function getSyntaxRules(
+  theme: Theme,
+): {
+  scope: string[]
+  style: { foreground: RGBA; italic?: boolean; bold?: boolean; underline?: boolean; background?: RGBA }
+}[] {
   return [
     {
       scope: ["default"],

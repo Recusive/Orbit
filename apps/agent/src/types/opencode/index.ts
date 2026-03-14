@@ -22,4 +22,4 @@ export type {
   SubtaskPart as OcSubtaskPart,
   TextPart as OcTextPart,
   ToolPart as OcToolPart,
-} from '@opencode-ai/sdk/v2/client';
+} from '@orbit.build/sdk/v2/client';

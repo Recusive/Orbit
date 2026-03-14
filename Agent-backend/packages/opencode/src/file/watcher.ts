@@ -90,9 +90,11 @@ export namespace FileWatcher {
         })
         const sub = await withTimeout(pending, SUBSCRIBE_TIMEOUT_MS).catch((err: unknown) => {
           log.error("failed to subscribe to Instance.directory", { error: err })
-          void pending.then((s) => s.unsubscribe()).catch(() => {
-            /* intentional: swallow unsubscribe errors for timed-out subscription */
-          })
+          void pending
+            .then((s) => s.unsubscribe())
+            .catch(() => {
+              /* intentional: swallow unsubscribe errors for timed-out subscription */
+            })
           return undefined
         })
         if (sub) subs.push(sub)
@@ -112,9 +114,11 @@ export namespace FileWatcher {
           })
           const sub = await withTimeout(pending, SUBSCRIBE_TIMEOUT_MS).catch((err: unknown) => {
             log.error("failed to subscribe to vcsDir", { error: err })
-            void pending.then((s) => s.unsubscribe()).catch(() => {
-              /* intentional: swallow unsubscribe errors for timed-out subscription */
-            })
+            void pending
+              .then((s) => s.unsubscribe())
+              .catch(() => {
+                /* intentional: swallow unsubscribe errors for timed-out subscription */
+              })
             return undefined
           })
           if (sub) subs.push(sub)

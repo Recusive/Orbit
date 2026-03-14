@@ -14,9 +14,15 @@ const managedConfigDir = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR!
 afterEach(async () => {
   delete process.env.OPENCODE_CONFIG
   delete process.env.OPENCODE_TUI_CONFIG
-  await fs.rm(path.join(Global.Path.config, "tui.json"), { force: true }).catch(() => { /* noop */ })
-  await fs.rm(path.join(Global.Path.config, "tui.jsonc"), { force: true }).catch(() => { /* noop */ })
-  await fs.rm(managedConfigDir, { force: true, recursive: true }).catch(() => { /* noop */ })
+  await fs.rm(path.join(Global.Path.config, "tui.json"), { force: true }).catch(() => {
+    /* noop */
+  })
+  await fs.rm(path.join(Global.Path.config, "tui.jsonc"), { force: true }).catch(() => {
+    /* noop */
+  })
+  await fs.rm(managedConfigDir, { force: true, recursive: true }).catch(() => {
+    /* noop */
+  })
 })
 
 test("loads tui config with the same precedence order as server config paths", async () => {

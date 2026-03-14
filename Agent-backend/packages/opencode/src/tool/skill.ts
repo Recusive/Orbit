@@ -68,7 +68,9 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
 
       if (skill === undefined) {
         const available = allSkills.map((s) => s.name).join(", ")
-        throw new Error(`Skill "${params.name}" not found. Available skills: ${available.length > 0 ? available : "none"}`)
+        throw new Error(
+          `Skill "${params.name}" not found. Available skills: ${available.length > 0 ? available : "none"}`,
+        )
       }
 
       await ctx.ask({

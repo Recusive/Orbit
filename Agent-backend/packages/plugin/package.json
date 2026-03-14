@@ -1,9 +1,9 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "@opencode-ai/plugin",
-  "version": "1.2.24",
+  "name": "@orbit.build/plugin",
+  "version": "0.0.5",
   "type": "module",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "build": "tsc"
@@ -16,7 +16,7 @@
     "dist"
   ],
   "dependencies": {
-    "@opencode-ai/sdk": "workspace:*",
+    "@orbit.build/sdk": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

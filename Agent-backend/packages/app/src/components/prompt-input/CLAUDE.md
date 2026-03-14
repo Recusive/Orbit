@@ -30,9 +30,9 @@ Extracted logic modules for the SolidJS chat input component (`prompt-input.tsx`
 
 ## Dependencies
 
-- **SDK:** `@opencode-ai/sdk/v2/client` — `Message`, `Part`, `TextPartInput`, `FilePartInput`, `AgentPartInput` types
-- **UI:** `@opencode-ai/ui/toast` — toast notifications
-- **Util:** `@opencode-ai/util/encode` (base64), `@opencode-ai/util/path` (filename extraction)
+- **SDK:** `@orbit.build/sdk/v2/client` — `Message`, `Part`, `TextPartInput`, `FilePartInput`, `AgentPartInput` types
+- **UI:** `@orbit.build/ui/toast` — toast notifications
+- **Util:** `@orbit.build/util/encode` (base64), `@orbit.build/util/path` (filename extraction)
 - **SolidJS contexts:** `@/context/prompt`, `@/context/sdk`, `@/context/file`, `@/context/language`, `@/context/layout`, `@/context/sync`, `@/context/local`, `@/context/permission`, `@/context/global-sync`
 - **Router:** `@solidjs/router` — `useNavigate`, `useParams`
 

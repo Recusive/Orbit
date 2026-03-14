@@ -5,7 +5,6 @@ import { createInterface } from "readline"
 
 import z from "zod"
 
-
 import { FileTime } from "../file/time"
 import { LSP } from "../lsp"
 import { Instance } from "../project/instance"

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Shared utility library (`@opencode-ai/util`) used across all packages. Provides foundational helpers for arrays, encoding, errors, functions, identifiers, paths, retry logic, and slug generation. Zero external dependencies except Zod.
+Shared utility library (`@orbit.build/util`) used across all packages. Provides foundational helpers for arrays, encoding, errors, functions, identifiers, paths, retry logic, and slug generation. Zero external dependencies except Zod.
 
 ## Usage Status
 
@@ -35,9 +35,9 @@ Shared utility library (`@opencode-ai/util`) used across all packages. Provides 
 Exports are per-file (no barrel index.ts):
 
 ```typescript
-import { base64Encode, checksum } from "@opencode-ai/util/encode"
-import { NamedError } from "@opencode-ai/util/error"
-import { iife } from "@opencode-ai/util/iife"
+import { base64Encode, checksum } from "@orbit.build/util/encode"
+import { NamedError } from "@orbit.build/util/error"
+import { iife } from "@orbit.build/util/iife"
 ```
 
 ## Dependencies

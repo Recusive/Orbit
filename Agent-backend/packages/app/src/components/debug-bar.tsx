@@ -1,7 +1,7 @@
 import { useIsRouting, useLocation } from "@solidjs/router"
 import { batch, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Tooltip } from "@orbit.build/ui/tooltip"
 
 type Mem = Performance & {
   memory?: {

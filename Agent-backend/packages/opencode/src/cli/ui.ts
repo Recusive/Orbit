@@ -1,6 +1,6 @@
 import { EOL } from "os"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
 
 import { logo as glyphs } from "./logo"

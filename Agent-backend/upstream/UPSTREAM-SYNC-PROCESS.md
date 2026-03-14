@@ -304,7 +304,7 @@ grep -rn '"opencode\|opencode['"'"'"]' Agent-backend/packages/opencode/src/ --in
 | --------------------- | --------------------------------------------- | ----------------------------------------------------------------------------- |
 | **MUST rename**       | User-facing strings, CLI text, error messages | `"opencode"` in help text, `"OpenCode"` in error messages, User-Agent headers |
 | **SHOULD rename**     | Internal service tags, log prefixes           | `Log.create({ service: "opencode" })`, Effect service tags                    |
-| **CANNOT rename**     | External npm packages, plugin API names       | `@opencode-ai/plugin`, `@opencode-ai/sdk`                                     |
+| **CANNOT rename**     | Published CLI package names, plugin API names | `opencode-ai`, `opencode-anthropic-auth`                                      |
 | **CONTEXT-DEPENDENT** | Data directories, config paths                | `~/.opencode/` vs `~/.orbit/` — backward compat matters                       |
 | **DEFER**             | Environment variables                         | `OPENCODE_*` env vars — renaming breaks existing users' configs               |
 

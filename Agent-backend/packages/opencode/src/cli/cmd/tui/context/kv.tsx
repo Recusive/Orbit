@@ -1,15 +1,12 @@
 import path from "path"
 
-import { createSignal  } from "solid-js"
+import { createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 
 import { createSimpleContext } from "./helper"
 
-
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
-
-
 
 export const { use: useKV, provider: KVProvider } = createSimpleContext({
   name: "KV",
@@ -22,7 +19,9 @@ export const { use: useKV, provider: KVProvider } = createSimpleContext({
       .then((x) => {
         setStore(x as Record<string, unknown>)
       })
-      .catch(() => { /* noop */ })
+      .catch(() => {
+        /* noop */
+      })
       .finally(() => {
         setReady(true)
       })

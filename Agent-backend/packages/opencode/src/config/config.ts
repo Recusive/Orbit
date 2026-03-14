@@ -5,14 +5,8 @@ import os from "os"
 import path from "path"
 import { pathToFileURL } from "url"
 
-import { NamedError } from "@opencode-ai/util/error"
-import {
-  
-  applyEdits,
-  modify,
-  parse as parseJsonc,
-  printParseErrorCode
-} from "jsonc-parser"
+import { NamedError } from "@orbit.build/util/error"
+import { applyEdits, modify, parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
 import { mergeDeep, pipe, unique } from "remeda"
 import z from "zod"
 
@@ -30,9 +24,7 @@ import { Log } from "../util/log"
 import { ConfigMarkdown } from "./markdown"
 import { ConfigPaths } from "./paths"
 
-import type {ParseError as JsoncParseError} from "jsonc-parser";
-
-
+import type { ParseError as JsoncParseError } from "jsonc-parser"
 
 import { BunProc } from "@/bun"
 import { PackageRegistry } from "@/bun/registry"
@@ -48,6 +40,10 @@ export namespace Config {
   const ModelId = z.string().meta({ $ref: "https://models.dev/model-schema.json#/$defs/Model" })
 
   const log = Log.create({ service: "config" })
+  const LEGACY_PLUGIN_PACKAGE_SCOPE = "@opencode-ai"
+  // Public npm package written into generated user project manifests.
+  const PUBLIC_PLUGIN_PACKAGE = "@orbit.build/plugin"
+  const LEGACY_PLUGIN_PACKAGES = [`${LEGACY_PLUGIN_PACKAGE_SCOPE}/plugin`]
 
   /** Safely extract the message from a ConfigFrontmatterError or return undefined. */
   function extractFrontmatterMessage(err: unknown): string | undefined {
@@ -267,12 +263,19 @@ export namespace Config {
     const pkg = path.join(dir, "package.json")
     const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
 
-    const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => ({
-      dependencies: {},
-    }))
+    const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(
+      (): { dependencies?: Record<string, string> } => ({
+        dependencies: {},
+      }),
+    )
+
+    for (const legacy of LEGACY_PLUGIN_PACKAGES) {
+      delete json.dependencies?.[legacy]
+    }
+
     json.dependencies = {
       ...json.dependencies,
-      "@opencode-ai/plugin": targetVersion,
+      [PUBLIC_PLUGIN_PACKAGE]: targetVersion,
     }
     await Filesystem.writeJson(pkg, json)
 
@@ -293,6 +296,27 @@ export namespace Config {
     ).catch((err: unknown) => {
       log.warn("failed to install dependencies", { dir, error: err })
     })
+
+    const pluginPkgPath = path.join(dir, "node_modules", ...PUBLIC_PLUGIN_PACKAGE.split("/"), "package.json")
+    const installedOk = await (async () => {
+      if (!Filesystem.exists(pluginPkgPath)) return false
+      if (targetVersion === "*") return true
+
+      const installed = await Filesystem.readJson<{ version?: string }>(pluginPkgPath).catch(() => null)
+      if (!installed?.version) return false
+      if (targetVersion === "latest") return true
+      return installed.version === targetVersion
+    })()
+
+    if (!installedOk) {
+      delete json.dependencies?.[PUBLIC_PLUGIN_PACKAGE]
+      await Filesystem.writeJson(pkg, json)
+      log.warn("plugin install verification failed, will retry on next run", {
+        dir,
+        expected: pluginPkgPath,
+        targetVersion,
+      })
+    }
   }
 
   async function isWritable(dir: string): Promise<boolean> {
@@ -321,16 +345,28 @@ export namespace Config {
     if (!pkgExists) return true
 
     const parsed = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => null)
-    const dependencies = parsed?.dependencies ?? {}
-    const depVersion = dependencies["@opencode-ai/plugin"]
+    const dependencies: Record<string, string> = parsed?.dependencies ?? {}
+    for (const legacy of LEGACY_PLUGIN_PACKAGES) {
+      if (dependencies[legacy]) return true
+    }
+
+    const depVersion = dependencies[PUBLIC_PLUGIN_PACKAGE]
     if (!depVersion) return true
 
+    const pluginPkgPath = path.join(dir, "node_modules", ...PUBLIC_PLUGIN_PACKAGE.split("/"), "package.json")
+    if (!Filesystem.exists(pluginPkgPath)) return true
+
     const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
+    if (targetVersion !== "latest" && targetVersion !== "*") {
+      const installed = await Filesystem.readJson<{ version?: string }>(pluginPkgPath).catch(() => null)
+      if (installed?.version !== targetVersion) return true
+    }
+
     if (targetVersion === "latest") {
-      const isOutdated = await PackageRegistry.isOutdated("@opencode-ai/plugin", depVersion, dir)
+      const isOutdated = await PackageRegistry.isOutdated(PUBLIC_PLUGIN_PACKAGE, depVersion, dir)
       if (!isOutdated) return false
       log.info("Cached version is outdated, proceeding with install", {
-        pkg: "@opencode-ai/plugin",
+        pkg: PUBLIC_PLUGIN_PACKAGE,
         cachedVersion: depVersion,
       })
       return true
@@ -364,7 +400,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse command ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load command", { command: item, err })
         return undefined
       })
@@ -401,7 +441,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse agent ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load agent", { agent: item, err })
         return undefined
       })
@@ -437,7 +481,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse mode ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load mode", { mode: item, err })
         return undefined
       })
@@ -1216,7 +1264,9 @@ export namespace Config {
             await fs.unlink(legacy)
           }
         })
-        .catch(() => { /* legacy config migration is best-effort */ })
+        .catch(() => {
+          /* legacy config migration is best-effort */
+        })
     }
 
     return result
@@ -1257,7 +1307,9 @@ export namespace Config {
       if (parsed.data.$schema === undefined && isFile) {
         parsed.data.$schema = "https://opencode.ai/config.json"
         const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
-        await Filesystem.write(options.path, updated).catch(() => { /* best-effort schema injection */ })
+        await Filesystem.write(options.path, updated).catch(() => {
+          /* best-effort schema injection */
+        })
       }
       const result = parsed.data
       if (result.plugin && isFile) {
@@ -1312,9 +1364,7 @@ export namespace Config {
   }
 
   function globalConfigFile(): string {
-    const candidates = ["orbit.jsonc", "orbit.json", "config.json"].map((file) =>
-      path.join(Global.Path.config, file),
-    )
+    const candidates = ["orbit.jsonc", "orbit.json", "config.json"].map((file) => path.join(Global.Path.config, file))
     for (const file of candidates) {
       if (existsSync(file)) return file
     }

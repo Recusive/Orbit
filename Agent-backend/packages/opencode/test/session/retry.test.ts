@@ -6,8 +6,7 @@ import { describe, expect, test } from "bun:test"
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionRetry } from "../../src/session/retry"
 
-import type { NamedError } from "@opencode-ai/util/error"
-
+import type { NamedError } from "@orbit.build/util/error"
 
 function apiError(headers?: Record<string, string>): MessageV2.APIError {
   return new MessageV2.APIError({
@@ -84,7 +83,9 @@ describe("session.retry.delay", () => {
 
     try {
       await promise
-    } catch { /* expected abort error */ }
+    } catch {
+      /* expected abort error */
+    }
 
     process.emitWarning = originalWarn
     expect(warnings.some((w) => w.includes("TimeoutOverflowWarning"))).toBe(false)

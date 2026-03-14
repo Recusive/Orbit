@@ -96,7 +96,10 @@ async function fetchReleases(): Promise<Release[]> {
   return releases
 }
 
-function calculate(releases: Release[]): { total: number; stats: { tag: string; name: string; downloads: number; assets: { name: string; downloads: number }[] }[] } {
+function calculate(releases: Release[]): {
+  total: number
+  stats: { tag: string; name: string; downloads: number; assets: { name: string; downloads: number }[] }[]
+} {
   let total = 0
   const stats = []
 

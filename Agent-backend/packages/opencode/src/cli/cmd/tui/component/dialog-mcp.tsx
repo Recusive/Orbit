@@ -2,17 +2,16 @@ import { TextAttributes } from "@opentui/core"
 import { useLocal } from "@tui/context/local"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
-import { DialogSelect   } from "@tui/ui/dialog-select"
+import { DialogSelect } from "@tui/ui/dialog-select"
 import { map, pipe, entries, sortBy } from "remeda"
 import { createMemo, createSignal } from "solid-js"
 
 import { useTheme } from "../context/theme"
 
-import type {DialogSelectRef, DialogSelectOption} from "@tui/ui/dialog-select";
+import type { DialogSelectRef, DialogSelectOption } from "@tui/ui/dialog-select"
 import type { JSX } from "solid-js"
 
 import { Keybind } from "@/util/keybind"
-
 
 function Status(props: { enabled: boolean; loading: boolean }): JSX.Element {
   const { theme } = useTheme()

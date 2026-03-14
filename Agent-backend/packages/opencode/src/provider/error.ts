@@ -7,10 +7,12 @@ import { iife } from "@/util/iife"
 interface ParsedJsonBody {
   type?: string
   message?: unknown
-  error?: {
-    code?: string
-    message?: unknown
-  } | string
+  error?:
+    | {
+        code?: string
+        message?: unknown
+      }
+    | string
 }
 
 export namespace ProviderError {
@@ -85,9 +87,10 @@ export namespace ProviderError {
         const bodyMessage = typeof body.message === "string" ? body.message : undefined
         const bodyError = typeof body.error === "string" ? body.error : undefined
         const errorVal = body.error
-        const bodyErrorMessage = typeof errorVal === "object" && "message" in errorVal && typeof errorVal.message === "string"
-          ? errorVal.message
-          : undefined
+        const bodyErrorMessage =
+          typeof errorVal === "object" && "message" in errorVal && typeof errorVal.message === "string"
+            ? errorVal.message
+            : undefined
         const errMsg = bodyMessage ?? bodyError ?? bodyErrorMessage
         if (errMsg !== undefined) {
           return `${msg}: ${errMsg}`

@@ -14,7 +14,9 @@ const baseCtx = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
 }
 
 interface AskInput {
@@ -42,7 +44,10 @@ type ToolCtx = typeof baseCtx & {
   ask: (input: AskInput) => Promise<void>
 }
 
-async function execute(params: { patchText: string }, ctx: ToolCtx): Promise<{ title: string; output: string; metadata: any }> {
+async function execute(
+  params: { patchText: string },
+  ctx: ToolCtx,
+): Promise<{ title: string; output: string; metadata: any }> {
   const tool = await ApplyPatchTool.init()
   return tool.execute(params, ctx)
 }

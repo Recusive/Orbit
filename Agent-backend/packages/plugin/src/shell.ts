@@ -1,11 +1,6 @@
 export type ShellFunction = (input: Uint8Array) => Uint8Array
 
-export type ShellExpression =
-  | { toString(): string }
-  | ShellExpression[]
-  | string
-  | { raw: string }
-  | ReadableStream
+export type ShellExpression = { toString(): string } | ShellExpression[] | string | { raw: string } | ReadableStream
 
 export interface BunShell {
   (strings: TemplateStringsArray, ...expressions: ShellExpression[]): BunShellPromise

@@ -1,9 +1,8 @@
 import os from "os"
 import path from "path"
 
-
 // Direct imports for bundled providers
-import { createAmazonBedrock  } from "@ai-sdk/amazon-bedrock"
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createAzure } from "@ai-sdk/azure"
 import { createCerebras } from "@ai-sdk/cerebras"
@@ -23,9 +22,9 @@ import { createVercel } from "@ai-sdk/vercel"
 import { createXai } from "@ai-sdk/xai"
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers"
 import { createGitLab, VERSION as GITLAB_PROVIDER_VERSION } from "@gitlab/gitlab-ai-provider"
-import { NamedError } from "@opencode-ai/util/error"
-import { createOpenRouter  } from "@openrouter/ai-sdk-provider"
-import { NoSuchModelError  } from "ai"
+import { NamedError } from "@orbit.build/util/error"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { NoSuchModelError } from "ai"
 import fuzzysort from "fuzzysort"
 import { GoogleAuth } from "google-auth-library"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
@@ -48,9 +47,9 @@ import { ModelsDev } from "./models"
 import { createOpenaiCompatible as createGitHubCopilotOpenAICompatible } from "./sdk/copilot"
 import { ProviderTransform } from "./transform"
 
-import type {AmazonBedrockProviderSettings} from "@ai-sdk/amazon-bedrock";
-import type {LanguageModelV2} from "@openrouter/ai-sdk-provider";
-import type {Provider as SDK} from "ai";
+import type { AmazonBedrockProviderSettings } from "@ai-sdk/amazon-bedrock"
+import type { LanguageModelV2 } from "@openrouter/ai-sdk-provider"
+import type { Provider as SDK } from "ai"
 
 import { iife } from "@/util/iife"
 
@@ -89,9 +88,15 @@ export namespace Provider {
     GOOGLE_VERTEX_ENDPOINT: string
   } {
     const project =
-      (options.project as string | undefined) ?? Env.get("GOOGLE_CLOUD_PROJECT") ?? Env.get("GCP_PROJECT") ?? Env.get("GCLOUD_PROJECT")
+      (options.project as string | undefined) ??
+      Env.get("GOOGLE_CLOUD_PROJECT") ??
+      Env.get("GCP_PROJECT") ??
+      Env.get("GCLOUD_PROJECT")
     const location =
-      (options.location as string | undefined) ?? Env.get("GOOGLE_CLOUD_LOCATION") ?? Env.get("VERTEX_LOCATION") ?? "us-central1"
+      (options.location as string | undefined) ??
+      Env.get("GOOGLE_CLOUD_LOCATION") ??
+      Env.get("VERTEX_LOCATION") ??
+      "us-central1"
     const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
 
     return {
@@ -138,7 +143,11 @@ export namespace Provider {
     "@ai-sdk/github-copilot": createGitHubCopilotOpenAICompatible as (options: Record<string, unknown>) => unknown,
   }
 
-  type CustomModelLoader = (sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>) => LanguageModelV2 | Promise<LanguageModelV2>
+  type CustomModelLoader = (
+    sdk: ExtendedSDK,
+    modelID: string,
+    options?: Record<string, unknown>,
+  ) => LanguageModelV2 | Promise<LanguageModelV2>
   type CustomLoader = (provider: Info) => Promise<{
     autoload: boolean
     getModel?: CustomModelLoader
@@ -196,10 +205,15 @@ export namespace Provider {
       return Promise.resolve({
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string): LanguageModelV2 {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID) as LanguageModelV2
+          if (sdk.responses === undefined && sdk.chat === undefined)
+            return sdk.languageModel(modelID) as LanguageModelV2
           return shouldUseCopilotResponsesApi(modelID)
-            ? (sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
-            : (sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
+            ? sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
+            : sdk.chat !== undefined
+              ? sdk.chat(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
         },
         options: {},
       })
@@ -208,10 +222,15 @@ export namespace Provider {
       return Promise.resolve({
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string): LanguageModelV2 {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID) as LanguageModelV2
+          if (sdk.responses === undefined && sdk.chat === undefined)
+            return sdk.languageModel(modelID) as LanguageModelV2
           return shouldUseCopilotResponsesApi(modelID)
-            ? (sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
-            : (sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
+            ? sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
+            : sdk.chat !== undefined
+              ? sdk.chat(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
         },
         options: {},
       })
@@ -221,9 +240,11 @@ export namespace Provider {
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>): LanguageModelV2 {
           if (options?.useCompletionUrls === true) {
-            return sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.chat !== undefined ? sdk.chat(modelID) : (sdk.languageModel(modelID) as LanguageModelV2)
           } else {
-            return sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
           }
         },
         options: {},
@@ -235,13 +256,16 @@ export namespace Provider {
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>): LanguageModelV2 {
           if (options?.useCompletionUrls === true) {
-            return sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.chat !== undefined ? sdk.chat(modelID) : (sdk.languageModel(modelID) as LanguageModelV2)
           } else {
-            return sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
           }
         },
         options: {
-          baseURL: resourceName !== undefined ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
+          baseURL:
+            resourceName !== undefined ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
         },
       })
     },
@@ -281,7 +305,13 @@ export namespace Provider {
         process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ?? process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI,
       )
 
-      if (profile === undefined && awsAccessKeyId === undefined && awsBearerToken === undefined && awsWebIdentityTokenFile === undefined && !containerCreds)
+      if (
+        profile === undefined &&
+        awsAccessKeyId === undefined &&
+        awsBearerToken === undefined &&
+        awsWebIdentityTokenFile === undefined &&
+        !containerCreds
+      )
         return { autoload: false }
 
       const providerOptions: AmazonBedrockProviderSettings = {
@@ -424,7 +454,10 @@ export namespace Provider {
         Env.get("GCLOUD_PROJECT")
 
       const location =
-        (provider.options.location as string | undefined) ?? Env.get("GOOGLE_CLOUD_LOCATION") ?? Env.get("VERTEX_LOCATION") ?? "us-central1"
+        (provider.options.location as string | undefined) ??
+        Env.get("GOOGLE_CLOUD_LOCATION") ??
+        Env.get("VERTEX_LOCATION") ??
+        "us-central1"
 
       const autoload = project !== undefined && project !== ""
       if (!autoload) return Promise.resolve({ autoload: false })
@@ -889,10 +922,7 @@ export namespace Provider {
           id: modelID,
           api: {
             id: model.id ?? existingModel.api.id,
-            npm:
-              model.provider?.npm ??
-              provider.npm ??
-              existingModel.api.npm,
+            npm: model.provider?.npm ?? provider.npm ?? existingModel.api.npm,
             url: model.provider?.api ?? provider.api ?? existingModel.api.url,
           },
           status: model.status ?? existingModel.status,
@@ -1009,9 +1039,10 @@ export namespace Provider {
               () => Auth.get(enterpriseProviderID) as Promise<Auth.Info>,
               database[enterpriseProviderID],
             )
-            const patch: Partial<Info> = enterpriseProviderID in providers
-              ? { options: enterpriseOptions }
-              : { source: "custom", options: enterpriseOptions }
+            const patch: Partial<Info> =
+              enterpriseProviderID in providers
+                ? { options: enterpriseOptions }
+                : { source: "custom", options: enterpriseOptions }
             mergeProvider(enterpriseProviderID, patch)
           }
         }
@@ -1059,7 +1090,7 @@ export namespace Provider {
         if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
         if (model.status === "deprecated") delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
         if (
-          (configProvider?.blacklist?.includes(modelID) === true) ||
+          configProvider?.blacklist?.includes(modelID) === true ||
           (configProvider?.whitelist !== undefined && !configProvider.whitelist.includes(modelID))
         )
           delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
@@ -1118,7 +1149,7 @@ export namespace Provider {
 
       if (model.providerID === "google-vertex" && !model.api.npm.includes("@ai-sdk/openai-compatible")) {
         const optRecord = options
-        delete optRecord.fetch  
+        delete optRecord.fetch
       }
 
       if (model.api.npm.includes("@ai-sdk/openai-compatible") && options.includeUsage !== false) {
@@ -1138,7 +1169,9 @@ export namespace Provider {
       const existing = s.sdk.get(key)
       if (existing !== undefined) return existing
 
-      const customFetch = options.fetch as ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) | undefined
+      const customFetch = options.fetch as
+        | ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>)
+        | undefined
 
       options.fetch = async (input: RequestInfo | URL, init?: BunFetchRequestInit): Promise<Response> => {
         // Preserve custom fetch if it exists, wrap it with timeout logic
@@ -1166,7 +1199,7 @@ export namespace Provider {
           if (!keepIds && Array.isArray(body.input)) {
             for (const item of body.input as Record<string, unknown>[]) {
               if ("id" in item) {
-                delete (item).id  
+                delete item.id
               }
             }
             opts.body = JSON.stringify(body)
@@ -1199,7 +1232,7 @@ export namespace Provider {
         installedPath = model.api.npm
       }
 
-      const mod = await import(installedPath) as Record<string, unknown>
+      const mod = (await import(installedPath)) as Record<string, unknown>
 
       const createKey = Object.keys(mod).find((k) => k.startsWith("create"))
       if (createKey === undefined) {
@@ -1250,9 +1283,15 @@ export namespace Provider {
     const sdk = await getSDK(model)
 
     try {
-      const language = (model.providerID in s.modelLoaders
-        ? await s.modelLoaders[model.providerID](sdk as ExtendedSDK, model.api.id, provider.options as Record<string, unknown>)
-        : sdk.languageModel(model.api.id)) as LanguageModelV2
+      const language = (
+        model.providerID in s.modelLoaders
+          ? await s.modelLoaders[model.providerID](
+              sdk as ExtendedSDK,
+              model.api.id,
+              provider.options as Record<string, unknown>,
+            )
+          : sdk.languageModel(model.api.id)
+      ) as LanguageModelV2
       s.models.set(key, language)
       return language
     } catch (e: unknown) {
@@ -1268,7 +1307,10 @@ export namespace Provider {
     }
   }
 
-  export async function closest(providerID: string, query: string[]): Promise<{ providerID: string; modelID: string } | undefined> {
+  export async function closest(
+    providerID: string,
+    query: string[],
+  ): Promise<{ providerID: string; modelID: string } | undefined> {
     const s = await state()
     if (!(providerID in s.providers)) return undefined
     const provider = s.providers[providerID]
@@ -1372,7 +1414,9 @@ export namespace Provider {
       return { providerID: entry.providerID, modelID: entry.modelID }
     }
 
-    const provider = Object.values(providers).find((p) => cfg.provider === undefined || Object.keys(cfg.provider).includes(p.id))
+    const provider = Object.values(providers).find(
+      (p) => cfg.provider === undefined || Object.keys(cfg.provider).includes(p.id),
+    )
     if (provider === undefined) throw new Error("no providers found")
     const sorted = sort(Object.values(provider.models))
     if (sorted.length === 0) throw new Error("no models found")

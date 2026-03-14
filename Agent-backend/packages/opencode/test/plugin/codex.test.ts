@@ -1,13 +1,8 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  parseJwtClaims,
-  extractAccountIdFromClaims,
-  extractAccountId
-  
-} from "../../src/plugin/codex"
+import { parseJwtClaims, extractAccountIdFromClaims, extractAccountId } from "../../src/plugin/codex"
 
-import type {IdTokenClaims} from "../../src/plugin/codex";
+import type { IdTokenClaims } from "../../src/plugin/codex"
 
 function createTestJwt(payload: object): string {
   const header = Buffer.from(JSON.stringify({ alg: "none" })).toString("base64url")

@@ -1,7 +1,7 @@
-import { createOrbitClient } from '@opencode-ai/sdk/v2/client';
 import { createLogger } from '@orbit/common/lib';
+import { createOrbitClient } from '@orbit.build/sdk/v2/client';
 
-import type { OrbitClient } from '@opencode-ai/sdk/v2/client';
+import type { OrbitClient } from '@orbit.build/sdk/v2/client';
 
 const logger = createLogger('OcClient');
 

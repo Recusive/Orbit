@@ -1,4 +1,4 @@
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { Hono } from "hono"
 import { basicAuth } from "hono/basic-auth"
 import { websocket } from "hono/bun"

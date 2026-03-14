@@ -53,8 +53,7 @@ export namespace Control {
     }
 
     Database.use((db) => {
-      db
-        .update(ControlAccountTable)
+      db.update(ControlAccountTable)
         .set({
           access_token: json.access_token,
           refresh_token: json.refresh_token ?? row.refresh_token,

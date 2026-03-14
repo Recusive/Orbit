@@ -16,7 +16,9 @@ export namespace Selection {
     if (!text) return false
 
     Clipboard.copy(text)
-      .then(() => { toast.show({ message: "Copied to clipboard", variant: "info" }); })
+      .then(() => {
+        toast.show({ message: "Copied to clipboard", variant: "info" })
+      })
       .catch(toast.error)
 
     renderer.clearSelection()

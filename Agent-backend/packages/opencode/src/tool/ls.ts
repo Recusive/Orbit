@@ -2,7 +2,6 @@ import * as path from "path"
 
 import z from "zod"
 
-
 import { Ripgrep } from "../file/ripgrep"
 import { Instance } from "../project/instance"
 

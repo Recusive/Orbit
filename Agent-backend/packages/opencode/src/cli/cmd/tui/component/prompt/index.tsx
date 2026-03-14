@@ -33,7 +33,7 @@ import { usePromptStash } from "./stash"
 
 import type { AutocompleteRef } from "./autocomplete"
 import type { PromptInfo } from "./history"
-import type { FilePart } from "@opencode-ai/sdk/v2"
+import type { FilePart } from "@orbit.build/sdk/v2"
 import type { BoxRenderable, MouseEvent, PasteEvent, TextareaRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 
@@ -264,80 +264,80 @@ export function Prompt(props: PromptProps): JSX.Element {
           dialog.clear()
 
           void (async (): Promise<void> => {
-          // replace summarized text parts with the actual text
-          const text = store.prompt.parts
-            .filter((p) => p.type === "text")
-            .reduce((acc, p) => {
-              if (!p.source) return acc
-              return acc.replace(p.source.text.value, p.text)
-            }, store.prompt.input)
+            // replace summarized text parts with the actual text
+            const text = store.prompt.parts
+              .filter((p) => p.type === "text")
+              .reduce((acc, p) => {
+                if (!p.source) return acc
+                return acc.replace(p.source.text.value, p.text)
+              }, store.prompt.input)
 
-          const nonTextParts = store.prompt.parts.filter((p) => p.type !== "text")
+            const nonTextParts = store.prompt.parts.filter((p) => p.type !== "text")
 
-          const value = text
-          const content = await Editor.open({ value, renderer })
-          if (!content) return
+            const value = text
+            const content = await Editor.open({ value, renderer })
+            if (!content) return
 
-          input.setText(content)
+            input.setText(content)
 
-          // Update positions for nonTextParts based on their location in new content
-          // Filter out parts whose virtual text was deleted
-          // this handles a case where the user edits the text in the editor
-          // such that the virtual text moves around or is deleted
-          const updatedNonTextParts = nonTextParts
-            .map((part) => {
-              let virtualText = ""
-              if (part.type === "file" && part.source?.text) {
-                virtualText = part.source.text.value
-              } else if (part.type === "agent" && part.source) {
-                virtualText = part.source.value
-              }
+            // Update positions for nonTextParts based on their location in new content
+            // Filter out parts whose virtual text was deleted
+            // this handles a case where the user edits the text in the editor
+            // such that the virtual text moves around or is deleted
+            const updatedNonTextParts = nonTextParts
+              .map((part) => {
+                let virtualText = ""
+                if (part.type === "file" && part.source?.text) {
+                  virtualText = part.source.text.value
+                } else if (part.type === "agent" && part.source) {
+                  virtualText = part.source.value
+                }
 
-              if (!virtualText) return part
+                if (!virtualText) return part
 
-              const newStart = content.indexOf(virtualText)
-              // if the virtual text is deleted, remove the part
-              if (newStart === -1) return null
+                const newStart = content.indexOf(virtualText)
+                // if the virtual text is deleted, remove the part
+                if (newStart === -1) return null
 
-              const newEnd = newStart + virtualText.length
+                const newEnd = newStart + virtualText.length
 
-              if (part.type === "file" && part.source?.text) {
-                return {
-                  ...part,
-                  source: {
-                    ...part.source,
-                    text: {
-                      ...part.source.text,
+                if (part.type === "file" && part.source?.text) {
+                  return {
+                    ...part,
+                    source: {
+                      ...part.source,
+                      text: {
+                        ...part.source.text,
+                        start: newStart,
+                        end: newEnd,
+                      },
+                    },
+                  }
+                }
+
+                if (part.type === "agent" && part.source) {
+                  return {
+                    ...part,
+                    source: {
+                      ...part.source,
                       start: newStart,
                       end: newEnd,
                     },
-                  },
+                  }
                 }
-              }
 
-              if (part.type === "agent" && part.source) {
-                return {
-                  ...part,
-                  source: {
-                    ...part.source,
-                    start: newStart,
-                    end: newEnd,
-                  },
-                }
-              }
+                return part
+              })
+              .filter((part) => part !== null)
 
-              return part
+            setStore("prompt", {
+              input: content,
+              // keep only the non-text parts because the text parts were
+              // already expanded inline
+              parts: updatedNonTextParts,
             })
-            .filter((part) => part !== null)
-
-          setStore("prompt", {
-            input: content,
-            // keep only the non-text parts because the text parts were
-            // already expanded inline
-            parts: updatedNonTextParts,
-          })
-          restoreExtmarksFromParts(updatedNonTextParts)
-          input.cursorOffset = Bun.stringWidth(content)
+            restoreExtmarksFromParts(updatedNonTextParts)
+            input.cursorOffset = Bun.stringWidth(content)
           })()
         },
       },
@@ -662,7 +662,9 @@ export function Prompt(props: PromptProps): JSX.Element {
             })),
           ],
         })
-        .catch(() => { /* noop */ })
+        .catch(() => {
+          /* noop */
+        })
     }
     history.append({
       ...store.prompt,
@@ -941,7 +943,9 @@ export function Prompt(props: PromptProps): JSX.Element {
                     input.cursorOffset = input.plainText.length
                 }
               }}
-              onSubmit={() => { void submit(); }}
+              onSubmit={() => {
+                void submit()
+              }}
               onPaste={(event: PasteEvent) => {
                 if (props.disabled) {
                   event.preventDefault()
@@ -969,11 +973,13 @@ export function Prompt(props: PromptProps): JSX.Element {
                     // Handle SVG as raw text content, not as base64 image
                     if (mime === "image/svg+xml") {
                       event.preventDefault()
-                      void Filesystem.readText(filepath).catch(() => undefined).then((content) => {
-                        if (content) {
-                          pasteText(content, `[SVG: ${filename}]`)
-                        }
-                      })
+                      void Filesystem.readText(filepath)
+                        .catch(() => undefined)
+                        .then((content) => {
+                          if (content) {
+                            pasteText(content, `[SVG: ${filename}]`)
+                          }
+                        })
                       return
                     }
                     if (mime.startsWith("image/")) {
@@ -992,7 +998,9 @@ export function Prompt(props: PromptProps): JSX.Element {
                         })
                       return
                     }
-                  } catch { /* empty */ }
+                  } catch {
+                    /* empty */
+                  }
                 }
 
                 const lineCount = (pastedContent.match(/\n/g)?.length ?? 0) + 1

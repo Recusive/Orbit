@@ -1,7 +1,7 @@
 import { EOL } from "os"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 

@@ -33,7 +33,7 @@ vi.mock('@orbit/common/lib', () => ({
   }),
 }));
 
-vi.mock('@opencode-ai/sdk/v2/client', () => ({
+vi.mock('@orbit.build/sdk/v2/client', () => ({
   createOrbitClient: vi.fn(),
 }));
 

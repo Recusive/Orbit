@@ -18,8 +18,12 @@ const ctx = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
+  ask: async () => {
+    /* noop */
+  },
 }
 
 describe("tool.read external_directory permission", () => {
@@ -121,7 +125,9 @@ describe("tool.read external_directory permission", () => {
           },
         }
         // This will fail because file doesn't exist, but we can check if permission was asked
-        await read.execute({ filePath: "../outside.txt" }, testCtx).catch(() => { /* noop */ })
+        await read.execute({ filePath: "../outside.txt" }, testCtx).catch(() => {
+          /* noop */
+        })
         const extDirReq = requests.find((r) => r.permission === "external_directory")
         expect(extDirReq).toBeDefined()
       },
@@ -294,9 +300,9 @@ describe("tool.read truncation", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        expect(
-          read.execute({ filePath: path.join(tmp.path, "short.txt"), offset: 4, limit: 5 }, ctx),
-        ).rejects.toThrow("Offset 4 is out of range for this file (3 lines)")
+        expect(read.execute({ filePath: path.join(tmp.path, "short.txt"), offset: 4, limit: 5 }, ctx)).rejects.toThrow(
+          "Offset 4 is out of range for this file (3 lines)",
+        )
       },
     })
   })
@@ -339,7 +345,9 @@ describe("tool.read truncation", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Promise.all(
-          Array.from({ length: 10 }, (_, i) => Bun.write(path.join(dir, "dir", `file-${String(i + 1)}.txt`), `line${String(i)}`)),
+          Array.from({ length: 10 }, (_, i) =>
+            Bun.write(path.join(dir, "dir", `file-${String(i + 1)}.txt`), `line${String(i)}`),
+          ),
         )
       },
     })

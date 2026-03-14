@@ -47,7 +47,9 @@ const _stashContext = createSimpleContext({
       // Rewrite file with only valid entries to self-heal corruption
       if (lines.length > 0) {
         const content = lines.map((line) => JSON.stringify(line)).join("\n") + "\n"
-        writeFile(stashPath, content).catch(() => { /* noop */ })
+        writeFile(stashPath, content).catch(() => {
+          /* noop */
+        })
       }
     })()
 
@@ -69,11 +71,15 @@ const _stashContext = createSimpleContext({
 
         if (willTrim) {
           const content = store.entries.map((line) => JSON.stringify(line)).join("\n") + "\n"
-          writeFile(stashPath, content).catch(() => { /* noop */ })
+          writeFile(stashPath, content).catch(() => {
+            /* noop */
+          })
           return
         }
 
-        appendFile(stashPath, JSON.stringify(stash) + "\n").catch(() => { /* noop */ })
+        appendFile(stashPath, JSON.stringify(stash) + "\n").catch(() => {
+          /* noop */
+        })
       },
       pop(): StashEntry | undefined {
         if (store.entries.length === 0) return undefined
@@ -85,7 +91,9 @@ const _stashContext = createSimpleContext({
         )
         const content =
           store.entries.length > 0 ? store.entries.map((line) => JSON.stringify(line)).join("\n") + "\n" : ""
-        writeFile(stashPath, content).catch(() => { /* noop */ })
+        writeFile(stashPath, content).catch(() => {
+          /* noop */
+        })
         return entry
       },
       remove(index: number): void {
@@ -97,7 +105,9 @@ const _stashContext = createSimpleContext({
         )
         const content =
           store.entries.length > 0 ? store.entries.map((line) => JSON.stringify(line)).join("\n") + "\n" : ""
-        writeFile(stashPath, content).catch(() => { /* noop */ })
+        writeFile(stashPath, content).catch(() => {
+          /* noop */
+        })
       },
     }
   },

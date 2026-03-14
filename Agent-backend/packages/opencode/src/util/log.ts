@@ -68,10 +68,14 @@ export namespace Log {
       Global.Path.log,
       options.dev === true ? "dev.log" : (new Date().toISOString().split(".")[0] ?? "").replace(/:/g, "") + ".log",
     )
-    await fs.truncate(logpath).catch(() => { /* ignore missing file */ })
+    await fs.truncate(logpath).catch(() => {
+      /* ignore missing file */
+    })
     const stream = createWriteStream(logpath, { flags: "a" })
     write = (msg: string): number => {
-      stream.write(msg, () => { /* noop callback */ })
+      stream.write(msg, () => {
+        /* noop callback */
+      })
       return msg.length
     }
   }
@@ -85,7 +89,13 @@ export namespace Log {
     if (files.length <= 5) return
 
     const filesToDelete = files.slice(0, -10)
-    await Promise.all(filesToDelete.map((file) => fs.unlink(file).catch(() => { /* ignore */ })))
+    await Promise.all(
+      filesToDelete.map((file) =>
+        fs.unlink(file).catch(() => {
+          /* ignore */
+        }),
+      ),
+    )
   }
 
   function formatError(error: Error, depth = 0): string {
@@ -124,9 +134,9 @@ export namespace Log {
       const next = new Date()
       const diff = next.getTime() - last
       last = next.getTime()
-      return [next.toISOString().split(".")[0], "+" + String(diff) + "ms", prefix, message]
-        .filter(Boolean)
-        .join(" ") + "\n"
+      return (
+        [next.toISOString().split(".")[0], "+" + String(diff) + "ms", prefix, message].filter(Boolean).join(" ") + "\n"
+      )
     }
     const result: Logger = {
       debug(message?: unknown, extra?: Record<string, unknown>) {

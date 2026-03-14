@@ -13,7 +13,7 @@ export interface LinkProps {
  * Link component that renders clickable hyperlinks.
  * Clicking anywhere on the link text opens the URL in the default browser.
  */
- 
+
 export function Link(props: LinkProps): JSX.Element {
   const displayText = props.children ?? props.href
 
@@ -22,7 +22,9 @@ export function Link(props: LinkProps): JSX.Element {
     <text
       fg={props.fg}
       onMouseUp={() => {
-        open(props.href).catch(() => { /* noop */ })
+        open(props.href).catch(() => {
+          /* noop */
+        })
       }}
     >
       {displayText}

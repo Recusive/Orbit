@@ -28,7 +28,9 @@ const TestAdaptor: Adaptor = {
   create() {
     throw new Error("not used")
   },
-  async remove() { /* noop */ },
+  async remove() {
+    /* noop */
+  },
   async fetch(_config, _input, _init?) {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -57,9 +59,8 @@ describe("control-plane/workspace.startSyncing", () => {
     const id1 = Identifier.descending("workspace")
     const id2 = Identifier.descending("workspace")
 
-    Database.use((db) =>
-      { db
-        .insert(WorkspaceTable)
+    Database.use((db) => {
+      db.insert(WorkspaceTable)
         .values([
           {
             id: id1,
@@ -77,8 +78,8 @@ describe("control-plane/workspace.startSyncing", () => {
             name: "local",
           },
         ])
-        .run(); },
-    )
+        .run()
+    })
 
     const done = new Promise<void>((resolve) => {
       const listener = (event: { directory?: string; payload: unknown }): void => {
@@ -94,7 +95,11 @@ describe("control-plane/workspace.startSyncing", () => {
     const sync = Workspace.startSyncing(project)
     await Promise.race([
       done,
-      new Promise((_, reject) => setTimeout(() => { reject(new Error("timed out waiting for sync event")); }, 2000)),
+      new Promise((_, reject) =>
+        setTimeout(() => {
+          reject(new Error("timed out waiting for sync event"))
+        }, 2000),
+      ),
     ])
 
     sync.stop()

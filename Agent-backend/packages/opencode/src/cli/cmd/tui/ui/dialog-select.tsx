@@ -2,15 +2,15 @@ import { RGBA, TextAttributes } from "@opentui/core"
 import { useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { useKeybind } from "@tui/context/keybind"
 import { useTheme, selectedForeground } from "@tui/context/theme"
-import { useDialog  } from "@tui/ui/dialog"
+import { useDialog } from "@tui/ui/dialog"
 import * as fuzzysort from "fuzzysort"
-import { entries, filter, flatMap, groupBy, pipe, isDeepEqual  } from "remeda"
-import { batch, createEffect, createMemo, For, Show,  on } from "solid-js"
+import { entries, filter, flatMap, groupBy, pipe, isDeepEqual } from "remeda"
+import { batch, createEffect, createMemo, For, Show, on } from "solid-js"
 import { createStore } from "solid-js/store"
 
-import type { InputRenderable, ScrollBoxRenderable} from "@opentui/core";
-import type {DialogContext} from "@tui/ui/dialog";
-import type {JSX} from "solid-js";
+import type { InputRenderable, ScrollBoxRenderable } from "@opentui/core"
+import type { DialogContext } from "@tui/ui/dialog"
+import type { JSX } from "solid-js"
 
 import { Keybind } from "@/util/keybind"
 import { Locale } from "@/util/locale"
@@ -237,7 +237,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
           <text fg={theme.text} attributes={TextAttributes.BOLD}>
             {props.title}
           </text>
-          <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+          <text
+            fg={theme.textMuted}
+            onMouseUp={() => {
+              dialog.clear()
+            }}
+          >
             esc
           </text>
         </box>
@@ -339,10 +344,13 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
           </For>
         </scrollbox>
       </Show>
-      <Show when={keybinds().length > 0} fallback={
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX element
-        <box flexShrink={0} />
-      }>
+      <Show
+        when={keybinds().length > 0}
+        fallback={
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX element
+          <box flexShrink={0} />
+        }
+      >
         <box paddingRight={2} paddingLeft={4} flexDirection="row" gap={2} flexShrink={0} paddingTop={1}>
           <For each={keybinds()}>
             {(item) => (

@@ -4,8 +4,8 @@ import os from "os"
 import path from "path"
 import { pathToFileURL, fileURLToPath } from "url"
 
-import { NamedError } from "@opencode-ai/util/error"
-import {  tool, jsonSchema,  asSchema } from "ai"
+import { NamedError } from "@orbit.build/util/error"
+import { tool, jsonSchema, asSchema } from "ai"
 import { $ } from "bun"
 import { ulid } from "ulid"
 import z from "zod"
@@ -45,16 +45,7 @@ import { SystemPrompt } from "./system"
 import { Session } from "."
 
 import type { Tool } from "@/tool/tool"
-import type {Tool as AITool, ToolCallOptions} from "ai";
-
-
-
-
-
-
-
-
-
+import type { Tool as AITool, ToolCallOptions } from "ai"
 
 import { PermissionNext } from "@/permission/next"
 import { Shell } from "@/shell/shell"
@@ -302,7 +293,9 @@ export namespace SessionPrompt {
       })
     }
 
-    using _cleanup = defer(() => { cancel(sessionID); })
+    using _cleanup = defer(() => {
+      cancel(sessionID)
+    })
 
     // Structured output state
     // Note: On session resumption, state is reset but outputFormat is preserved
@@ -328,8 +321,7 @@ export namespace SessionPrompt {
         const msg = msgs[i]
         if (!lastUser && msg.info.role === "user") lastUser = msg.info
         if (!lastAssistant && msg.info.role === "assistant") lastAssistant = msg.info
-        if (!lastFinished && msg.info.role === "assistant" && msg.info.finish)
-          lastFinished = msg.info
+        if (!lastFinished && msg.info.role === "assistant" && msg.info.finish) lastFinished = msg.info
         if (lastUser && lastFinished) break
         const task = msg.parts.filter((part) => part.type === "compaction" || part.type === "subtask")
         if (task.length > 0 && !lastFinished) {
@@ -380,7 +372,8 @@ export namespace SessionPrompt {
           const providerID = err.data.providerID
           const modelID = err.data.modelID
           const suggestions = err.data.suggestions
-          const hint = Array.isArray(suggestions) && suggestions.length > 0 ? ` Did you mean: ${suggestions.join(", ")}?` : ""
+          const hint =
+            Array.isArray(suggestions) && suggestions.length > 0 ? ` Did you mean: ${suggestions.join(", ")}?` : ""
           void Bus.publish(Session.Event.Error, {
             sessionID,
             error: new NamedError.Unknown({
@@ -641,7 +634,9 @@ export namespace SessionPrompt {
         model,
         abort,
       })
-      using _instructionCleanup = defer(() => { InstructionPrompt.clear(processor.message.id); })
+      using _instructionCleanup = defer(() => {
+        InstructionPrompt.clear(processor.message.id)
+      })
 
       // Check if user explicitly invoked an agent via @ in this turn
       const lastUserMsg = msgs.findLast((m) => m.info.role === "user")
@@ -704,7 +699,16 @@ export namespace SessionPrompt {
         system.push(STRUCTURED_OUTPUT_SYSTEM_PROMPT)
       }
 
-      log.info("llm call", { status: "started", sessionID, step, modelID: model.id, providerID: model.providerID, messageCount: msgs.length, toolCount: Object.keys(tools).length, isLastStep })
+      log.info("llm call", {
+        status: "started",
+        sessionID,
+        step,
+        modelID: model.id,
+        providerID: model.providerID,
+        messageCount: msgs.length,
+        toolCount: Object.keys(tools).length,
+        isLastStep,
+      })
       const result = await processor.process({
         user: lastUser,
         agent,
@@ -738,7 +742,8 @@ export namespace SessionPrompt {
       }
 
       // Check if model finished (finish reason is not "tool-calls" or "unknown")
-      const modelFinished = processor.message.finish !== undefined && !["tool-calls", "unknown"].includes(processor.message.finish)
+      const modelFinished =
+        processor.message.finish !== undefined && !["tool-calls", "unknown"].includes(processor.message.finish)
 
       if (modelFinished && !processor.message.error) {
         if (format.type === "json_schema") {
@@ -923,7 +928,7 @@ export namespace SessionPrompt {
           content: MCPContentItem[]
           metadata?: Record<string, unknown>
         }
-        const result = await execute(args, opts) as MCPResult
+        const result = (await execute(args, opts)) as MCPResult
 
         await Plugin.trigger(
           "tool.execute.after",
@@ -1047,7 +1052,9 @@ export namespace SessionPrompt {
       format: input.format,
       variant,
     }
-    using _ = defer(() => { InstructionPrompt.clear(info.id); })
+    using _ = defer(() => {
+      InstructionPrompt.clear(info.id)
+    })
 
     type Draft<T> = T extends MessageV2.Part ? Omit<T, "id"> & { id?: string } : never
     const assign = (part: Draft<MessageV2.Part>): MessageV2.Part => ({
@@ -1220,7 +1227,9 @@ export namespace SessionPrompt {
                       messageID: info.id,
                       extra: { bypassCwdCheck: true, model },
                       messages: [],
-                      metadata: () => { /* no-op */ },
+                      metadata: () => {
+                        /* no-op */
+                      },
                       ask: () => Promise.resolve(),
                     }
                     const result = await t.execute(args, readCtx)
@@ -1279,7 +1288,9 @@ export namespace SessionPrompt {
                   messageID: info.id,
                   extra: { bypassCwdCheck: true },
                   messages: [],
-                  metadata: () => { /* no-op */ },
+                  metadata: () => {
+                    /* no-op */
+                  },
                   ask: () => Promise.resolve(),
                 }
                 const result = await ReadTool.init().then((t) => t.execute(args, listCtx))
@@ -1391,7 +1402,11 @@ export namespace SessionPrompt {
     }
   }
 
-  async function insertReminders(input: { messages: MessageV2.WithParts[]; agent: Agent.Info; session: Session.Info }): Promise<MessageV2.WithParts[]> {
+  async function insertReminders(input: {
+    messages: MessageV2.WithParts[]
+    agent: Agent.Info
+    session: Session.Info
+  }): Promise<MessageV2.WithParts[]> {
     const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
     if (!userMessage) return input.messages
 
@@ -1551,7 +1566,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
 
     using _ = defer(() => {
       // If no queued callbacks, cancel (the default)
-      const entry = state()[input.sessionID] as { callbacks: { resolve(input: MessageV2.WithParts): void; reject(reason?: unknown): void }[] } | undefined
+      const entry = state()[input.sessionID] as
+        | { callbacks: { resolve(input: MessageV2.WithParts): void; reject(reason?: unknown): void }[] }
+        | undefined
       const callbacks = entry?.callbacks ?? []
       if (callbacks.length === 0) {
         cancel(input.sessionID)
@@ -1887,10 +1904,13 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       if (Provider.ModelNotFoundError.isInstance(e)) {
         const err = e as InstanceType<typeof Provider.ModelNotFoundError>
         const { providerID, modelID, suggestions } = err.data
-        const hint = Array.isArray(suggestions) && suggestions.length > 0 ? ` Did you mean: ${suggestions.join(", ")}?` : ""
+        const hint =
+          Array.isArray(suggestions) && suggestions.length > 0 ? ` Did you mean: ${suggestions.join(", ")}?` : ""
         void Bus.publish(Session.Event.Error, {
           sessionID: input.sessionID,
-          error: new NamedError.Unknown({ message: `Model not found: ${providerID}/${modelID}.${hint}` }).toObject() as z.infer<typeof NamedError.Unknown.Schema>,
+          error: new NamedError.Unknown({
+            message: `Model not found: ${providerID}/${modelID}.${hint}`,
+          }).toObject() as z.infer<typeof NamedError.Unknown.Schema>,
         })
       }
       throw e
@@ -1948,14 +1968,14 @@ NOTE: At any point in time through this workflow you should feel free to ask the
       { parts: parts as never },
     )
 
-    const result = (await prompt({
+    const result = await prompt({
       sessionID: input.sessionID,
       messageID: input.messageID,
       model: userModel,
       agent: userAgent,
       parts,
       variant: input.variant,
-    }))
+    })
 
     void Bus.publish(Command.Event.Executed, {
       name: input.command,
@@ -2025,7 +2045,9 @@ NOTE: At any point in time through this workflow you should feel free to ask the
           : MessageV2.toModelMessages(contextMessages, model)),
       ],
     })
-    const text = await result.text.catch((err: unknown) => { log.error("failed to generate title", { error: err }); })
+    const text = await result.text.catch((err: unknown) => {
+      log.error("failed to generate title", { error: err })
+    })
     if (text) {
       const raw = text
         .replace(/<think>[\s\S]*?<\/think>\s*/g, "")

@@ -1,4 +1,4 @@
-import { Hono  } from "hono"
+import { Hono } from "hono"
 import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 
@@ -8,10 +8,9 @@ import { lazy } from "../../util/lazy"
 import { AsyncQueue } from "../../util/queue"
 import { errors } from "../error"
 
-import type {Context} from "hono";
+import type { Context } from "hono"
 
 import { TuiEvent } from "@/cli/cmd/tui/event"
-
 
 const TuiRequest = z.object({
   path: z.string(),

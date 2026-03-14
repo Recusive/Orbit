@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Shared build and development script utilities (`@opencode-ai/script`). Provides helpers used by build scripts across packages — version management via semver, build orchestration, and script utilities.
+Shared build and development script utilities (`@orbit.build/script`). Provides helpers used by build scripts across packages — version management via semver, build orchestration, and script utilities.
 
 ## Usage Status
 

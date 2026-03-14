@@ -160,7 +160,9 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("creates tool with correct id", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object", properties: { name: { type: "string" } } },
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     // AI SDK tool type doesn't expose id, but we set it internally
@@ -170,7 +172,9 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("creates tool with description", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object" },
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     expect(tool.description).toContain("structured format")
@@ -188,7 +192,9 @@ describe("structured-output.createStructuredOutputTool", () => {
 
     const tool = SessionPrompt.createStructuredOutputTool({
       schema,
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     // AI SDK wraps schema in { jsonSchema: {...} }
@@ -207,7 +213,9 @@ describe("structured-output.createStructuredOutputTool", () => {
 
     const tool = SessionPrompt.createStructuredOutputTool({
       schema,
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     // AI SDK wraps schema in { jsonSchema: {...} }
@@ -251,7 +259,9 @@ describe("structured-output.createStructuredOutputTool", () => {
         },
         required: ["name", "age"],
       },
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     // The schema requires both 'name' and 'age'
@@ -273,7 +283,9 @@ describe("structured-output.createStructuredOutputTool", () => {
         },
         required: ["count"],
       },
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     // The schema defines 'count' as a number
@@ -366,7 +378,9 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("toModelOutput returns text value", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object" },
-      onSuccess: () => { /* noop */ },
+      onSuccess: () => {
+        /* noop */
+      },
     })
 
     expect(tool.toModelOutput).toBeDefined()

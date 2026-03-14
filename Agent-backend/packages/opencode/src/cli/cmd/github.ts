@@ -31,7 +31,6 @@ import type {
   PullRequestEvent,
 } from "@octokit/webhooks-types"
 
-
 import { Instance } from "@/project/instance"
 import { SessionPrompt } from "@/session/prompt"
 import { git } from "@/util/git"
@@ -334,7 +333,10 @@ export const GithubInstallCommand = cmd({
 
             // Get installation
             const installation = await getInstallation()
-            if (installation !== undefined && installation !== null) { s.stop("GitHub app already installed"); return; }
+            if (installation !== undefined && installation !== null) {
+              s.stop("GitHub app already installed")
+              return
+            }
 
             // Open browser
             const url = "https://github.com/apps/opencode-agent"
@@ -375,8 +377,7 @@ export const GithubInstallCommand = cmd({
             async function getInstallation(): Promise<unknown> {
               const data = await fetch(
                 `https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
-              )
-                .then((res) => res.json() as Promise<InstallationResponse>)
+              ).then((res) => res.json() as Promise<InstallationResponse>)
               return data.installation
             }
           }
@@ -1161,7 +1162,12 @@ export const GithubRunCommand = cmd({
         return `orbit/${type}${String(issueId ?? "")}-${timestamp}`
       }
 
-      async function pushToNewBranch(summary: string, branch: string, commit: boolean, isSchedule: boolean): Promise<void> {
+      async function pushToNewBranch(
+        summary: string,
+        branch: string,
+        commit: boolean,
+        isSchedule: boolean,
+      ): Promise<void> {
         console.log("Pushing to new branch...")
         if (commit) {
           await gitRun(["add", "."])
@@ -1195,7 +1201,10 @@ export const GithubRunCommand = cmd({
         await gitRun(["push", "fork", `HEAD:${remoteBranch}`])
       }
 
-      async function branchIsDirty(originalHead: string, expectedBranch: string): Promise<{
+      async function branchIsDirty(
+        originalHead: string,
+        expectedBranch: string,
+      ): Promise<{
         dirty: boolean
         uncommittedChanges: boolean
         switched: boolean
@@ -1256,7 +1265,8 @@ export const GithubRunCommand = cmd({
           throw new Error(`Failed to check permissions for user ${String(actor)}: ${String(error)}`, { cause: error })
         }
 
-        if (!["admin", "write"].includes(permission)) throw new Error(`User ${String(actor)} does not have write permissions`)
+        if (!["admin", "write"].includes(permission))
+          throw new Error(`User ${String(actor)} does not have write permissions`)
       }
 
       async function addReaction(reactionCommentType?: "issue" | "pr_review"): Promise<void> {
@@ -1493,7 +1503,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
       function buildPromptDataForIssue(issue: GitHubIssue): string {
         // Only called for non-schedule events, so payload is defined
-        const comments = (issue.comments.nodes)
+        const comments = issue.comments.nodes
           .filter((c) => {
             const id = parseInt(c.databaseId)
             return id !== triggerCommentId
@@ -1618,16 +1628,20 @@ query($owner: String!, $repo: String!, $number: Int!) {
 
       function buildPromptDataForPR(pr: GitHubPullRequest): string {
         // Only called for non-schedule events, so payload is defined
-        const comments = (pr.comments.nodes)
+        const comments = pr.comments.nodes
           .filter((c) => {
             const id = parseInt(c.databaseId)
             return id !== triggerCommentId
           })
           .map((c) => `- ${c.author.login} at ${c.createdAt}: ${c.body}`)
 
-        const files = pr.files.nodes.map((f) => `- ${f.path} (${f.changeType}) +${String(f.additions)}/-${String(f.deletions)}`)
+        const files = pr.files.nodes.map(
+          (f) => `- ${f.path} (${f.changeType}) +${String(f.additions)}/-${String(f.deletions)}`,
+        )
         const reviewData = pr.reviews.nodes.map((r) => {
-          const reviewComments = r.comments.nodes.map((c) => `    - ${c.path}:${c.line !== null ? String(c.line) : "?"}: ${c.body}`)
+          const reviewComments = r.comments.nodes.map(
+            (c) => `    - ${c.path}:${c.line !== null ? String(c.line) : "?"}: ${c.body}`,
+          )
           return [
             `- ${r.author.login} at ${r.submittedAt}:`,
             `  - Review body: ${r.body}`,

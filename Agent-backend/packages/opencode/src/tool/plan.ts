@@ -2,7 +2,6 @@ import path from "path"
 
 import z from "zod"
 
-
 import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
 import { Provider } from "../provider/provider"
@@ -13,9 +12,7 @@ import { MessageV2 } from "../session/message-v2"
 import EXIT_DESCRIPTION from "./plan-exit.txt"
 import { Tool } from "./tool"
 
-async function getLastModel(
-  sessionID: string,
-): Promise<{ modelID: string; providerID: string }> {
+async function getLastModel(sessionID: string): Promise<{ modelID: string; providerID: string }> {
   for (const item of MessageV2.stream(sessionID)) {
     if (item.info.role === "user") return item.info.model
   }

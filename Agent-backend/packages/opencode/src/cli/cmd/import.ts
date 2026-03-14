@@ -10,7 +10,7 @@ import { bootstrap } from "../bootstrap"
 
 import { cmd } from "./cmd"
 
-import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
+import type { Session as SDKSession, Message, Part } from "@orbit.build/sdk/v2"
 import type { Argv } from "yargs"
 
 /** Discriminated union returned by the ShareNext API (GET /api/share/:id/data) */
@@ -132,18 +132,16 @@ export const ImportCommand = cmd({
       }
 
       const row = { ...Session.toRow(exportData.info), project_id: Instance.project.id }
-      Database.use((db) =>
-        { db
-          .insert(SessionTable)
+      Database.use((db) => {
+        db.insert(SessionTable)
           .values(row)
           .onConflictDoUpdate({ target: SessionTable.id, set: { project_id: row.project_id } })
-          .run(); },
-      )
+          .run()
+      })
 
       for (const msg of exportData.messages) {
-        Database.use((db) =>
-          { db
-            .insert(MessageTable)
+        Database.use((db) => {
+          db.insert(MessageTable)
             .values({
               id: msg.info.id,
               session_id: exportData.info.id,
@@ -151,13 +149,12 @@ export const ImportCommand = cmd({
               data: msg.info,
             })
             .onConflictDoNothing()
-            .run(); },
-        )
+            .run()
+        })
 
         for (const part of msg.parts) {
-          Database.use((db) =>
-            { db
-              .insert(PartTable)
+          Database.use((db) => {
+            db.insert(PartTable)
               .values({
                 id: part.id,
                 message_id: msg.info.id,
@@ -165,8 +162,8 @@ export const ImportCommand = cmd({
                 data: part,
               })
               .onConflictDoNothing()
-              .run(); },
-          )
+              .run()
+          })
         }
       }
 

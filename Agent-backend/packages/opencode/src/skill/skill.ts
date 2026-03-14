@@ -1,7 +1,7 @@
 import os from "os"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
 
 import { Config } from "../config/config"
@@ -17,8 +17,6 @@ import { Flag } from "@/flag/flag"
 import { Global } from "@/global"
 import { Session } from "@/session"
 import { Filesystem } from "@/util/filesystem"
-
-
 
 export namespace Skill {
   const log = Log.create({ service: "skill" })
@@ -64,7 +62,9 @@ export namespace Skill {
         const message = ConfigMarkdown.FrontmatterError.isInstance(err)
           ? (err as InstanceType<typeof ConfigMarkdown.FrontmatterError>).data.message
           : `Failed to parse skill ${match}`
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message }).toObject() as { name: "UnknownError"; data: { message: string } } })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message }).toObject() as { name: "UnknownError"; data: { message: string } },
+        })
         log.error("failed to load skill", { skill: match, err })
         return undefined
       })

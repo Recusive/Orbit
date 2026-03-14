@@ -1,4 +1,4 @@
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { APICallError, convertToModelMessages, LoadAPIKeyError } from "ai"
 import z from "zod"
 
@@ -17,7 +17,6 @@ import { Snapshot } from "@/snapshot"
 import { Database, eq, desc, inArray } from "@/storage/db"
 import { fn } from "@/util/fn"
 import { iife } from "@/util/iife"
-
 
 export namespace MessageV2 {
   export function isMedia(mime: string): boolean {
@@ -830,10 +829,7 @@ export namespace MessageV2 {
 
   export function fromError(e: unknown, ctx: { providerID: string }): ReturnType<NamedError["toObject"]> {
     if (e instanceof DOMException && e.name === "AbortError") {
-      return new MessageV2.AbortedError(
-        { message: e.message },
-        { cause: e },
-      ).toObject()
+      return new MessageV2.AbortedError({ message: e.message }, { cause: e }).toObject()
     }
     if (MessageV2.OutputLengthError.isInstance(e)) {
       return e as ReturnType<NamedError["toObject"]>

@@ -52,9 +52,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `COLOR-SYSTEM-REFACTOR.md` — File-by-file color refactor plan (patterns A-J, semantic tokens, verification)
 - `DEAD-CSS-REMOVAL-PLAN.md` — Dead CSS removal plan
 
-## development/ (6 files)
+## development/ (7 files)
 
 - `DEVELOPMENT.md` — Development workflow and setup
+- `NPM-PUBLISH-GUIDE.md` — Publishing @orbit.build/sdk and @orbit.build/plugin to npm (account, 2FA, versioning, troubleshooting)
 - `RELEASE-GUIDE.md` — How to tag, build, and ship a new version (step-by-step)
 - `TROUBLESHOOTING.md` — Common issues and solutions
 - `CI-CD-GUIDE.md` — GitHub Actions CI/CD pipeline
@@ -65,7 +66,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (10 entries)
+## plans/tracked/todo/ (9 entries)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
@@ -81,7 +82,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (20 entries)
+## plans/tracked/done/ (21 entries)
 
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
 - `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI
@@ -103,6 +104,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `opencode-session-restore-speed.md` — OpenCode session restore speed (pre-warm, skip validate, skeleton on mount)
 - `fix-provider-api-key-flow.md` — Fix provider API key → model selection end-to-end flow
 - `fix-provider-cache-invalidation.md` — Fix provider not showing connected after API key save (backend cache invalidation)
+- `rename-opencode-ai-to-orbit.md` — Rename @opencode-ai/_ packages to @orbit.build/_ (npm scope, imports, config migration)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

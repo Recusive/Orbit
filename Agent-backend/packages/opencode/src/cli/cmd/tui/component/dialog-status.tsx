@@ -50,7 +50,12 @@ export function DialogStatus(): JSX.Element {
         <text fg={theme.text} attributes={TextAttributes.BOLD}>
           Status
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>

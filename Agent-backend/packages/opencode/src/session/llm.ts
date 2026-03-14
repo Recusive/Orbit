@@ -1,9 +1,4 @@
-import {
-  streamText,
-  wrapLanguageModel,
-  tool,
-  jsonSchema
-} from "ai"
+import { streamText, wrapLanguageModel, tool, jsonSchema } from "ai"
 import { mergeDeep, pipe } from "remeda"
 
 import { SystemPrompt } from "./system"

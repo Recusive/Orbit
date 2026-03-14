@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Plugin SDK (`@opencode-ai/plugin`) for extending OpenCode/Orbit with custom tools, hooks, and authentication providers. Defines the `Plugin` type, the `Hooks` interface (20+ hook points), and the `tool()` factory function for creating custom tools with Zod-validated arguments.
+Plugin SDK (`@orbit.build/plugin`) for extending OpenCode/Orbit with custom tools, hooks, and authentication providers. Defines the `Plugin` type, the `Hooks` interface (20+ hook points), and the `tool()` factory function for creating custom tools with Zod-validated arguments.
 
 ## Usage Status
 
@@ -47,7 +47,7 @@ Plugin SDK (`@opencode-ai/plugin`) for extending OpenCode/Orbit with custom tool
 ## Tool Factory
 
 ```typescript
-import { tool } from "@opencode-ai/plugin/tool"
+import { tool } from "@orbit.build/plugin/tool"
 
 const myTool = tool({
   description: "Does something useful",
@@ -62,7 +62,7 @@ const myTool = tool({
 
 ## Dependencies
 
-- `@opencode-ai/sdk` — SDK types (Event, Message, Part, Provider, etc.)
+- `@orbit.build/sdk` — SDK types (Event, Message, Part, Provider, etc.)
 - `zod` — Argument validation for custom tools
 
 ## Notes

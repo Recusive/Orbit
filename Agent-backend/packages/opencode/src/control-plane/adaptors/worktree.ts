@@ -1,6 +1,6 @@
-import {  WorkspaceInfo } from "../types"
+import { WorkspaceInfo } from "../types"
 
-import type {Adaptor} from "../types";
+import type { Adaptor } from "../types"
 import type z from "zod"
 
 import { Worktree } from "@/worktree"
@@ -30,7 +30,7 @@ export const WorktreeAdaptor: Adaptor = {
       directory: config.directory,
       branch: config.branch,
     })
-    bootstrap();
+    bootstrap()
   },
   async remove(info) {
     const config = Config.parse(info)

@@ -1,7 +1,7 @@
-import { spawn as launch  } from "child_process"
+import { spawn as launch } from "child_process"
 import { buffer } from "node:stream/consumers"
 
-import type {ChildProcess} from "child_process";
+import type { ChildProcess } from "child_process"
 
 export namespace Process {
   export type Stdio = "inherit" | "pipe" | "ignore"

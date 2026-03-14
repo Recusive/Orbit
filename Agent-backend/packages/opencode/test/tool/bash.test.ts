@@ -11,7 +11,6 @@ import { tmpdir } from "../fixture/fixture"
 
 import type { PermissionNext } from "../../src/permission/next"
 
-
 const ctx = {
   sessionID: "test",
   messageID: "",
@@ -19,8 +18,12 @@ const ctx = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
+  ask: async () => {
+    /* noop */
+  },
 }
 
 const projectRoot = path.join(__dirname, "../..")

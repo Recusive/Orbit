@@ -1,6 +1,6 @@
 import { MessageV2 } from "./message-v2"
 
-import type { NamedError } from "@opencode-ai/util/error"
+import type { NamedError } from "@orbit.build/util/error"
 
 import { iife } from "@/util/iife"
 

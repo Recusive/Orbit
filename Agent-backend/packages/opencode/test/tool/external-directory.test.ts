@@ -2,7 +2,6 @@ import path from "path"
 
 import { describe, expect, test } from "bun:test"
 
-
 import { Instance } from "../../src/project/instance"
 import { assertExternalDirectory } from "../../src/tool/external-directory"
 
@@ -16,7 +15,9 @@ const baseCtx: Omit<Tool.Context, "ask"> = {
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
+  metadata: () => {
+    /* noop */
+  },
 }
 
 describe("tool.assertExternalDirectory", () => {

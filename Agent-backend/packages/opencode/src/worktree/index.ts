@@ -1,7 +1,7 @@
 import fs from "fs/promises"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
 
 import { Global } from "../global"
@@ -316,10 +316,7 @@ export namespace Worktree {
     return false
   }
 
-  async function runStartScripts(
-    directory: string,
-    input: { projectID: string; extra?: string },
-  ): Promise<boolean> {
+  async function runStartScripts(directory: string, input: { projectID: string; extra?: string }): Promise<boolean> {
     const row = Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, input.projectID)).get())
     const project = row ? Project.fromRow(row) : undefined
     const startup = project?.commands?.start?.trim() ?? ""
@@ -449,9 +446,7 @@ export namespace Worktree {
     }
 
     const directory = await canonical(input.directory)
-    const locate = async (
-      stdout: Uint8Array | undefined,
-    ): Promise<{ path?: string; branch?: string } | undefined> => {
+    const locate = async (stdout: Uint8Array | undefined): Promise<{ path?: string; branch?: string } | undefined> => {
       const lines = outputText(stdout)
         .split("\n")
         .map((line) => line.trim())

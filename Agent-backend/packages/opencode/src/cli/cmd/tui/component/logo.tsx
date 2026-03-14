@@ -28,18 +28,22 @@ export function Logo(): JSX.Element {
 
       if (markerIndex === -1) {
         elements.push(
-          (<text fg={fg} attributes={attrs} selectable={false}>
-            {rest}
-          </text>) as JSX.Element,
+          (
+            <text fg={fg} attributes={attrs} selectable={false}>
+              {rest}
+            </text>
+          ) as JSX.Element,
         )
         break
       }
 
       if (markerIndex > 0) {
         elements.push(
-          (<text fg={fg} attributes={attrs} selectable={false}>
-            {rest.slice(0, markerIndex)}
-          </text>) as JSX.Element,
+          (
+            <text fg={fg} attributes={attrs} selectable={false}>
+              {rest.slice(0, markerIndex)}
+            </text>
+          ) as JSX.Element,
         )
       }
 
@@ -47,23 +51,29 @@ export function Logo(): JSX.Element {
       switch (marker) {
         case "_":
           elements.push(
-            (<text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-              {" "}
-            </text>) as JSX.Element,
+            (
+              <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
+                {" "}
+              </text>
+            ) as JSX.Element,
           )
           break
         case "^":
           elements.push(
-            (<text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-              ▀
-            </text>) as JSX.Element,
+            (
+              <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
+                ▀
+              </text>
+            ) as JSX.Element,
           )
           break
         case "~":
           elements.push(
-            (<text fg={shadow} attributes={attrs} selectable={false}>
-              ▀
-            </text>) as JSX.Element,
+            (
+              <text fg={shadow} attributes={attrs} selectable={false}>
+                ▀
+              </text>
+            ) as JSX.Element,
           )
           break
       }

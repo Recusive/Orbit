@@ -384,7 +384,9 @@ export namespace SessionProcessor {
               error: errorObj,
               stack: JSON.stringify(errorObj.stack),
             })
-            const error = MessageV2.fromError(e, { providerID: input.model.providerID }) as NonNullable<MessageV2.Assistant["error"]>
+            const error = MessageV2.fromError(e, { providerID: input.model.providerID }) as NonNullable<
+              MessageV2.Assistant["error"]
+            >
             if (MessageV2.ContextOverflowError.isInstance(error)) {
               needsCompaction = true
               void Bus.publish(Session.Event.Error, {

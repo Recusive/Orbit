@@ -30,16 +30,10 @@ import { WriteTool } from "./write"
 
 import type { Tool } from "./tool"
 import type { Agent } from "../agent/agent"
-import type {ToolContext as PluginToolContext, ToolDefinition} from "@opencode-ai/plugin";
-
-
-
+import type { ToolContext as PluginToolContext, ToolDefinition } from "@orbit.build/plugin"
 
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log"
-
-
-
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })

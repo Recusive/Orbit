@@ -1,6 +1,6 @@
 import path from "path"
 
-import { Slug } from "@opencode-ai/util/slug"
+import { Slug } from "@orbit.build/util/slug"
 import { Decimal } from "decimal.js"
 import z from "zod"
 
@@ -22,7 +22,7 @@ import { SessionTable, MessageTable, PartTable } from "./session.sql"
 import type { SQL } from "../storage/db"
 import type { Provider } from "@/provider/provider"
 import type { LanguageModelV2Usage } from "@ai-sdk/provider"
-import type {ProviderMetadata} from "ai";
+import type { ProviderMetadata } from "ai"
 
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
@@ -340,7 +340,9 @@ export namespace Session {
   }
 
   export const get = fn(Identifier.schema("session"), (id) => {
-    const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, id)).get()) as SessionRow | undefined
+    const row = Database.use((db) => db.select().from(SessionTable).where(eq(SessionTable.id, id)).get()) as
+      | SessionRow
+      | undefined
     if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
     return fromRow(row)
   })
@@ -353,7 +355,12 @@ export namespace Session {
     const { ShareNext } = await import("@/share/share-next")
     const share = await ShareNext.create(id)
     Database.use((db) => {
-      const row = db.update(SessionTable).set({ share_url: share.url }).where(eq(SessionTable.id, id)).returning().get() as SessionRow | undefined
+      const row = db
+        .update(SessionTable)
+        .set({ share_url: share.url })
+        .where(eq(SessionTable.id, id))
+        .returning()
+        .get() as SessionRow | undefined
       if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
       const info = fromRow(row)
       Database.effect(() => void Bus.publish(Event.Updated, { info }))
@@ -366,7 +373,9 @@ export namespace Session {
     const { ShareNext } = await import("@/share/share-next")
     await ShareNext.remove(id)
     Database.use((db) => {
-      const row = db.update(SessionTable).set({ share_url: null }).where(eq(SessionTable.id, id)).returning().get() as SessionRow | undefined
+      const row = db.update(SessionTable).set({ share_url: null }).where(eq(SessionTable.id, id)).returning().get() as
+        | SessionRow
+        | undefined
       if (!row) throw new NotFoundError({ message: `Session not found: ${id}` })
       const info = fromRow(row)
       Database.effect(() => void Bus.publish(Event.Updated, { info }))
@@ -661,7 +670,9 @@ export namespace Session {
       for (const child of children(sessionID)) {
         await remove(child.id)
       }
-      await unshare(sessionID).catch(() => { /* ignore sharing errors */ })
+      await unshare(sessionID).catch(() => {
+        /* ignore sharing errors */
+      })
       // CASCADE delete handles messages and parts automatically
       Database.use((db) => {
         db.delete(SessionTable).where(eq(SessionTable.id, sessionID)).run()
@@ -804,10 +815,10 @@ export namespace Session {
       const bedrockUsage = bedrock?.usage as Record<string, number> | undefined
       const veniceUsage = venice?.usage as Record<string, number> | undefined
       const cacheWriteInputTokens = safe(
-        ((anthropic?.cacheCreationInputTokens as number | undefined) ??
+        (anthropic?.cacheCreationInputTokens as number | undefined) ??
           bedrockUsage?.cacheWriteInputTokens ??
           veniceUsage?.cacheCreationInputTokens ??
-          0),
+          0,
       )
 
       // OpenRouter provides inputTokens as the total count of input tokens (including cached).

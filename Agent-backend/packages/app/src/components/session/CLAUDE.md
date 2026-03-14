@@ -67,9 +67,9 @@ This can be imported directly into Orbit's React code — no SolidJS dependency.
 
 ## Dependencies
 
-- **SDK types:** `@opencode-ai/sdk/v2/client` — `Message`, `AssistantMessage`, `Part`, `UserMessage`
-- **UI library:** `@opencode-ai/ui` — Accordion, Button, DropdownMenu, Icon, IconButton, Popover, Tooltip, FileIcon, Markdown, ScrollView, Spinner, TextField
-- **Utilities:** `@opencode-ai/util` — `path.getFilename()`, `encode.checksum()`, `array.findLast()`
+- **SDK types:** `@orbit.build/sdk/v2/client` — `Message`, `AssistantMessage`, `Part`, `UserMessage`
+- **UI library:** `@orbit.build/ui` — Accordion, Button, DropdownMenu, Icon, IconButton, Popover, Tooltip, FileIcon, Markdown, ScrollView, Spinner, TextField
+- **Utilities:** `@orbit.build/util` — `path.getFilename()`, `encode.checksum()`, `array.findLast()`
 - **SolidJS contexts:** `@/context/sync`, `@/context/layout`, `@/context/command`, `@/context/language`, `@/context/platform`, `@/context/server`, `@/context/global-sdk`, `@/context/file`
 - **DnD:** `@thisbeyond/solid-dnd` — sortable tab drag-and-drop
 

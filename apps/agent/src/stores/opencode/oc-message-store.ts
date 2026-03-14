@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 
 import type { OcMessage, OcPart } from '@/types/opencode';
-import type { SessionMessagesResponses } from '@opencode-ai/sdk/v2/client';
+import type { SessionMessagesResponses } from '@orbit.build/sdk/v2/client';
 
 const logger = createLogger('OcMessageStore');
 

@@ -860,8 +860,7 @@ describe("session.message-v2.fromError", () => {
     expect(result).toStrictEqual({
       name: "APIError",
       data: {
-        message:
-          "Please reauthenticate with the copilot provider to ensure your credentials work properly with Orbit.",
+        message: "Please reauthenticate with the copilot provider to ensure your credentials work properly with Orbit.",
         statusCode: 403,
         isRetryable: false,
         responseHeaders: { "content-type": "application/json" },

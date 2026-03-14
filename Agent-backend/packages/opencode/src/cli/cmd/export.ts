@@ -10,8 +10,6 @@ import { cmd } from "./cmd"
 
 import type { Argv } from "yargs"
 
-
-
 export const ExportCommand = cmd({
   command: "export [sessionID]",
   describe: "export session data as JSON",

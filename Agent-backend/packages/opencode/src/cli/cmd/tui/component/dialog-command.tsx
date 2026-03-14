@@ -1,20 +1,12 @@
 import { useKeyboard } from "@opentui/solid"
-import {  useKeybind } from "@tui/context/keybind"
+import { useKeybind } from "@tui/context/keybind"
 import { useDialog } from "@tui/ui/dialog"
-import { DialogSelect   } from "@tui/ui/dialog-select"
-import {
-  createContext,
-  createMemo,
-  createSignal,
-  onCleanup,
-  useContext
+import { DialogSelect } from "@tui/ui/dialog-select"
+import { createContext, createMemo, createSignal, onCleanup, useContext } from "solid-js"
 
-
-} from "solid-js"
-
-import type {KeybindKey} from "@tui/context/keybind";
-import type {DialogSelectOption, DialogSelectRef} from "@tui/ui/dialog-select";
-import type {Accessor, JSX, ParentProps} from "solid-js";
+import type { KeybindKey } from "@tui/context/keybind"
+import type { DialogSelectOption, DialogSelectRef } from "@tui/ui/dialog-select"
+import type { Accessor, JSX, ParentProps } from "solid-js"
 
 type Context = ReturnType<typeof init>
 const ctx = createContext<Context>()
@@ -53,7 +45,9 @@ function init(): {
   const keybind = useKeybind()
 
   const entries = createMemo(() => {
-    const all = registrations().flatMap((x) => x()).filter(Boolean)
+    const all = registrations()
+      .flatMap((x) => x())
+      .filter(Boolean)
     return all.map((x) => ({
       ...x,
       footer: x.keybind ? keybind.print(x.keybind) : undefined,
@@ -106,7 +100,9 @@ function init(): {
           display: "/" + slash.name,
           description: option.description ?? option.title,
           aliases: slash.aliases?.map((alias) => "/" + alias),
-          onSelect: () => { result.trigger(option.value); },
+          onSelect: () => {
+            result.trigger(option.value)
+          },
         }
       })
     },

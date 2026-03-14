@@ -14,7 +14,6 @@ import { tmpdir } from "../fixture/fixture"
 
 import type { Adaptor } from "../../src/control-plane/types"
 
-
 afterEach(async () => {
   mock.restore()
   await resetDatabase()
@@ -45,7 +44,9 @@ async function setup(state: State) {
     create() {
       throw new Error("not used")
     },
-    async remove() { /* noop */ },
+    async remove() {
+      /* noop */
+    },
 
     async fetch(_config: unknown, input: RequestInfo | URL, init?: RequestInit) {
       const url =
@@ -73,9 +74,8 @@ async function setup(state: State) {
   const id1 = Identifier.descending("workspace")
   const id2 = Identifier.descending("workspace")
 
-  Database.use((db) =>
-    { db
-      .insert(WorkspaceTable)
+  Database.use((db) => {
+    db.insert(WorkspaceTable)
       .values([
         {
           id: id1,
@@ -93,8 +93,8 @@ async function setup(state: State) {
           name: "local",
         },
       ])
-      .run(); },
-  )
+      .run()
+  })
 
   const { WorkspaceRouterMiddleware } = await import("../../src/control-plane/workspace-router-middleware")
   const app = new Hono().use(WorkspaceRouterMiddleware)

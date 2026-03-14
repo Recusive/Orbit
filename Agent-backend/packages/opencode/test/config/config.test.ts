@@ -15,7 +15,9 @@ import { tmpdir } from "../fixture/fixture"
 const managedConfigDir = process.env.OPENCODE_TEST_MANAGED_CONFIG_DIR!
 
 afterEach(async () => {
-  await fs.rm(managedConfigDir, { force: true, recursive: true }).catch(() => { /* noop */ })
+  await fs.rm(managedConfigDir, { force: true, recursive: true }).catch(() => {
+    /* noop */
+  })
 })
 
 async function writeManagedSettings(settings: object, filename = "orbit.json"): Promise<void> {
@@ -667,7 +669,9 @@ test("does not try to install dependencies in read-only OPENCODE_CONFIG_DIR", as
     },
     dispose: async (dir) => {
       const ro = path.join(dir, "readonly")
-      await fs.chmod(ro, 0o755).catch(() => { /* noop */ })
+      await fs.chmod(ro, 0o755).catch(() => {
+        /* noop */
+      })
       return ro
     },
   })

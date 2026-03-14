@@ -1,8 +1,8 @@
-# Rename `@opencode-ai/*` → `@orbit.build/*` Packages
+# Rename `@orbit.build/*` → `@orbit.build/*` Packages
 
 ## Context
 
-The Agent-backend engine auto-generates `.orbit/package.json` in every user project with `"@opencode-ai/plugin"` as a dependency. Users can see this on disk. The `@opencode-ai` branding leaks OpenCode's upstream identity — it should read `@orbit.build` to match the product name.
+The Agent-backend engine auto-generates `.orbit/package.json` in every user project with `"@orbit.build/plugin"` as a dependency. Users can see this on disk. The `@opencode-ai` branding leaks OpenCode's upstream identity — it should read `@orbit.build` to match the product name.
 
 **npm scope**: `@orbit.build` org was just created on npmjs.com under the `orbit-ai` account. The org exists but has zero published packages. Before the rename can ship in a release:
 
@@ -11,11 +11,11 @@ The Agent-backend engine auto-generates `.orbit/package.json` in every user proj
 3. **Publish order matters** — SDK first, then plugin (plugin depends on SDK). See step 8.
 4. **npm 2FA** — if the `orbit-ai` account has 2FA enabled, the publish commands will prompt for a one-time code. No special setup required, just have the authenticator app ready.
 
-**Upstream divergence**: Three repo policy documents previously stated `@opencode-ai/*` imports should not be renamed for upstream mergeability (`orbit-rebrand.md`, `upstream-sync.md`, `UPSTREAM-SYNC-PROCESS.md`). This rename intentionally diverges — those documents are updated in this plan. The trade-off is ~300+ extra merge conflict points on future upstream syncs, accepted in exchange for clean product branding.
+**Upstream divergence**: Three repo policy documents previously stated `@orbit.build/*` imports should not be renamed for upstream mergeability (`orbit-rebrand.md`, `upstream-sync.md`, `UPSTREAM-SYNC-PROCESS.md`). This rename intentionally diverges — those documents are updated in this plan. The trade-off is ~300+ extra merge conflict points on future upstream syncs, accepted in exchange for clean product branding.
 
 **Production install path**: `installDependencies()` in `config.ts` writes a dependency into user `.orbit/package.json` files and runs `bun install` from the npm registry (not the workspace). Both `@orbit.build/plugin` AND `@orbit.build/sdk` must be published to npm before any release — `plugin` depends on `sdk` (`plugin/package.json:19`), so a standalone plugin publish would fail to install.
 
-**SDK in generated code**: `generate.ts:18` embeds `import { createOrbitClient } from "@opencode-ai/sdk"` into OpenAPI code samples. After the rename, these will read `@orbit.build/sdk`, so that package must also exist on npm for generated docs to be accurate.
+**SDK in generated code**: `generate.ts:18` embeds `import { createOrbitClient } from "@orbit.build/sdk"` into OpenAPI code samples. After the rename, these will read `@orbit.build/sdk`, so that package must also exist on npm for generated docs to be accurate.
 
 ---
 
@@ -23,15 +23,15 @@ The Agent-backend engine auto-generates `.orbit/package.json` in every user proj
 
 | Old                    | New                    |
 | ---------------------- | ---------------------- |
-| `@opencode-ai/plugin`  | `@orbit.build/plugin`  |
-| `@opencode-ai/sdk`     | `@orbit.build/sdk`     |
-| `@opencode-ai/util`    | `@orbit.build/util`    |
-| `@opencode-ai/script`  | `@orbit.build/script`  |
-| `@opencode-ai/app`     | `@orbit.build/app`     |
-| `@opencode-ai/ui`      | `@orbit.build/ui`      |
-| `@opencode-ai/desktop` | `@orbit.build/desktop` |
+| `@orbit.build/plugin`  | `@orbit.build/plugin`  |
+| `@orbit.build/sdk`     | `@orbit.build/sdk`     |
+| `@orbit.build/util`    | `@orbit.build/util`    |
+| `@orbit.build/script`  | `@orbit.build/script`  |
+| `@orbit.build/app`     | `@orbit.build/app`     |
+| `@orbit.build/ui`      | `@orbit.build/ui`      |
+| `@orbit.build/desktop` | `@orbit.build/desktop` |
 
-**Dual SDK note**: Two `package.json` files both declare `"name": "@opencode-ai/sdk"` — the root-level `packages/opencode-sdk/` (compiled runtime consumed by Orbit frontend) and `Agent-backend/packages/sdk/js/` (source + codegen consumed by Agent-backend workspace). They live in separate Bun workspaces, so no conflict. The rename handles both.
+**Dual SDK note**: Two `package.json` files both declare `"name": "@orbit.build/sdk"` — the root-level `packages/orbit-sdk/` (compiled runtime consumed by Orbit frontend) and `Agent-backend/packages/sdk/js/` (source + codegen consumed by Agent-backend workspace). They live in separate Bun workspaces, so no conflict. The rename handles both.
 
 ---
 
@@ -39,14 +39,14 @@ The Agent-backend engine auto-generates `.orbit/package.json` in every user proj
 
 ### 1. Extract plugin package constant and add migration logic
 
-In `Agent-backend/packages/opencode/src/config/config.ts`, replace the 4 hard-coded `"@opencode-ai/plugin"` string literals with a constant, add legacy cleanup, and add post-install verification:
+In `Agent-backend/packages/opencode/src/config/config.ts`, replace the 4 hard-coded `"@orbit.build/plugin"` string literals with a constant, add legacy cleanup, and add post-install verification:
 
 ```ts
 // The public npm package name written into user .orbit/package.json files.
 const PUBLIC_PLUGIN_PACKAGE = '@orbit.build/plugin';
 
 // Legacy package names to clean up from existing user projects.
-const LEGACY_PLUGIN_PACKAGES = ['@opencode-ai/plugin'];
+const LEGACY_PLUGIN_PACKAGES = ['@orbit.build/plugin'];
 ```
 
 Update `installDependencies()` to remove legacy deps and verify the install succeeded:
@@ -180,7 +180,7 @@ export async function needsInstall(dir: string): Promise<boolean> {
 ### 2. Rename SDK directory
 
 ```bash
-git mv packages/opencode-sdk packages/orbit-sdk
+git mv packages/orbit-sdk packages/orbit-sdk
 ```
 
 ### 3. Scope rename via vetted file list
@@ -189,7 +189,7 @@ Use a single search surface for both replacement and verification:
 
 ```bash
 # Build the file list (one source of truth)
-rg -l '@opencode-ai/' . \
+rg -l '@orbit.build/' . \
   -g '*.{ts,tsx,js,jsx,mjs,cjs,d.ts,json,md,css}' \
   -g '!**/node_modules/**' \
   -g '!**/dist/**' \
@@ -205,7 +205,7 @@ cat /tmp/rename-targets.txt
 xargs sed -i '' 's/@opencode-ai\//@orbit.build\//g' < /tmp/rename-targets.txt
 ```
 
-**Why `rg -l` instead of `find`**: The original plan used `find ... -name "*.ts"` which missed the build-critical CSS import in `Agent-backend/packages/app/src/index.css` (`@import "@opencode-ai/ui/styles/tailwind"`). Using `rg -l` with a comprehensive glob list covers all file types.
+**Why `rg -l` instead of `find`**: The original plan used `find ... -name "*.ts"` which missed the build-critical CSS import in `Agent-backend/packages/app/src/index.css` (`@import "@orbit.build/ui/styles/tailwind"`). Using `rg -l` with a comprehensive glob list covers all file types.
 
 **Excluded directories:**
 
@@ -218,7 +218,7 @@ xargs sed -i '' 's/@opencode-ai\//@orbit.build\//g' < /tmp/rename-targets.txt
 - 10 `package.json` files (7 name fields + dependency entries)
 - ~600 TypeScript imports across ~214 source files
 - 1 CSS import (`Agent-backend/packages/app/src/index.css`)
-- `turbo.json` task reference (`@opencode-ai/app#test`)
+- `turbo.json` task reference (`@orbit.build/app#test`)
 - 104 occurrences in `openapi.json`
 - ~78 occurrences across documentation/CLAUDE.md files
 - Vitest mock in `providers-settings.test.tsx`
@@ -236,21 +236,21 @@ Regenerating ensures auto-generated code in `packages/sdk/js/src/gen/` stays in 
 
 ### 5. Update path references for renamed SDK directory
 
-| File               | Lines   | Change                                                     |
-| ------------------ | ------- | ---------------------------------------------------------- |
-| `tsconfig.json`    | 47-49   | `./packages/opencode-sdk/...` → `./packages/orbit-sdk/...` |
-| `vite.config.ts`   | 69-74   | `./packages/opencode-sdk/...` → `./packages/orbit-sdk/...` |
-| `vitest.config.ts` | 127-132 | `./packages/opencode-sdk/...` → `./packages/orbit-sdk/...` |
+| File               | Lines   | Change                                                  |
+| ------------------ | ------- | ------------------------------------------------------- |
+| `tsconfig.json`    | 47-49   | `./packages/orbit-sdk/...` → `./packages/orbit-sdk/...` |
+| `vite.config.ts`   | 69-74   | `./packages/orbit-sdk/...` → `./packages/orbit-sdk/...` |
+| `vitest.config.ts` | 127-132 | `./packages/orbit-sdk/...` → `./packages/orbit-sdk/...` |
 
-Alias keys (`@opencode-ai/sdk` → `@orbit.build/sdk`) are handled by step 3's sed. Verify the path values manually.
+Alias keys (`@orbit.build/sdk` → `@orbit.build/sdk`) are handled by step 3's sed. Verify the path values manually.
 
 ### 6. Update upstream strategy documents
 
 These documents must reflect the intentional fork divergence:
 
-- `Agent-backend/docs/plans/orbit-rebrand.md` — remove `@opencode-ai/*` from "Keep as-is" section
-- `Agent-backend/docs/plans/git/upstream-sync.md` — move `@opencode-ai/*` from "Leave as opencode" to "Rename to Orbit" column
-- `Agent-backend/upstream/UPSTREAM-SYNC-PROCESS.md` — remove `@opencode-ai/plugin` and `@opencode-ai/sdk` from "CANNOT rename" row
+- `Agent-backend/docs/plans/orbit-rebrand.md` — remove `@orbit.build/*` from "Keep as-is" section
+- `Agent-backend/docs/plans/git/upstream-sync.md` — move `@orbit.build/*` from "Leave as opencode" to "Rename to Orbit" column
+- `Agent-backend/upstream/UPSTREAM-SYNC-PROCESS.md` — remove `@orbit.build/plugin` and `@orbit.build/sdk` from "CANNOT rename" row
 
 ### 7. Regenerate lock files
 
@@ -297,8 +297,8 @@ npm view @orbit.build/plugin
 ### 9. Verify
 
 ```bash
-# 1. No stale @opencode-ai/ references remain (excluding upstream)
-rg '@opencode-ai/' . \
+# 1. No stale @orbit.build/ references remain (excluding upstream)
+rg '@orbit.build/' . \
   -g '*.{ts,tsx,js,jsx,mjs,cjs,d.ts,json,md,css}' \
   -g '!**/node_modules/**' \
   -g '!**/dist/**' \
@@ -306,8 +306,8 @@ rg '@opencode-ai/' . \
   -g '!reference/opencode-reference/**' \
   -g '!**/bun.lock*'
 
-# 2. No stale opencode-sdk directory references remain
-rg 'opencode-sdk' . \
+# 2. No stale orbit-sdk directory references remain
+rg 'orbit-sdk' . \
   -g '*.{ts,tsx,js,jsx,mjs,cjs,d.ts,json,md,css}' \
   -g '!**/node_modules/**' \
   -g '!**/dist/**' \
@@ -346,7 +346,7 @@ npm view @orbit.build/plugin
 
 `Agent-backend/packages/opencode/src/installation/index.ts` and `src/cli/cmd/uninstall.ts` contain bare `opencode-ai` references (without `@` prefix) — these are REAL published npm package names that users have installed via `npm install -g opencode-ai`, `bun install -g opencode-ai`, etc.
 
-The sed pattern `@opencode-ai/` correctly skips these (they lack the `@` prefix). **Do NOT broaden the sed pattern to catch `opencode-ai` without `@`** — these lines must keep the published package name until the CLI is republished under a new name.
+The sed pattern `@orbit.build/` correctly skips these (they lack the `@` prefix). **Do NOT broaden the sed pattern to catch `opencode-ai` without `@`** — these lines must keep the published package name until the CLI is republished under a new name.
 
 Affected lines:
 

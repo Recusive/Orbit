@@ -35,14 +35,26 @@ export function Footer(): JSX.Element {
       if (connected()) return
       if (!store.welcome) {
         setStore("welcome", true)
-        timeouts.push(setTimeout(() => { tick(); }, 5000))
+        timeouts.push(
+          setTimeout(() => {
+            tick()
+          }, 5000),
+        )
         return
       }
 
       setStore("welcome", false)
-      timeouts.push(setTimeout(() => { tick(); }, 10_000))
+      timeouts.push(
+        setTimeout(() => {
+          tick()
+        }, 10_000),
+      )
     }
-    timeouts.push(setTimeout(() => { tick(); }, 10_000))
+    timeouts.push(
+      setTimeout(() => {
+        tick()
+      }, 10_000),
+    )
 
     onCleanup(() => {
       timeouts.forEach(clearTimeout)

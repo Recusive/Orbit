@@ -3,7 +3,7 @@
 import path from "path"
 import { parseArgs } from "util"
 
-import { createOpencode } from "@opencode-ai/sdk"
+import { createOpencode } from "@orbit.build/sdk"
 import { pathToFileURL } from "bun"
 
 async function main(): Promise<void> {
@@ -39,8 +39,7 @@ Examples:
   const opencode = await createOpencode({ port: 0 })
 
   try {
-    const parts: ({ type: "text"; text: string } | { type: "file"; url: string; filename: string; mime: string })[] =
-      []
+    const parts: ({ type: "text"; text: string } | { type: "file"; url: string; filename: string; mime: string })[] = []
 
     if (values.file !== undefined) {
       const resolved = path.resolve(process.cwd(), values.file)

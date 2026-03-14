@@ -1,18 +1,15 @@
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { map, filter, pipe, fromEntries, mapValues } from "remeda"
 import z from "zod"
 
 import { Plugin } from "../plugin"
 import { Provider } from "./provider"
 
-import type { AuthOuathResult } from "@opencode-ai/plugin"
+import type { AuthOuathResult } from "@orbit.build/plugin"
 
 import { Auth } from "@/auth"
 import { Instance } from "@/project/instance"
 import { fn } from "@/util/fn"
-
-
-
 
 export namespace ProviderAuth {
   const state = Instance.state(async () => {

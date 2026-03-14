@@ -14,7 +14,6 @@ import { Database, eq } from "@/storage/db"
 import { fn } from "@/util/fn"
 import { Log } from "@/util/log"
 
-
 export namespace Workspace {
   export const Event = {
     Ready: BusEvent.define(
@@ -109,7 +108,9 @@ export namespace Workspace {
       const info = fromRow(row)
       const adaptor = await getAdaptor(row.type)
       void adaptor.remove(info)
-      Database.use((db) => { db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run() })
+      Database.use((db) => {
+        db.delete(WorkspaceTable).where(eq(WorkspaceTable.id, id)).run()
+      })
       return info
     }
     return undefined

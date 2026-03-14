@@ -1,6 +1,6 @@
 import { gitlabAuthPlugin as GitlabAuthPlugin } from "@gitlab/opencode-gitlab-auth"
-import { createOpencodeClient } from "@opencode-ai/sdk"
-import { NamedError } from "@opencode-ai/util/error"
+import { createOpencodeClient } from "@orbit.build/sdk"
+import { NamedError } from "@orbit.build/util/error"
 
 import { BunProc } from "../bun"
 import { Bus } from "../bus"
@@ -14,9 +14,8 @@ import { Log } from "../util/log"
 import { CodexAuthPlugin } from "./codex"
 import { CopilotAuthPlugin } from "./copilot"
 
-import type { Hooks, PluginInput, Plugin as PluginInstance } from "@opencode-ai/plugin"
-import type { Event as SdkEvent } from "@opencode-ai/sdk"
-
+import type { Hooks, PluginInput, Plugin as PluginInstance } from "@orbit.build/plugin"
+import type { Event as SdkEvent } from "@orbit.build/sdk"
 
 export namespace Plugin {
   const log = Log.create({ service: "plugin" })
@@ -109,9 +108,11 @@ export namespace Plugin {
     }
   })
 
-  export async function trigger<
-    Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool">,
-  >(name: Name, input: Parameters<Required<Hooks>[Name]>[0], output: Parameters<Required<Hooks>[Name]>[1]): Promise<Parameters<Required<Hooks>[Name]>[1]> {
+  export async function trigger<Name extends Exclude<keyof Required<Hooks>, "auth" | "event" | "tool">>(
+    name: Name,
+    input: Parameters<Required<Hooks>[Name]>[0],
+    output: Parameters<Required<Hooks>[Name]>[1],
+  ): Promise<Parameters<Required<Hooks>[Name]>[1]> {
     for (const hook of await state().then((x) => x.hooks)) {
       const fn = hook[name]
       if (!fn) continue

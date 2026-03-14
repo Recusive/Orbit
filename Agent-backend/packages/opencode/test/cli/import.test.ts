@@ -1,8 +1,8 @@
 import { test, expect } from "bun:test"
 
-import { parseShareUrl, transformShareData  } from "../../src/cli/cmd/import"
+import { parseShareUrl, transformShareData } from "../../src/cli/cmd/import"
 
-import type {ShareData} from "../../src/cli/cmd/import";
+import type { ShareData } from "../../src/cli/cmd/import"
 
 // parseShareUrl tests
 test("parses valid share URLs", () => {

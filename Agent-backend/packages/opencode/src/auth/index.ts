@@ -46,32 +46,25 @@ export namespace Auth {
 
   export async function all(): Promise<Record<string, Info>> {
     const data = await Filesystem.readJson<Record<string, unknown>>(filepath).catch(() => ({}))
-    return Object.entries(data).reduce<Record<string, Info>>(
-      (acc, [key, value]) => {
-        const parsed = Info.safeParse(value)
-        if (!parsed.success) return acc
-        acc[key] = parsed.data
-        return acc
-      },
-      {},
-    )
+    return Object.entries(data).reduce<Record<string, Info>>((acc, [key, value]) => {
+      const parsed = Info.safeParse(value)
+      if (!parsed.success) return acc
+      acc[key] = parsed.data
+      return acc
+    }, {})
   }
 
   export async function set(key: string, info: Info): Promise<void> {
     const normalized = key.replace(/\/+$/, "")
     const data = await all()
-    const cleaned = Object.fromEntries(
-      Object.entries(data).filter(([k]) => k !== key && k !== normalized + "/"),
-    )
+    const cleaned = Object.fromEntries(Object.entries(data).filter(([k]) => k !== key && k !== normalized + "/"))
     await Filesystem.writeJson(filepath, { ...cleaned, [normalized]: info }, 0o600)
   }
 
   export async function remove(key: string): Promise<void> {
     const normalized = key.replace(/\/+$/, "")
     const data = await all()
-    const cleaned = Object.fromEntries(
-      Object.entries(data).filter(([k]) => k !== key && k !== normalized),
-    )
+    const cleaned = Object.fromEntries(Object.entries(data).filter(([k]) => k !== key && k !== normalized))
     await Filesystem.writeJson(filepath, cleaned, 0o600)
   }
 }

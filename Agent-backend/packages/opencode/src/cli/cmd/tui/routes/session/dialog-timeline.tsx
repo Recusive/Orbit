@@ -29,19 +29,17 @@ export function DialogTimeline(props: {
     const result: DialogSelectOption<string>[] = []
     for (const message of messages) {
       if (message.role !== "user") continue
-      const part = (sync.data.part[message.id] ?? []).find(
-        (x) => x.type === "text" && !x.synthetic && !x.ignored,
-      )
+      const part = (sync.data.part[message.id] ?? []).find((x) => x.type === "text" && !x.synthetic && !x.ignored)
       if (part?.type !== "text") continue
       result.push({
         title: part.text.replace(/\n/g, " "),
         value: message.id,
         footer: Locale.time(message.time.created),
         onSelect: (dlg) => {
-          dlg.replace(() =>
+          dlg.replace(() => (
             // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
-            (<DialogMessage messageID={message.id} sessionID={props.sessionID} setPrompt={props.setPrompt} />)
-          )
+            <DialogMessage messageID={message.id} sessionID={props.sessionID} setPrompt={props.setPrompt} />
+          ))
         },
       })
     }
@@ -50,5 +48,13 @@ export function DialogTimeline(props: {
   })
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
-  return <DialogSelect onMove={(option) => { props.onMove(option.value); }} title="Timeline" options={options()} />
+  return (
+    <DialogSelect
+      onMove={(option) => {
+        props.onMove(option.value)
+      }}
+      title="Timeline"
+      options={options()}
+    />
+  )
 }

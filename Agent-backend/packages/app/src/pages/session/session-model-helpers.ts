@@ -1,4 +1,4 @@
-import type { UserMessage } from "@opencode-ai/sdk/v2"
+import type { UserMessage } from "@orbit.build/sdk/v2"
 import { batch } from "solid-js"
 
 type Local = {

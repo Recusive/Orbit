@@ -4,7 +4,7 @@ import { getClient } from './client';
 
 import type { OcProviderInfo } from '@/stores/opencode';
 import type { OcProviderAuthAuthorization, OcQuestionAnswer, OcSession } from '@/types/opencode';
-import type { ProviderListResponses, SessionMessagesResponses } from '@opencode-ai/sdk/v2/client';
+import type { ProviderListResponses, SessionMessagesResponses } from '@orbit.build/sdk/v2/client';
 
 import { useToolStore } from '@/stores/agent/tool-store';
 import {

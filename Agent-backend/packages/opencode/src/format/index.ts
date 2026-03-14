@@ -14,9 +14,6 @@ import * as Formatter from "./formatter"
 
 import type { Info as FormatterInfo } from "./formatter"
 
-
-
-
 export namespace Format {
   const log = Log.create({ service: "format" })
 
@@ -112,37 +109,37 @@ export namespace Format {
     log.info("init")
     Bus.subscribe(File.Event.Edited, (payload) => {
       void (async (): Promise<void> => {
-      const file = payload.properties.file
-      log.info("formatting", { file })
-      const ext = path.extname(file)
+        const file = payload.properties.file
+        log.info("formatting", { file })
+        const ext = path.extname(file)
 
-      for (const item of await getFormatter(ext)) {
-        log.info("running", { command: item.command })
-        try {
-          const proc = Process.spawn(
-            item.command.map((x) => x.replace("$FILE", file)),
-            {
-              cwd: Instance.directory,
-              env: { ...process.env, ...item.environment },
-              stdout: "ignore",
-              stderr: "ignore",
-            },
-          )
-          const exit = await proc.exited
-          if (exit !== 0)
-            log.error("failed", {
+        for (const item of await getFormatter(ext)) {
+          log.info("running", { command: item.command })
+          try {
+            const proc = Process.spawn(
+              item.command.map((x) => x.replace("$FILE", file)),
+              {
+                cwd: Instance.directory,
+                env: { ...process.env, ...item.environment },
+                stdout: "ignore",
+                stderr: "ignore",
+              },
+            )
+            const exit = await proc.exited
+            if (exit !== 0)
+              log.error("failed", {
+                command: item.command,
+                ...item.environment,
+              })
+          } catch (error) {
+            log.error("failed to format file", {
+              error,
               command: item.command,
               ...item.environment,
+              file,
             })
-        } catch (error) {
-          log.error("failed to format file", {
-            error,
-            command: item.command,
-            ...item.environment,
-            file,
-          })
+          }
         }
-      }
       })()
     })
   }

@@ -1,13 +1,13 @@
 import path from "path"
 
-import {  applyEdits, modify, parse as parseJsonc } from "jsonc-parser"
+import { applyEdits, modify, parse as parseJsonc } from "jsonc-parser"
 import { unique } from "remeda"
 import z from "zod"
 
 import { ConfigPaths } from "./paths"
 import { TuiInfo, TuiOptions } from "./tui-schema"
 
-import type {ParseError as JsoncParseError} from "jsonc-parser";
+import type { ParseError as JsoncParseError } from "jsonc-parser"
 
 import { Flag } from "@/flag/flag"
 import { Global } from "@/global"

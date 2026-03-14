@@ -8,8 +8,8 @@ import {
   PlatformProvider,
   ServerConnection,
   useCommand,
-} from "@opencode-ai/app"
-import { Splash } from "@opencode-ai/ui/logo"
+} from "@orbit.build/app"
+import { Splash } from "@orbit.build/ui/logo"
 import type { AsyncStorage } from "@solid-primitives/storage"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { readImage } from "@tauri-apps/plugin-clipboard-manager"

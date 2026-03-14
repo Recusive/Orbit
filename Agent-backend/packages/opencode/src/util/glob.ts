@@ -1,7 +1,7 @@
-import { glob, globSync  } from "glob"
+import { glob, globSync } from "glob"
 import { minimatch } from "minimatch"
 
-import type {GlobOptions} from "glob";
+import type { GlobOptions } from "glob"
 
 export namespace Glob {
   export interface Options {

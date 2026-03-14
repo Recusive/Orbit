@@ -78,10 +78,7 @@ async function getAvailableTools(agent: Agent.Info): Promise<AvailableTool[]> {
   return ToolRegistry.tools(model, agent)
 }
 
-function resolveTools(
-  agent: Agent.Info,
-  availableTools: AvailableTool[],
-): Record<string, boolean> {
+function resolveTools(agent: Agent.Info, availableTools: AvailableTool[]): Record<string, boolean> {
   const disabled = PermissionNext.disabled(
     availableTools.map((tool: AvailableTool) => tool.id),
     agent.permission,

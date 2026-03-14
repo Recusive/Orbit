@@ -301,7 +301,9 @@ describe("file/time", () => {
           // Nested locks on same file cause deadlock - this is expected
           // The outer lock waits for inner to complete, but inner waits for outer to release
           const timeout = new Promise<never>((_, reject) =>
-            setTimeout(() => { reject(new Error("Deadlock detected")); }, 100),
+            setTimeout(() => {
+              reject(new Error("Deadlock detected"))
+            }, 100),
           )
 
           const nestedLock = FileTime.withLock(filepath, async () => {

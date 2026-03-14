@@ -1,6 +1,6 @@
 import path from "path"
 
-import { Portal, useKeyboard, useTerminalDimensions  } from "@opentui/solid"
+import { Portal, useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 
@@ -13,7 +13,7 @@ import { useTheme, selectedForeground } from "../../context/theme"
 import { useTuiConfig } from "../../context/tui-config"
 import { useDialog } from "../../ui/dialog"
 
-import type { PermissionRequest } from "@opencode-ai/sdk/v2"
+import type { PermissionRequest } from "@orbit.build/sdk/v2"
 import type { TextareaRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 
@@ -21,7 +21,6 @@ import { Global } from "@/global"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Keybind } from "@/util/keybind"
 import { Locale } from "@/util/locale"
-
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -689,7 +688,9 @@ function Prompt<const T extends Record<string, string>>(props: {
                 paddingLeft={1}
                 paddingRight={1}
                 backgroundColor={option === store.selected ? theme.warning : theme.backgroundMenu}
-                onMouseOver={() => { setStore("selected", option); }}
+                onMouseOver={() => {
+                  setStore("selected", option)
+                }}
                 onMouseUp={() => {
                   setStore("selected", option)
                   props.onSelect(option)

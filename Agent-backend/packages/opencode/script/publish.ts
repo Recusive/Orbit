@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 import { fileURLToPath } from "url"
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import { $ } from "bun"
 
 import pkg from "../package.json"

@@ -31,7 +31,9 @@ describe("util.process", () => {
   test("aborts a running process", async () => {
     const abort = new AbortController()
     const started = Date.now()
-    setTimeout(() => { abort.abort(); }, 25)
+    setTimeout(() => {
+      abort.abort()
+    }, 25)
 
     const out = await Process.run(node("setInterval(() => {}, 1000)"), {
       abort: abort.signal,
@@ -47,7 +49,9 @@ describe("util.process", () => {
 
     const abort = new AbortController()
     const started = Date.now()
-    setTimeout(() => { abort.abort(); }, 25)
+    setTimeout(() => {
+      abort.abort()
+    }, 25)
 
     const out = await Process.run(node('process.on("SIGTERM", () => {}); setInterval(() => {}, 1000)'), {
       abort: abort.signal,

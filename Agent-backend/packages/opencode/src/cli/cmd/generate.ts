@@ -15,7 +15,7 @@ export const GenerateCommand = {
           {
             lang: "js",
             source: [
-              `import { createOrbitClient } from "@opencode-ai/sdk`,
+              `import { createOrbitClient } from "@orbit.build/sdk`,
               ``,
               `const client = createOrbitClient()`,
               `await client.${opId}({`,

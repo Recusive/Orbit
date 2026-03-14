@@ -191,7 +191,9 @@ test("reject - removes from pending list", async () => {
       expect(pending.length).toBe(1)
 
       await Question.reject(pending[0].id)
-      askPromise.catch(() => { /* noop */ }) // Ignore rejection
+      askPromise.catch(() => {
+        /* noop */
+      }) // Ignore rejection
 
       const pendingAfter = await Question.list()
       expect(pendingAfter.length).toBe(0)

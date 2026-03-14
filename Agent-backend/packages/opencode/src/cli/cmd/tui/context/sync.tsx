@@ -1,4 +1,4 @@
-import { Binary } from "@opencode-ai/util/binary"
+import { Binary } from "@orbit.build/util/binary"
 import { useSDK } from "@tui/context/sdk"
 import { batch, onMount } from "solid-js"
 import { createStore, produce, reconcile } from "solid-js/store"
@@ -8,7 +8,7 @@ import { useExit } from "./exit"
 import { createSimpleContext } from "./helper"
 
 import type { Snapshot } from "@/snapshot"
-import type { Path } from "@opencode-ai/sdk"
+import type { Path } from "@orbit.build/sdk"
 import type {
   Message,
   Agent,
@@ -27,8 +27,9 @@ import type {
   SessionStatus,
   ProviderListResponse,
   ProviderAuthMethod,
-  VcsInfo, Workspace 
-} from "@opencode-ai/sdk/v2"
+  VcsInfo,
+  Workspace,
+} from "@orbit.build/sdk/v2"
 
 import { Log } from "@/util/log"
 
@@ -308,7 +309,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
               const field = event.properties.field as keyof typeof part
               const existing = part[field] as string | undefined
               // @ts-expect-error - SolidJS produce: dynamic field mutation on message part
-              ;(part[field]) = (existing ?? "") + event.properties.delta
+              part[field] = (existing ?? "") + event.properties.delta
             }),
           )
           break
@@ -330,7 +331,9 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
         }
 
         case "lsp.updated": {
-          void sdk.client.lsp.status().then((x) => { if (x.data) setStore("lsp", x.data); })
+          void sdk.client.lsp.status().then((x) => {
+            if (x.data) setStore("lsp", x.data)
+          })
           break
         }
 
@@ -412,7 +415,7 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
             const providerList = responses[1]
             const agents = responses[2]
             const config = responses[3]
-            const sessions = responses[4] as typeof responses[4] | undefined
+            const sessions = responses[4] as (typeof responses)[4] | undefined
 
             batch(() => {
               setStore("provider", reconcile(providers.providers))
@@ -428,18 +431,40 @@ export const { use: useSync, provider: SyncProvider } = createSimpleContext({
           if (store.status !== "complete") setStore("status", "partial")
           // non-blocking
           void Promise.all([
-            ...(args.continue ? [] : [sessionListPromise.then((sessions) => { setStore("session", reconcile(sessions)); })]),
-            sdk.client.command.list().then((x) => { setStore("command", reconcile(x.data ?? [])); }),
-            sdk.client.lsp.status().then((x) => { if (x.data) setStore("lsp", reconcile(x.data)); }),
-            sdk.client.mcp.status().then((x) => { if (x.data) setStore("mcp", reconcile(x.data)); }),
-            sdk.client.experimental.resource.list().then((x) => { setStore("mcp_resource", reconcile(x.data ?? {})); }),
-            sdk.client.formatter.status().then((x) => { if (x.data) setStore("formatter", reconcile(x.data)); }),
+            ...(args.continue
+              ? []
+              : [
+                  sessionListPromise.then((sessions) => {
+                    setStore("session", reconcile(sessions))
+                  }),
+                ]),
+            sdk.client.command.list().then((x) => {
+              setStore("command", reconcile(x.data ?? []))
+            }),
+            sdk.client.lsp.status().then((x) => {
+              if (x.data) setStore("lsp", reconcile(x.data))
+            }),
+            sdk.client.mcp.status().then((x) => {
+              if (x.data) setStore("mcp", reconcile(x.data))
+            }),
+            sdk.client.experimental.resource.list().then((x) => {
+              setStore("mcp_resource", reconcile(x.data ?? {}))
+            }),
+            sdk.client.formatter.status().then((x) => {
+              if (x.data) setStore("formatter", reconcile(x.data))
+            }),
             sdk.client.session.status().then((x) => {
               if (x.data) setStore("session_status", reconcile(x.data))
             }),
-            sdk.client.provider.auth().then((x) => { setStore("provider_auth", reconcile(x.data ?? {})); }),
-            sdk.client.vcs.get().then((x) => { setStore("vcs", reconcile(x.data)); }),
-            sdk.client.path.get().then((x) => { if (x.data) setStore("path", reconcile(x.data)); }),
+            sdk.client.provider.auth().then((x) => {
+              setStore("provider_auth", reconcile(x.data ?? {}))
+            }),
+            sdk.client.vcs.get().then((x) => {
+              setStore("vcs", reconcile(x.data))
+            }),
+            sdk.client.path.get().then((x) => {
+              if (x.data) setStore("path", reconcile(x.data))
+            }),
             syncWorkspaces(),
           ]).then(() => {
             setStore("status", "complete")

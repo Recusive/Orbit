@@ -4,7 +4,7 @@
 
 ## Purpose
 
-All SolidJS UI components for the OpenCode web app. Flat structure with three subdirectories (`prompt-input/`, `session/`, `server/`). Contains dialogs, settings tabs, the prompt input system, terminal wrapper, session header, file tree, status popover, titlebar, and debug bar. Components depend heavily on the `@/context/` providers and `@opencode-ai/ui` component library (Kobalte).
+All SolidJS UI components for the OpenCode web app. Flat structure with three subdirectories (`prompt-input/`, `session/`, `server/`). Contains dialogs, settings tabs, the prompt input system, terminal wrapper, session header, file tree, status popover, titlebar, and debug bar. Components depend heavily on the `@/context/` providers and `@orbit.build/ui` component library (Kobalte).
 
 ## Usage Status
 
@@ -104,9 +104,9 @@ Session chrome — header, tabs, context breakdown.
 ## Dependencies
 
 - **Internal contexts:** Nearly every component imports from `@/context/` (sdk, sync, server, layout, settings, language, platform, command, permission, prompt, file, terminal, comments, highlights, local, models)
-- **UI library:** `@opencode-ai/ui` — Button, Icon, IconButton, Popover, Tabs, Select, Tooltip, Switch, Accordion, ScrollView, Markdown, etc.
-- **SDK:** `@opencode-ai/sdk/v2/client` for `Message`, `Part`, `UserMessage` types
-- **Utilities:** `@opencode-ai/util` (path, encode, array), `@/utils/` (persist, base64, id, server-health, server-errors, runtime-adapters, terminal-writer, worktree, same)
+- **UI library:** `@orbit.build/ui` — Button, Icon, IconButton, Popover, Tabs, Select, Tooltip, Switch, Accordion, ScrollView, Markdown, etc.
+- **SDK:** `@orbit.build/sdk/v2/client` for `Message`, `Part`, `UserMessage` types
+- **Utilities:** `@orbit.build/util` (path, encode, array), `@/utils/` (persist, base64, id, server-health, server-errors, runtime-adapters, terminal-writer, worktree, same)
 - **SolidJS:** `solid-js`, `solid-js/store`, `solid-js/web`, `@solidjs/router`
 - **External:** `ghostty-web` (terminal), `fuzzysort` (search)
 
@@ -122,7 +122,7 @@ For Orbit, study these patterns:
 
 4. **Terminal integration** — Ghostty WASM lazy-loading pattern, theme color conversion (oklch → hex via `resolveThemeVariant`), PTY lifecycle management, and serialization for buffer persistence.
 
-5. **Dialog patterns** — all dialogs use `@opencode-ai/ui` Dialog/Popover primitives from Kobalte. Form state uses `createStore` (SolidJS store), not multiple signals.
+5. **Dialog patterns** — all dialogs use `@orbit.build/ui` Dialog/Popover primitives from Kobalte. Form state uses `createStore` (SolidJS store), not multiple signals.
 
 ## Notes
 

@@ -44,9 +44,9 @@
       "@/*": ["./apps/agent/src/*"],
       "@canvas/*": ["./apps/Canvas-UI-Builder/src/*"],
       "@editor/*": ["./apps/editor/src/*"],
-      "@opencode-ai/sdk": ["./packages/opencode-sdk/src/v2/index.d.ts"],
-      "@opencode-ai/sdk/v2": ["./packages/opencode-sdk/src/v2/index.d.ts"],
-      "@opencode-ai/sdk/v2/client": ["./packages/opencode-sdk/src/v2/client.d.ts"],
+      "@orbit.build/sdk": ["./packages/orbit-sdk/src/v2/index.d.ts"],
+      "@orbit.build/sdk/v2": ["./packages/orbit-sdk/src/v2/index.d.ts"],
+      "@orbit.build/sdk/v2/client": ["./packages/orbit-sdk/src/v2/client.d.ts"],
       "@orbit/common": ["./apps/common/src/index.ts"],
       "@orbit/common/*": ["./apps/common/src/*"]
     }

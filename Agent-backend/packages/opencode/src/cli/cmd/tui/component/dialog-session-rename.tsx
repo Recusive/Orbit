@@ -7,7 +7,6 @@ import { useSDK } from "../context/sdk"
 
 import type { JSX } from "solid-js"
 
-
 interface DialogSessionRenameProps {
   session: string
 }
@@ -30,7 +29,9 @@ export function DialogSessionRename(props: DialogSessionRenameProps): JSX.Elemen
         })
         dialog.clear()
       }}
-      onCancel={() => { dialog.clear(); }}
+      onCancel={() => {
+        dialog.clear()
+      }}
     />
   )
 }

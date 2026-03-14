@@ -5,11 +5,9 @@ import { OAUTH_DUMMY_KEY } from "../auth"
 import { Installation } from "../installation"
 import { Log } from "../util/log"
 
-import type { Hooks, PluginInput } from "@opencode-ai/plugin"
-
+import type { Hooks, PluginInput } from "@orbit.build/plugin"
 
 import { ProviderTransform } from "@/provider/transform"
-
 
 const log = Log.create({ service: "plugin.codex" })
 
@@ -297,8 +295,12 @@ function startOAuthServer(): { port: number; redirectUri: string } {
         pendingOAuth = undefined
 
         exchangeCodeForTokens(code, `http://localhost:${String(OAUTH_PORT)}/auth/callback`, current.pkce)
-          .then((tokens) => { current.resolve(tokens) })
-          .catch((err: unknown) => { current.reject(err instanceof Error ? err : new Error(String(err))) })
+          .then((tokens) => {
+            current.resolve(tokens)
+          })
+          .catch((err: unknown) => {
+            current.reject(err instanceof Error ? err : new Error(String(err)))
+          })
 
         return new Response(HTML_SUCCESS, {
           headers: { "Content-Type": "text/html" },
@@ -466,7 +468,9 @@ export function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
             const headers = new Headers()
             if (init?.headers) {
               if (init.headers instanceof Headers) {
-                init.headers.forEach((value, key) => { headers.set(key, value) })
+                init.headers.forEach((value, key) => {
+                  headers.set(key, value)
+                })
               } else if (Array.isArray(init.headers)) {
                 for (const [key, value] of init.headers) {
                   headers.set(key, value)
@@ -626,8 +630,7 @@ export function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
     "chat.headers": (_input, output) => {
       if (_input.model.providerID !== "openai") return Promise.resolve()
       output.headers.originator = "opencode"
-      output.headers["User-Agent"] =
-        `opencode/${Installation.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`
+      output.headers["User-Agent"] = `opencode/${Installation.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`
       output.headers.session_id = _input.sessionID
       return Promise.resolve()
     },

@@ -4,7 +4,6 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { Instance } from "@/project/instance"
 
-
 export namespace SessionStatus {
   export const Info = z
     .union([

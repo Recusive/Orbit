@@ -2,7 +2,6 @@ import { existsSync } from "fs"
 
 import { mergeDeep, unique } from "remeda"
 
-
 import { Config } from "./config"
 import { migrateTuiConfig } from "./migrate-tui-config"
 import { ConfigPaths } from "./paths"

@@ -4,7 +4,7 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import solidPlugin from "@opentui/solid/bun-plugin"
 import { $ } from "bun"
 

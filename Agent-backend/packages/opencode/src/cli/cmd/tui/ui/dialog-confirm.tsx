@@ -5,7 +5,7 @@ import { createStore } from "solid-js/store"
 
 import { useTheme } from "../context/theme"
 
-import { useDialog  } from "./dialog"
+import { useDialog } from "./dialog"
 
 import type { DialogContext } from "./dialog"
 import type { JSX } from "solid-js"
@@ -19,7 +19,6 @@ export interface DialogConfirmProps {
   onCancel?: () => void
 }
 
- 
 export function DialogConfirm(props: DialogConfirmProps): JSX.Element {
   const dialog = useDialog()
   const { theme } = useTheme()
@@ -45,7 +44,12 @@ export function DialogConfirm(props: DialogConfirmProps): JSX.Element {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -85,11 +89,17 @@ DialogConfirm.show = (dialog: DialogContext, title: string, message: string): Pr
         <DialogConfirm
           title={title}
           message={message}
-          onConfirm={() => { resolve(true); }}
-          onCancel={() => { resolve(false); }}
+          onConfirm={() => {
+            resolve(true)
+          }}
+          onCancel={() => {
+            resolve(false)
+          }}
         />
       ),
-      () => { resolve(false); },
+      () => {
+        resolve(false)
+      },
     )
   })
 }

@@ -21,7 +21,7 @@ The OpenCode web UI — a SolidJS single-page application that connects to the h
 | `src/app.tsx`          | Root component — 15+ nested providers, lazy-loaded routes (`/` → Home, `/:slug/session/:id` → Session), error boundary |
 | `src/index.css`        | Global styles (Tailwind imports + theme variables)                                                                     |
 | `src/index.ts`         | Package exports for consumption by `packages/desktop`                                                                  |
-| `package.json`         | `@opencode-ai/app` — SolidJS + Vite + Tailwind + Shiki + Ghostty-web                                                   |
+| `package.json`         | `@orbit.build/app` — SolidJS + Vite + Tailwind + Shiki + Ghostty-web                                                   |
 | `vite.config.ts`       | Vite config — port 3000, ESNext target                                                                                 |
 | `playwright.config.ts` | E2E test configuration                                                                                                 |
 | `AGENTS.md`            | Dev guide — local setup, SolidJS patterns, browser automation                                                          |
@@ -118,7 +118,7 @@ bun run test:e2e:report      # View HTML report
 
 ## Dependencies
 
-- **Internal:** `@opencode-ai/sdk` (API client), `@opencode-ai/ui` (component library), `@opencode-ai/util` (utilities)
+- **Internal:** `@orbit.build/sdk` (API client), `@orbit.build/ui` (component library), `@orbit.build/util` (utilities)
 - **SolidJS ecosystem:** `solid-js`, `@solidjs/router`, `@solidjs/meta`, `@kobalte/core`, `solid-list`, `virtua` (virtual scrolling), `@thisbeyond/solid-dnd`
 - **Terminal:** `ghostty-web` (Ghostty terminal emulator compiled to WASM)
 - **Code:** `shiki` + `@shikijs/transformers` (syntax highlighting), `marked` + `marked-shiki` (Markdown rendering)

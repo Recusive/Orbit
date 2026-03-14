@@ -1,7 +1,7 @@
 import { existsSync } from "fs"
 import path from "path"
 
-import { fn } from "@opencode-ai/util/fn"
+import { fn } from "@orbit.build/util/fn"
 import z from "zod"
 
 import { SessionTable } from "../session/session.sql"
@@ -73,7 +73,7 @@ export namespace Project {
 
   export function fromRow(row: Row): Info {
     const icon =
-      row.icon_url ?? row.icon_color
+      (row.icon_url ?? row.icon_color)
         ? { url: row.icon_url ?? undefined, color: row.icon_color ?? undefined }
         : undefined
     return {

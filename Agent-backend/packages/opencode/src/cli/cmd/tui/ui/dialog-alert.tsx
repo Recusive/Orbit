@@ -3,7 +3,7 @@ import { useKeyboard } from "@opentui/solid"
 
 import { useTheme } from "../context/theme"
 
-import { useDialog  } from "./dialog"
+import { useDialog } from "./dialog"
 
 import type { DialogContext } from "./dialog"
 import type { JSX } from "solid-js"
@@ -14,7 +14,6 @@ export interface DialogAlertProps {
   onConfirm?: () => void
 }
 
- 
 export function DialogAlert(props: DialogAlertProps): JSX.Element {
   const dialog = useDialog()
   const { theme } = useTheme()
@@ -32,7 +31,12 @@ export function DialogAlert(props: DialogAlertProps): JSX.Element {
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -60,8 +64,18 @@ DialogAlert.show = (dialog: DialogContext, title: string, message: string): Prom
   return new Promise<void>((resolve) => {
     dialog.replace(
       // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
-      () => <DialogAlert title={title} message={message} onConfirm={() => { resolve(); }} />,
-      () => { resolve(); },
+      () => (
+        <DialogAlert
+          title={title}
+          message={message}
+          onConfirm={() => {
+            resolve()
+          }}
+        />
+      ),
+      () => {
+        resolve()
+      },
     )
   })
 }

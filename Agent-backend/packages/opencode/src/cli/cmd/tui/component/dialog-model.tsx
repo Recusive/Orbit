@@ -12,7 +12,6 @@ import { createDialogProviderOptions, DialogProvider } from "./dialog-provider"
 
 import type { Accessor, JSX } from "solid-js"
 
-
 export function useConnected(): Accessor<boolean> {
   const sync = useSync()
   return createMemo(() =>
@@ -38,8 +37,11 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
     const favorites = connected() ? local.model.favorite() : []
     const recents = local.model.recent()
 
-    function toOptions(items: typeof favorites, category: string): {
-      key: typeof items[number]
+    function toOptions(
+      items: typeof favorites,
+      category: string,
+    ): {
+      key: (typeof items)[number]
       value: { providerID: string; modelID: string }
       title: string
       description: string

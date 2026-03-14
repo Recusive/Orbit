@@ -189,9 +189,9 @@ Complex logic extracted from `global-sync.tsx` — per-directory child store man
 
 ## Dependencies
 
-- **SDK:** `@opencode-ai/sdk/v2/client` for all data types (`Session`, `Message`, `Part`, `Config`, `Project`, `PermissionRequest`, `Todo`, `FileDiff`, `McpStatus`, `LspStatus`, etc.)
-- **UI library:** `@opencode-ai/ui/context` (`createSimpleContext`), `@opencode-ai/ui/toast` (`showToast`)
-- **Utilities:** `@opencode-ai/util/binary` (sorted array operations), `@opencode-ai/util/retry`, `@opencode-ai/util/path`, `@opencode-ai/util/encode`
+- **SDK:** `@orbit.build/sdk/v2/client` for all data types (`Session`, `Message`, `Part`, `Config`, `Project`, `PermissionRequest`, `Todo`, `FileDiff`, `McpStatus`, `LspStatus`, etc.)
+- **UI library:** `@orbit.build/ui/context` (`createSimpleContext`), `@orbit.build/ui/toast` (`showToast`)
+- **Utilities:** `@orbit.build/util/binary` (sorted array operations), `@orbit.build/util/retry`, `@orbit.build/util/path`, `@orbit.build/util/encode`
 - **Internal:** `@/utils/persist` (localStorage wrapper), `@/utils/base64`, `@/utils/same` (deep equality), `@/utils/server-health`, `@/utils/server-errors`
 - **SolidJS:** `solid-js`, `solid-js/store` (`createStore`, `produce`, `reconcile`), `@solidjs/router`, `@solid-primitives/i18n`, `@solid-primitives/storage`, `@solid-primitives/event-bus`
 
@@ -215,8 +215,8 @@ Complex logic extracted from `global-sync.tsx` — per-directory child store man
 
 ## Notes
 
-- **`createSimpleContext` pattern** — most providers use `@opencode-ai/ui/context`'s `createSimpleContext`, which auto-generates `useX()` hook and `XProvider` component from an `init()` function. Orbit's Zustand stores serve the same purpose without the SolidJS context boilerplate.
-- **Binary search everywhere** — sorted arrays + `Binary.search()` from `@opencode-ai/util/binary` is the canonical pattern for sessions, messages, and parts. All stores maintain sorted order by ID.
+- **`createSimpleContext` pattern** — most providers use `@orbit.build/ui/context`'s `createSimpleContext`, which auto-generates `useX()` hook and `XProvider` component from an `init()` function. Orbit's Zustand stores serve the same purpose without the SolidJS context boilerplate.
+- **Binary search everywhere** — sorted arrays + `Binary.search()` from `@orbit.build/util/binary` is the canonical pattern for sessions, messages, and parts. All stores maintain sorted order by ID.
 - **Multi-directory support** — `GlobalSync` manages state for multiple workspace directories simultaneously (up to 30), with idle eviction after 20 minutes. This is more complex than Orbit currently needs but shows how to scale.
 - **19 test files** across context + subdirectories — the most thoroughly tested layer of the frontend.
 - **`reconcile()` for state updates** — SolidJS's `reconcile()` (like React's reconciliation) is used to efficiently update store arrays from server responses. Orbit uses Immer's `produce()` instead.

@@ -1,11 +1,11 @@
-import { lazy } from "@opencode-ai/util/lazy"
+import { lazy } from "@orbit.build/util/lazy"
 import z from "zod"
 
 import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
 import { Log } from "../util/log"
 
-import type {IPty} from "bun-pty";
+import type { IPty } from "bun-pty"
 
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
@@ -259,7 +259,11 @@ export namespace Pty {
     }
   }
 
-  export function connect(id: string, ws: Socket, cursor?: number): { onMessage: (message: string | ArrayBuffer) => void; onClose: () => void } | undefined {
+  export function connect(
+    id: string,
+    ws: Socket,
+    cursor?: number,
+  ): { onMessage: (message: string | ArrayBuffer) => void; onClose: () => void } | undefined {
     const session = state().get(id)
     if (session === undefined) {
       ws.close()
