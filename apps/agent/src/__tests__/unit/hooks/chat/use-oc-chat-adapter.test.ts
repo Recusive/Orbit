@@ -286,6 +286,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [running],
         },
       ],
@@ -301,6 +302,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [running],
         },
       ],
@@ -315,6 +317,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [success],
         },
       ],
@@ -335,6 +338,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [makeTool({ status: 'success', success: true, toolOutput: 'done' })],
         },
       ],
@@ -356,6 +360,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [makeTool({ toolInput: {} })],
         },
       ],
@@ -374,6 +379,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [makeTool({ toolInput: todosInput })],
         },
       ],
@@ -395,6 +401,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [makeTool({ toolInput: {} })],
         },
       ],
@@ -410,6 +417,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [makeTool({ toolInput: todosInput })],
         },
       ],
@@ -421,6 +429,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [
             makeTool({ status: 'success', success: true, toolOutput: 'ok', toolInput: todosInput }),
           ],
@@ -443,6 +452,7 @@ describe('useOcChatAdapter helpers', () => {
       [
         {
           chat: { id: 'msg-1', role: 'assistant', content: '', displayedContent: '' },
+          hasCompaction: false,
           tools: [
             makeTool({
               status: 'success',

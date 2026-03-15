@@ -5,6 +5,7 @@ import { ocSessionService } from './oc-session-service';
 import type { OcGlobalEvent } from '@/types/opencode';
 
 import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useOcMessageStore, useOcPermissionStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -21,11 +22,11 @@ function isActiveDirectory(directory: string): boolean {
 
 export const ocEventCoordinator = {
   /**
-   * [warning] TESTED: OpenCode title-loading settlement in this coordinator is
-   *     covered by integration tests.
+   * [warning] TESTED: OpenCode title-loading and compaction settlement in this
+   *     coordinator are covered by integration tests.
    *     If you modify this, run:
-   *     bun run test -- apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
-   *     Test file: apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts
+   *     bun run test -- apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts apps/agent/src/__tests__/integration/services/opencode/oc-compact-flow.test.ts
+   *     Test files: apps/agent/src/__tests__/integration/services/opencode/oc-title-loading.test.ts, apps/agent/src/__tests__/integration/services/opencode/oc-compact-flow.test.ts
    */
   handleGlobalEvent(event: OcGlobalEvent): void {
     if (!isActiveDirectory(event.directory)) {
@@ -68,6 +69,7 @@ export const ocEventCoordinator = {
         useOcMessageStore.getState().clearSession(payload.properties.info.id);
         useUIStore.getState().setTitleLoading(payload.properties.info.id, false);
         useOcSessionStore.getState().clearPendingSend(payload.properties.info.id);
+        useChatStore.getState().settleCompaction(payload.properties.info.id);
         break;
       case 'session.status':
         logger.debug('Event dispatched', {
@@ -95,6 +97,7 @@ export const ocEventCoordinator = {
           useOcSessionStore.getState().setSessionError(payload.properties.sessionID, errorMessage);
           useUIStore.getState().setTitleLoading(payload.properties.sessionID, false);
           useOcSessionStore.getState().clearPendingSend(payload.properties.sessionID);
+          useChatStore.getState().settleCompaction(payload.properties.sessionID);
         }
         break;
       case 'message.updated':
@@ -197,9 +200,16 @@ export const ocEventCoordinator = {
         logger.info('Session compacted, reloading messages', {
           sessionId: payload.properties.sessionID,
         });
-        void ocSessionService.loadMessages(payload.properties.sessionID).catch((error: unknown) => {
-          logger.error('Failed to reload compacted OpenCode session', error);
-        });
+        void ocSessionService
+          .loadMessages(payload.properties.sessionID)
+          .then(() => {
+            useChatStore.getState().settleCompaction(payload.properties.sessionID);
+          })
+          .catch((error: unknown) => {
+            logger.error('Failed to reload compacted OpenCode session', error);
+            // Still settle on failure — don't leave a stuck indicator
+            useChatStore.getState().settleCompaction(payload.properties.sessionID);
+          });
         break;
       default: {
         const eventType = (payload as { type: string }).type;

@@ -4,6 +4,7 @@ import type { OcSession } from '@/types/opencode';
 
 import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useBackendStore } from '@/stores/backend';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useOcMessageStore, useOcPermissionStore, useOcSessionStore } from '@/stores/opencode';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -88,6 +89,18 @@ function resetStores(): void {
     switchingBackend: false,
   });
   useUIStore.setState(useUIStore.getInitialState(), true);
+  useChatStore.setState({
+    sessions: {},
+    activeSessionId: null,
+    lastCreatedSessionId: null,
+    pendingMessage: null,
+    remappedOrbitIds: {},
+    rewindEpoch: 0,
+    conversationLoadEpoch: 0,
+    loadedSessions: {},
+    activeCompactions: {},
+    lruOrder: [],
+  });
   useOcSessionStore.setState({
     sessions: {},
     activeSessionId: null,
@@ -120,6 +133,7 @@ describe('useOpencodeLifecycle', () => {
       restoreSelection: mockRestoreSelection,
     });
     mockOnOpencodeCrashed.mockResolvedValue(() => undefined);
+    mockOpencodeStop.mockResolvedValue(undefined);
   });
 
   it('pre-warms the process before workspace init and reuses it during startup', async () => {
@@ -222,5 +236,99 @@ describe('useOpencodeLifecycle', () => {
     expect(useBackendStore.getState().opencodeHealthy).toBe(true);
     expect(healthyAtRestore).toEqual([true]);
     expect(mockToastError).not.toHaveBeenCalled();
+  });
+
+  it('clears Claude compactions and preserves OpenCode compactions when switching to opencode', async () => {
+    useBackendStore.setState({ activeBackend: 'claude' });
+    useUIStore.setState({ workspacePath: '/workspace' });
+    useChatStore.getState().markCompacting('claude-session', {
+      backend: 'claude',
+      messageId: 'claude-message',
+      status: 'pending',
+    });
+    useChatStore.getState().markCompacting('oc-session', {
+      backend: 'opencode',
+      messageId: 'oc-message',
+      status: 'pending',
+    });
+
+    mockOpencodeStatus.mockResolvedValue({
+      running: true,
+      port: 5252,
+      healthy: true,
+      binaryPath: null,
+      error: null,
+    });
+    mockListSessions.mockResolvedValue([]);
+    mockLoadProviders.mockResolvedValue(undefined);
+
+    renderHook(() => {
+      useOpencodeLifecycle();
+    });
+
+    act(() => {
+      useBackendStore.setState({ activeBackend: 'opencode' });
+    });
+
+    await waitFor(() => {
+      expect(mockRestoreSelection).toHaveBeenCalledTimes(1);
+    });
+
+    expect(useChatStore.getState().activeCompactions).toEqual({
+      'oc-session': {
+        backend: 'opencode',
+        messageId: 'oc-message',
+        status: 'pending',
+      },
+    });
+  });
+
+  it('clears OpenCode compactions and preserves Claude compactions when switching away from opencode', async () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    useUIStore.setState({ workspacePath: '/workspace' });
+    useChatStore.getState().markCompacting('oc-session', {
+      backend: 'opencode',
+      messageId: 'oc-message',
+      status: 'pending',
+    });
+    useChatStore.getState().markCompacting('claude-session', {
+      backend: 'claude',
+      messageId: 'claude-message',
+      status: 'pending',
+    });
+
+    mockOpencodeStatus.mockResolvedValue({
+      running: true,
+      port: 4141,
+      healthy: true,
+      binaryPath: null,
+      error: null,
+    });
+    mockListSessions.mockResolvedValue([]);
+    mockLoadProviders.mockResolvedValue(undefined);
+
+    renderHook(() => {
+      useOpencodeLifecycle();
+    });
+
+    await waitFor(() => {
+      expect(mockRestoreSelection).toHaveBeenCalledTimes(1);
+    });
+
+    act(() => {
+      useBackendStore.setState({ activeBackend: 'claude' });
+    });
+
+    await waitFor(() => {
+      expect(mockOpencodeStop).toHaveBeenCalledTimes(1);
+    });
+
+    expect(useChatStore.getState().activeCompactions).toEqual({
+      'claude-session': {
+        backend: 'claude',
+        messageId: 'claude-message',
+        status: 'pending',
+      },
+    });
   });
 });

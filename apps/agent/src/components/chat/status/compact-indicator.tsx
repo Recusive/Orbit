@@ -1,9 +1,10 @@
 /**
  * CompactIndicator — Shown in place of the user message bubble when `/compact` is sent.
  *
- * Two states derived from ChatStore's compactingMessageId:
- * - **Compacting**: ThinkingDots + "Context compacting" (this message ID matches compactingMessageId)
- * - **Done**: Minimize2 icon + "Context compacted" (default / after compact_complete clears the ID)
+ * States are derived from ChatStore's per-session compaction map:
+ * - **Compacting**: ThinkingDots + "Context compacting"
+ * - **Timed out**: Minimize2 + "Context compaction timed out"
+ * - **Done**: Minimize2 + "Context compacted"
  */
 import { Minimize2 } from 'lucide-react';
 
@@ -18,7 +19,16 @@ interface CompactIndicatorProps {
 }
 
 export const CompactIndicator: FC<CompactIndicatorProps> = ({ messageId }) => {
-  const isCompacting = useChatStore((s) => s.compactingMessageId === messageId);
+  const compactionStatus = useChatStore((state) => {
+    for (const entry of Object.values(state.activeCompactions)) {
+      if (entry.messageId === messageId) {
+        return entry.status;
+      }
+    }
+    return null;
+  });
+  const isCompacting = compactionStatus === 'pending';
+  const isTimedOut = compactionStatus === 'timed_out';
 
   return (
     <div className="flex w-full items-center gap-3 py-1.5 select-none cursor-default">
@@ -32,6 +42,13 @@ export const CompactIndicator: FC<CompactIndicatorProps> = ({ messageId }) => {
             <ThinkingDots size={10} speed={1.2} />
             <span className="text-[11px] font-medium text-lg-text-secondary">
               Context compacting
+            </span>
+          </>
+        ) : isTimedOut ? (
+          <>
+            <Minimize2 className="h-3 w-3 text-lg-text-secondary" />
+            <span className="text-[11px] font-medium text-lg-text-secondary">
+              Context compaction timed out
             </span>
           </>
         ) : (

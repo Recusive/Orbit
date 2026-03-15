@@ -165,6 +165,19 @@ export const ocSessionService = {
     await getClient().session.abort({ sessionID: sessionId }, { throwOnError: true });
   },
 
+  async compactSession(sessionId: string, providerId: string, modelId: string): Promise<void> {
+    logger.info('Compacting session', { sessionId, providerId, modelId });
+    await getClient().session.summarize(
+      {
+        sessionID: sessionId,
+        providerID: providerId,
+        modelID: modelId,
+      },
+      { throwOnError: true }
+    );
+    logger.info('Session compact request sent', { sessionId });
+  },
+
   async revertSession(sessionId: string, messageId: string): Promise<OcSession> {
     logger.info('Reverting session', { sessionId, messageId });
     const response = await getClient().session.revert(

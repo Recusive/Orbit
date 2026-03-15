@@ -1,5 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 
 import { createChatOpenHandlers } from './handlers/chat-actions';
 import { useOcChat } from './use-oc-chat';
@@ -24,6 +25,7 @@ import type {
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { ocSessionService } from '@/services/opencode/oc-session-service';
 import { useToolStore } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useOcPermissionStore, useOcProviderStore, useOcSessionStore } from '@/stores/opencode';
 
 type OcRenderedMessage = ReturnType<typeof useOcChat>['messages'][number];
@@ -37,11 +39,13 @@ interface AdaptedOcParts {
   interruptReason?: string;
   isInterrupted: boolean;
   isThinkingActive: boolean;
+  hasCompaction: boolean;
 }
 
 interface AdaptedOcMessage {
   chat: ChatMessage;
   tools: ToolExecution[];
+  hasCompaction: boolean;
 }
 
 interface SyncActions {
@@ -73,14 +77,6 @@ function appendLine(content: string, line: string): string {
   }
 
   return `${content}\n${line}`;
-}
-
-function appendBlock(content: string, block: string): string {
-  if (content.length === 0) {
-    return block;
-  }
-
-  return `${content}\n\n${block}`;
 }
 
 /**
@@ -226,6 +222,7 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
   let interruptReason: string | undefined;
   let isInterrupted = false;
   let isThinkingActive = false;
+  let hasCompaction = false;
   const thinkingBlocks: ThinkingBlock[] = [];
   const tools: ToolExecution[] = [];
 
@@ -287,7 +284,7 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
         break;
 
       case 'compaction':
-        content = appendBlock(content, '---\n*Context compacted*');
+        hasCompaction = true;
         break;
 
       case 'retry':
@@ -356,34 +353,46 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
     ...(interruptReason !== undefined ? { interruptReason } : {}),
     isInterrupted,
     isThinkingActive,
+    hasCompaction,
   };
 }
 
 export function buildOcSessionUsage(messages: OcRenderedMessage[]): UsageData {
-  return messages.reduce<UsageData>(
-    (usage, entry) => {
-      if (entry.message.role !== 'assistant') {
-        return usage;
-      }
-
-      const tokens = entry.message.tokens;
-
-      return {
-        inputTokens: usage.inputTokens + tokens.input,
-        outputTokens: usage.outputTokens + tokens.output,
-        cacheReadInputTokens: usage.cacheReadInputTokens + tokens.cache.read,
-        cacheCreationInputTokens: usage.cacheCreationInputTokens + tokens.cache.write,
-        totalCostUsd: usage.totalCostUsd + entry.message.cost,
-      };
-    },
-    {
-      inputTokens: 0,
-      outputTokens: 0,
-      cacheReadInputTokens: 0,
-      cacheCreationInputTokens: 0,
-      totalCostUsd: 0,
+  // Use the last assistant message's token breakdown as a context window snapshot.
+  // Each turn's tokens.input reflects what the model actually received — after
+  // compaction, this value drops because old messages were replaced with a summary.
+  // Matches the reference app: session-context-metrics.ts:lastAssistantWithTokens()
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const entry = messages[i];
+    if (entry?.message.role !== 'assistant') {
+      continue;
     }
-  );
+    const tokens = entry.message.tokens;
+    const total =
+      tokens.input + tokens.output + tokens.reasoning + tokens.cache.read + tokens.cache.write;
+    if (total <= 0) {
+      continue;
+    }
+    return {
+      inputTokens: tokens.input,
+      outputTokens: tokens.output,
+      cacheReadInputTokens: tokens.cache.read,
+      cacheCreationInputTokens: tokens.cache.write,
+      // Cost is still cumulative (lifetime spend, not current context)
+      totalCostUsd: messages.reduce(
+        (sum, m) => sum + (m.message.role === 'assistant' ? m.message.cost : 0),
+        0
+      ),
+    };
+  }
+
+  return {
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    totalCostUsd: 0,
+  };
 }
 
 export function adaptPermission(permission: OcPermissionAsked): PermissionRequest {
@@ -518,6 +527,7 @@ function adaptOcMessage(
       ...(interruptReason !== undefined ? { interruptReason } : {}),
     },
     tools: adapted.tools,
+    hasCompaction: adapted.hasCompaction,
   };
 }
 
@@ -585,6 +595,9 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
     () => filterOcMessages(messages, revertMessageId),
     [messages, revertMessageId]
   );
+  const activeCompaction = useChatStore(
+    (state) => (sessionId !== null ? state.activeCompactions[sessionId] : undefined) ?? null
+  );
 
   const adapted = useMemo(() => {
     if (sessionId === null) {
@@ -635,12 +648,66 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
 
   const sessionUsage = useMemo(() => buildOcSessionUsage(visibleMessages), [visibleMessages]);
   const pendingPermissions = useMemo(() => permissions.map(adaptPermission), [permissions]);
-  const chatMessages = useMemo(() => adapted.map((entry) => entry.chat), [adapted]);
+  const chatMessages = useMemo(() => {
+    const entries = adapted.map((entry) => {
+      const chat = entry.chat;
+      // Backend user messages with a compaction part render as CompactIndicator
+      if (entry.hasCompaction && chat.role === 'user') {
+        return { ...chat, content: '/compact', displayedContent: '/compact' };
+      }
+      return chat;
+    });
+    // Synthetic message for live compaction (pending/timed_out)
+    if (activeCompaction !== null) {
+      entries.push({
+        id: activeCompaction.messageId,
+        role: 'user' as const,
+        content: '/compact',
+        displayedContent: '/compact',
+      });
+    }
+    return entries;
+  }, [activeCompaction, adapted]);
   const displayedMessages = useOcStreamingReveal(chatMessages);
   const open = useMemo(() => createChatOpenHandlers({ postMessage }), [postMessage]);
 
   const handleSend = useCallback(
     (text: string): void => {
+      const trimmed = text.trim();
+      if (trimmed === '/compact' || trimmed === '/summarize') {
+        if (sessionId === null) {
+          return;
+        }
+
+        if (!providerId || !modelId) {
+          toast.warning('Connect a provider to compact this session');
+          return;
+        }
+
+        if (useChatStore.getState().activeCompactions[sessionId] !== undefined) {
+          return;
+        }
+
+        const syntheticId = `oc-compact-${crypto.randomUUID()}`;
+        useChatStore.getState().markCompacting(sessionId, {
+          backend: 'opencode',
+          messageId: syntheticId,
+          status: 'pending',
+        });
+
+        window.setTimeout(() => {
+          useChatStore.getState().markCompactionTimedOut(sessionId, syntheticId);
+        }, 30_000);
+
+        void ocSessionService
+          .compactSession(sessionId, providerId, modelId)
+          .catch((error: unknown) => {
+            logger.error('Failed to compact OpenCode session', error, { sessionId });
+            useChatStore.getState().settleCompaction(sessionId);
+          });
+        return;
+      }
+
       void send(text, {
         agent,
         ...(providerId ? { providerId } : {}),
@@ -648,7 +715,7 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
         ...(variant ? { variant } : {}),
       });
     },
-    [agent, modelId, providerId, send, variant]
+    [agent, modelId, providerId, send, sessionId, variant]
   );
 
   const handleStop = useCallback((): void => {

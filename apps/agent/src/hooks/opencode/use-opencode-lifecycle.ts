@@ -18,6 +18,7 @@ const logger = createLogger('OpenCodeLifecycle');
 function cleanupClaudeState(): void {
   useQueuedMessageStore.getState().clearQueue();
   useToolStore.getState().clearPermissions();
+  useChatStore.getState().clearCompactionsByBackend('claude');
   const activeSession = useChatStore.getState().activeSessionId;
   if (activeSession) {
     useCheckpointStore.getState().clearSessionCheckpoints(activeSession);
@@ -27,6 +28,7 @@ function cleanupClaudeState(): void {
 function cleanupOpenCodeState(): void {
   ocSseManager.disconnect();
   destroyClient();
+  useChatStore.getState().clearCompactionsByBackend('opencode');
   const sessionState = useOcSessionStore.getState();
   const sessionIds = new Set<string>([
     ...Object.keys(sessionState.sessions),

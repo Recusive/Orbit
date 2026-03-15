@@ -756,6 +756,10 @@ export interface OrbitClient {
       parameters: { sessionID: string; directory?: string; workspace?: string },
       options?: { throwOnError?: boolean }
     ): Promise<ApiResponse<Session>>;
+    summarize(
+      parameters: { sessionID: string; providerID: string; modelID: string },
+      options?: { throwOnError?: boolean }
+    ): Promise<ApiResponse<boolean>>;
   };
   permission: {
     reply(

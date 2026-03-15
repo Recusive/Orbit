@@ -61,6 +61,12 @@ export interface ChatSessionData {
   isStopPending: boolean;
 }
 
+export interface ActiveCompaction {
+  backend: 'opencode' | 'claude';
+  messageId: string;
+  status: 'pending' | 'timed_out';
+}
+
 /** Tracks LRU order — most recent access at end of array */
 type LruTracker = string[];
 
@@ -81,8 +87,8 @@ export interface ChatStoreState {
   conversationLoadEpoch: number;
   /** Tracks sessions loaded from backend to prevent duplicate conversation:load requests */
   loadedSessions: Record<string, boolean>;
-  /** Message ID of the /compact user message currently being processed (null when idle) */
-  compactingMessageId: string | null;
+  /** Active /compact operations keyed by session ID. */
+  activeCompactions: Record<string, ActiveCompaction>;
   /** LRU access order for eviction (most recently accessed at end) */
   lruOrder: LruTracker;
 
@@ -107,8 +113,10 @@ export interface ChatStoreState {
   markSessionLoaded: (id: string) => void;
   clearSessionLoaded: (id: string) => void;
   isSessionLoaded: (id: string) => boolean;
-  markCompacting: (messageId: string) => void;
-  markCompacted: () => void;
+  markCompacting: (sessionId: string, compaction: ActiveCompaction) => void;
+  markCompactionTimedOut: (sessionId: string, messageId: string) => void;
+  settleCompaction: (sessionId: string) => void;
+  clearCompactionsByBackend: (backend: ActiveCompaction['backend']) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -214,7 +222,7 @@ export const useChatStore = create<ChatStoreState>()(
       lastCreatedSessionId: null,
       pendingMessage: null,
       remappedOrbitIds: {},
-      compactingMessageId: null,
+      activeCompactions: {},
       rewindEpoch: 0,
       conversationLoadEpoch: 0,
       loadedSessions: {},
@@ -394,6 +402,11 @@ export const useChatStore = create<ChatStoreState>()(
             Reflect.deleteProperty(draft.loadedSessions, oldId);
           }
 
+          if (draft.activeCompactions[oldId] !== undefined) {
+            draft.activeCompactions[newId] = draft.activeCompactions[oldId];
+            Reflect.deleteProperty(draft.activeCompactions, oldId);
+          }
+
           // Update LRU order
           const lruIdx = draft.lruOrder.indexOf(oldId);
           if (lruIdx >= 0) {
@@ -406,6 +419,7 @@ export const useChatStore = create<ChatStoreState>()(
         set((draft) => {
           Reflect.deleteProperty(draft.sessions, id);
           Reflect.deleteProperty(draft.loadedSessions, id);
+          Reflect.deleteProperty(draft.activeCompactions, id);
 
           // Remove from LRU
           const lruIdx = draft.lruOrder.indexOf(id);
@@ -460,15 +474,37 @@ export const useChatStore = create<ChatStoreState>()(
         return get().loadedSessions[id] === true;
       },
 
-      markCompacting: (messageId: string): void => {
+      markCompacting: (sessionId: string, compaction: ActiveCompaction): void => {
         set((draft) => {
-          draft.compactingMessageId = messageId;
+          draft.activeCompactions[sessionId] = compaction;
         });
       },
 
-      markCompacted: (): void => {
+      markCompactionTimedOut: (sessionId: string, messageId: string): void => {
         set((draft) => {
-          draft.compactingMessageId = null;
+          const entry = draft.activeCompactions[sessionId];
+          if (entry?.messageId === messageId && entry.status === 'pending') {
+            draft.activeCompactions[sessionId] = {
+              ...entry,
+              status: 'timed_out',
+            };
+          }
+        });
+      },
+
+      settleCompaction: (sessionId: string): void => {
+        set((draft) => {
+          Reflect.deleteProperty(draft.activeCompactions, sessionId);
+        });
+      },
+
+      clearCompactionsByBackend: (backend: ActiveCompaction['backend']): void => {
+        set((draft) => {
+          for (const [sessionId, entry] of Object.entries(draft.activeCompactions)) {
+            if (entry.backend === backend) {
+              Reflect.deleteProperty(draft.activeCompactions, sessionId);
+            }
+          }
         });
       },
     })),

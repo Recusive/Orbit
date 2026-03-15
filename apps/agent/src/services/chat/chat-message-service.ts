@@ -918,7 +918,10 @@ class ChatMessageService {
   ): void {
     const { session_id } = message;
     logger.info(`Context compaction completed (bridge event) for session ${session_id}`);
-    useChatStore.getState().markCompacted();
+    const entry = useChatStore.getState().activeCompactions[session_id];
+    if (entry?.backend === 'claude') {
+      useChatStore.getState().settleCompaction(session_id);
+    }
 
     // The SDK rewrites the JSONL asynchronously after compact_boundary fires.
     // Retry with backoff to handle slow machines where the SDK hasn't finished writing.
