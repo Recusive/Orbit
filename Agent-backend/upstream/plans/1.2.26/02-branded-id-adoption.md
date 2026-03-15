@@ -1,5 +1,23 @@
 # Phase 2: Branded ID Adoption
 
+## How to Execute
+
+**All files already exist in our fork — apply upstream diffs as patches.**
+
+For each modified file:
+
+```bash
+# 1. Get the exact diff
+cd Agent-backend/upstream/repo/clone
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/<path>
+
+# 2. Apply relevant hunks to our fork's copy (manual — fork may have diverged)
+# 3. Rename any "opencode" → "orbit" in the new code
+# 4. Verify: cd packages/opencode && bun run typecheck
+```
+
+Most changes are mechanical: `Identifier.ascending("session")` → `SessionID.descending()`, add import, done.
+
 ## Summary
 
 Replace all raw `Identifier.ascending("session")` / `Identifier.schema("session")` / `Identifier.descending("session")` calls with branded ID types (`SessionID.descending()`, `SessionID.zod`, etc.) across 25+ files. This is a mechanical but sweeping refactor that touches every layer of the engine -- sessions, messages, permissions, tools, questions, pty, workspaces, and the control plane.

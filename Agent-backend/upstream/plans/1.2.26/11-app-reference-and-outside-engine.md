@@ -1,5 +1,21 @@
 # Phase 11: App Reference + Outside-Engine Changes
 
+## How to Execute
+
+**App: already copied to `repo/reference/1.2.26/app/`. Plugin + util: apply small diffs.**
+
+```bash
+cd Agent-backend/upstream/repo/clone
+
+# Plugin ESM fix — apply diff
+git diff v1.2.24..v1.2.26 -- packages/plugin/src/index.ts
+git diff v1.2.24..v1.2.26 -- packages/plugin/src/example.ts
+git diff v1.2.24..v1.2.26 -- packages/plugin/tsconfig.json
+
+# New util file — copy
+git show v1.2.26:packages/util/src/module.ts > ../../packages/util/src/module.ts
+```
+
 ## Summary
 
 This covers everything OUTSIDE `packages/opencode/src/` that we missed in the initial diff:

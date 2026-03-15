@@ -1,5 +1,15 @@
 # Phase 5B: TUI & CLI Changes
 
+## How to Execute
+
+**All files exist in our fork — apply upstream diffs.**
+
+```bash
+cd Agent-backend/upstream/repo/clone
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/cli/cmd/tui/<path>
+# Apply hunks to our fork's version
+```
+
 ## Summary
 
 TUI changes from v1.2.24 to v1.2.26 fall into four categories: workspace support propagation (passing `workspaceID` through session creation), branded ID adoption in the TUI layer, bug fixes (auto-submit race condition, better error messages), and cleanup (OpenRouter warning removal, provider hint updates, flag rename).

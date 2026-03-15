@@ -1,5 +1,14 @@
 # Phase 9: Desktop App Integration
 
+## How to Execute
+
+**No upstream files to copy — this phase edits Orbit's own frontend and Tauri code.**
+
+1. Regenerate SDK: `cd Agent-backend && ./script/generate.ts`
+2. Update shared schemas in `packages/shared-schemas/` to match new API shapes
+3. Update React stores/hooks in `apps/agent/src/` if API responses changed
+4. Test: `bunx tauri dev`
+
 ## Summary
 
 After porting upstream engine changes (v1.2.24 to v1.2.26), the Orbit desktop app (Tauri + React) needs updates to stay compatible. The engine runs as the `orbit-server` sidecar binary, and the React frontend connects via HTTP API + SSE streaming. Changes in the engine's API surface, response shapes, and provider behavior must be reflected across: the auto-generated SDK client, shared schemas, Zustand stores, service layer, adapter hooks, and Tauri sidecar spawner.

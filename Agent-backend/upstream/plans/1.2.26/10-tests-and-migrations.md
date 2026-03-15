@@ -1,5 +1,32 @@
 # Phase 10: Tests, Migrations & Config
 
+## How to Execute
+
+**Tests: copy new test files, apply diffs to modified tests. Migrations: copy from upstream. Config: apply diffs.**
+
+New test files — copy:
+
+```bash
+cd Agent-backend/upstream/repo/clone
+git show v1.2.26:packages/opencode/test/<path> > ../../packages/opencode/test/<path>
+```
+
+Modified test files — apply diffs:
+
+```bash
+git diff v1.2.24..v1.2.26 -- packages/opencode/test/<path>
+```
+
+Migrations — copy the directories:
+
+```bash
+git checkout v1.2.26 -- packages/opencode/drizzle/
+cp -R packages/opencode/drizzle/* ../../packages/opencode/drizzle/
+git checkout v1.2.24 -- packages/opencode/drizzle/  # restore clone
+```
+
+Config — apply diffs to package.json, tsconfig.json, script/build.ts.
+
 ## Summary
 
 v1.2.24 to v1.2.26 adds 14 new test files, modifies 36 existing test files, introduces 3 new DB migrations, and updates `tsconfig.json`, `package.json`, and `script/build.ts`. The test modifications are primarily mechanical (branded ID adoption in test contexts), while the new tests cover the account system, Effect-based utilities, message pagination, and share infrastructure. The migrations add account tables, reorganize org tracking, and optimize message query indexes.

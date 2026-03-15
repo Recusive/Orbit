@@ -1,5 +1,19 @@
 # Phase 8: Rename opencode -> Orbit
 
+## How to Execute
+
+**Find-and-replace in our fork — no upstream files to copy. This phase only edits our fork.**
+
+```bash
+cd Agent-backend/packages/opencode
+
+# Audit current state
+grep -rn "opencode" src/ --include="*.ts" --include="*.tsx" | grep -v node_modules | wc -l
+
+# Apply safe bulk patterns (see categories below)
+# Then manually review context-dependent occurrences
+```
+
 ## Summary
 
 Rename all user-facing "opencode" strings to "Orbit" across the engine codebase (`packages/opencode/src/`). There are **212 occurrences across 58 files**. Each occurrence falls into one of five categories with different rename strategies. This plan categorizes every occurrence and defines safe find-and-replace patterns.

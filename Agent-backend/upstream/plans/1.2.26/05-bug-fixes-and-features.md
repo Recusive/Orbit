@@ -1,5 +1,25 @@
 # Phase 5: Bug Fixes and Standalone Features
 
+## How to Execute
+
+**Mix of NEW files (copy) and MODIFIED files (apply diffs). Each item is independent.**
+
+New files — copy directly:
+
+```bash
+cd Agent-backend/upstream/repo/clone
+git show v1.2.26:packages/opencode/src/<path> > ../../packages/opencode/src/<path>
+```
+
+Modified files — get diff and apply:
+
+```bash
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/<path>
+# Apply relevant hunks to our fork's version
+```
+
+Each bug fix / feature can be done independently. Start with the easiest (data-url.ts, protected.ts) and work up.
+
 ## Summary
 
 All standalone bug fixes, new features, and refactors from v1.2.24 to v1.2.26 that do NOT depend on the Effect system (Phase 0) or the Account system (Phase 4). These can be ported independently and in any order.

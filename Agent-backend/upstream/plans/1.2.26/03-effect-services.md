@@ -1,5 +1,29 @@
 # Phase 3: Effect Service Layer
 
+## How to Execute
+
+**Mix of NEW files (copy from upstream) and MODIFIED files (apply diffs).**
+
+New files — copy directly:
+
+```bash
+cd Agent-backend/upstream/repo/clone
+git show v1.2.26:packages/opencode/src/auth/service.ts > ../../packages/opencode/src/auth/service.ts
+git show v1.2.26:packages/opencode/src/provider/auth-service.ts > ../../packages/opencode/src/provider/auth-service.ts
+git show v1.2.26:packages/opencode/src/effect/runtime.ts > ../../packages/opencode/src/effect/runtime.ts
+git show v1.2.26:packages/opencode/src/util/instance-state.ts > ../../packages/opencode/src/util/instance-state.ts
+git show v1.2.26:packages/opencode/src/util/effect-http-client.ts > ../../packages/opencode/src/util/effect-http-client.ts
+```
+
+Modified files — get diff and apply hunks:
+
+```bash
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/auth/index.ts
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/provider/auth.ts
+```
+
+Then rename `@opencode` → `@orbit` in Effect service tags.
+
 ## Summary
 
 Introduce an Effect-based service architecture for auth and provider auth, replacing imperative `Promise`-based implementations with Effect `ServiceMap` services, `ManagedRuntime`, and `ScopedCache`. This creates a clean separation between service logic (pure Effect, testable) and public API (thin async wrappers calling `runtime.runPromise`).

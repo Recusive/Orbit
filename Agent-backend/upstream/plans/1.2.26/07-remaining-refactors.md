@@ -1,5 +1,23 @@
 # Phase 7: Server Refactor + CLI Rename + Misc Refactors
 
+## How to Execute
+
+**Mix: server.ts may already be done in our fork. CLI rename = copy + rename file. Misc = apply diffs.**
+
+```bash
+cd Agent-backend/upstream/repo/clone
+
+# Server — compare first, our fork may already have createApp()
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/server/server.ts | head -30
+
+# CLI rename — copy new file, delete old
+git show v1.2.26:packages/opencode/src/cli/cmd/providers.ts > ../../packages/opencode/src/cli/cmd/providers.ts
+rm ../../packages/opencode/src/cli/cmd/auth.ts
+
+# Misc — apply diffs per file
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/<path>
+```
+
 ## Summary
 
 This phase covers structural refactors from upstream v1.2.24 -> v1.2.26 that are NOT Bun shell removal (Phase 6) or full rename (Phase 8). The three major areas are: (A) server.ts singleton-to-factory refactor, (B) CLI `auth` -> `providers` rename, and (C) miscellaneous refactors including branded IDs, new Account system, and provider changes.

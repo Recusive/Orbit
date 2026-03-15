@@ -1,5 +1,23 @@
 # Phase 1: Branded ID Foundation
 
+## How to Execute
+
+**All 11 files are NEW — copy from upstream clone, then adapt.**
+
+For each file listed below:
+
+```bash
+# 1. Copy from upstream
+cd Agent-backend/upstream/repo/clone
+git show v1.2.26:packages/opencode/src/<path> > ../../packages/opencode/src/<path>
+
+# 2. Rename "opencode" → "orbit" in user-facing strings (see Rename section below)
+
+# 3. Verify: bun run typecheck (from packages/opencode/)
+```
+
+No existing files are modified in this phase.
+
 ## Summary
 
 Create 9 new `schema.ts` files defining branded ID types (SessionID, MessageID, PartID, ProviderID, ModelID, WorkspaceID, PermissionID, ProjectID, PtyID, QuestionID, ToolID) plus 2 utility files (`withStatics` helper and Effect-to-Zod bridge), giving compile-time type safety to IDs that are currently raw strings.

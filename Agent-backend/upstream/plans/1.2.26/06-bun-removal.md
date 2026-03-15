@@ -1,5 +1,16 @@
 # Phase 6: Bun Shell Removal
 
+## How to Execute
+
+**All files exist in our fork — apply upstream diffs. Our fork already did most of this work.**
+
+```bash
+cd Agent-backend/upstream/repo/clone
+git diff v1.2.24..v1.2.26 -- packages/opencode/src/<path>
+# Compare with our fork — many changes may already be applied
+# Only apply hunks that our fork is missing
+```
+
 ## Summary
 
 Replace all `import { $ } from "bun"` (Bun shell) usage with `Process.run()` / `Process.text()` / `Process.lines()` from `@/util/process`. This removes the dependency on Bun's shell API, making the codebase portable to Node.js and other runtimes. Upstream also introduced a `git()` helper in `@/util/git` that wraps git commands with a consistent `GitResult` interface.

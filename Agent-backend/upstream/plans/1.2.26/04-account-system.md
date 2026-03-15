@@ -1,5 +1,32 @@
 # Phase 4: Account System
 
+## How to Execute
+
+**Mostly NEW files (copy from upstream) + delete old `control/` module.**
+
+New files — copy directly:
+
+```bash
+cd Agent-backend/upstream/repo/clone
+mkdir -p ../../packages/opencode/src/account
+git show v1.2.26:packages/opencode/src/account/account.sql.ts > ../../packages/opencode/src/account/account.sql.ts
+git show v1.2.26:packages/opencode/src/account/schema.ts > ../../packages/opencode/src/account/schema.ts
+git show v1.2.26:packages/opencode/src/account/repo.ts > ../../packages/opencode/src/account/repo.ts
+git show v1.2.26:packages/opencode/src/account/service.ts > ../../packages/opencode/src/account/service.ts
+git show v1.2.26:packages/opencode/src/account/index.ts > ../../packages/opencode/src/account/index.ts
+mkdir -p ../../packages/opencode/src/cli/effect
+git show v1.2.26:packages/opencode/src/cli/effect/prompt.ts > ../../packages/opencode/src/cli/effect/prompt.ts
+git show v1.2.26:packages/opencode/src/cli/cmd/account.ts > ../../packages/opencode/src/cli/cmd/account.ts
+```
+
+Delete old module:
+
+```bash
+rm -rf Agent-backend/packages/opencode/src/control/
+```
+
+Then rename any "opencode" references in the copied files. Also copy DB migrations.
+
 ## Summary
 
 Replace the legacy `control/` module (simple Zod-based account lookup + token refresh) with a full Effect-based `account/` system. This adds multi-account management, org switching, device-code OAuth login, remote config fetching, and 4 new CLI commands. The old `control/` directory is deleted entirely.

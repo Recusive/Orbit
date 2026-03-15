@@ -1,5 +1,9 @@
 # Phase 0: Add Effect.ts Dependency
 
+## How to Execute
+
+This phase is config-only — edit `package.json` and `tsconfig.json` directly. No files to copy.
+
 ## Summary
 
 Add the `effect` package (v4.0.0-beta.31) and its language service plugin to the monorepo, establishing the foundation all subsequent branded-type phases depend on.
