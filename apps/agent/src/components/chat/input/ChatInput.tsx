@@ -8,11 +8,11 @@
 import { memo, useEffect, useMemo } from 'react';
 
 import { InputControls } from './InputControls';
-import { OcQuestionCard } from './OcQuestionCard';
 import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
 import { LexicalChatEditor } from './lexical';
 import { MentionPopover } from './mention-popover';
+import { OcQuestionModal } from './oc-question-modal';
 import { SlashCommandPopover } from './slash-command-popover';
 import { useChatInput } from './use-chat-input';
 
@@ -100,7 +100,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   });
 
   // Split permissions into AskUserQuestion vs regular tool permissions.
-  // AskUserQuestion gets its own interactive card; other tools use the compact modal.
+  // Question-style tools get their own overlay; other tools use the compact modal.
   const { askUserQuestions, regularPermissions } = useMemo(() => {
     const ask: (typeof permissions)[number][] = [];
     const regular: (typeof permissions)[number][] = [];
@@ -116,6 +116,9 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
+  const activeOcQuestion =
+    questions !== undefined && questions.length > 0 ? questions[0] : undefined;
+  const isQuestionOverlayActive = activeAskQuestion !== undefined || activeOcQuestion !== undefined;
 
   // Build known command names for multi-command highlighting.
   // Includes popover-selected command (explicit state, flicker-free) + all known commands from store.
@@ -131,18 +134,16 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   // Global keyboard shortcuts for regular permission modals.
   // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
   // the input (which would otherwise send a message).
-  // AskUserQuestion handles its own keyboard shortcuts internally.
+  // Question overlays handle their own keyboard shortcuts internally.
   useEffect(() => {
     if (regularPermissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
       return;
     }
+    if (isQuestionOverlayActive) {
+      return;
+    }
 
     const handleKeyDown = (e: KeyboardEvent): void => {
-      const active = document.activeElement;
-      if (active instanceof HTMLElement && active.closest('[data-oc-question]') !== null) {
-        return;
-      }
-
       const firstPermission = regularPermissions[0];
       if (firstPermission === undefined) return;
 
@@ -182,7 +183,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
+  }, [isQuestionOverlayActive, onPermissionApprove, onPermissionDeny, regularPermissions]);
 
   return (
     <div className="flex justify-center px-4 pb-1 shrink-0 relative">
@@ -190,7 +191,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         className={`${getInputBoxClasses()} relative`}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* AskUserQuestion Modal — full overlay replacing the entire input box content */}
+        {/* Question overlays — full replacement for the input box content */}
         {activeAskQuestion !== undefined &&
         onPermissionApprove !== undefined &&
         onPermissionDeny !== undefined ? (
@@ -198,6 +199,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
             request={activeAskQuestion}
             onApprove={onPermissionApprove}
             onDeny={onPermissionDeny}
+          />
+        ) : activeOcQuestion !== undefined &&
+          onQuestionReply !== undefined &&
+          onQuestionReject !== undefined ? (
+          <OcQuestionModal
+            question={activeOcQuestion}
+            onReply={onQuestionReply}
+            onReject={onQuestionReject}
           />
         ) : (
           <>
@@ -216,22 +225,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
                     onApprove={onPermissionApprove}
                     onDeny={onPermissionDeny}
                     isLast={index === regularPermissions.length - 1}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {questions !== undefined &&
-            questions.length > 0 &&
-            onQuestionReply !== undefined &&
-            onQuestionReject !== undefined ? (
-              <div className="space-y-2 px-1 pb-1">
-                {questions.map((question) => (
-                  <OcQuestionCard
-                    key={question.id}
-                    question={question}
-                    onReply={onQuestionReply}
-                    onReject={onQuestionReject}
                   />
                 ))}
               </div>
