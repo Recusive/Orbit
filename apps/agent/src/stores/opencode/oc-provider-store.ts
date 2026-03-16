@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 import type { OcProviderAuthMethod } from '@/types/opencode';
 
@@ -33,8 +34,10 @@ interface OcProviderState {
   variantSelections: Record<string, string | undefined>;
   selectedProviderId: string | null;
   selectedModelId: string | null;
+  hiddenModels: Record<string, string[]>;
   selectedAgent: 'build' | 'plan' | 'explore';
   isLoading: boolean;
+  toggleModelVisibility: (providerId: string, modelId: string) => void;
   setLoading: (isLoading: boolean) => void;
   setProviders: (input: {
     providers: OcProviderInfo[];
@@ -49,86 +52,114 @@ interface OcProviderState {
   clear: () => void;
 }
 
-export const useOcProviderStore = create<OcProviderState>((set) => ({
-  providers: [],
-  connectedProviders: [],
-  defaultModels: {},
-  authMethods: {},
-  variantSelections: {},
-  selectedProviderId: null,
-  selectedModelId: null,
-  selectedAgent: 'build',
-  isLoading: false,
-  setLoading: (isLoading) => {
-    set({ isLoading });
-  },
-  setProviders: ({ providers, connectedProviders, defaultModels }) => {
-    set((state) => {
-      const fallbackProvider =
-        providers.find((provider) => provider.id === state.selectedProviderId) ??
-        providers.find((provider) => connectedProviders.includes(provider.id)) ??
-        providers[0];
-      const currentModelStillExists =
-        fallbackProvider?.id === state.selectedProviderId &&
-        state.selectedModelId !== null &&
-        fallbackProvider.models[state.selectedModelId] !== undefined;
-      const fallbackModelId = currentModelStillExists
-        ? state.selectedModelId
-        : fallbackProvider
-          ? (defaultModels[fallbackProvider.id] ?? Object.keys(fallbackProvider.models)[0] ?? null)
-          : null;
-
-      return {
-        providers,
-        connectedProviders,
-        defaultModels,
-        selectedProviderId: fallbackProvider?.id ?? null,
-        selectedModelId: fallbackModelId,
-      };
-    });
-  },
-  setAuthMethods: (authMethods) => {
-    set({ authMethods });
-  },
-  setSelectedProviderId: (providerId) => {
-    set((state) => {
-      const provider = state.providers.find((item) => item.id === providerId);
-      return {
-        selectedProviderId: providerId,
-        selectedModelId: provider
-          ? (state.defaultModels[providerId] ?? Object.keys(provider.models)[0] ?? null)
-          : null,
-      };
-    });
-  },
-  setSelectedModelId: (selectedModelId) => {
-    set({ selectedModelId });
-  },
-  setSelectedVariant: (providerId, modelId, variant) => {
-    set((state) => ({
-      variantSelections: {
-        ...state.variantSelections,
-        [modelKey(providerId, modelId)]: variant,
-      },
-    }));
-  },
-  setSelectedAgent: (selectedAgent) => {
-    set({ selectedAgent });
-  },
-  clear: () => {
-    set({
+export const useOcProviderStore = create<OcProviderState>()(
+  persist(
+    (set) => ({
       providers: [],
       connectedProviders: [],
       defaultModels: {},
       authMethods: {},
       variantSelections: {},
+      hiddenModels: {},
       selectedProviderId: null,
       selectedModelId: null,
       selectedAgent: 'build',
       isLoading: false,
-    });
-  },
-}));
+      toggleModelVisibility: (providerId, modelId) => {
+        set((state) => {
+          if (state.selectedProviderId === providerId && state.selectedModelId === modelId) {
+            return state;
+          }
+          const current = state.hiddenModels[providerId] ?? [];
+          const isHidden = current.includes(modelId);
+          return {
+            hiddenModels: {
+              ...state.hiddenModels,
+              [providerId]: isHidden
+                ? current.filter((id) => id !== modelId)
+                : [...current, modelId],
+            },
+          };
+        });
+      },
+      setLoading: (isLoading) => {
+        set({ isLoading });
+      },
+      setProviders: ({ providers, connectedProviders, defaultModels }) => {
+        set((state) => {
+          const fallbackProvider =
+            providers.find((provider) => provider.id === state.selectedProviderId) ??
+            providers.find((provider) => connectedProviders.includes(provider.id)) ??
+            providers[0];
+          const currentModelStillExists =
+            fallbackProvider?.id === state.selectedProviderId &&
+            state.selectedModelId !== null &&
+            fallbackProvider.models[state.selectedModelId] !== undefined;
+          const fallbackModelId = currentModelStillExists
+            ? state.selectedModelId
+            : fallbackProvider
+              ? (defaultModels[fallbackProvider.id] ??
+                Object.keys(fallbackProvider.models)[0] ??
+                null)
+              : null;
+
+          return {
+            providers,
+            connectedProviders,
+            defaultModels,
+            selectedProviderId: fallbackProvider?.id ?? null,
+            selectedModelId: fallbackModelId,
+          };
+        });
+      },
+      setAuthMethods: (authMethods) => {
+        set({ authMethods });
+      },
+      setSelectedProviderId: (providerId) => {
+        set((state) => {
+          const provider = state.providers.find((item) => item.id === providerId);
+          return {
+            selectedProviderId: providerId,
+            selectedModelId: provider
+              ? (state.defaultModels[providerId] ?? Object.keys(provider.models)[0] ?? null)
+              : null,
+          };
+        });
+      },
+      setSelectedModelId: (selectedModelId) => {
+        set({ selectedModelId });
+      },
+      setSelectedVariant: (providerId, modelId, variant) => {
+        set((state) => ({
+          variantSelections: {
+            ...state.variantSelections,
+            [modelKey(providerId, modelId)]: variant,
+          },
+        }));
+      },
+      setSelectedAgent: (selectedAgent) => {
+        set({ selectedAgent });
+      },
+      clear: () => {
+        set({
+          providers: [],
+          connectedProviders: [],
+          defaultModels: {},
+          authMethods: {},
+          variantSelections: {},
+          selectedProviderId: null,
+          selectedModelId: null,
+          selectedAgent: 'build',
+          isLoading: false,
+        });
+      },
+    }),
+    {
+      name: 'orbit-oc-hidden-models',
+      partialize: (state) => ({ hiddenModels: state.hiddenModels }),
+    }
+  )
+);
 
 /**
  * Returns the context window size (in tokens) for the currently selected
