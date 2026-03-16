@@ -11,6 +11,7 @@ import { InputControls } from './InputControls';
 import { OcQuestionCard } from './OcQuestionCard';
 import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
+import { LexicalChatEditor } from './lexical';
 import { MentionPopover } from './mention-popover';
 import { SlashCommandPopover } from './slash-command-popover';
 import { useChatInput } from './use-chat-input';
@@ -20,48 +21,12 @@ import type { FC } from 'react';
 
 import { ElementContextChip } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import { useModel } from '@/stores/agent/tool-store';
 
 /** Check if a permission request is for the AskUserQuestion tool */
 function isAskUserQuestion(toolName: string): boolean {
   return toolName.toLowerCase() === 'askuserquestion';
-}
-
-interface TextSegment {
-  readonly text: string;
-  readonly isCommand: boolean;
-}
-
-/** Parse text into segments, marking /<known-command> tokens for blue highlighting. */
-function parseCommandSegments(text: string, knownNames: ReadonlySet<string>): TextSegment[] {
-  if (text.length === 0 || knownNames.size === 0) return [{ text, isCommand: false }];
-
-  const segments: TextSegment[] = [];
-  // Match /<word> tokens preceded by start-of-string or whitespace
-  const pattern = /(?:^|(?<=\s))\/([\w-]+)/g;
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while ((match = pattern.exec(text)) !== null) {
-    const name = match[1];
-    if (name === undefined || !knownNames.has(name)) continue;
-
-    // Text before this match
-    if (match.index > lastIndex) {
-      segments.push({ text: text.slice(lastIndex, match.index), isCommand: false });
-    }
-    // The command token
-    segments.push({ text: match[0], isCommand: true });
-    lastIndex = match.index + match[0].length;
-  }
-
-  // Remaining text after last match
-  if (lastIndex < text.length) {
-    segments.push({ text: text.slice(lastIndex), isCommand: false });
-  }
-
-  return segments.length > 0 ? segments : [{ text, isCommand: false }];
 }
 
 export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
@@ -96,14 +61,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     slashGhostText,
     leadingCommand,
     // Refs
-    inputRef,
+    editorElementRef,
+    editorRef,
     imageInputRef,
     // Popover state
     popover,
     // Handlers
-    handleInputChange,
-    handleKeyDown,
-    handlePaste,
+    handleShiftTab,
+    handleTextChange,
     handleSend,
     handleImageClick,
     handleImageSelect,
@@ -162,13 +127,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     }
     return names;
   }, [leadingCommand, slashCommands]);
-
-  // Parse input text into segments for the colored overlay
-  const commandSegments = useMemo(
-    () => parseCommandSegments(inputText, knownCommandNames),
-    [inputText, knownCommandNames]
-  );
-  const hasAnyCommand = commandSegments.some((seg) => seg.isCommand);
 
   // Global keyboard shortcuts for regular permission modals.
   // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
@@ -295,76 +253,20 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               </ContextChips>
             ) : null}
 
-            {/* Input Area — text is always transparent, overlay renders the visible text.
-                This avoids all WebKit cursor issues with styled inline elements. */}
-            <div className="relative">
-              <div
-                ref={inputRef}
-                data-demo-input
-                className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
-                style={{
-                  minHeight: INPUT_SIZES.textareaMinHeight,
-                  maxHeight: INPUT_SIZES.textareaMaxHeight,
-                  // Only make text transparent when commands are detected.
-                  // When no command, contentEditable renders text normally — no overlay needed.
-                  ...(hasAnyCommand
-                    ? { color: 'transparent', caretColor: 'var(--foreground)' }
-                    : {}),
-                }}
-                contentEditable
-                suppressContentEditableWarning
-                data-placeholder="Plan, @ for context, / for commands"
-                data-empty={isInputEmpty}
-                onInput={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onScroll={(e) => {
-                  // Sync overlay scroll with contentEditable scroll
-                  const overlay = e.currentTarget.nextElementSibling;
-                  if (overlay instanceof HTMLElement) {
-                    overlay.scrollTop = e.currentTarget.scrollTop;
-                  }
-                }}
-              />
-
-              {/* Command highlight overlay — renders all text with known /commands in blue.
-                  ContentEditable text is transparent when commands are present, so this overlay
-                  provides the visible text. Same font/padding = pixel-perfect alignment. */}
-              {hasAnyCommand ? (
-                <div
-                  aria-hidden
-                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word overflow-hidden"
-                  style={{
-                    minHeight: INPUT_SIZES.textareaMinHeight,
-                    maxHeight: INPUT_SIZES.textareaMaxHeight,
-                  }}
-                >
-                  {commandSegments.map((seg, i) => (
-                    <span
-                      key={`${String(i)}-${seg.text.slice(0, 8)}`}
-                      className={seg.isCommand ? 'text-git-untracked' : 'text-foreground'}
-                    >
-                      {seg.text}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
-
-              {/* Ghost autocomplete text — mirrors input position, typed portion is invisible */}
-              {slashGhostText.length > 0 ? (
-                <div
-                  aria-hidden
-                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word"
-                  style={{
-                    minHeight: INPUT_SIZES.textareaMinHeight,
-                    maxHeight: INPUT_SIZES.textareaMaxHeight,
-                  }}
-                >
-                  <span className="invisible">{inputText}</span>
-                  <span className="text-muted-foreground/40">{slashGhostText}</span>
-                </div>
-              ) : null}
-            </div>
+            <LexicalChatEditor
+              editorElementRef={editorElementRef}
+              editorRef={editorRef}
+              inputText={inputText}
+              isInputEmpty={isInputEmpty}
+              knownCommandNames={knownCommandNames}
+              onSelectSlashCommand={handleSlashSelect}
+              onSend={handleSend}
+              onShiftTab={handleShiftTab}
+              onTextChange={handleTextChange}
+              popover={popover}
+              slashCommands={slashCommands}
+              slashGhostText={slashGhostText}
+            />
 
             {/* Mention Popover */}
             <MentionPopover
@@ -373,7 +275,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               query={popover.mentionQuery}
               onQueryChange={popover.setMentionQuery}
               onSelect={handleMentionSelect}
-              anchorRef={inputRef}
+              anchorRef={editorElementRef}
             />
 
             {/* Slash Command Popover — absolutely positioned inside the input box */}

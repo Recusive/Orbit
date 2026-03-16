@@ -120,8 +120,8 @@ const UserMessageBubble: FC<{
   }, []);
 
   // Render /slash-commands and @file tokens with special styling anywhere in the message.
-  // Slash commands → gray inline code. @file tokens → light blue clickable links that
-  // open the file in the code editor. Plain text between tokens is preserved as-is.
+  // Slash commands stay as plain blue text to match the chat input surface. @file tokens
+  // remain clickable links that open the file in the code editor.
   const renderedContent = useMemo(() => {
     // Match /slash-commands and @file tokens anywhere in the string
     const tokenPattern = /(\/[\w-]+|@[\w./-]+)/g;
@@ -166,9 +166,9 @@ const UserMessageBubble: FC<{
         );
       } else {
         parts.push(
-          <code key={key} className="rounded-[5px] bg-lg-control px-1.5 py-0.5 font-mono text-sm">
+          <span key={key} className="text-git-untracked">
             {token}
-          </code>
+          </span>
         );
       }
 

@@ -8,6 +8,7 @@ import type {
   ReactElementContext,
   ThinkingMode,
 } from '@/types/protocol';
+import type { LexicalEditor } from 'lexical';
 
 export interface UsageData {
   readonly inputTokens: number;
@@ -71,6 +72,8 @@ export interface PopoverNavigationState {
   setMentionQuery: (query: string) => void;
   mentionSelectedIndex: number;
   setMentionSelectedIndex: React.Dispatch<React.SetStateAction<number>>;
+  mentionStartIndex: number;
+  setMentionStartIndex: (index: number) => void;
   // Slash popover
   slashOpen: boolean;
   setSlashOpen: (open: boolean) => void;
@@ -115,14 +118,14 @@ export interface UseChatInputReturn {
   /** Name of a known leading slash command (e.g., "compact") for visual highlighting, or null */
   leadingCommand: string | null;
   // Refs
-  inputRef: React.RefObject<HTMLDivElement | null>;
+  editorElementRef: React.RefObject<HTMLDivElement | null>;
+  editorRef: React.RefObject<LexicalEditor | null>;
   imageInputRef: React.RefObject<HTMLInputElement | null>;
   // Popover state
   popover: PopoverNavigationState;
   // Handlers
-  handleInputChange: (e: React.SyntheticEvent<HTMLDivElement>) => void;
-  handleKeyDown: (e: React.KeyboardEvent) => void;
-  handlePaste: (e: React.ClipboardEvent) => void;
+  handleShiftTab: () => void;
+  handleTextChange: (text: string) => void;
   handleSend: () => void;
   handleImageClick: () => void;
   handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;

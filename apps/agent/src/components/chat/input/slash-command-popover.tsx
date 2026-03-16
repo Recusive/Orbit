@@ -95,6 +95,9 @@ export const SlashCommandPopover: FC<SlashCommandPopoverProps> = ({
       // Prevent clicks inside the popover from bubbling to the chat input
       onMouseDown={(e) => {
         e.stopPropagation();
+        if (!(e.target instanceof HTMLInputElement)) {
+          e.preventDefault();
+        }
       }}
     >
       <Command shouldFilter={false} className="bg-transparent">

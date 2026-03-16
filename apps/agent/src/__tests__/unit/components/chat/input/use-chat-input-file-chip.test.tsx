@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import type { UseChatInputOptions } from '@/components/chat/input/types';
+import type { LexicalEditor } from 'lexical';
 
 import { useChatInput } from '@/components/chat/input/use-chat-input';
 import { useBackendStore } from '@/stores/backend/backend-store';
@@ -113,15 +114,11 @@ describe('useChatInput pending file chips', () => {
 
   it('focuses input after adding chips', async () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
     const focusSpy = vi.fn();
-    Object.defineProperty(input, 'focus', {
-      value: focusSpy,
-      writable: true,
-    });
+    const editor = { focus: focusSpy } as unknown as LexicalEditor;
 
     act(() => {
-      (result.current.inputRef as { current: HTMLDivElement | null }).current = input;
+      result.current.editorRef.current = editor;
       usePendingContextStore
         .getState()
         .enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
@@ -159,20 +156,11 @@ describe('useChatInput pending file chips', () => {
     useBackendStore.setState({ activeBackend: 'opencode' });
     const onModeChange = vi.fn();
     const { result } = renderHook(() => useChatInput(createOptions({ onModeChange })));
-    const preventDefault = vi.fn();
 
     act(() => {
-      result.current.handleKeyDown({
-        key: 'Tab',
-        shiftKey: true,
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault,
-      } as unknown as React.KeyboardEvent);
+      result.current.handleShiftTab();
     });
 
-    expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(onModeChange).not.toHaveBeenCalled();
     expect(useOcProviderStore.getState().selectedAgent).toBe('plan');
   });
@@ -181,20 +169,11 @@ describe('useChatInput pending file chips', () => {
     useBackendStore.setState({ activeBackend: 'opencode' });
     useOcProviderStore.setState({ selectedAgent: 'explore' });
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const preventDefault = vi.fn();
 
     act(() => {
-      result.current.handleKeyDown({
-        key: 'Tab',
-        shiftKey: true,
-        metaKey: false,
-        ctrlKey: false,
-        altKey: false,
-        preventDefault,
-      } as unknown as React.KeyboardEvent);
+      result.current.handleShiftTab();
     });
 
-    expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(useOcProviderStore.getState().selectedAgent).toBe('build');
   });
 });

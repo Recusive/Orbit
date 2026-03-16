@@ -45,7 +45,18 @@ function makeAssistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage
   };
 }
 
-function renderMessageItem(overrides: Partial<MessageItemProps> = {}): void {
+function makeUserMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id: 'user-1',
+    role: 'user',
+    content: '/strategy-competitors',
+    displayedContent: '/strategy-competitors',
+    isStreaming: false,
+    ...overrides,
+  };
+}
+
+function renderMessageItem(overrides: Partial<MessageItemProps> = {}): ReturnType<typeof render> {
   const props: MessageItemProps = {
     message: makeAssistantMessage(),
     tools: [],
@@ -60,7 +71,7 @@ function renderMessageItem(overrides: Partial<MessageItemProps> = {}): void {
     ...overrides,
   };
 
-  render(<MessageItem {...props} />);
+  return render(<MessageItem {...props} />);
 }
 
 describe('MessageItem action bar visibility', () => {
@@ -109,5 +120,14 @@ describe('MessageItem action bar visibility', () => {
       expect.objectContaining({ rewindDisabled: false, showRewind: true }),
       undefined
     );
+  });
+
+  it('renders slash commands in user bubbles as plain blue text, not inline code badges', () => {
+    const { container } = renderMessageItem({
+      message: makeUserMessage(),
+    });
+
+    expect(screen.getByText('/strategy-competitors')).toHaveClass('text-git-untracked');
+    expect(container.querySelector('code')).toBeNull();
   });
 });

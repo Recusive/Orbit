@@ -1,7 +1,9 @@
 import { act, renderHook } from '@testing-library/react';
+import { createEditor } from 'lexical';
 
 import type { SlashCommand, UseChatInputOptions } from '@/components/chat/input/types';
 
+import { readEditorText, setEditorText } from '@/components/chat/input/lexical';
 import { useChatInput } from '@/components/chat/input/use-chat-input';
 import { useBackendStore } from '@/stores/backend/backend-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
@@ -89,6 +91,10 @@ function createOptions(overrides: Partial<UseChatInputOptions> = {}): UseChatInp
   };
 }
 
+function attachEditor(): ReturnType<typeof createEditor> {
+  return createEditor();
+}
+
 describe('slash command highlighting in useChatInput', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
@@ -107,11 +113,13 @@ describe('slash command highlighting in useChatInput', () => {
 
   it('sets leadingCommand when a command is selected from the popover', () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = '/com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, '/com');
+      result.current.handleTextChange('/com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(0);
@@ -132,11 +140,13 @@ describe('slash command highlighting in useChatInput', () => {
 
   it('does not set leadingCommand for mid-message slash commands', () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = 'hello /com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, 'hello /com');
+      result.current.handleTextChange('hello /com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(6);
@@ -157,11 +167,13 @@ describe('slash command highlighting in useChatInput', () => {
 
   it('clears leadingCommand when command text is deleted', () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = '/com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, '/com');
+      result.current.handleTextChange('/com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(0);
@@ -178,12 +190,9 @@ describe('slash command highlighting in useChatInput', () => {
 
     expect(result.current.leadingCommand).toBe('compact');
 
-    // Simulate user deleting text
-    input.textContent = '/compac';
     act(() => {
-      result.current.handleInputChange({
-        currentTarget: input,
-      } as React.SyntheticEvent<HTMLDivElement>);
+      setEditorText(editor, '/compac');
+      result.current.handleTextChange('/compac');
     });
 
     expect(result.current.leadingCommand).toBeNull();
@@ -191,11 +200,13 @@ describe('slash command highlighting in useChatInput', () => {
 
   it('keeps leadingCommand when typing after the command', () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = '/com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, '/com');
+      result.current.handleTextChange('/com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(0);
@@ -210,12 +221,9 @@ describe('slash command highlighting in useChatInput', () => {
       });
     });
 
-    // Type more text after the command
-    input.textContent = '/compact hello world';
     act(() => {
-      result.current.handleInputChange({
-        currentTarget: input,
-      } as React.SyntheticEvent<HTMLDivElement>);
+      setEditorText(editor, '/compact hello world');
+      result.current.handleTextChange('/compact hello world');
     });
 
     expect(result.current.leadingCommand).toBe('compact');
@@ -224,11 +232,13 @@ describe('slash command highlighting in useChatInput', () => {
   it('clears leadingCommand on send', () => {
     const onSend = vi.fn();
     const { result } = renderHook(() => useChatInput(createOptions({ onSend })));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = '/com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, '/com');
+      result.current.handleTextChange('/com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(0);
@@ -249,16 +259,19 @@ describe('slash command highlighting in useChatInput', () => {
 
     expect(result.current.leadingCommand).toBeNull();
     expect(onSend).toHaveBeenCalledTimes(1);
+    expect(readEditorText(editor)).toBe('');
   });
 
   it('sends the command as part of the message text', () => {
     const onSend = vi.fn();
     const { result } = renderHook(() => useChatInput(createOptions({ onSend })));
-    const input = document.createElement('div');
-    input.contentEditable = 'true';
-    document.body.appendChild(input);
-    (result.current.inputRef as { current: HTMLDivElement }).current = input;
-    input.textContent = '/com';
+    const editor = attachEditor();
+
+    act(() => {
+      result.current.editorRef.current = editor;
+      setEditorText(editor, '/com');
+      result.current.handleTextChange('/com');
+    });
 
     act(() => {
       result.current.popover.setSlashStartIndex(0);
@@ -273,12 +286,9 @@ describe('slash command highlighting in useChatInput', () => {
       });
     });
 
-    // Type a message
-    input.textContent = '/compact hello';
     act(() => {
-      result.current.handleInputChange({
-        currentTarget: input,
-      } as React.SyntheticEvent<HTMLDivElement>);
+      setEditorText(editor, '/compact hello');
+      result.current.handleTextChange('/compact hello');
     });
 
     act(() => {

@@ -121,6 +121,10 @@ export default defineConfig({
           ) {
             return 'vendor-codemirror';
           }
+          // Lexical editor framework
+          if (id.includes('node_modules/lexical') || id.includes('node_modules/@lexical')) {
+            return 'vendor-lexical';
+          }
           // xterm terminal emulator (~200KB)
           if (id.includes('node_modules/@xterm') || id.includes('node_modules/xterm')) {
             return 'vendor-xterm';
@@ -196,6 +200,18 @@ export default defineConfig({
       '@codemirror/state',
       '@codemirror/view',
       '@lezer/highlight',
+      // Lexical chat input editor packages
+      // NOTE: @lexical/react has no root "." export — must list deep imports individually.
+      'lexical',
+      '@lexical/react/LexicalComposer',
+      '@lexical/react/LexicalComposerContext',
+      '@lexical/react/LexicalContentEditable',
+      '@lexical/react/LexicalErrorBoundary',
+      '@lexical/react/LexicalHistoryPlugin',
+      '@lexical/react/LexicalPlainTextPlugin',
+      '@lexical/plain-text',
+      '@lexical/history',
+      '@lexical/selection',
       // xterm packages must be pre-bundled to prevent runtime discovery that triggers
       // 504 "Outdated Optimize Dep" errors — especially in Tauri's WKWebView which
       // doesn't handle Vite's full-reload recovery as well as a regular browser.

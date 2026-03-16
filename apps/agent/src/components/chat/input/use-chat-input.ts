@@ -8,12 +8,14 @@ import {
   THINKING_MODE_INFO,
   THINKING_MODES,
 } from './constants';
-import { getFilteredCommandsCount, getCommandAtIndex } from './slash-command-popover';
-import { usePopoverNavigation, handlePopoverKeyDown } from './use-popover-navigation';
+import { clearEditor, replaceTriggerRange } from './lexical';
+import { getCommandAtIndex } from './slash-command-popover';
+import { usePopoverNavigation } from './use-popover-navigation';
 
 import type { SlashCommand, UseChatInputOptions, UseChatInputReturn } from './types';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
 import type { InputMode } from '@/types/protocol';
+import type { LexicalEditor } from 'lexical';
 
 import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
@@ -26,94 +28,6 @@ import { useOcProviderStore } from '@/stores/opencode';
 
 const logger = createLogger('ChatInput');
 const OPENCODE_AGENTS = ['build', 'plan', 'explore'] as const;
-
-function getTextOffset(container: HTMLElement, node: Node, offset: number): number {
-  const range = document.createRange();
-  range.setStart(container, 0);
-  range.setEnd(node, offset);
-  return range.toString().length;
-}
-
-function getSelectionOffsets(container: HTMLElement): { start: number; end: number } {
-  const selection = window.getSelection();
-  if (selection === null || selection.rangeCount === 0) {
-    return { start: 0, end: 0 };
-  }
-
-  const range = selection.getRangeAt(0);
-  return {
-    start: getTextOffset(container, range.startContainer, range.startOffset),
-    end: getTextOffset(container, range.endContainer, range.endOffset),
-  };
-}
-
-export function getCursorOffset(container: HTMLElement): number {
-  const selection = window.getSelection();
-  if (selection === null || selection.rangeCount === 0) return 0;
-  const range = selection.getRangeAt(0);
-  return getTextOffset(container, range.startContainer, range.startOffset);
-}
-
-export function setCursorAtTextOffset(container: HTMLElement, offset: number): void {
-  const selection = window.getSelection();
-  if (selection === null) return;
-  const activeSelection = selection;
-
-  let remaining = offset;
-
-  function placeRange(boundary: 'before' | 'after', node: Node): void {
-    const range = document.createRange();
-    if (boundary === 'before') {
-      range.setStartBefore(node);
-    } else {
-      range.setStartAfter(node);
-    }
-    range.collapse(true);
-    activeSelection.removeAllRanges();
-    activeSelection.addRange(range);
-  }
-
-  function walk(parent: Node): boolean {
-    for (const child of parent.childNodes) {
-      if (child instanceof HTMLBRElement) {
-        if (remaining === 0) {
-          placeRange('before', child);
-          return true;
-        }
-        remaining -= 1;
-        continue;
-      }
-
-      if (child.nodeType === Node.TEXT_NODE) {
-        const len = child.textContent?.length ?? 0;
-        if (remaining <= len) {
-          const range = document.createRange();
-          range.setStart(child, remaining);
-          range.collapse(true);
-          activeSelection.removeAllRanges();
-          activeSelection.addRange(range);
-          return true;
-        }
-        remaining -= len;
-        continue;
-      }
-
-      if (child instanceof HTMLElement && walk(child)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  if (walk(container)) return;
-
-  const range = document.createRange();
-  range.selectNodeContents(container);
-  range.collapse(false);
-  activeSelection.removeAllRanges();
-  activeSelection.addRange(range);
-}
 
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
@@ -144,7 +58,8 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const fetchSkills = useCommandsStore((state) => state.fetchSkills);
 
   // Refs
-  const inputRef = useRef<HTMLDivElement>(null);
+  const editorElementRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<LexicalEditor | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   // Guard against ESC key repeat triggering multiple stops
   // React state updates are async, so isAgentRunning can be true for multiple rapid keydown events
@@ -163,41 +78,6 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     void fetchCommands();
     void fetchSkills();
   }, [fetchCommands, fetchSkills]);
-
-  // Listen for focus event from feedback button
-  useEffect(() => {
-    const handleFocusEvent = (): void => {
-      inputRef.current?.focus();
-    };
-    window.addEventListener('focusChatInput', handleFocusEvent);
-    return () => {
-      window.removeEventListener('focusChatInput', handleFocusEvent);
-    };
-  }, []);
-
-  // Listen for prefill event from rewind — populates input with the removed message
-  useEffect(() => {
-    const handlePrefill = (e: Event): void => {
-      const text = (e as CustomEvent<{ text: string }>).detail.text;
-      if (!text || !inputRef.current) return;
-      inputRef.current.textContent = text;
-      setInputText(text);
-      // Move cursor to end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      if (sel) {
-        range.selectNodeContents(inputRef.current);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      inputRef.current.focus();
-    };
-    window.addEventListener('prefillChatInput', handlePrefill);
-    return () => {
-      window.removeEventListener('prefillChatInput', handlePrefill);
-    };
-  }, []);
 
   // Drain pending context chips from the store (survives ChatInput unmount).
   // Runs immediately on mount and whenever new chips are queued while mounted.
@@ -218,7 +98,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         });
         return nextItems.length > 0 ? [...prev, ...nextItems] : prev;
       });
-      inputRef.current?.focus();
+      editorRef.current?.focus();
     };
 
     drainAndAttach();
@@ -238,81 +118,23 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     }
   }, [isAgentRunning]);
 
-  // Input change handler - detects @ mentions and / commands
-  const handleInputChange = useCallback(
-    (e: React.SyntheticEvent<HTMLDivElement>): void => {
-      const container = e.currentTarget;
-      const text = container.textContent || '';
+  const handleTextChange = useCallback(
+    (text: string): void => {
       setInputText(text);
 
-      // Clear leading command highlight if the text no longer starts with it
-      if (leadingCommand !== null) {
-        const token = `/${leadingCommand}`;
-        const afterToken = text[token.length];
-        const stillValid =
-          text.startsWith(token) && (afterToken === undefined || /\s/.test(afterToken));
-        if (!stillValid) {
-          setLeadingCommand(null);
-        }
+      if (leadingCommand === null) {
+        return;
       }
 
-      const cursorPos = getCursorOffset(container);
-      const beforeCursor = text.slice(0, cursorPos);
-      let handledPopover = false;
-
-      // Detect / slash command — triggers after any whitespace or at start of input.
-      // Find the last "/" before cursor that's either at position 0 or preceded by a space.
-      const lastSlashIndex = beforeCursor.lastIndexOf('/');
-      if (
-        lastSlashIndex !== -1 &&
-        (lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ')
-      ) {
-        const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
-        if (!afterSlash.includes(' ')) {
-          // Only keep the popover open if there are matching commands (or query is empty → show all).
-          // When nothing matches the user is likely typing a URL or path, not a slash command.
-          if (afterSlash === '' || getFilteredCommandsCount(afterSlash, slashCommands) > 0) {
-            popover.setSlashQuery(afterSlash);
-            popover.setSlashStartIndex(lastSlashIndex);
-            popover.setSlashOpen(true);
-            if (popover.mentionOpen) {
-              popover.setMentionOpen(false);
-              popover.setMentionQuery('');
-            }
-            handledPopover = true;
-          } else {
-            popover.closeSlashPopover();
-          }
-        }
-      }
-
-      if (!handledPopover) {
-        // Detect @ mention
-        const lastAtIndex = beforeCursor.lastIndexOf('@');
-        if (lastAtIndex !== -1) {
-          const afterAt = beforeCursor.slice(lastAtIndex + 1);
-          if (!afterAt.includes(' ')) {
-            popover.setMentionQuery(afterAt);
-            popover.setMentionOpen(true);
-            if (popover.slashOpen) {
-              popover.setSlashOpen(false);
-              popover.setSlashQuery('');
-            }
-            handledPopover = true;
-          }
-        }
-      }
-
-      if (!handledPopover && popover.mentionOpen) {
-        popover.setMentionOpen(false);
-        popover.setMentionQuery('');
-      }
-      if (!handledPopover && popover.slashOpen) {
-        popover.setSlashOpen(false);
-        popover.setSlashQuery('');
+      const token = `/${leadingCommand}`;
+      const afterToken = text[token.length];
+      const stillValid =
+        text.startsWith(token) && (afterToken === undefined || /\s/.test(afterToken));
+      if (!stillValid) {
+        setLeadingCommand(null);
       }
     },
-    [popover, slashCommands, leadingCommand]
+    [leadingCommand]
   );
 
   // Send message handler
@@ -353,8 +175,8 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     // Clear input immediately
     setInputText('');
     setLeadingCommand(null);
-    if (inputRef.current) {
-      inputRef.current.textContent = '';
+    if (editorRef.current) {
+      clearEditor(editorRef.current);
     }
 
     // Extract file paths from attached context
@@ -387,7 +209,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     );
     setAttachedContext([]);
     clearElementContexts();
-  }, [inputText, onSend, attachedContext, clearElementContexts, elementContexts]);
+  }, [attachedContext, clearElementContexts, elementContexts, inputText, onSend]);
 
   // Image handlers
   const handleImageClick = useCallback((): void => {
@@ -450,38 +272,43 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         return [...prev, newContext];
       });
 
-      // Remove the @query from input
-      if (inputRef.current) {
-        const cursorPos = getCursorOffset(inputRef.current);
-        const text = inputRef.current.textContent;
-        const beforeCursor = text.slice(0, cursorPos);
-        const lastAtIndex = beforeCursor.lastIndexOf('@');
+      const nextText =
+        inputText.slice(0, popover.mentionStartIndex) +
+        inputText.slice(popover.mentionStartIndex + 1 + popover.mentionQuery.length);
+      setInputText(nextText);
 
-        if (lastAtIndex !== -1) {
-          const newText = text.slice(0, lastAtIndex) + text.slice(cursorPos);
-          inputRef.current.textContent = newText;
-          setInputText(newText);
-          setCursorAtTextOffset(inputRef.current, lastAtIndex);
-        }
+      if (editorRef.current !== null) {
+        replaceTriggerRange(
+          editorRef.current,
+          {
+            end: popover.mentionStartIndex + 1 + popover.mentionQuery.length,
+            kind: 'mention',
+            query: popover.mentionQuery,
+            start: popover.mentionStartIndex,
+          },
+          ''
+        );
       }
 
       popover.closeMentionPopover();
-      inputRef.current?.focus();
+      editorRef.current?.focus();
     },
-    [popover]
+    [inputText, popover]
   );
 
   // Slash command selection handler — replaces only the /query token at slashStartIndex
   const handleSlashSelect = useCallback(
     (command: SlashCommand): void => {
-      if (!inputRef.current) return;
-
-      const currentText = inputRef.current.textContent;
       const start = popover.slashStartIndex;
-      const tokenEnd = start + 1 + popover.slashQuery.length;
+      const end = start + 1 + popover.slashQuery.length;
+      const triggerRange = {
+        end,
+        kind: 'slash' as const,
+        query: popover.slashQuery,
+        start,
+      };
 
       if (command.kind === 'skill') {
-        // Skills become context chips — remove /query token from text
         const skillContext: ContextItem = {
           id: crypto.randomUUID(),
           type: 'skill',
@@ -495,45 +322,30 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
           return [...prev, skillContext];
         });
 
-        const before = currentText.slice(0, start);
-        const after = currentText.slice(tokenEnd).replace(/^ /, '');
-        const newText = (before + after).trim();
-        inputRef.current.textContent = newText;
-        setInputText(newText);
+        const nextText = inputText.slice(0, start) + inputText.slice(end);
+        setInputText(nextText);
+        if (editorRef.current !== null) {
+          replaceTriggerRange(editorRef.current, triggerRange, '');
+        }
+        setLeadingCommand(null);
       } else {
-        // Regular commands: replace /query with /command + space as plain text.
-        // The visual badge is rendered as a CSS overlay in ChatInput.tsx (like ghost text),
-        // not as a DOM element inside the contentEditable. This avoids ALL WebKit cursor
-        // issues — typed text never merges with the command because there's no styled
-        // element in the DOM for the browser to extend.
-        const before = currentText.slice(0, start);
-        const after = currentText.slice(tokenEnd);
         const replacement = `/${command.name} `;
-        const newText = before + replacement + after;
-        inputRef.current.textContent = newText;
-        setInputText(newText);
-        // Set the leading command for blue highlighting (explicit state, not derived)
+        const nextText = inputText.slice(0, start) + replacement + inputText.slice(end);
+        setInputText(nextText);
+        if (editorRef.current !== null) {
+          replaceTriggerRange(editorRef.current, triggerRange, replacement);
+        }
         if (start === 0) {
           setLeadingCommand(command.name);
-        }
-
-        // Place cursor after the command + space
-        const cursorPos = start + replacement.length;
-        const textNode = inputRef.current.firstChild;
-        if (textNode !== null) {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.setStart(textNode, Math.min(cursorPos, textNode.textContent?.length ?? 0));
-          range.collapse(true);
-          sel?.removeAllRanges();
-          sel?.addRange(range);
+        } else {
+          setLeadingCommand(null);
         }
       }
 
       popover.closeSlashPopover();
-      inputRef.current.focus();
+      editorRef.current?.focus();
     },
-    [popover]
+    [inputText, popover]
   );
 
   // Context removal handler
@@ -573,92 +385,19 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     };
   }, [isAgentRunning, popover.slashOpen, popover.mentionOpen, handleStop]);
 
-  // Keyboard handler
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent): void => {
-      // ESC stop is handled by the global window listener (useEffect above)
-      // so it works regardless of which element has focus.
+  const handleShiftTab = useCallback((): void => {
+    if (activeBackend === 'claude') {
+      const nextMode: InputMode =
+        inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
+      onModeChange(nextMode);
+      return;
+    }
 
-      // Handle slash command popover
-      if (popover.slashOpen) {
-        const itemCount = getFilteredCommandsCount(popover.slashQuery, slashCommands);
-        const handled = handlePopoverKeyDown(e, {
-          itemCount,
-          selectedIndex: popover.slashSelectedIndex,
-          setSelectedIndex: popover.setSlashSelectedIndex,
-          onSelect: () => {
-            const selectedCommand = getCommandAtIndex(
-              popover.slashQuery,
-              popover.slashSelectedIndex,
-              slashCommands
-            );
-            if (selectedCommand) {
-              handleSlashSelect(selectedCommand);
-            }
-          },
-          onClose: popover.closeSlashPopover,
-        });
-        if (handled) return;
-      }
-
-      // MentionPopover handles its own keyboard navigation internally
-      // Skip sending message when mention popover is open (it handles Enter)
-      if (popover.mentionOpen) {
-        return;
-      }
-
-      // Shift+Tab cycles the active backend mode when focus is inside the chat input.
-      // Scoped here to preserve native reverse-tab navigation elsewhere.
-      if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-
-        if (activeBackend === 'claude') {
-          const nextMode: InputMode =
-            inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
-          onModeChange(nextMode);
-        } else {
-          const currentIndex = OPENCODE_AGENTS.indexOf(selectedOcAgent);
-          const nextIndex = (currentIndex + 1) % OPENCODE_AGENTS.length;
-          const nextAgent = OPENCODE_AGENTS[nextIndex] ?? 'build';
-          setSelectedOcAgent(nextAgent);
-        }
-
-        return;
-      }
-
-      // Enter sends message
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [
-      activeBackend,
-      popover,
-      slashCommands,
-      handleSlashSelect,
-      handleSend,
-      inputMode,
-      onModeChange,
-      selectedOcAgent,
-      setSelectedOcAgent,
-    ]
-  );
-
-  // Paste handler — plain text paste with cursor restoration
-  const handlePaste = useCallback((e: React.ClipboardEvent): void => {
-    const container = inputRef.current;
-    if (container === null) return;
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData('text/plain');
-    const currentText = container.textContent;
-    const { start, end } = getSelectionOffsets(container);
-    const newText = currentText.slice(0, start) + pastedText + currentText.slice(end);
-    const cursorPos = start + pastedText.length;
-    container.textContent = newText;
-    setInputText(newText);
-    setCursorAtTextOffset(container, cursorPos);
-  }, []);
+    const currentIndex = OPENCODE_AGENTS.indexOf(selectedOcAgent);
+    const nextIndex = (currentIndex + 1) % OPENCODE_AGENTS.length;
+    const nextAgent = OPENCODE_AGENTS[nextIndex] ?? 'build';
+    setSelectedOcAgent(nextAgent);
+  }, [activeBackend, inputMode, onModeChange, selectedOcAgent, setSelectedOcAgent]);
 
   // Mode cycling handlers
   const cycleInputMode = useCallback((): void => {
@@ -734,14 +473,14 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     slashGhostText,
     leadingCommand,
     // Refs
-    inputRef,
+    editorElementRef,
+    editorRef,
     imageInputRef,
     // Popover state
     popover,
     // Handlers
-    handleInputChange,
-    handleKeyDown,
-    handlePaste,
+    handleShiftTab,
+    handleTextChange,
     handleSend,
     handleImageClick,
     handleImageSelect,
