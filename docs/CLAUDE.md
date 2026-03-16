@@ -17,6 +17,7 @@ Use this to find the right file. Read the file directly — no links needed.
 | `quality/`              | Linting, audits, health metrics     | Code standards, audit results    |
 | `reference/`            | SDK docs, prompts, external guides  | API references, prompt templates |
 | `specs/`                | Behavior specs, acceptance criteria | What "done" looks like           |
+| `skills/`               | Agent skill creation and publishing | Creating/publishing skills       |
 | `orbitweb/`             | Marketing site context              | Orbitweb-specific (read-only)    |
 
 ## decisions/ (5 files)
@@ -150,6 +151,11 @@ Use this to find the right file. Read the file directly — no links needed.
 - `PENCIL-CANVAS-ARCHITECTURE.md` — Pencil design editor architecture (dual-canvas rendering, scene graph, AI streaming generation via MCP)
 - `System-Prompt.xml` — System prompt template
 - `canvas-rebuild-prompt.md` — Canvas rebuild prompt context
+
+## skills/ (2 files)
+
+- `skill-guide.md` — Definitive guide to building agent skills (compiled from Anthropic's official guide, AgentSkills spec, and skills-ref library)
+- `SKILLS-PUBLISHING-GUIDE.md` — How to create skills, publish to Recusive/Skills repo, CLI commands, skills.sh leaderboard mechanics, well-known endpoint hosting
 
 ## orbitweb/ (1 file)
 

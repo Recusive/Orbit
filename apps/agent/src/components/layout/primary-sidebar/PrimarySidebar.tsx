@@ -22,7 +22,7 @@ import {
   Settings2,
   Terminal,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
@@ -31,6 +31,7 @@ import { SettingsNavList } from './components/SettingsNavList';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { VaultNoteList } from './components/VaultNoteList';
+import { WorkspaceItem } from './components/WorkspaceItem';
 import { TriStateSwitch } from './components/tri-state-switch';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
@@ -50,6 +51,7 @@ import {
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { SFSymbol } from '@/components/shared';
+import { WorktreeItem } from '@/components/sidebar';
 import { Kbd } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -284,6 +286,34 @@ export const PrimarySidebar: FC = () => {
 
   // Welcome mode — no workspace open
   const isWelcome = !workspacePath;
+
+  // Worktree state for the pinned workspaces header
+  const mainWorktreePath = worktrees.find((wt) => wt.worktree.isMain)?.worktree.path ?? null;
+  const effectiveActiveWorktreePath = activeWorktreePath ?? mainWorktreePath;
+  const activeWorktreeExpanded =
+    worktrees.length > 0
+      ? (worktrees.find((wt) => wt.worktree.path === effectiveActiveWorktreePath)?.isExpanded ??
+        true)
+      : true;
+  const worktreeListRef = useRef<HTMLDivElement>(null);
+
+  // Whether the sessions/conversations UI is currently visible
+  const showingSessionsUi =
+    !isWelcome &&
+    !vaultOpen &&
+    !settingsOpen &&
+    ((!isEditorMode && activeTab === 'conversations') ||
+      (isEditorMode && editorTab === 'sessions'));
+
+  // Auto-scroll active worktree into view when it changes, tab becomes visible, or rows hydrate
+  useLayoutEffect(() => {
+    if (!showingSessionsUi || !effectiveActiveWorktreePath || !worktreeListRef.current) return;
+    const el = worktreeListRef.current.querySelector<HTMLElement>(
+      `[data-worktree-path="${CSS.escape(effectiveActiveWorktreePath)}"]`
+    );
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [showingSessionsUi, effectiveActiveWorktreePath, worktrees.length]);
+
   const setRootPath = useFileStore((s) => s.setRootPath);
   const { projects } = useRecentProjects();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
@@ -566,6 +596,66 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : null}
 
+      {/* Workspaces header — pinned above scroll so it stays visible while conversations scroll */}
+      {showingSessionsUi ? (
+        <div className="shrink-0 py-1.5 animate-title-in">
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+              Workspaces
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  aria-label="Create worktree"
+                  className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-90 transition-transform duration-75 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
+                  onClick={handleOpenCreateWorktree}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <span>Create worktree</span>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          {/* Worktree list — capped at ~5 rows to prevent starving the conversation scroll area */}
+          <div
+            ref={worktreeListRef}
+            className="flex flex-col gap-0.5 mt-1 max-h-[160px] overflow-y-auto overscroll-y-contain"
+          >
+            {worktrees.length > 0 ? (
+              worktrees.map((wt) => (
+                <div key={wt.worktree.path} data-worktree-path={wt.worktree.path}>
+                  <WorktreeItem
+                    worktreeState={wt}
+                    active={wt.worktree.path === effectiveActiveWorktreePath}
+                    onToggle={() => {
+                      toggleWorktreeExpanded(wt.worktree.path);
+                    }}
+                    onSelect={() => {
+                      useUIStore.getState().switchToWorktree(wt.worktree.path);
+                      useChatStore.getState().clearActiveSession();
+                    }}
+                    onRemove={() => {
+                      handleOpenDeleteWorktreeDialog(wt.worktree);
+                    }}
+                  />
+                </div>
+              ))
+            ) : workspaceName ? (
+              <WorkspaceItem
+                name={workspaceName}
+                active
+                expanded
+                onToggle={() => {
+                  // No-op for single workspace
+                }}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {/* Tab Content — mask fades bottom edge when more content is below */}
       <div
         ref={scrollContainerRef}
@@ -664,10 +754,8 @@ export const PrimarySidebar: FC = () => {
           ) : (
             <ConversationList
               conversations={conversations}
-              worktrees={worktrees}
-              workspaceName={workspaceName}
+              expanded={activeWorktreeExpanded}
               activeConversationId={activeConversationId}
-              activeWorktreePath={activeWorktreePath}
               editingConversationId={editingConversationId}
               onLoadConversation={handleLoadConversation}
               onStartEditConversation={setEditingConversationId}
@@ -679,22 +767,13 @@ export const PrimarySidebar: FC = () => {
               }}
               onDeleteConversation={handleOpenDeleteDialog}
               onDuplicateConversation={handleDuplicateConversation}
-              onToggleWorktree={toggleWorktreeExpanded}
-              onSelectWorktree={(path) => {
-                useUIStore.getState().switchToWorktree(path);
-                useChatStore.getState().clearActiveSession();
-              }}
-              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
-              onOpenCreateWorktree={handleOpenCreateWorktree}
             />
           )
         ) : activeTab === 'conversations' ? (
           <ConversationList
             conversations={conversations}
-            worktrees={worktrees}
-            workspaceName={workspaceName}
+            expanded={activeWorktreeExpanded}
             activeConversationId={activeConversationId}
-            activeWorktreePath={activeWorktreePath}
             editingConversationId={editingConversationId}
             onLoadConversation={handleLoadConversation}
             onStartEditConversation={setEditingConversationId}
@@ -706,13 +785,6 @@ export const PrimarySidebar: FC = () => {
             }}
             onDeleteConversation={handleOpenDeleteDialog}
             onDuplicateConversation={handleDuplicateConversation}
-            onToggleWorktree={toggleWorktreeExpanded}
-            onSelectWorktree={(path) => {
-              useUIStore.getState().switchToWorktree(path);
-              useChatStore.getState().clearActiveSession();
-            }}
-            onRemoveWorktree={handleOpenDeleteWorktreeDialog}
-            onOpenCreateWorktree={handleOpenCreateWorktree}
           />
         ) : (
           <FileExplorer />
