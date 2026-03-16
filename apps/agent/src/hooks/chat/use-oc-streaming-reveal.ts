@@ -85,6 +85,50 @@ function createEntry(message: ChatMessage): RevealEntry {
   };
 }
 
+/**
+ * Compute the single ordered reveal frontier for this message.
+ *
+ * Returns which thinking block (if any) is eligible to advance, and how far
+ * content may advance. The invariant is: reveal exactly one frontier at a time.
+ * Later thinking blocks stay at '' until displayedContent reaches their offset.
+ */
+function getRevealFrontier(
+  message: ChatMessage,
+  blocks: ThinkingBlock[],
+  entry: RevealEntry
+): { activeThinkingIndex: number; contentCeiling: number } {
+  for (const [index, block] of blocks.entries()) {
+    const offset = block.contentOffset;
+    const blockOffset = offset ?? 0;
+    const revealed = entry.thinkingLengths[index] ?? 0;
+    const stillGrowing = message.isThinkingActive === true && index === blocks.length - 1;
+    const pending = stillGrowing || revealed < block.content.length;
+
+    if (!pending) {
+      continue;
+    }
+
+    if (offset === undefined) {
+      return { activeThinkingIndex: index, contentCeiling: 0 };
+    }
+
+    if (entry.contentLength < blockOffset) {
+      return { activeThinkingIndex: -1, contentCeiling: blockOffset };
+    }
+
+    return { activeThinkingIndex: index, contentCeiling: blockOffset };
+  }
+
+  return { activeThinkingIndex: -1, contentCeiling: message.content.length };
+}
+
+/**
+ * Ordered reveal for OpenCode assistant streaming.
+ *
+ * [warning] TESTED: This hook's streaming frontier behavior is covered by unit tests.
+ *     If you modify this, run: bun run test -- apps/agent/src/__tests__/unit/hooks/chat/use-oc-streaming-reveal.test.ts
+ *     Test file: apps/agent/src/__tests__/unit/hooks/chat/use-oc-streaming-reveal.test.ts
+ */
 export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
   const [version, setVersion] = useState(0);
   const entriesRef = useRef<Record<string, RevealEntry>>(
@@ -205,24 +249,26 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
         }
 
         let advanced = false;
+        const { activeThinkingIndex, contentCeiling } = getRevealFrontier(message, blocks, entry);
 
-        if (entry.contentLength < message.content.length) {
-          entry.contentLength = Math.min(
-            findNextWordEnd(message.content, entry.contentLength),
-            message.content.length
-          );
-          advanced = true;
-        }
-
-        for (const [index, block] of blocks.entries()) {
-          const currentLength = entry.thinkingLengths[index] ?? 0;
-          if (currentLength < block.content.length) {
-            entry.thinkingLengths[index] = Math.min(
+        if (activeThinkingIndex !== -1) {
+          const block = blocks[activeThinkingIndex];
+          const currentLength = entry.thinkingLengths[activeThinkingIndex] ?? 0;
+          if (block !== undefined && currentLength < block.content.length) {
+            entry.thinkingLengths[activeThinkingIndex] = Math.min(
               findNextWordEnd(block.content, currentLength),
               block.content.length
             );
             advanced = true;
           }
+        }
+
+        if (entry.contentLength < contentCeiling) {
+          entry.contentLength = Math.min(
+            findNextWordEnd(message.content, entry.contentLength),
+            contentCeiling
+          );
+          advanced = true;
         }
 
         if (advanced) {
@@ -276,9 +322,13 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
       ...block,
       content: block.content.slice(0, entry.thinkingLengths[index] ?? block.content.length),
     }));
+    const thinkingLag = rawRevealedBlocks.some(
+      (block, index) => block.content.length < (thinkingBlocks[index]?.content.length ?? 0)
+    );
+    const visibleRevealedBlocks = rawRevealedBlocks.filter((block) => block.content.length > 0);
     const revealedBlocks = reuseThinkingBlocks(
       prevThinkingRef.current.get(message.id),
-      rawRevealedBlocks
+      visibleRevealedBlocks
     );
     prevThinkingRef.current.set(message.id, revealedBlocks);
     const revealedThinking =
@@ -287,19 +337,16 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
         : message.thinking;
     const contentLength = Math.min(entry.contentLength, message.content.length);
     const displayedContent = message.content.slice(0, contentLength);
-    const thinkingLag = revealedBlocks.some(
-      (block, index) => block.content.length < (thinkingBlocks[index]?.content.length ?? 0)
-    );
     const contentLag = displayedContent.length < message.content.length;
     const isStreaming = message.isStreaming === true || contentLag || thinkingLag;
 
     return {
       ...message,
       displayedContent,
-      ...(revealedThinking !== undefined ? { thinking: revealedThinking } : {}),
-      ...(revealedBlocks.length > 0 ? { thinkingBlocks: revealedBlocks } : {}),
-      ...(thinkingLag || message.isThinkingActive === true ? { isThinkingActive: true } : {}),
-      ...(isStreaming ? { isStreaming: true } : {}),
+      thinking: revealedThinking,
+      thinkingBlocks: revealedBlocks.length > 0 ? revealedBlocks : undefined,
+      isThinkingActive: thinkingLag || message.isThinkingActive === true,
+      isStreaming,
     } satisfies ChatMessage;
   });
 }
