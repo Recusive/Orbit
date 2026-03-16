@@ -2,19 +2,64 @@ import { SessionShareTable } from "./share.sql"
 
 import type * as SDK from "@orbit.build/sdk/v2"
 
+import { Account } from "@/account"
 import { Bus } from "@/bus"
 import { Config } from "@/config/config"
 import { Provider } from "@/provider/provider"
 import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
+import { SessionID } from "@/session/schema"
 import { Database, eq } from "@/storage/db"
 import { Log } from "@/util/log"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
 
+  type ApiEndpoints = {
+    create: string
+    sync: (shareID: string) => string
+    remove: (shareID: string) => string
+    data: (shareID: string) => string
+  }
+
+  function apiEndpoints(resource: string): ApiEndpoints {
+    return {
+      create: `/api/${resource}`,
+      sync: (shareID) => `/api/${resource}/${shareID}/sync`,
+      remove: (shareID) => `/api/${resource}/${shareID}`,
+      data: (shareID) => `/api/${resource}/${shareID}/data`,
+    }
+  }
+
+  const legacyApi = apiEndpoints("share")
+  const consoleApi = apiEndpoints("shares")
+
   export async function url(): Promise<string> {
-    return Config.get().then((x) => x.enterprise?.url ?? "https://opncd.ai")
+    const req = await request()
+    return req.baseUrl
+  }
+
+  export async function request(): Promise<{
+    headers: Record<string, string>
+    api: ApiEndpoints
+    baseUrl: string
+  }> {
+    const headers: Record<string, string> = {}
+
+    const active = Account.active()
+    if (!active?.active_org_id) {
+      const baseUrl = await Config.get().then((x) => x.enterprise?.url ?? "https://opncd.ai")
+      return { headers, api: legacyApi, baseUrl }
+    }
+
+    const token = await Account.token(active.id)
+    if (!token) {
+      throw new Error("No active account token available for sharing")
+    }
+
+    headers.authorization = `Bearer ${token}`
+    headers["x-org-id"] = active.active_org_id
+    return { headers, api: consoleApi, baseUrl: active.url }
   }
 
   const disabled = process.env.OPENCODE_DISABLE_SHARE === "true" || process.env.OPENCODE_DISABLE_SHARE === "1"
@@ -198,9 +243,10 @@ export namespace ShareNext {
 
   async function fullSync(sessionID: string): Promise<void> {
     log.info("full sync", { sessionID })
-    const session = Session.get(sessionID)
-    const diffs = await Session.diff(sessionID)
-    const messages = await Array.fromAsync(MessageV2.stream(sessionID))
+    const brandedSessionID = SessionID.make(sessionID)
+    const session = Session.get(brandedSessionID)
+    const diffs = await Session.diff(brandedSessionID)
+    const messages = await Array.fromAsync(MessageV2.stream(brandedSessionID))
     const models = await Promise.all(
       Array.from(
         new Map(

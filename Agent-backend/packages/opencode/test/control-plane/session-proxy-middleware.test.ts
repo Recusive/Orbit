@@ -1,18 +1,16 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
+import { WorkspaceID } from "../../src/control-plane/schema"
 import { Hono } from "hono"
-
-import * as adaptors from "../../src/control-plane/adaptors"
-import { WorkspaceContext } from "../../src/control-plane/workspace-context"
-import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
-import { Flag } from "../../src/flag/flag"
-import { Identifier } from "../../src/id/id"
-import { Instance } from "../../src/project/instance"
+import { tmpdir } from "../fixture/fixture"
 import { Project } from "../../src/project/project"
+import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
+import { Instance } from "../../src/project/instance"
+import { WorkspaceContext } from "../../src/control-plane/workspace-context"
 import { Database } from "../../src/storage/db"
 import { resetDatabase } from "../fixture/db"
-import { tmpdir } from "../fixture/fixture"
-
+import * as adaptors from "../../src/control-plane/adaptors"
 import type { Adaptor } from "../../src/control-plane/types"
+import { Flag } from "../../src/flag/flag"
 
 afterEach(async () => {
   mock.restore()
@@ -28,33 +26,28 @@ afterEach(() => {
   Flag.OPENCODE_EXPERIMENTAL_WORKSPACES = original
 })
 
-interface State {
+type State = {
   workspace?: "first" | "second"
-  calls: { method: string; url: string; body?: string }[]
+  calls: Array<{ method: string; url: string; body?: string }>
 }
 
 const remote = { type: "testing", name: "remote-a" } as unknown as typeof WorkspaceTable.$inferInsert
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- complex inferred return type
 async function setup(state: State) {
   const TestAdaptor: Adaptor = {
     configure(config) {
       return config
     },
-    create() {
+    async create() {
       throw new Error("not used")
     },
-    async remove() {
-      /* noop */
-    },
+    async remove() {},
 
     async fetch(_config: unknown, input: RequestInfo | URL, init?: RequestInit) {
       const url =
-        input instanceof Request
-          ? input.url
-          : input instanceof URL
-            ? input.href
-            : new URL(input, "http://workspace.test").href
+        input instanceof Request || input instanceof URL
+          ? input.toString()
+          : new URL(input, "http://workspace.test").toString()
       const request = new Request(url, init)
       const body = request.method === "GET" || request.method === "HEAD" ? undefined : await request.text()
       state.calls.push({
@@ -71,11 +64,12 @@ async function setup(state: State) {
   await using tmp = await tmpdir({ git: true })
   const { project } = await Project.fromDirectory(tmp.path)
 
-  const id1 = Identifier.descending("workspace")
-  const id2 = Identifier.descending("workspace")
+  const id1 = WorkspaceID.ascending()
+  const id2 = WorkspaceID.ascending()
 
-  Database.use((db) => {
-    db.insert(WorkspaceTable)
+  Database.use((db) =>
+    db
+      .insert(WorkspaceTable)
       .values([
         {
           id: id1,
@@ -93,8 +87,8 @@ async function setup(state: State) {
           name: "local",
         },
       ])
-      .run()
-  })
+      .run(),
+  )
 
   const { WorkspaceRouterMiddleware } = await import("../../src/control-plane/workspace-router-middleware")
   const app = new Hono().use(WorkspaceRouterMiddleware)

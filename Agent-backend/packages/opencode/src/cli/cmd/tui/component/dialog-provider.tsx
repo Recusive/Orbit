@@ -19,6 +19,7 @@ import type { ProviderAuthAuthorization } from "@orbit.build/sdk/v2"
 import type { Accessor, JSX } from "solid-js"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
+  orbit: 0,
   opencode: 0,
   "opencode-go": 1,
   openai: 2,
@@ -47,8 +48,7 @@ export function createDialogProviderOptions(): Accessor<
         title: provider.name,
         value: provider.id,
         description: {
-          opencode: "(Recommended)",
-          anthropic: "(Claude Max or API key)",
+          anthropic: "(API key)",
           openai: "(ChatGPT Plus/Pro or API key)",
           "opencode-go": "Low cost subscription for everyone",
         }[provider.id],
@@ -277,12 +277,22 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
       description={
         (
           {
+            orbit: (() => (
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Zen gives you access to the best coding models with a single API key.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                </text>
+              </box>
+            )) as () => JSX.Element,
             opencode: (() => (
               // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box gap={1}>
                 <text fg={theme.textMuted}>
-                  OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                  key.
+                  OpenCode Zen gives you access to the best coding models with a single API key.
                 </text>
                 <text fg={theme.text}>
                   Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
@@ -293,8 +303,7 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
               // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box gap={1}>
                 <text fg={theme.textMuted}>
-                  OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding
-                  models with generous usage limits.
+                  OpenCode Go provides reliable access to popular coding models with generous usage limits.
                 </text>
                 <text fg={theme.text}>
                   Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go

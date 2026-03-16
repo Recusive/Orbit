@@ -61,7 +61,7 @@ const startEventStream = (input: { directory: string; workspaceID?: string }): v
   }) as typeof globalThis.fetch
 
   const sdk = createOpencodeClient({
-    baseUrl: "http://opencode.internal",
+    baseUrl: "http://orbit.internal",
     directory: input.directory,
     experimental_workspaceID: input.workspaceID,
     fetch: fetchFn,

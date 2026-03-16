@@ -1,16 +1,17 @@
 import { test, expect } from "bun:test"
-
-import { Instance } from "../../src/project/instance"
 import { Question } from "../../src/question"
+import { Instance } from "../../src/project/instance"
+import { QuestionID } from "../../src/question/schema"
 import { tmpdir } from "../fixture/fixture"
+import { SessionID } from "../../src/session/schema"
 
 test("ask - returns pending promise", async () => {
   await using tmp = await tmpdir({ git: true })
   await Instance.provide({
     directory: tmp.path,
-    fn: () => {
+    fn: async () => {
       const promise = Question.ask({
-        sessionID: "ses_test",
+        sessionID: SessionID.make("ses_test"),
         questions: [
           {
             question: "What would you like to do?",
@@ -43,8 +44,8 @@ test("ask - adds to pending list", async () => {
         },
       ]
 
-      void Question.ask({
-        sessionID: "ses_test",
+      Question.ask({
+        sessionID: SessionID.make("ses_test"),
         questions,
       })
 
@@ -74,7 +75,7 @@ test("reply - resolves the pending ask with answers", async () => {
       ]
 
       const askPromise = Question.ask({
-        sessionID: "ses_test",
+        sessionID: SessionID.make("ses_test"),
         questions,
       })
 
@@ -97,8 +98,8 @@ test("reply - removes from pending list", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      void Question.ask({
-        sessionID: "ses_test",
+      Question.ask({
+        sessionID: SessionID.make("ses_test"),
         questions: [
           {
             question: "What would you like to do?",
@@ -131,7 +132,7 @@ test("reply - does nothing for unknown requestID", async () => {
     directory: tmp.path,
     fn: async () => {
       await Question.reply({
-        requestID: "que_unknown",
+        requestID: QuestionID.make("que_unknown"),
         answers: [["Option 1"]],
       })
       // Should not throw
@@ -147,7 +148,7 @@ test("reject - throws RejectedError", async () => {
     directory: tmp.path,
     fn: async () => {
       const askPromise = Question.ask({
-        sessionID: "ses_test",
+        sessionID: SessionID.make("ses_test"),
         questions: [
           {
             question: "What would you like to do?",
@@ -174,7 +175,7 @@ test("reject - removes from pending list", async () => {
     directory: tmp.path,
     fn: async () => {
       const askPromise = Question.ask({
-        sessionID: "ses_test",
+        sessionID: SessionID.make("ses_test"),
         questions: [
           {
             question: "What would you like to do?",
@@ -191,9 +192,7 @@ test("reject - removes from pending list", async () => {
       expect(pending.length).toBe(1)
 
       await Question.reject(pending[0].id)
-      askPromise.catch(() => {
-        /* noop */
-      }) // Ignore rejection
+      askPromise.catch(() => {}) // Ignore rejection
 
       const pendingAfter = await Question.list()
       expect(pendingAfter.length).toBe(0)
@@ -206,7 +205,7 @@ test("reject - does nothing for unknown requestID", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      await Question.reject("que_unknown")
+      await Question.reject(QuestionID.make("que_unknown"))
       // Should not throw
     },
   })
@@ -239,7 +238,7 @@ test("ask - handles multiple questions", async () => {
       ]
 
       const askPromise = Question.ask({
-        sessionID: "ses_test",
+        sessionID: SessionID.make("ses_test"),
         questions,
       })
 
@@ -263,8 +262,8 @@ test("list - returns all pending requests", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      void Question.ask({
-        sessionID: "ses_test1",
+      Question.ask({
+        sessionID: SessionID.make("ses_test1"),
         questions: [
           {
             question: "Question 1?",
@@ -274,8 +273,8 @@ test("list - returns all pending requests", async () => {
         ],
       })
 
-      void Question.ask({
-        sessionID: "ses_test2",
+      Question.ask({
+        sessionID: SessionID.make("ses_test2"),
         questions: [
           {
             question: "Question 2?",

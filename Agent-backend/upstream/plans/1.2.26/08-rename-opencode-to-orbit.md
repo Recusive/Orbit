@@ -1,4 +1,4 @@
-# Phase 8: Rename opencode -> Orbit
+# ✅ Phase 8: Rename opencode -> Orbit
 
 ## How to Execute
 
@@ -32,14 +32,14 @@ These are strings that end users see in CLI output, error messages, help text, U
 | `cli/cmd/auth.ts` (-> `providers.ts`) | 344              | `opencode: 0` (priority key)                                                                  | `orbit: 0`                                                                        | Provider ID in priority map             |
 | `cli/cmd/auth.ts`                     | 371              | `opencode: "recommended"` (hint)                                                              | `orbit: "recommended"`                                                            | Login hint text                         |
 | `cli/cmd/auth.ts`                     | 447              | `if (provider === "opencode")`                                                                | `if (provider === "orbit")`                                                       | Provider check                          |
-| `cli/cmd/auth.ts`                     | 448              | `"Create an api key at https://opencode.ai/auth"`                                             | `"Create an api key at https://orbit.dev/auth"`                                   | User-facing URL                         |
+| `cli/cmd/auth.ts`                     | 448              | `"Create an api key at https://opencode.ai/auth"`                                             | `"Create an api key at https://orbit.build/auth"`                                 | User-facing URL                         |
 | `cli/cmd/auth.ts`                     | 297              | `${url}/.well-known/opencode`                                                                 | Keep (server-side well-known path)                                                | See Category 4                          |
-| `cli/cmd/auth.ts`                     | 457              | `"...Read more: https://opencode.ai/docs/providers/..."`                                      | `"...Read more: https://orbit.dev/docs/providers/..."`                            | Doc URL                                 |
+| `cli/cmd/auth.ts`                     | 457              | `"...Read more: https://opencode.ai/docs/providers/..."`                                      | `"...Read more: https://orbit.build/docs/providers/..."`                          | Doc URL                                 |
 | `cli/cmd/github.ts`                   | 147              | `"opencode-agent[bot]"`                                                                       | `"orbit-agent[bot]"`                                                              | GitHub bot username                     |
 | `cli/cmd/github.ts`                   | 149              | `".github/workflows/opencode.yml"`                                                            | `".github/workflows/orbit.yml"`                                                   | Workflow filename                       |
-| `cli/cmd/github.ts`                   | 258              | `"https://opencode.ai/docs/github/#usage-examples"`                                           | `"https://orbit.dev/docs/github/#usage-examples"`                                 | Doc URL                                 |
+| `cli/cmd/github.ts`                   | 258              | `"https://opencode.ai/docs/github/#usage-examples"`                                           | `"https://orbit.build/docs/github/#usage-examples"`                               | Doc URL                                 |
 | `cli/cmd/github.ts`                   | 340              | `"https://github.com/apps/opencode-agent"`                                                    | `"https://github.com/apps/orbit-agent"`                                           | GitHub App URL                          |
-| `cli/cmd/github.ts`                   | 377              | `"https://api.opencode.ai/get_github_app_installation..."`                                    | `"https://api.orbit.dev/get_github_app_installation..."`                          | API URL                                 |
+| `cli/cmd/github.ts`                   | 377              | `"https://api.opencode.ai/get_github_app_installation..."`                                    | `"https://api.orbit.build/get_github_app_installation..."`                        | API URL                                 |
 | `cli/cmd/github.ts`                   | 420              | `uses: anomalyco/opencode/github@latest`                                                      | `uses: anomalyco/orbit/github@latest`                                             | GitHub Action ref                       |
 | `cli/cmd/pr.ts`                       | 95               | `// Check for opencode session link`                                                          | `// Check for orbit session link`                                                 | Comment                                 |
 | `cli/cmd/pr.ts`                       | 125              | `// Launch opencode TUI`                                                                      | `// Launch orbit TUI`                                                             | Comment                                 |
@@ -48,7 +48,7 @@ These are strings that end users see in CLI output, error messages, help text, U
 | `cli/cmd/mcp.ts`                      | 710              | `name: "opencode-debug"`                                                                      | `name: "orbit-debug"`                                                             | MCP client name                         |
 | `cli/cmd/models.ts`                   | 67-68            | `a.startsWith("opencode")` / `b.startsWith("opencode")`                                       | `a.startsWith("orbit")` / `b.startsWith("orbit")`                                 | Sort priority                           |
 | **Error Messages & User Text**        |                  |                                                                                               |                                                                                   |                                         |
-| `session/retry.ts`                    | 74               | `"https://opencode.ai/zen"`                                                                   | `"https://orbit.dev/zen"`                                                         | Rate limit error URL                    |
+| `session/retry.ts`                    | 74               | `"https://opencode.ai/zen"`                                                                   | `"https://orbit.build/zen"`                                                       | Rate limit error URL                    |
 | **User-Agent Headers**                |                  |                                                                                               |                                                                                   |                                         |
 | `session/llm.ts`                      | 221              | `"User-Agent": \`opencode/${Installation.VERSION}\``                                          | `"User-Agent": \`orbit/${Installation.VERSION}\``                                 | HTTP header                             |
 | `plugin/codex.ts`                     | 545              | `"User-Agent": \`opencode/${Installation.VERSION}\``                                          | `"User-Agent": \`orbit/${Installation.VERSION}\``                                 | HTTP header                             |
@@ -62,7 +62,7 @@ These are strings that end users see in CLI output, error messages, help text, U
 | **HTTP Headers (API identification)** |                  |                                                                                               |                                                                                   |                                         |
 | `session/llm.ts`                      | 212              | `input.model.providerID.startsWith("opencode")`                                               | `.startsWith("orbit")`                                                            | Provider check                          |
 | `session/llm.ts`                      | 214-217          | `"x-opencode-project"`, `"x-opencode-session"`, `"x-opencode-request"`, `"x-opencode-client"` | `"x-orbit-project"`, `"x-orbit-session"`, `"x-orbit-request"`, `"x-orbit-client"` | Custom headers                          |
-| `provider/provider.ts`                | 402-403          | `"HTTP-Referer": "https://opencode.ai/"`, `"X-Title": "opencode"`                             | `"https://orbit.dev/"`, `"orbit"`                                                 | OpenRouter headers                      |
+| `provider/provider.ts`                | 402-403          | `"HTTP-Referer": "https://opencode.ai/"`, `"X-Title": "opencode"`                             | `"https://orbit.build/"`, `"orbit"`                                               | OpenRouter headers                      |
 | `provider/provider.ts`                | 413-414          | Same pattern for ai-gateway                                                                   | Same rename                                                                       |                                         |
 | `provider/provider.ts`                | 498-499          | Same pattern for additional provider                                                          | Same rename                                                                       |                                         |
 | `provider/provider.ts`                | 639              | `"X-Cerebras-3rd-Party-Integration": "opencode"`                                              | `"orbit"`                                                                         | Cerebras header                         |
@@ -91,10 +91,10 @@ These are strings that end users see in CLI output, error messages, help text, U
 | `auth/index.ts`                            | 8           | `OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"`         | `"orbit-oauth-dummy-key"`                |
 | `lsp/server.ts`                            | 1253        | `"opencode-jdtls-data"` (temp dir prefix)              | `"orbit-jdtls-data"`                     |
 | `acp/agent.ts`                             | 538         | `id: "opencode-login"`                                 | `id: "orbit-login"`                      |
-| `mcp/oauth-provider.ts`                    | 44          | `client_uri: "https://opencode.ai"`                    | `"https://orbit.dev"`                    |
-| `server/server.ts`                         | 120-121     | `*.opencode.ai` CORS regex                             | Add `*.orbit.dev` pattern                |
+| `mcp/oauth-provider.ts`                    | 44          | `client_uri: "https://opencode.ai"`                    | `"https://orbit.build"`                  |
+| `server/server.ts`                         | 120-121     | `*.opencode.ai` CORS regex                             | Add `*.orbit.build` pattern              |
 | `server/server.ts`                         | 199-200     | `x-opencode-workspace`, `x-opencode-directory` headers | `x-orbit-workspace`, `x-orbit-directory` |
-| `server/server.ts`                         | 565, 567    | `app.opencode.ai` proxy                                | `app.orbit.dev`                          |
+| `server/server.ts`                         | 565, 567    | `app.opencode.ai` proxy                                | `app.orbit.build`                        |
 | `control-plane/adaptors/worktree.ts`       | 42          | `"http://opencode.internal"`                           | `"http://orbit.internal"`                |
 | `control-plane/adaptors/worktree.ts`       | 44          | `"x-opencode-directory"`                               | `"x-orbit-directory"`                    |
 | `control-plane/workspace-server/server.ts` | 25-26       | `x-opencode-workspace`, `x-opencode-directory`         | `x-orbit-workspace`, `x-orbit-directory` |
@@ -129,7 +129,7 @@ These are npm package names, external API identifiers, or third-party references
 | `config/config.ts`             | `".opencode/"` directory                                   | **Keep for now** -- same reasoning.                                                                                            |
 | `config/config.ts`             | `"$schema": "https://opencode.ai/config.json"`             | **Keep** -- schema URL must resolve.                                                                                           |
 | `config/config.ts`             | `".well-known/opencode"` remote config path                | **Keep** -- server-side path.                                                                                                  |
-| `config/config.ts`             | `"https://opencode.ai/docs/..."` doc URLs in `.describe()` | **Rename** to orbit.dev URLs                                                                                                   |
+| `config/config.ts`             | `"https://opencode.ai/docs/..."` doc URLs in `.describe()` | **Rename** to orbit.build URLs                                                                                                 |
 | `config/paths.ts`              | Data directory paths                                       | Check if already uses `orbit`                                                                                                  |
 | `config/migrate-tui-config.ts` | `"https://opencode.ai/tui.json"` schema URL                | **Keep**                                                                                                                       |
 | `config/migrate-tui-config.ts` | `opencodeFiles()` function name                            | **Rename** to `configFiles()`                                                                                                  |
@@ -166,15 +166,15 @@ These are npm package names, external API identifiers, or third-party references
 
 These patterns can be applied with `replace_all` safely:
 
-| Pattern                                  | Replacement                            | Scope              | Count |
-| ---------------------------------------- | -------------------------------------- | ------------------ | ----- |
-| `"User-Agent": \`opencode/`              | `"User-Agent": \`orbit/`               | All `.ts` files    | ~8    |
-| `"x-opencode-`                           | `"x-orbit-`                            | All `.ts` files    | ~7    |
-| `opencode.internal`                      | `orbit.internal`                       | All `.ts` files    | ~3    |
-| `opencode-agent` (GitHub bot/app)        | `orbit-agent`                          | `github.ts` only   | ~3    |
-| `opencode.ai/docs/`                      | `orbit.dev/docs/`                      | All `.ts` files    | ~3    |
-| `"X-Title": "opencode"`                  | `"X-Title": "orbit"`                   | `provider.ts` only | ~3    |
-| `"HTTP-Referer": "https://opencode.ai/"` | `"HTTP-Referer": "https://orbit.dev/"` | `provider.ts` only | ~3    |
+| Pattern                                  | Replacement                              | Scope              | Count |
+| ---------------------------------------- | ---------------------------------------- | ------------------ | ----- |
+| `"User-Agent": \`opencode/`              | `"User-Agent": \`orbit/`                 | All `.ts` files    | ~8    |
+| `"x-opencode-`                           | `"x-orbit-`                              | All `.ts` files    | ~7    |
+| `opencode.internal`                      | `orbit.internal`                         | All `.ts` files    | ~3    |
+| `opencode-agent` (GitHub bot/app)        | `orbit-agent`                            | `github.ts` only   | ~3    |
+| `opencode.ai/docs/`                      | `orbit.build/docs/`                      | All `.ts` files    | ~3    |
+| `"X-Title": "opencode"`                  | `"X-Title": "orbit"`                     | `provider.ts` only | ~3    |
+| `"HTTP-Referer": "https://opencode.ai/"` | `"HTTP-Referer": "https://orbit.build/"` | `provider.ts` only | ~3    |
 
 ### Patterns Requiring Manual Review
 
@@ -297,5 +297,5 @@ grep -rn 'x-opencode-' src/ --include="*.ts"
 - **`uninstall.ts`**: The uninstall commands reference `opencode-ai` (npm) and `opencode` (brew/scoop/choco). These are the actual installed package names and CANNOT be renamed unless we publish under new names. For the CLI binary (which is already `orbit`), the uninstall flow should detect the installation method and use the correct package name.
 - **`installation/index.ts`**: External URLs for version checking (brew formula, npm registry, chocolatey, scoop, GitHub releases) all use `opencode` in their paths. These are third-party hosted and cannot be changed unless we create new listings.
 - **`models-snapshot.ts`**: The `"opencode"` provider entry at line ~21018 is a snapshot of models.dev data. The upstream provider ID is `"opencode"` in the models.dev registry. We need to either: (a) map it to `"orbit"` at runtime, or (b) add `"orbit"` as an alias.
-- **CORS regex**: `server/server.ts` line 121 has `/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/`. Add `orbit.dev` pattern alongside, don't remove the opencode one (backward compat).
+- **CORS regex**: `server/server.ts` line 121 has `/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/`. Add `orbit.build` pattern alongside, don't remove the opencode one (backward compat).
 - **Dual-support pattern for headers**: The server reads `x-opencode-workspace` headers from clients. If existing desktop app versions send `x-opencode-*`, we need to support both during transition. Pattern: `c.req.header("x-orbit-workspace") ?? c.req.header("x-opencode-workspace")`.

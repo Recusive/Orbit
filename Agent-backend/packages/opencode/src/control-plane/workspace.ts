@@ -1,6 +1,7 @@
 import z from "zod"
 
 import { getAdaptor } from "./adaptors"
+import { WorkspaceID } from "./schema"
 import { parseSSE } from "./sse"
 import { WorkspaceInfo } from "./types"
 import { WorkspaceTable } from "./workspace.sql"
@@ -9,7 +10,7 @@ import type { Project } from "@/project/project"
 
 import { BusEvent } from "@/bus/bus-event"
 import { GlobalBus } from "@/bus/global"
-import { Identifier } from "@/id/id"
+import { ProjectID } from "@/project/schema"
 import { Database, eq } from "@/storage/db"
 import { fn } from "@/util/fn"
 import { Log } from "@/util/log"
@@ -37,26 +38,26 @@ export namespace Workspace {
 
   function fromRow(row: typeof WorkspaceTable.$inferSelect): Info {
     return {
-      id: row.id,
+      id: WorkspaceID.make(row.id),
       type: row.type,
       branch: row.branch,
       name: row.name,
       directory: row.directory,
       extra: row.extra,
-      projectID: row.project_id,
+      projectID: ProjectID.make(row.project_id),
     }
   }
 
   const CreateInput = z.object({
-    id: Identifier.schema("workspace").optional(),
+    id: WorkspaceID.zod.optional(),
     type: Info.shape.type,
     branch: Info.shape.branch,
-    projectID: Info.shape.projectID,
+    projectID: ProjectID.zod,
     extra: Info.shape.extra,
   })
 
   export const create = fn(CreateInput, async (input) => {
-    const id = Identifier.ascending("workspace", input.id)
+    const id = WorkspaceID.ascending(input.id)
     const adaptor = await getAdaptor(input.type)
 
     const config = await adaptor.configure({ ...input, id, name: null, directory: null })
@@ -96,13 +97,13 @@ export namespace Workspace {
     return rows.map(fromRow).sort((a, b) => a.id.localeCompare(b.id))
   }
 
-  export const get = fn(Identifier.schema("workspace"), (id) => {
+  export const get = fn(WorkspaceID.zod, (id) => {
     const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
     if (row === undefined) return undefined
     return fromRow(row)
   })
 
-  export const remove = fn(Identifier.schema("workspace"), async (id) => {
+  export const remove = fn(WorkspaceID.zod, async (id) => {
     const row = Database.use((db) => db.select().from(WorkspaceTable).where(eq(WorkspaceTable.id, id)).get())
     if (row !== undefined) {
       const info = fromRow(row)

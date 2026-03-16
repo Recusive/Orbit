@@ -2,11 +2,12 @@ import { EOL } from "os"
 import { basename } from "path"
 
 import { Agent } from "../../../agent/agent"
-import { Identifier } from "../../../id/id"
 import { PermissionNext } from "../../../permission/next"
 import { Instance } from "../../../project/instance"
 import { Provider } from "../../../provider/provider"
+import { ModelID, ProviderID } from "../../../provider/schema"
 import { Session } from "../../../session"
+import { MessageID, PartID } from "../../../session/schema"
 import { ToolRegistry } from "../../../tool/registry"
 import { iife } from "../../../util/iife"
 import { bootstrap } from "../../bootstrap"
@@ -74,7 +75,11 @@ export const AgentCommand = cmd({
 })
 
 async function getAvailableTools(agent: Agent.Info): Promise<AvailableTool[]> {
-  const model = agent.model ?? (await Provider.defaultModel())
+  const rawModel = agent.model ?? (await Provider.defaultModel())
+  const model = {
+    providerID: ProviderID.make(rawModel.providerID),
+    modelID: ModelID.make(rawModel.modelID),
+  }
   return ToolRegistry.tools(model, agent)
 }
 
@@ -129,7 +134,7 @@ async function createToolContext(agent: Agent.Info): Promise<{
   ask: (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => Promise<void>
 }> {
   const session = await Session.create({ title: `Debug tool run (${agent.name})` })
-  const messageID = Identifier.ascending("message")
+  const messageID = MessageID.ascending()
   const model = agent.model ?? (await Provider.defaultModel())
   const now = Date.now()
   const message: MessageV2.Assistant = {
@@ -140,8 +145,8 @@ async function createToolContext(agent: Agent.Info): Promise<{
       created: now,
     },
     parentID: messageID,
-    modelID: model.modelID,
-    providerID: model.providerID,
+    modelID: ModelID.make(model.modelID),
+    providerID: ProviderID.make(model.providerID),
     mode: "debug",
     agent: agent.name,
     path: {
@@ -166,7 +171,7 @@ async function createToolContext(agent: Agent.Info): Promise<{
   return {
     sessionID: session.id,
     messageID,
-    callID: Identifier.ascending("part"),
+    callID: PartID.ascending(),
     agent: agent.name,
     abort: new AbortController().signal,
     messages: [],

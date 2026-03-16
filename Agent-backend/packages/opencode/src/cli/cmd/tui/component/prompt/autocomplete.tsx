@@ -1,10 +1,11 @@
+import { pathToFileURL } from "url"
+
 import { useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "@tui/component/border"
 import { useCommandDialog } from "@tui/component/dialog-command"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
 import { useTheme, selectedForeground } from "@tui/context/theme"
-import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import { firstBy } from "remeda"
 import { createMemo, createResource, createEffect, onMount, onCleanup, Index, Show, createSignal } from "solid-js"

@@ -79,4 +79,14 @@ describe("util.process", () => {
     })
     expect(out.stdout.toString()).toBe("set")
   })
+
+  test("returns stdout text", async () => {
+    const out = await Process.text(node('process.stdout.write("hello")'))
+    expect(out.text).toBe("hello")
+  })
+
+  test("splits stdout into lines", async () => {
+    const lines = await Process.lines(node('process.stdout.write("a\\nb\\n")'))
+    expect(lines).toEqual(["a", "b"])
+  })
 })

@@ -1,6 +1,7 @@
 import z from "zod"
 
 import { BusEvent } from "@/bus/bus-event"
+import { SessionID } from "@/session/schema"
 
 export const TuiEvent = {
   PromptAppend: BusEvent.define("tui.prompt.append", z.object({ text: z.string() })),
@@ -42,7 +43,7 @@ export const TuiEvent = {
   SessionSelect: BusEvent.define(
     "tui.session.select",
     z.object({
-      sessionID: z.string().regex(/^ses/).describe("Session ID to navigate to"),
+      sessionID: SessionID.zod.describe("Session ID to navigate to"),
     }),
   ),
 }

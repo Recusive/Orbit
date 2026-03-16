@@ -1,11 +1,12 @@
 import z from "zod"
 
+import { MessageID, SessionID } from "./schema"
+
 import { Session } from "."
 
 import type { MessageV2 } from "./message-v2"
 
 import { Bus } from "@/bus"
-import { Identifier } from "@/id/id"
 import { Snapshot } from "@/snapshot"
 import { Storage } from "@/storage/storage"
 import { fn } from "@/util/fn"
@@ -69,8 +70,8 @@ export namespace SessionSummary {
 
   export const summarize = fn(
     z.object({
-      sessionID: z.string(),
-      messageID: z.string(),
+      sessionID: SessionID.zod,
+      messageID: MessageID.zod,
     }),
     async (input) => {
       const all = Session.messages({ sessionID: input.sessionID })
@@ -81,7 +82,7 @@ export namespace SessionSummary {
     },
   )
 
-  async function summarizeSession(input: { sessionID: string; messages: MessageV2.WithParts[] }): Promise<void> {
+  async function summarizeSession(input: { sessionID: SessionID; messages: MessageV2.WithParts[] }): Promise<void> {
     const diffs = await computeDiff({ messages: input.messages })
     Session.setSummary({
       sessionID: input.sessionID,
@@ -98,7 +99,7 @@ export namespace SessionSummary {
     })
   }
 
-  async function summarizeMessage(input: { messageID: string; messages: MessageV2.WithParts[] }): Promise<void> {
+  async function summarizeMessage(input: { messageID: MessageID; messages: MessageV2.WithParts[] }): Promise<void> {
     const messages = input.messages.filter(
       (m) => m.info.id === input.messageID || (m.info.role === "assistant" && m.info.parentID === input.messageID),
     )
@@ -115,8 +116,8 @@ export namespace SessionSummary {
 
   export const diff = fn(
     z.object({
-      sessionID: Identifier.schema("session"),
-      messageID: Identifier.schema("message").optional(),
+      sessionID: SessionID.zod,
+      messageID: MessageID.zod.optional(),
     }),
     async (input) => {
       const diffs = await Storage.read<Snapshot.FileDiff[]>(["session_diff", input.sessionID]).catch(() => [])

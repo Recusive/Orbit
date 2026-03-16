@@ -1,4 +1,4 @@
-import { spawn } from "child_process"
+import { spawn as launch } from "child_process"
 import fs from "fs/promises"
 import { text } from "node:stream/consumers"
 import os from "os"
@@ -16,7 +16,7 @@ import { Log } from "../util/log"
 import { Process } from "../util/process"
 import { which } from "../util/which"
 
-import type { ChildProcessWithoutNullStreams } from "child_process"
+import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "child_process"
 
 interface GitHubRelease {
   tag_name?: string
@@ -27,6 +27,19 @@ interface GitHubRelease {
 interface GitHubAsset {
   name?: string
   browser_download_url?: string
+}
+
+function spawn(cmd: string, args: string[], opts?: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams
+function spawn(cmd: string, opts?: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams
+function spawn(
+  cmd: string,
+  args?: string[] | SpawnOptionsWithoutStdio,
+  opts?: SpawnOptionsWithoutStdio,
+): ChildProcessWithoutNullStreams {
+  if (Array.isArray(args)) {
+    return launch(cmd, [...args], { ...(opts ?? {}), windowsHide: true })
+  }
+  return launch(cmd, { ...(args ?? {}), windowsHide: true })
 }
 
 export namespace LSPServer {
@@ -1249,7 +1262,7 @@ export namespace LSPServer {
           return "config_linux"
         })(),
       )
-      const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-jdtls-data"))
+      const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "orbit-jdtls-data"))
       return {
         process: spawn(
           java,

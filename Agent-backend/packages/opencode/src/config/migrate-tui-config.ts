@@ -37,13 +37,13 @@ interface MigrateInput {
 }
 
 /**
- * Migrates tui-specific keys (theme, keybinds, tui) from opencode.json files
+ * Migrates tui-specific keys (theme, keybinds, tui) from orbit.json files
  * into dedicated tui.json files. Migration is performed per-directory and
  * skips only locations where a tui.json already exists.
  */
 export async function migrateTuiConfig(input: MigrateInput): Promise<void> {
-  const opencode = opencodeFiles(input)
-  for (const file of opencode) {
+  const configFiles = orbitConfigFiles(input)
+  for (const file of configFiles) {
     const source = await Filesystem.readText(file).catch((error: unknown) => {
       log.warn("failed to read config for tui migration", { path: file, error })
       return undefined
@@ -141,7 +141,7 @@ async function backupAndStripLegacy(file: string, source: string): Promise<boole
     })
 }
 
-function opencodeFiles(input: { directories: string[]; managed: string }): string[] {
+function orbitConfigFiles(input: { directories: string[]; managed: string }): string[] {
   const project = Flag.OPENCODE_DISABLE_PROJECT_CONFIG
     ? []
     : ConfigPaths.projectFiles("orbit", Instance.directory, Instance.worktree)

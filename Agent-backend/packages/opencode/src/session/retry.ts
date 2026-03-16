@@ -71,7 +71,7 @@ export namespace SessionRetry {
       }
       if (!apiData.isRetryable) return undefined
       if (typeof apiData.responseBody === "string" && apiData.responseBody.includes("FreeUsageLimitError"))
-        return `Free usage exceeded, add credits https://opencode.ai/zen`
+        return `Free usage exceeded, add credits https://orbit.build/zen`
       return apiData.message.includes("Overloaded") ? "Provider is overloaded" : apiData.message
     }
 

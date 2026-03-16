@@ -1,4 +1,4 @@
-# Phase 5B: TUI & CLI Changes
+# ✅ Phase 5B: TUI & CLI Changes
 
 ## How to Execute
 

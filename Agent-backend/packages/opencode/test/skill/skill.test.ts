@@ -1,5 +1,6 @@
 import fs from "fs/promises"
 import path from "path"
+import { pathToFileURL } from "url"
 
 import { test, expect } from "bun:test"
 
@@ -218,6 +219,38 @@ test("returns empty array when no skills exist", async () => {
     fn: async () => {
       const skills = await Skill.all()
       expect(skills).toEqual([])
+    },
+  })
+})
+
+test("formats verbose skill output as xml", async () => {
+  await using tmp = await tmpdir({
+    git: true,
+    init: async (dir) => {
+      const skillDir = path.join(dir, ".orbit", "skill", "fmt-skill")
+      await Bun.write(
+        path.join(skillDir, "SKILL.md"),
+        `---
+name: fmt-skill
+description: Formatting test skill.
+---
+
+# Format Skill
+`,
+      )
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const skills = await Skill.all()
+      const formatted = Skill.fmt(skills, { verbose: true })
+      const skillPath = path.join(tmp.path, ".orbit", "skill", "fmt-skill", "SKILL.md")
+
+      expect(formatted).toContain("<available_skills>")
+      expect(formatted).toContain("<name>fmt-skill</name>")
+      expect(formatted).toContain(`<location>${pathToFileURL(skillPath).href}</location>`)
     },
   })
 })

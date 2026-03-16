@@ -11,6 +11,7 @@ import { Instance } from "../project/instance"
 import { Filesystem } from "../util/filesystem"
 import { Log } from "../util/log"
 
+import { Protected } from "./protected"
 import { Ripgrep } from "./ripgrep"
 
 import { BusEvent } from "@/bus/bus-event"
@@ -357,10 +358,7 @@ export namespace File {
 
       if (isGlobalHome) {
         const dirs = new Set<string>()
-        const ignoreSet = new Set<string>()
-
-        if (process.platform === "darwin") ignoreSet.add("Library")
-        if (process.platform === "win32") ignoreSet.add("AppData")
+        const ignoreSet = Protected.names()
 
         const ignoreNested = new Set(["node_modules", "dist", "build", "target", "vendor"])
         const shouldIgnore = (name: string): boolean => name.startsWith(".") || ignoreSet.has(name)

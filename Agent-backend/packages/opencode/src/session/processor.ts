@@ -2,19 +2,21 @@ import { SessionCompaction } from "./compaction"
 import { LLM } from "./llm"
 import { MessageV2 } from "./message-v2"
 import { SessionRetry } from "./retry"
+import { PartID } from "./schema"
 import { SessionStatus } from "./status"
 import { SessionSummary } from "./summary"
 
 import { Session } from "."
 
+import type { SessionID } from "./schema"
 import type { Provider } from "@/provider/provider"
 
 import { Agent } from "@/agent/agent"
 import { Bus } from "@/bus"
 import { Config } from "@/config/config"
-import { Identifier } from "@/id/id"
 import { PermissionNext } from "@/permission/next"
 import { Plugin } from "@/plugin"
+import { ProviderID } from "@/provider/schema"
 import { Question } from "@/question"
 import { Snapshot } from "@/snapshot"
 import { Log } from "@/util/log"
@@ -35,7 +37,7 @@ export namespace SessionProcessor {
 
   export function create(input: {
     assistantMessage: MessageV2.Assistant
-    sessionID: string
+    sessionID: SessionID
     model: Provider.Model
     abort: AbortSignal
   }): {
@@ -78,7 +80,7 @@ export namespace SessionProcessor {
                     continue
                   }
                   const reasoningPart: MessageV2.ReasoningPart = {
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "reasoning",
@@ -128,7 +130,7 @@ export namespace SessionProcessor {
                 case "tool-input-start": {
                   const existing = toolcalls.get(value.id)
                   const tpart = Session.updatePart({
-                    id: existing?.id ?? Identifier.ascending("part"),
+                    id: existing?.id ?? PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "tool",
@@ -253,7 +255,7 @@ export namespace SessionProcessor {
                 case "start-step": {
                   snapshot = await Snapshot.track()
                   Session.updatePart({
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.sessionID,
                     snapshot,
@@ -272,7 +274,7 @@ export namespace SessionProcessor {
                   input.assistantMessage.cost += usage.cost
                   input.assistantMessage.tokens = usage.tokens
                   Session.updatePart({
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     reason: value.finishReason,
                     snapshot: await Snapshot.track(),
                     messageID: input.assistantMessage.id,
@@ -286,7 +288,7 @@ export namespace SessionProcessor {
                     const patch = await Snapshot.patch(snapshot)
                     if (patch.files.length > 0) {
                       Session.updatePart({
-                        id: Identifier.ascending("part"),
+                        id: PartID.ascending(),
                         messageID: input.assistantMessage.id,
                         sessionID: input.sessionID,
                         type: "patch",
@@ -311,7 +313,7 @@ export namespace SessionProcessor {
 
                 case "text-start":
                   currentText = {
-                    id: Identifier.ascending("part"),
+                    id: PartID.ascending(),
                     messageID: input.assistantMessage.id,
                     sessionID: input.assistantMessage.sessionID,
                     type: "text",
@@ -384,9 +386,9 @@ export namespace SessionProcessor {
               error: errorObj,
               stack: JSON.stringify(errorObj.stack),
             })
-            const error = MessageV2.fromError(e, { providerID: input.model.providerID }) as NonNullable<
-              MessageV2.Assistant["error"]
-            >
+            const error = MessageV2.fromError(e, {
+              providerID: ProviderID.make(input.model.providerID),
+            }) as NonNullable<MessageV2.Assistant["error"]>
             if (MessageV2.ContextOverflowError.isInstance(error)) {
               needsCompaction = true
               void Bus.publish(Session.Event.Error, {
@@ -421,7 +423,7 @@ export namespace SessionProcessor {
             const patch = await Snapshot.patch(snapshot)
             if (patch.files.length > 0) {
               Session.updatePart({
-                id: Identifier.ascending("part"),
+                id: PartID.ascending(),
                 messageID: input.assistantMessage.id,
                 sessionID: input.sessionID,
                 type: "patch",

@@ -1,25 +1,21 @@
+import { describe, expect, test } from "bun:test"
 import path from "path"
 import { pathToFileURL } from "url"
-
-import { describe, expect, test } from "bun:test"
-
+import type { PermissionNext } from "../../src/permission/next"
+import type { Tool } from "../../src/tool/tool"
 import { Instance } from "../../src/project/instance"
 import { SkillTool } from "../../src/tool/skill"
 import { tmpdir } from "../fixture/fixture"
-
-import type { PermissionNext } from "../../src/permission/next"
-import type { Tool } from "../../src/tool/tool"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const baseCtx: Omit<Tool.Context, "ask"> = {
-  sessionID: "test",
-  messageID: "",
+  sessionID: SessionID.make("ses_test"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => {
-    /* noop */
-  },
+  metadata: () => {},
 }
 
 describe("tool.skill", () => {
@@ -27,7 +23,7 @@ describe("tool.skill", () => {
     await using tmp = await tmpdir({
       git: true,
       init: async (dir) => {
-        const skillDir = path.join(dir, ".orbit", "skill", "tool-skill")
+        const skillDir = path.join(dir, ".opencode", "skill", "tool-skill")
         await Bun.write(
           path.join(skillDir, "SKILL.md"),
           `---
@@ -49,8 +45,8 @@ description: Skill for tool tests.
         directory: tmp.path,
         fn: async () => {
           const tool = await SkillTool.init()
-          const skillPath = path.join(tmp.path, ".orbit", "skill", "tool-skill", "SKILL.md")
-          expect(tool.description).toContain(`<location>${pathToFileURL(skillPath).href}</location>`)
+          const skillPath = path.join(tmp.path, ".opencode", "skill", "tool-skill", "SKILL.md")
+          expect(tool.description).toContain(`**tool-skill**: Skill for tool tests.`)
         },
       })
     } finally {
@@ -62,7 +58,7 @@ description: Skill for tool tests.
     await using tmp = await tmpdir({
       git: true,
       init: async (dir) => {
-        const skillDir = path.join(dir, ".orbit", "skill", "tool-skill")
+        const skillDir = path.join(dir, ".opencode", "skill", "tool-skill")
         await Bun.write(
           path.join(skillDir, "SKILL.md"),
           `---
@@ -87,7 +83,7 @@ Use this skill.
         directory: tmp.path,
         fn: async () => {
           const tool = await SkillTool.init()
-          const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+          const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
           const ctx: Tool.Context = {
             ...baseCtx,
             ask: async (req) => {
@@ -96,7 +92,7 @@ Use this skill.
           }
 
           const result = await tool.execute({ name: "tool-skill" }, ctx)
-          const dir = path.join(tmp.path, ".orbit", "skill", "tool-skill")
+          const dir = path.join(tmp.path, ".opencode", "skill", "tool-skill")
           const file = path.resolve(dir, "scripts", "demo.txt")
 
           expect(requests.length).toBe(1)

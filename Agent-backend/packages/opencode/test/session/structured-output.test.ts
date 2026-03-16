@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
-
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionPrompt } from "../../src/session/prompt"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 describe("structured-output.OutputFormat", () => {
   test("parses text format", () => {
@@ -77,9 +77,10 @@ describe("structured-output.StructuredOutputError", () => {
     })
 
     const obj = error.toObject()
+    const data = obj.data as { message: string; retries: number }
     expect(obj.name).toBe("StructuredOutputError")
-    expect((obj.data as { message: string }).message).toBe("Test error")
-    expect((obj.data as { retries: number }).retries).toBe(2)
+    expect(data.message).toBe("Test error")
+    expect(data.retries).toBe(2)
   })
 
   test("isInstance correctly identifies error", () => {
@@ -96,8 +97,8 @@ describe("structured-output.StructuredOutputError", () => {
 describe("structured-output.UserMessage", () => {
   test("user message accepts outputFormat", () => {
     const result = MessageV2.User.safeParse({
-      id: "test-id",
-      sessionID: "test-session",
+      id: MessageID.ascending(),
+      sessionID: SessionID.descending(),
       role: "user",
       time: { created: Date.now() },
       agent: "default",
@@ -112,8 +113,8 @@ describe("structured-output.UserMessage", () => {
 
   test("user message works without outputFormat (optional)", () => {
     const result = MessageV2.User.safeParse({
-      id: "test-id",
-      sessionID: "test-session",
+      id: MessageID.ascending(),
+      sessionID: SessionID.descending(),
       role: "user",
       time: { created: Date.now() },
       agent: "default",
@@ -125,10 +126,10 @@ describe("structured-output.UserMessage", () => {
 
 describe("structured-output.AssistantMessage", () => {
   const baseAssistantMessage = {
-    id: "test-id",
-    sessionID: "test-session",
+    id: MessageID.ascending(),
+    sessionID: SessionID.descending(),
     role: "assistant" as const,
-    parentID: "parent-id",
+    parentID: MessageID.ascending(),
     modelID: "claude-3",
     providerID: "anthropic",
     mode: "default",
@@ -160,9 +161,7 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("creates tool with correct id", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object", properties: { name: { type: "string" } } },
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     // AI SDK tool type doesn't expose id, but we set it internally
@@ -172,9 +171,7 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("creates tool with description", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object" },
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     expect(tool.description).toContain("structured format")
@@ -192,9 +189,7 @@ describe("structured-output.createStructuredOutputTool", () => {
 
     const tool = SessionPrompt.createStructuredOutputTool({
       schema,
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     // AI SDK wraps schema in { jsonSchema: {...} }
@@ -213,9 +208,7 @@ describe("structured-output.createStructuredOutputTool", () => {
 
     const tool = SessionPrompt.createStructuredOutputTool({
       schema,
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     // AI SDK wraps schema in { jsonSchema: {...} }
@@ -238,7 +231,7 @@ describe("structured-output.createStructuredOutputTool", () => {
     const result = await tool.execute!(testArgs, {
       toolCallId: "test-call-id",
       messages: [],
-      abortSignal: undefined as unknown as AbortSignal,
+      abortSignal: undefined as any,
     })
 
     expect(capturedOutput).toEqual(testArgs)
@@ -246,7 +239,7 @@ describe("structured-output.createStructuredOutputTool", () => {
     expect(result.metadata.valid).toBe(true)
   })
 
-  test("AI SDK validates schema before execute - missing required field", () => {
+  test("AI SDK validates schema before execute - missing required field", async () => {
     // Note: The AI SDK validates the input against the schema BEFORE calling execute()
     // So invalid inputs never reach the tool's execute function
     // This test documents the expected schema behavior
@@ -259,9 +252,7 @@ describe("structured-output.createStructuredOutputTool", () => {
         },
         required: ["name", "age"],
       },
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     // The schema requires both 'name' and 'age'
@@ -271,7 +262,7 @@ describe("structured-output.createStructuredOutputTool", () => {
     expect(inputSchema.jsonSchema?.required).toContain("age")
   })
 
-  test("AI SDK validates schema types before execute - wrong type", () => {
+  test("AI SDK validates schema types before execute - wrong type", async () => {
     // Note: The AI SDK validates the input against the schema BEFORE calling execute()
     // So invalid inputs never reach the tool's execute function
     // This test documents the expected schema behavior
@@ -283,9 +274,7 @@ describe("structured-output.createStructuredOutputTool", () => {
         },
         required: ["count"],
       },
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     // The schema defines 'count' as a number
@@ -323,7 +312,7 @@ describe("structured-output.createStructuredOutputTool", () => {
       {
         toolCallId: "test-call-id",
         messages: [],
-        abortSignal: undefined as unknown as AbortSignal,
+        abortSignal: undefined as any,
       },
     )
 
@@ -362,7 +351,7 @@ describe("structured-output.createStructuredOutputTool", () => {
       {
         toolCallId: "test-call-id",
         messages: [],
-        abortSignal: undefined as unknown as AbortSignal,
+        abortSignal: undefined as any,
       },
     )
 
@@ -378,9 +367,7 @@ describe("structured-output.createStructuredOutputTool", () => {
   test("toModelOutput returns text value", () => {
     const tool = SessionPrompt.createStructuredOutputTool({
       schema: { type: "object" },
-      onSuccess: () => {
-        /* noop */
-      },
+      onSuccess: () => {},
     })
 
     expect(tool.toModelOutput).toBeDefined()

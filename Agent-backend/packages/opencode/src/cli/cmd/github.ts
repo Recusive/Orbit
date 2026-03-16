@@ -10,11 +10,12 @@ import { Octokit } from "@octokit/rest"
 import { map, pipe, sortBy, values } from "remeda"
 
 import { Bus } from "../../bus"
-import { Identifier } from "../../id/id"
 import { ModelsDev } from "../../provider/models"
 import { Provider } from "../../provider/provider"
+import { ModelID, ProviderID } from "../../provider/schema"
 import { Session } from "../../session"
 import { MessageV2 } from "../../session/message-v2"
+import { MessageID, PartID } from "../../session/schema"
 import { Filesystem } from "../../util/filesystem"
 import { bootstrap } from "../bootstrap"
 import { UI } from "../ui"
@@ -143,9 +144,9 @@ interface InstallationResponse {
   installation?: unknown
 }
 
-const AGENT_USERNAME = "opencode-agent[bot]"
+const AGENT_USERNAME = "orbit-agent[bot]"
 const AGENT_REACTION = "eyes"
-const WORKFLOW_FILE = ".github/workflows/opencode.yml"
+const WORKFLOW_FILE = ".github/workflows/orbit.yml"
 
 // Event categories for routing
 // USER_EVENTS: triggered by user actions, have actor/issueId, support reactions/comments
@@ -254,7 +255,7 @@ export const GithubInstallCommand = cmd({
                 "",
                 "    3. Go to a GitHub issue and comment `/oc summarize` to see the agent in action",
                 "",
-                "   Learn more about the GitHub agent - https://opencode.ai/docs/github/#usage-examples",
+                "   Learn more about the GitHub agent - https://orbit.build/docs/github/#usage-examples",
               ].join("\n"),
             )
           }
@@ -339,7 +340,7 @@ export const GithubInstallCommand = cmd({
             }
 
             // Open browser
-            const url = "https://github.com/apps/opencode-agent"
+            const url = "https://github.com/apps/orbit-agent"
             const command =
               process.platform === "darwin"
                 ? `open "${url}"`
@@ -376,7 +377,7 @@ export const GithubInstallCommand = cmd({
 
             async function getInstallation(): Promise<unknown> {
               const data = await fetch(
-                `https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
+                `https://api.orbit.build/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
               ).then((res) => res.json() as Promise<InstallationResponse>)
               return data.installation
             }
@@ -418,7 +419,7 @@ jobs:
           persist-credentials: false
 
       - name: Run orbit
-        uses: anomalyco/opencode/github@latest${envStr}
+        uses: anomalyco/orbit/github@latest${envStr}
         with:
           model: ${provider}/${model}`,
             )
@@ -488,13 +489,13 @@ export const GithubRunCommand = cmd({
           ? (payload as IssueCommentEvent | IssuesEvent).issue.number
           : (payload as PullRequestEvent | PullRequestReviewCommentEvent).pull_request.number
       const runUrl = `/${owner}/${repo}/actions/runs/${runId}`
-      const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://opencode.ai"
+      const shareBaseUrl = isMock ? "https://dev.opencode.ai" : "https://orbit.build"
 
       let appToken: string
       let octoRest: Octokit
       let octoGraph: typeof graphql
       let gitConfig: string
-      let session: { id: string; title: string; version: string }
+      let session: Session.Info
       let shareId: string | undefined
       let exitCode = 0
       type PromptFiles = Awaited<ReturnType<typeof getUserPrompt>>["promptFiles"]
@@ -556,7 +557,7 @@ export const GithubRunCommand = cmd({
           await addReaction(commentType)
         }
 
-        // Setup opencode session
+        // Setup orbit session
         const repoData = await fetchRepo()
         session = await Session.create({
           permission: [
@@ -747,7 +748,7 @@ export const GithubRunCommand = cmd({
 
       function normalizeOidcBaseUrl(): string {
         const value = process.env.OIDC_BASE_URL
-        if (!value) return "https://api.opencode.ai"
+        if (!value) return "https://api.orbit.build"
         return value.replace(/\/+$/, "")
       }
 
@@ -963,22 +964,22 @@ export const GithubRunCommand = cmd({
 
         const result = await SessionPrompt.prompt({
           sessionID: session.id,
-          messageID: Identifier.ascending("message"),
+          messageID: MessageID.ascending(),
           variant,
           model: {
-            providerID,
-            modelID,
+            providerID: ProviderID.make(providerID),
+            modelID: ModelID.make(modelID),
           },
           // agent is omitted - server will use default_agent from config or fall back to "build"
           parts: [
             {
-              id: Identifier.ascending("part"),
+              id: PartID.ascending(),
               type: "text",
               text: message,
             },
             ...files.flatMap((f) => [
               {
-                id: Identifier.ascending("part"),
+                id: PartID.ascending(),
                 type: "file" as const,
                 mime: f.mime,
                 url: `data:${f.mime};base64,${f.content}`,
@@ -1017,16 +1018,16 @@ export const GithubRunCommand = cmd({
         console.log("Requesting summary from agent...")
         const summary = await SessionPrompt.prompt({
           sessionID: session.id,
-          messageID: Identifier.ascending("message"),
+          messageID: MessageID.ascending(),
           variant,
           model: {
-            providerID,
-            modelID,
+            providerID: ProviderID.make(providerID),
+            modelID: ModelID.make(modelID),
           },
           tools: { "*": false }, // Disable all tools to force text response
           parts: [
             {
-              id: Identifier.ascending("part"),
+              id: PartID.ascending(),
               type: "text",
               text: "Summarize the actions (tool calls & reasoning) you did for the user in 1-2 sentences.",
             },
@@ -1055,7 +1056,7 @@ export const GithubRunCommand = cmd({
 
       async function getOidcToken(): Promise<string> {
         try {
-          return await core.getIDToken("opencode-github-action")
+          return await core.getIDToken("orbit-github-action")
         } catch (error: unknown) {
           console.error("Failed to get OIDC token:", error instanceof Error ? error.message : String(error))
           throw new Error(

@@ -1,14 +1,12 @@
-import path from "path"
-
 import { describe, expect, test } from "bun:test"
-
-import { Instance } from "../../src/project/instance"
-import { Server } from "../../src/server/server"
+import path from "path"
 import { Session } from "../../src/session"
 import { Log } from "../../src/util/log"
+import { Instance } from "../../src/project/instance"
+import { Server } from "../../src/server/server"
 
 const projectRoot = path.join(__dirname, "../..")
-void Log.init({ print: false })
+Log.init({ print: false })
 
 describe("tui.selectSession endpoint", () => {
   test("should return 200 when called with valid session", async () => {

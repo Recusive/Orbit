@@ -26,14 +26,17 @@ import { ConfigPaths } from "./paths"
 
 import type { ParseError as JsoncParseError } from "jsonc-parser"
 
+import { Account } from "@/account"
 import { BunProc } from "@/bun"
 import { PackageRegistry } from "@/bun/registry"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
-import { Control } from "@/control"
+import { Env } from "@/env"
 import { Installation } from "@/installation"
 import { Filesystem } from "@/util/filesystem"
 import { iife } from "@/util/iife"
+import { Lock } from "@/util/lock"
+import { Process } from "@/util/process"
 import { proxied } from "@/util/proxied"
 
 export namespace Config {
@@ -90,12 +93,12 @@ export namespace Config {
   export const state = Instance.state(async () => {
     const auth = await Auth.all()
 
-    // Config loading order (low -> high precedence): https://opencode.ai/docs/config#precedence-order
+    // Config loading order (low -> high precedence): https://orbit.build/docs/config#precedence-order
     // 1) Remote .well-known/opencode (org defaults)
-    // 2) Global config (~/.config/opencode/opencode.json{,c})
+    // 2) Global config (~/.config/orbit/orbit.json{,c})
     // 3) Custom config (OPENCODE_CONFIG)
-    // 4) Project config (opencode.json{,c})
-    // 5) .opencode directories (.opencode/agents/, .opencode/commands/, .opencode/plugins/, .opencode/opencode.json{,c})
+    // 4) Project config (orbit.json{,c})
+    // 5) .orbit directories (.orbit/agents/, .orbit/commands/, .orbit/plugins/, .orbit/orbit.json{,c})
     // 6) Inline config (OPENCODE_CONFIG_CONTENT)
     // Managed config directory is enterprise-only and always overrides everything above.
     let result: Info = {}
@@ -122,9 +125,6 @@ export namespace Config {
         log.debug("loaded remote config from well-known", { url })
       }
     }
-
-    await Control.token()
-    // Reserved for future use with control plane token
 
     // Global user config overrides remote config.
     result = mergeConfigConcatArrays(result, await global())
@@ -190,6 +190,34 @@ export namespace Config {
         }),
       )
       log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
+    }
+
+    const active = Account.active()
+    if (active?.active_org_id) {
+      try {
+        const [config, token] = await Promise.all([
+          Account.config(active.id, active.active_org_id),
+          Account.token(active.id),
+        ])
+        if (token) {
+          process.env.OPENCODE_CONSOLE_TOKEN = token
+          Env.set("OPENCODE_CONSOLE_TOKEN", token)
+        }
+
+        if (config) {
+          result = mergeConfigConcatArrays(
+            result,
+            await load(JSON.stringify(config), {
+              dir: path.dirname(`${active.url}/api/config`),
+              source: `${active.url}/api/config`,
+            }),
+          )
+        }
+      } catch (err) {
+        log.debug("failed to fetch remote account config", {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
 
     // Load managed config files last (highest priority) - enterprise admin-controlled
@@ -286,6 +314,7 @@ export namespace Config {
 
     // Install any additional dependencies defined in the package.json
     // This allows local plugins and custom tools to use external packages
+    using _ = await Lock.write("bun-install")
     await BunProc.run(
       [
         "install",
@@ -294,6 +323,26 @@ export namespace Config {
       ],
       { cwd: dir },
     ).catch((err: unknown) => {
+      if (err instanceof Process.RunFailedError) {
+        const detail = {
+          dir,
+          cmd: err.cmd,
+          code: err.code,
+          stdout: err.stdout.toString(),
+          stderr: err.stderr.toString(),
+        }
+        if (Flag.OPENCODE_STRICT_CONFIG_DEPS) {
+          log.error("failed to install dependencies", detail)
+          throw err
+        }
+        log.warn("failed to install dependencies", detail)
+        return
+      }
+
+      if (Flag.OPENCODE_STRICT_CONFIG_DEPS) {
+        log.error("failed to install dependencies", { dir, error: err })
+        throw err
+      }
       log.warn("failed to install dependencies", { dir, error: err })
     })
 
@@ -309,7 +358,8 @@ export namespace Config {
     })()
 
     if (!installedOk) {
-      delete json.dependencies?.[PUBLIC_PLUGIN_PACKAGE]
+      const { [PUBLIC_PLUGIN_PACKAGE]: _drop, ...dependencies } = json.dependencies
+      json.dependencies = dependencies
       await Filesystem.writeJson(pkg, json)
       log.warn("plugin install verification failed, will retry on next run", {
         dir,
@@ -529,7 +579,7 @@ export namespace Config {
    *
    * @example
    * getPluginName("file:///path/to/plugin/foo.js") // "foo"
-   * getPluginName("oh-my-opencode@2.4.3") // "oh-my-opencode"
+   * getPluginName("oh-my-orbit@2.4.3") // "oh-my-orbit"
    * getPluginName("@scope/pkg@1.0.0") // "@scope/pkg"
    */
   export function getPluginName(plugin: string): string {
@@ -547,20 +597,20 @@ export namespace Config {
    * Deduplicates plugins by name, with later entries (higher priority) winning.
    * Priority order (highest to lowest):
    * 1. Local plugin/ directory
-   * 2. Local opencode.json
+   * 2. Local orbit.json
    * 3. Global plugin/ directory
-   * 4. Global opencode.json
+   * 4. Global orbit.json
    *
    * Since plugins are added in low-to-high priority order,
    * we reverse, deduplicate (keeping first occurrence), then restore order.
    */
   export function deduplicatePlugins(plugins: string[]): string[] {
     // seenNames: canonical plugin names for duplicate detection
-    // e.g., "oh-my-opencode", "@scope/pkg"
+    // e.g., "oh-my-orbit", "@scope/pkg"
     const seenNames = new Set<string>()
 
     // uniqueSpecifiers: full plugin specifiers to return
-    // e.g., "oh-my-opencode@2.4.3", "file:///path/to/plugin.js"
+    // e.g., "oh-my-orbit@2.4.3", "file:///path/to/plugin.js"
     const uniqueSpecifiers: string[] = []
 
     for (const specifier of plugins.toReversed()) {
@@ -1033,6 +1083,14 @@ export namespace Config {
             .describe(
               "Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.",
             ),
+          chunkTimeout: z
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe(
+              "Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.",
+            ),
         })
         .catchall(z.any())
         .optional(),
@@ -1051,7 +1109,7 @@ export namespace Config {
       command: z
         .record(z.string(), Command)
         .optional()
-        .describe("Command configuration, see https://opencode.ai/docs/commands"),
+        .describe("Command configuration, see https://orbit.build/docs/commands"),
       skills: Skills.optional().describe("Additional skill folder paths"),
       watcher: z
         .object({
@@ -1118,7 +1176,7 @@ export namespace Config {
         })
         .catchall(Agent)
         .optional()
-        .describe("Agent configuration, see https://opencode.ai/docs/agents"),
+        .describe("Agent configuration, see https://orbit.build/docs/agents"),
       provider: z
         .record(z.string(), Provider)
         .optional()

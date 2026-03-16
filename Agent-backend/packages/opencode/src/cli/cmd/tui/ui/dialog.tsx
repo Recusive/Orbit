@@ -183,7 +183,10 @@ export function DialogProvider(props: ParentProps): JSX.Element {
             }}
             size={value.size}
           >
-            {value.stack.at(-1)?.element}
+            {(() => {
+              const element = value.stack.at(-1)?.element
+              return typeof element === "function" ? element() : element
+            })()}
           </Dialog>
         </Show>
       </box>

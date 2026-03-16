@@ -1,6 +1,6 @@
-import { tool } from "./tool"
+import { tool } from "./tool.js"
 
-import type { Plugin } from "./index"
+import type { Plugin } from "./index.js"
 
 export const ExamplePlugin: Plugin = () => {
   return Promise.resolve({

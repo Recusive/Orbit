@@ -8,6 +8,8 @@ import { Scheduler } from "../scheduler"
 import { Filesystem } from "../util/filesystem"
 import { Glob } from "../util/glob"
 
+import { ToolID } from "./schema"
+
 import type { Agent } from "../agent/agent"
 
 export namespace Truncate {
@@ -91,7 +93,7 @@ export namespace Truncate {
     const unit = hitBytes ? "bytes" : "lines"
     const preview = out.join("\n")
 
-    const id = Identifier.ascending("tool")
+    const id = ToolID.ascending()
     const filepath = path.join(DIR, id)
     await Filesystem.write(filepath, text)
 

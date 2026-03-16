@@ -32,7 +32,7 @@ export namespace Installation {
     stdout: Buffer
     stderr: Buffer
   }> {
-    const body = await fetch("https://opencode.ai/install").then((res) => {
+    const body = await fetch("https://orbit.build/install").then((res) => {
       if (!res.ok) throw new Error(res.statusText)
       return res.text()
     })
@@ -246,7 +246,7 @@ export namespace Installation {
 
   export const VERSION = typeof OPENCODE_VERSION === "string" ? OPENCODE_VERSION : "local"
   export const CHANNEL = typeof OPENCODE_CHANNEL === "string" ? OPENCODE_CHANNEL : "local"
-  export const USER_AGENT = `opencode/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
+  export const USER_AGENT = `orbit/${CHANNEL}/${VERSION}/${Flag.OPENCODE_CLIENT}`
 
   interface BrewVersionInfo {
     formulae?: { versions?: { stable?: string } }[]

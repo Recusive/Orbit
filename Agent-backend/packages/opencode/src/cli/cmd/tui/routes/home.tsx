@@ -126,6 +126,7 @@ export function Home(): JSX.Element {
             }}
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX types resolve to error/any
             hint={Hint}
+            workspaceID={route.workspaceID}
           />
         </box>
         <box height={4} minHeight={0} width="100%" maxWidth={75} alignItems="center" paddingTop={3} flexShrink={1}>

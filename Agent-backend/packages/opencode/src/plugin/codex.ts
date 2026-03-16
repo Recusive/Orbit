@@ -100,7 +100,7 @@ function buildAuthorizeUrl(redirectUri: string, pkce: PkceCodes, state: string):
     id_token_add_organizations: "true",
     codex_cli_simplified_flow: "true",
     state,
-    originator: "opencode",
+    originator: "orbit",
   })
   return `${ISSUER}/oauth/authorize?${params.toString()}`
 }
@@ -546,7 +546,7 @@ export function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                "User-Agent": `opencode/${Installation.VERSION}`,
+                "User-Agent": `orbit/${Installation.VERSION}`,
               },
               body: JSON.stringify({ client_id: CLIENT_ID }),
             })
@@ -570,7 +570,7 @@ export function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
                     method: "POST",
                     headers: {
                       "Content-Type": "application/json",
-                      "User-Agent": `opencode/${Installation.VERSION}`,
+                      "User-Agent": `orbit/${Installation.VERSION}`,
                     },
                     body: JSON.stringify({
                       device_auth_id: deviceData.device_auth_id,
@@ -629,8 +629,8 @@ export function CodexAuthPlugin(input: PluginInput): Promise<Hooks> {
     },
     "chat.headers": (_input, output) => {
       if (_input.model.providerID !== "openai") return Promise.resolve()
-      output.headers.originator = "opencode"
-      output.headers["User-Agent"] = `opencode/${Installation.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`
+      output.headers.originator = "orbit"
+      output.headers["User-Agent"] = `orbit/${Installation.VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`
       output.headers.session_id = _input.sessionID
       return Promise.resolve()
     },

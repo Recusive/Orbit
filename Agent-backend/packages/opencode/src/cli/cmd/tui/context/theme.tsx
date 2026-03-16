@@ -653,9 +653,7 @@ function generateSubtleSyntax(theme: Theme): SyntaxStyle {
   )
 }
 
-function getSyntaxRules(
-  theme: Theme,
-): {
+function getSyntaxRules(theme: Theme): {
   scope: string[]
   style: { foreground: RGBA; italic?: boolean; bold?: boolean; underline?: boolean; background?: RGBA }
 }[] {

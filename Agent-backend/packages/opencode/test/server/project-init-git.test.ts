@@ -26,8 +26,7 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> =>
-      Instance.reload(input)
+    const reload = Instance.reload.bind(Instance)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -85,8 +84,7 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> =>
-      Instance.reload(input)
+    const reload = Instance.reload.bind(Instance)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -123,5 +121,22 @@ describe("project.initGit endpoint", () => {
       reloadSpy.mockRestore()
       GlobalBus.off("event", fn)
     }
+  })
+
+  test("accepts x-orbit-directory headers", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const app = Server.Default()
+
+    const current = await app.request("/project/current", {
+      headers: {
+        "x-orbit-directory": tmp.path,
+      },
+    })
+
+    expect(current.status).toBe(200)
+    expect(await current.json()).toMatchObject({
+      vcs: "git",
+      worktree: tmp.path,
+    })
   })
 })

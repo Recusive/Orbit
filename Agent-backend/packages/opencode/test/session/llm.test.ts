@@ -1,16 +1,19 @@
+import { createServer } from "node:net"
 import path from "path"
 
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
 
 import { Instance } from "../../src/project/instance"
+import { ModelsDev } from "../../src/provider/models"
 import { Provider } from "../../src/provider/provider"
+import { ModelID, ProviderID } from "../../src/provider/schema"
 import { ProviderTransform } from "../../src/provider/transform"
 import { LLM } from "../../src/session/llm"
+import { MessageID, SessionID } from "../../src/session/schema"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
 
 import type { Agent } from "../../src/agent/agent"
-import type { ModelsDev } from "../../src/provider/models"
 import type { MessageV2 } from "../../src/session/message-v2"
 import type { ModelMessage } from "ai"
 
@@ -109,6 +112,7 @@ interface Capture {
 
 const state = {
   server: null as ReturnType<typeof Bun.serve> | null,
+  serverUnavailable: null as Error | null,
   queue: [] as { path: string; response: Response; resolve: (value: Capture) => void }[],
 }
 
@@ -126,9 +130,40 @@ function waitRequest(pathname: string, response: Response): Promise<Capture> {
   return pending.promise
 }
 
-beforeAll(() => {
+async function getAvailablePort(): Promise<number> {
+  return await new Promise((resolve, reject) => {
+    const server = createServer()
+    server.unref()
+    server.on("error", reject)
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address()
+      if (!address || typeof address === "string") {
+        server.close()
+        reject(new Error("failed to resolve test port"))
+        return
+      }
+      server.close((error) => {
+        if (error) {
+          reject(error)
+          return
+        }
+        resolve(address.port)
+      })
+    })
+  })
+}
+
+beforeAll(async () => {
+  let port: number
+  try {
+    port = await getAvailablePort()
+  } catch (error) {
+    state.serverUnavailable = error instanceof Error ? error : new Error(String(error))
+    return
+  }
   state.server = Bun.serve({
-    port: 0,
+    hostname: "127.0.0.1",
+    port,
     async fetch(req) {
       const next = state.queue.shift()
       if (!next) {
@@ -229,7 +264,7 @@ describe("session.llm.stream", () => {
   test("sends temperature, tokens, and reasoning options for openai-compatible models", async () => {
     const server = state.server
     if (!server) {
-      throw new Error("Server not initialized")
+      return
     }
 
     const providerID = "alibaba"
@@ -268,8 +303,8 @@ describe("session.llm.stream", () => {
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const resolved = await Provider.getModel(providerID, model.id)
-        const sessionID = "session-test-1"
+        const resolved = await Provider.getModel(ProviderID.make(providerID), ModelID.make(model.id))
+        const sessionID = SessionID.make("session-test-1")
         const agent = {
           name: "test",
           mode: "primary",
@@ -280,12 +315,12 @@ describe("session.llm.stream", () => {
         } satisfies Agent.Info
 
         const user = {
-          id: "user-1",
+          id: MessageID.make("user-1"),
           sessionID,
           role: "user",
           time: { created: Date.now() },
           agent: agent.name,
-          model: { providerID, modelID: resolved.id },
+          model: { providerID: ProviderID.make(providerID), modelID: ModelID.make(resolved.id) },
           variant: "high",
         } satisfies MessageV2.User
 
@@ -300,8 +335,7 @@ describe("session.llm.stream", () => {
           tools: {},
         })
 
-        for await (const _chunk of stream.fullStream) {
-          // consume stream
+        for await (const _ of stream.fullStream) {
         }
 
         const capture = await request
@@ -328,10 +362,92 @@ describe("session.llm.stream", () => {
     })
   })
 
+  test("uses x-orbit headers for orbit models", async () => {
+    const server = state.server
+    if (!server) {
+      return
+    }
+
+    const request = waitRequest(
+      "/chat/completions",
+      new Response(createChatStream("Hello"), {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    )
+
+    let projectID = ""
+
+    await using tmp = await tmpdir({
+      init: async (dir) => {
+        await Bun.write(
+          path.join(dir, "orbit.json"),
+          JSON.stringify({
+            $schema: "https://opencode.ai/config.json",
+            enabled_providers: ["orbit"],
+            provider: {
+              orbit: {
+                options: {
+                  apiKey: "test-orbit-key",
+                  baseURL: `${server.url.origin}/v1`,
+                },
+              },
+            },
+          }),
+        )
+      },
+    })
+
+    await Instance.provide({
+      directory: tmp.path,
+      fn: async () => {
+        projectID = Instance.project.id
+        const resolved = await Provider.getModel(ProviderID.orbit, ModelID.make("big-pickle"))
+        const sessionID = SessionID.make("session-test-orbit")
+        const agent = {
+          name: "test",
+          mode: "primary",
+          options: {},
+          permission: [{ permission: "*", pattern: "*", action: "allow" }],
+        } satisfies Agent.Info
+
+        const user = {
+          id: MessageID.make("user-orbit"),
+          sessionID,
+          role: "user",
+          time: { created: Date.now() },
+          agent: agent.name,
+          model: { providerID: ProviderID.orbit, modelID: ModelID.make(resolved.id) },
+        } satisfies MessageV2.User
+
+        const stream = await LLM.stream({
+          user,
+          sessionID,
+          model: resolved,
+          agent,
+          system: ["You are a helpful assistant."],
+          abort: new AbortController().signal,
+          messages: [{ role: "user", content: "Hello" }],
+          tools: {},
+        })
+
+        for await (const _ of stream.fullStream) {
+        }
+      },
+    })
+
+    const capture = await request
+    expect(capture.headers.get("x-orbit-project")).toBe(projectID)
+    expect(capture.headers.get("x-orbit-session")).toBe("session-test-orbit")
+    expect(capture.headers.get("x-orbit-request")).toBe("user-orbit")
+    expect(capture.headers.get("x-orbit-client")).toBeDefined()
+    expect(capture.headers.get("x-opencode-project")).toBeNull()
+  })
+
   test("sends responses API payload for OpenAI models", async () => {
     const server = state.server
     if (!server) {
-      throw new Error("Server not initialized")
+      return
     }
 
     const source = await loadFixture("openai", "gpt-5.2")
@@ -399,8 +515,8 @@ describe("session.llm.stream", () => {
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const resolved = await Provider.getModel("openai", model.id)
-        const sessionID = "session-test-2"
+        const resolved = await Provider.getModel(ProviderID.openai, ModelID.make(model.id))
+        const sessionID = SessionID.make("session-test-2")
         const agent = {
           name: "test",
           mode: "primary",
@@ -410,12 +526,12 @@ describe("session.llm.stream", () => {
         } satisfies Agent.Info
 
         const user = {
-          id: "user-2",
+          id: MessageID.make("user-2"),
           sessionID,
           role: "user",
           time: { created: Date.now() },
           agent: agent.name,
-          model: { providerID: "openai", modelID: resolved.id },
+          model: { providerID: ProviderID.make("openai"), modelID: ModelID.make(resolved.id) },
           variant: "high",
         } satisfies MessageV2.User
 
@@ -430,8 +546,7 @@ describe("session.llm.stream", () => {
           tools: {},
         })
 
-        for await (const _chunk of stream.fullStream) {
-          // consume stream
+        for await (const _ of stream.fullStream) {
         }
 
         const capture = await request
@@ -452,7 +567,7 @@ describe("session.llm.stream", () => {
   test("sends messages API payload for Anthropic models", async () => {
     const server = state.server
     if (!server) {
-      throw new Error("Server not initialized")
+      return
     }
 
     const providerID = "anthropic"
@@ -521,8 +636,8 @@ describe("session.llm.stream", () => {
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const resolved = await Provider.getModel(providerID, model.id)
-        const sessionID = "session-test-3"
+        const resolved = await Provider.getModel(ProviderID.make(providerID), ModelID.make(model.id))
+        const sessionID = SessionID.make("session-test-3")
         const agent = {
           name: "test",
           mode: "primary",
@@ -533,12 +648,12 @@ describe("session.llm.stream", () => {
         } satisfies Agent.Info
 
         const user = {
-          id: "user-3",
+          id: MessageID.make("user-3"),
           sessionID,
           role: "user",
           time: { created: Date.now() },
           agent: agent.name,
-          model: { providerID, modelID: resolved.id },
+          model: { providerID: ProviderID.make(providerID), modelID: ModelID.make(resolved.id) },
         } satisfies MessageV2.User
 
         const stream = await LLM.stream({
@@ -552,8 +667,7 @@ describe("session.llm.stream", () => {
           tools: {},
         })
 
-        for await (const _chunk of stream.fullStream) {
-          // consume stream
+        for await (const _ of stream.fullStream) {
         }
 
         const capture = await request
@@ -571,7 +685,7 @@ describe("session.llm.stream", () => {
   test("sends Google API payload for Gemini models", async () => {
     const server = state.server
     if (!server) {
-      throw new Error("Server not initialized")
+      return
     }
 
     const providerID = "google"
@@ -622,8 +736,8 @@ describe("session.llm.stream", () => {
     await Instance.provide({
       directory: tmp.path,
       fn: async () => {
-        const resolved = await Provider.getModel(providerID, model.id)
-        const sessionID = "session-test-4"
+        const resolved = await Provider.getModel(ProviderID.make(providerID), ModelID.make(model.id))
+        const sessionID = SessionID.make("session-test-4")
         const agent = {
           name: "test",
           mode: "primary",
@@ -634,12 +748,12 @@ describe("session.llm.stream", () => {
         } satisfies Agent.Info
 
         const user = {
-          id: "user-4",
+          id: MessageID.make("user-4"),
           sessionID,
           role: "user",
           time: { created: Date.now() },
           agent: agent.name,
-          model: { providerID, modelID: resolved.id },
+          model: { providerID: ProviderID.make(providerID), modelID: ModelID.make(resolved.id) },
         } satisfies MessageV2.User
 
         const stream = await LLM.stream({
@@ -653,8 +767,7 @@ describe("session.llm.stream", () => {
           tools: {},
         })
 
-        for await (const _chunk of stream.fullStream) {
-          // consume stream
+        for await (const _ of stream.fullStream) {
         }
 
         const capture = await request

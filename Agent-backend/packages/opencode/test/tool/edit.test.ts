@@ -1,26 +1,21 @@
-import fs from "fs/promises"
-import path from "path"
-
 import { describe, test, expect } from "bun:test"
-
-import { FileTime } from "../../src/file/time"
-import { Instance } from "../../src/project/instance"
+import path from "path"
+import fs from "fs/promises"
 import { EditTool } from "../../src/tool/edit"
+import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+import { FileTime } from "../../src/file/time"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const ctx = {
-  sessionID: "test-edit-session",
-  messageID: "",
+  sessionID: SessionID.make("ses_test-edit-session"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => {
-    /* noop */
-  },
-  ask: async () => {
-    /* noop */
-  },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("tool.edit", () => {
@@ -146,7 +141,7 @@ describe("tool.edit", () => {
           FileTime.read(ctx.sessionID, filepath)
 
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -169,7 +164,7 @@ describe("tool.edit", () => {
         directory: tmp.path,
         fn: async () => {
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -194,7 +189,7 @@ describe("tool.edit", () => {
           FileTime.read(ctx.sessionID, filepath)
 
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -217,7 +212,7 @@ describe("tool.edit", () => {
         directory: tmp.path,
         fn: async () => {
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -250,7 +245,7 @@ describe("tool.edit", () => {
 
           // Try to edit with the new content
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -390,7 +385,7 @@ describe("tool.edit", () => {
         directory: tmp.path,
         fn: async () => {
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: filepath,
@@ -415,7 +410,7 @@ describe("tool.edit", () => {
           FileTime.read(ctx.sessionID, dirpath)
 
           const edit = await EditTool.init()
-          expect(
+          await expect(
             edit.execute(
               {
                 filePath: dirpath,
@@ -462,13 +457,13 @@ describe("tool.edit", () => {
     const next = "alpha\nbeta-updated\ngamma"
     const alt = "alpha\nbeta\nomega"
 
-    const normalize = (text: string, ending: "\n" | "\r\n"): string => {
+    const normalize = (text: string, ending: "\n" | "\r\n") => {
       const normalized = text.replaceAll("\r\n", "\n")
       if (ending === "\n") return normalized
       return normalized.replaceAll("\n", "\r\n")
     }
 
-    const count = (content: string): { crlf: number; lf: number } => {
+    const count = (content: string) => {
       const crlf = content.match(/\r\n/g)?.length ?? 0
       const lf = content.match(/\n/g)?.length ?? 0
       return {
@@ -477,26 +472,26 @@ describe("tool.edit", () => {
       }
     }
 
-    const expectLf = (content: string): void => {
+    const expectLf = (content: string) => {
       const counts = count(content)
       expect(counts.crlf).toBe(0)
       expect(counts.lf).toBeGreaterThan(0)
     }
 
-    const expectCrlf = (content: string): void => {
+    const expectCrlf = (content: string) => {
       const counts = count(content)
       expect(counts.lf).toBe(0)
       expect(counts.crlf).toBeGreaterThan(0)
     }
 
-    interface Input {
+    type Input = {
       content: string
       oldString: string
       newString: string
       replaceAll?: boolean
     }
 
-    const apply = async (input: Input): Promise<string> => {
+    const apply = async (input: Input) => {
       await using tmp = await tmpdir({
         init: async (dir) => {
           await Bun.write(path.join(dir, "test.txt"), input.content)

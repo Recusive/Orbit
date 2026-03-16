@@ -4,6 +4,7 @@ import z from "zod"
 
 import { Bus } from "../../bus"
 import { Session } from "../../session"
+import { SessionID } from "../../session/schema"
 import { lazy } from "../../util/lazy"
 import { AsyncQueue } from "../../util/queue"
 import { errors } from "../error"
@@ -377,8 +378,9 @@ export const TuiRoutes = lazy(() =>
       validator("json", TuiEvent.SessionSelect.properties),
       async (c) => {
         const { sessionID } = c.req.valid("json")
-        Session.get(sessionID)
-        await Bus.publish(TuiEvent.SessionSelect, { sessionID })
+        const brandedSessionID = SessionID.make(sessionID)
+        Session.get(brandedSessionID)
+        await Bus.publish(TuiEvent.SessionSelect, { sessionID: brandedSessionID })
         return c.json(true)
       },
     )

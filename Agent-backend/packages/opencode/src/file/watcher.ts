@@ -11,6 +11,7 @@ import { Instance } from "../project/instance"
 import { Log } from "../util/log"
 
 import { FileIgnore } from "./ignore"
+import { Protected } from "./protected"
 
 import type ParcelWatcher from "@parcel/watcher"
 
@@ -85,7 +86,7 @@ export namespace FileWatcher {
 
       if (Flag.OPENCODE_EXPERIMENTAL_FILEWATCHER) {
         const pending = w.subscribe(Instance.directory, subscribe, {
-          ignore: [...FileIgnore.PATTERNS, ...cfgIgnores],
+          ignore: [...FileIgnore.PATTERNS, ...cfgIgnores, ...Protected.paths()],
           backend,
         })
         const sub = await withTimeout(pending, SUBSCRIBE_TIMEOUT_MS).catch((err: unknown) => {

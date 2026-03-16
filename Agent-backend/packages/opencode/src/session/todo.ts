@@ -2,6 +2,7 @@ import z from "zod"
 
 import { Database, eq, asc } from "../storage/db"
 
+import { SessionID } from "./schema"
 import { TodoTable } from "./session.sql"
 
 import { Bus } from "@/bus"
@@ -21,13 +22,13 @@ export namespace Todo {
     Updated: BusEvent.define(
       "todo.updated",
       z.object({
-        sessionID: z.string(),
+        sessionID: SessionID.zod,
         todos: z.array(Info),
       }),
     ),
   }
 
-  export function update(input: { sessionID: string; todos: Info[] }): void {
+  export function update(input: { sessionID: SessionID; todos: Info[] }): void {
     Database.transaction((db) => {
       db.delete(TodoTable).where(eq(TodoTable.session_id, input.sessionID)).run()
       if (input.todos.length === 0) return
@@ -46,7 +47,7 @@ export namespace Todo {
     void Bus.publish(Event.Updated, input)
   }
 
-  export function get(sessionID: string): Info[] {
+  export function get(sessionID: SessionID): Info[] {
     const rows = Database.use((db) =>
       db.select().from(TodoTable).where(eq(TodoTable.session_id, sessionID)).orderBy(asc(TodoTable.position)).all(),
     )

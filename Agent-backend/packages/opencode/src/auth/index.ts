@@ -1,11 +1,16 @@
-import path from "path"
-
 import z from "zod"
 
-import { Global } from "../global"
-import { Filesystem } from "../util/filesystem"
+import * as S from "./service"
 
-export const OAUTH_DUMMY_KEY = "opencode-oauth-dummy-key"
+import type { Effect } from "effect"
+
+import { runtime } from "@/effect/runtime"
+
+export { OAUTH_DUMMY_KEY } from "./service"
+
+function runPromise<A>(f: (service: S.AuthService.Service) => Effect.Effect<A, S.AuthServiceError>): Promise<A> {
+  return runtime.runPromise(S.AuthService.use(f))
+}
 
 export namespace Auth {
   export const Oauth = z
@@ -37,34 +42,19 @@ export namespace Auth {
   export const Info = z.discriminatedUnion("type", [Oauth, Api, WellKnown]).meta({ ref: "Auth" })
   export type Info = z.infer<typeof Info>
 
-  const filepath = path.join(Global.Path.data, "auth.json")
-
   export async function get(providerID: string): Promise<Info | undefined> {
-    const auth = await all()
-    return auth[providerID]
+    return runPromise((service) => service.get(providerID))
   }
 
   export async function all(): Promise<Record<string, Info>> {
-    const data = await Filesystem.readJson<Record<string, unknown>>(filepath).catch(() => ({}))
-    return Object.entries(data).reduce<Record<string, Info>>((acc, [key, value]) => {
-      const parsed = Info.safeParse(value)
-      if (!parsed.success) return acc
-      acc[key] = parsed.data
-      return acc
-    }, {})
+    return runPromise((service) => service.all())
   }
 
   export async function set(key: string, info: Info): Promise<void> {
-    const normalized = key.replace(/\/+$/, "")
-    const data = await all()
-    const cleaned = Object.fromEntries(Object.entries(data).filter(([k]) => k !== key && k !== normalized + "/"))
-    await Filesystem.writeJson(filepath, { ...cleaned, [normalized]: info }, 0o600)
+    return runPromise((service) => service.set(key, info))
   }
 
   export async function remove(key: string): Promise<void> {
-    const normalized = key.replace(/\/+$/, "")
-    const data = await all()
-    const cleaned = Object.fromEntries(Object.entries(data).filter(([k]) => k !== key && k !== normalized))
-    await Filesystem.writeJson(filepath, cleaned, 0o600)
+    return runPromise((service) => service.remove(key))
   }
 }

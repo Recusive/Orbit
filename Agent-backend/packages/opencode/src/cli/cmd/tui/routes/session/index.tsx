@@ -70,8 +70,18 @@ import type { TodoWriteTool } from "@/tool/todo"
 import type { Tool } from "@/tool/tool"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { WriteTool } from "@/tool/write"
-import type { AssistantMessage, Part, ToolPart, UserMessage, TextPart, ReasoningPart } from "@orbit.build/sdk/v2"
+import type { ScrollAcceleration, ScrollBoxRenderable, MouseEvent as OpentuiMouseEvent } from "@opentui/core"
+import type { AssistantMessage, Part, ReasoningPart, TextPart, ToolPart, UserMessage } from "@orbit.build/sdk/v2"
+import type { PromptRef } from "@tui/component/prompt"
+import type { DialogContext } from "@tui/ui/dialog"
+import type { JSX } from "solid-js"
+
+import { UI } from "@/cli/ui.ts"
 import { Flag } from "@/flag/flag"
+import { Global } from "@/global"
+import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
+import { Filesystem } from "@/util/filesystem"
+import { Locale } from "@/util/locale"
 
 // Monkey-patch CodeRenderable to prevent flash-of-invisible-text on re-highlighting.
 // MarkdownRenderable hardcodes drawUnstyledText=false on child CodeRenderables.
@@ -81,23 +91,18 @@ import { Flag } from "@/flag/flag"
 // This patch: if text is already visible, skip the method entirely to preserve the
 // current styled/concealed content. Initial renders (text not yet visible) run
 // the original logic unchanged.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- patching internal opentui prototype
-const CodeProto = CodeRenderable.prototype as any
+interface CodeRenderablePatch {
+  _shouldRenderTextBuffer: boolean
+  ensureVisibleTextBeforeHighlight(): void
+}
+
+const CodeProto = CodeRenderable.prototype as unknown as CodeRenderablePatch
+// eslint-disable-next-line @typescript-eslint/unbound-method -- preserving original prototype method for monkey patch
 const _origEnsureVisible = CodeProto.ensureVisibleTextBeforeHighlight
-CodeProto.ensureVisibleTextBeforeHighlight = function () {
+CodeProto.ensureVisibleTextBeforeHighlight = function (this: CodeRenderablePatch): void {
   if (this._shouldRenderTextBuffer) return
   _origEnsureVisible.call(this)
 }
-import type { ScrollAcceleration, ScrollBoxRenderable, MouseEvent as OpentuiMouseEvent } from "@opentui/core"
-import type { PromptRef } from "@tui/component/prompt"
-import type { DialogContext } from "@tui/ui/dialog"
-import type { JSX } from "solid-js"
-
-import { UI } from "@/cli/ui.ts"
-import { Global } from "@/global"
-import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
-import { Filesystem } from "@/util/filesystem"
-import { Locale } from "@/util/locale"
 
 addDefaultParsers(parsers.parsers)
 
@@ -447,8 +452,11 @@ export function Session(): JSX.Element {
             const shareUrl = res.data?.share?.url
             if (shareUrl) return copy(shareUrl)
           })
-          .catch(() => {
-            toast.show({ message: "Failed to share session", variant: "error" })
+          .catch((error: unknown) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to share session",
+              variant: "error",
+            })
           })
           .finally(() => {
             dialog.clear()
@@ -565,8 +573,11 @@ export function Session(): JSX.Element {
           .then(() => {
             toast.show({ message: "Session unshared successfully", variant: "success" })
           })
-          .catch(() => {
-            toast.show({ message: "Failed to unshare session", variant: "error" })
+          .catch((error: unknown) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to unshare session",
+              variant: "error",
+            })
           })
           .finally(() => {
             dialog.clear()

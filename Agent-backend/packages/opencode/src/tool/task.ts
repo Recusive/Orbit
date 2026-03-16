@@ -2,10 +2,11 @@ import z from "zod"
 
 import { Agent } from "../agent/agent"
 import { Config } from "../config/config"
-import { Identifier } from "../id/id"
+import { ModelID, ProviderID } from "../provider/schema"
 import { Session } from "../session"
 import { MessageV2 } from "../session/message-v2"
 import { SessionPrompt } from "../session/prompt"
+import { MessageID, SessionID } from "../session/schema"
 
 import DESCRIPTION from "./task.txt"
 import { Tool } from "./tool"
@@ -68,14 +69,14 @@ export const TaskTool = Tool.define("task", async (ctx) => {
       const session: Session.Info = await iife(async () => {
         if (params.task_id) {
           try {
-            return Session.get(params.task_id)
+            return Session.get(SessionID.make(params.task_id))
           } catch {
             // Session not found, create a new one
           }
         }
 
         return await Session.create({
-          parentID: ctx.sessionID,
+          parentID: SessionID.make(ctx.sessionID),
           title: params.description + ` (@${agent.name} subagent)`,
           permission: [
             {
@@ -105,13 +106,19 @@ export const TaskTool = Tool.define("task", async (ctx) => {
           ],
         })
       })
-      const msg = MessageV2.get({ sessionID: ctx.sessionID, messageID: ctx.messageID })
+      const msg = MessageV2.get({ sessionID: SessionID.make(ctx.sessionID), messageID: MessageID.make(ctx.messageID) })
       if (msg.info.role !== "assistant") throw new Error("Not an assistant message")
 
-      const model = agent.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
-      }
+      const model =
+        agent.model !== undefined
+          ? {
+              modelID: ModelID.make(agent.model.modelID),
+              providerID: ProviderID.make(agent.model.providerID),
+            }
+          : {
+              modelID: msg.info.modelID,
+              providerID: msg.info.providerID,
+            }
 
       ctx.metadata({
         title: params.description,
@@ -121,7 +128,7 @@ export const TaskTool = Tool.define("task", async (ctx) => {
         },
       })
 
-      const messageID = Identifier.ascending("message")
+      const messageID = MessageID.ascending()
 
       function cancel(): void {
         SessionPrompt.cancel(session.id)

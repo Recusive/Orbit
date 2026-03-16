@@ -33,11 +33,11 @@ import { usePromptStash } from "./stash"
 
 import type { AutocompleteRef } from "./autocomplete"
 import type { PromptInfo } from "./history"
-import type { FilePart } from "@orbit.build/sdk/v2"
 import type { BoxRenderable, MouseEvent, PasteEvent, TextareaRenderable } from "@opentui/core"
+import type { FilePart } from "@orbit.build/sdk/v2"
 import type { JSX } from "solid-js"
 
-import { Identifier } from "@/id/id"
+import { MessageID, PartID } from "@/session/schema"
 import { Filesystem } from "@/util/filesystem"
 import { formatDuration } from "@/util/format"
 import { iife } from "@/util/iife"
@@ -45,6 +45,7 @@ import { Locale } from "@/util/locale"
 
 export interface PromptProps {
   sessionID?: string
+  workspaceID?: string
   visible?: boolean
   disabled?: boolean
   onSubmit?: () => void
@@ -558,7 +559,9 @@ export function Prompt(props: PromptProps): JSX.Element {
 
     let sessionID = props.sessionID
     if (sessionID === undefined) {
-      const res = await sdk.client.session.create({})
+      const res = await sdk.client.session.create({
+        workspaceID: props.workspaceID,
+      })
 
       if (res.error) {
         console.log("Creating a session failed:", res.error)
@@ -574,7 +577,7 @@ export function Prompt(props: PromptProps): JSX.Element {
       sessionID = res.data.id
     }
 
-    const messageID = Identifier.ascending("message")
+    const messageID = MessageID.ascending()
     let inputText = store.prompt.input
 
     // Expand pasted text inline before submitting
@@ -637,7 +640,7 @@ export function Prompt(props: PromptProps): JSX.Element {
         parts: nonTextParts
           .filter((x) => x.type === "file")
           .map((x) => ({
-            id: Identifier.ascending("part"),
+            id: PartID.ascending(),
             ...x,
           })),
       })
@@ -652,12 +655,12 @@ export function Prompt(props: PromptProps): JSX.Element {
           variant,
           parts: [
             {
-              id: Identifier.ascending("part"),
+              id: PartID.ascending(),
               type: "text",
               text: inputText,
             },
             ...nonTextParts.map((x) => ({
-              id: Identifier.ascending("part"),
+              id: PartID.ascending(),
               ...x,
             })),
           ],

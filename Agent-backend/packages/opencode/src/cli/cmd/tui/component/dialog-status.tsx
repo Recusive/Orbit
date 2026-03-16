@@ -1,7 +1,8 @@
+import { fileURLToPath } from "url"
+
 import { TextAttributes } from "@opentui/core"
 import { useSync } from "@tui/context/sync"
 import { useDialog } from "@tui/ui/dialog"
-import { fileURLToPath } from "bun"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
 
 import { useTheme } from "../context/theme"

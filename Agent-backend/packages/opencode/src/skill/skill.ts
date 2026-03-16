@@ -1,5 +1,6 @@
 import os from "os"
 import path from "path"
+import { pathToFileURL } from "url"
 
 import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
@@ -12,9 +13,12 @@ import { Log } from "../util/log"
 
 import { Discovery } from "./discovery"
 
+import type { Agent } from "@/agent/agent"
+
 import { Bus } from "@/bus"
 import { Flag } from "@/flag/flag"
 import { Global } from "@/global"
+import { PermissionNext } from "@/permission/next"
 import { Session } from "@/session"
 import { Filesystem } from "@/util/filesystem"
 
@@ -191,5 +195,33 @@ export namespace Skill {
 
   export async function dirs(): Promise<string[]> {
     return state().then((x) => x.dirs)
+  }
+
+  export async function available(agent?: Agent.Info): Promise<Info[]> {
+    const list = await all()
+    if (agent === undefined) return list
+    return list.filter((skill) => PermissionNext.evaluate("skill", skill.name, agent.permission).action !== "deny")
+  }
+
+  export function fmt(list: Info[], opts: { verbose: boolean }): string {
+    if (list.length === 0) {
+      return "No skills are currently available."
+    }
+
+    if (opts.verbose) {
+      return [
+        "<available_skills>",
+        ...list.flatMap((skill) => [
+          `  <skill>`,
+          `    <name>${skill.name}</name>`,
+          `    <description>${skill.description}</description>`,
+          `    <location>${pathToFileURL(skill.location).href}</location>`,
+          `  </skill>`,
+        ]),
+        "</available_skills>",
+      ].join("\n")
+    }
+
+    return ["## Available Skills", ...list.map((skill) => `- **${skill.name}**: ${skill.description}`)].join("\n")
   }
 }

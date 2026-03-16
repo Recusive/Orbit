@@ -33,7 +33,7 @@ export namespace Clipboard {
     const os = platform()
 
     if (os === "darwin") {
-      const tmpfile = path.join(tmpdir(), "opencode-clipboard.png")
+      const tmpfile = path.join(tmpdir(), "orbit-clipboard.png")
       try {
         await Process.run(
           [

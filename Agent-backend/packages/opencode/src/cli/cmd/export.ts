@@ -3,6 +3,7 @@ import { EOL } from "os"
 import * as prompts from "@clack/prompts"
 
 import { Session } from "../../session"
+import { SessionID } from "../../session/schema"
 import { bootstrap } from "../bootstrap"
 import { UI } from "../ui"
 
@@ -21,7 +22,7 @@ export const ExportCommand = cmd({
   },
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
-      let sessionID = args.sessionID
+      let sessionID = args.sessionID ? SessionID.make(args.sessionID) : undefined
       process.stderr.write(`Exporting session: ${sessionID ?? "latest"}\n`)
 
       if (!sessionID) {
@@ -31,7 +32,7 @@ export const ExportCommand = cmd({
         })
 
         const sessions = []
-        for (const session of Session.list()) {
+        for await (const session of Session.list()) {
           sessions.push(session)
         }
 
@@ -70,8 +71,8 @@ export const ExportCommand = cmd({
       }
 
       try {
-        const sessionInfo = Session.get(sessionID)
-        const messages = Session.messages({ sessionID: sessionID })
+        const sessionInfo = await Session.get(sessionID!)
+        const messages = await Session.messages({ sessionID: sessionInfo.id })
 
         const exportData = {
           info: sessionInfo,
@@ -84,7 +85,7 @@ export const ExportCommand = cmd({
         process.stdout.write(JSON.stringify(exportData, null, 2))
         process.stdout.write(EOL)
       } catch {
-        UI.error(`Session not found: ${sessionID}`)
+        UI.error(`Session not found: ${sessionID!}`)
         process.exit(1)
       }
     })

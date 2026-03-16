@@ -3,6 +3,7 @@ import path from "path"
 
 import { Flag } from "../../flag/flag"
 import { Session } from "../../session"
+import { SessionID } from "../../session/schema"
 import { Filesystem } from "../../util/filesystem"
 import { Locale } from "../../util/locale"
 import { Process } from "../../util/process"
@@ -48,9 +49,7 @@ export const SessionCommand = cmd({
   command: "session",
   describe: "manage sessions",
   builder: (yargs: Argv) => yargs.command(SessionListCommand).command(SessionDeleteCommand).demandCommand(),
-  handler() {
-    // parent command - noop
-  },
+  async handler() {},
 })
 
 export const SessionDeleteCommand = cmd({
@@ -65,13 +64,14 @@ export const SessionDeleteCommand = cmd({
   },
   handler: async (args) => {
     await bootstrap(process.cwd(), async () => {
+      const sessionID = SessionID.make(args.sessionID)
       try {
-        Session.get(args.sessionID)
+        await Session.get(sessionID)
       } catch {
         UI.error(`Session not found: ${args.sessionID}`)
         process.exit(1)
       }
-      await Session.remove(args.sessionID)
+      await Session.remove(sessionID)
       UI.println(UI.Style.TEXT_SUCCESS_BOLD + `Session ${args.sessionID} deleted` + UI.Style.TEXT_NORMAL)
     })
   },
@@ -109,8 +109,7 @@ export const SessionListCommand = cmd({
         output = formatSessionTable(sessions)
       }
 
-      const shouldPaginate =
-        process.stdout.isTTY && (args.maxCount === undefined || args.maxCount === 0) && args.format === "table"
+      const shouldPaginate = process.stdout.isTTY && !args.maxCount && args.format === "table"
 
       if (shouldPaginate) {
         const proc = Process.spawn(pagerCmd(), {

@@ -1,5 +1,8 @@
 import z from "zod"
 
+import { ModelID, ProviderID } from "../provider/schema"
+import { MessageID, SessionID } from "../session/schema"
+
 import DESCRIPTION from "./batch.txt"
 import { Tool } from "./tool"
 
@@ -33,13 +36,13 @@ export const BatchTool = Tool.define("batch", {
   },
   async execute(params, ctx) {
     const { Session } = await import("../session")
-    const { Identifier } = await import("../id/id")
+    const { PartID } = await import("../session/schema")
 
     const toolCalls = params.tool_calls.slice(0, 25)
     const discardedCalls = params.tool_calls.slice(25)
 
     const { ToolRegistry } = await import("./registry")
-    const availableTools = await ToolRegistry.tools({ modelID: "", providerID: "" })
+    const availableTools = await ToolRegistry.tools({ modelID: ModelID.make(""), providerID: ProviderID.make("") })
     const toolMap = new Map(availableTools.map((t) => [t.id, t]))
 
     type ToolAttachment = Omit<MessageV2.FilePart, "id" | "sessionID" | "messageID">
@@ -54,7 +57,7 @@ export const BatchTool = Tool.define("batch", {
       | { success: false; tool: string; error: unknown }
     > => {
       const callStartTime = Date.now()
-      const partID = Identifier.ascending("part")
+      const partID = PartID.ascending()
 
       try {
         if (DISALLOWED.has(call.tool)) {
@@ -74,8 +77,8 @@ export const BatchTool = Tool.define("batch", {
 
         Session.updatePart({
           id: partID,
-          messageID: ctx.messageID,
-          sessionID: ctx.sessionID,
+          messageID: MessageID.make(ctx.messageID),
+          sessionID: SessionID.make(ctx.sessionID),
           type: "tool",
           tool: call.tool,
           callID: partID,
@@ -91,15 +94,15 @@ export const BatchTool = Tool.define("batch", {
         const result = await tool.execute(validatedParams, { ...ctx, callID: partID })
         const attachments = result.attachments?.map((attachment) => ({
           ...attachment,
-          id: Identifier.ascending("part"),
-          sessionID: ctx.sessionID,
-          messageID: ctx.messageID,
+          id: PartID.ascending(),
+          sessionID: SessionID.make(ctx.sessionID),
+          messageID: MessageID.make(ctx.messageID),
         }))
 
         Session.updatePart({
           id: partID,
-          messageID: ctx.messageID,
-          sessionID: ctx.sessionID,
+          messageID: MessageID.make(ctx.messageID),
+          sessionID: SessionID.make(ctx.sessionID),
           type: "tool",
           tool: call.tool,
           callID: partID,
@@ -121,8 +124,8 @@ export const BatchTool = Tool.define("batch", {
       } catch (error) {
         Session.updatePart({
           id: partID,
-          messageID: ctx.messageID,
-          sessionID: ctx.sessionID,
+          messageID: MessageID.make(ctx.messageID),
+          sessionID: SessionID.make(ctx.sessionID),
           type: "tool",
           tool: call.tool,
           callID: partID,
@@ -146,11 +149,11 @@ export const BatchTool = Tool.define("batch", {
     // Add discarded calls as errors
     const now = Date.now()
     for (const call of discardedCalls) {
-      const partID = Identifier.ascending("part")
+      const partID = PartID.ascending()
       Session.updatePart({
         id: partID,
-        messageID: ctx.messageID,
-        sessionID: ctx.sessionID,
+        messageID: MessageID.make(ctx.messageID),
+        sessionID: SessionID.make(ctx.sessionID),
         type: "tool",
         tool: call.tool,
         callID: partID,

@@ -9,12 +9,15 @@ import { SessionCompaction } from "../../session/compaction"
 import { MessageV2 } from "../../session/message-v2"
 import { SessionPrompt } from "../../session/prompt"
 import { SessionRevert } from "../../session/revert"
+import { MessageID, PartID, SessionID } from "../../session/schema"
 import { Todo } from "../../session/todo"
 import { lazy } from "../../util/lazy"
 import { Log } from "../../util/log"
 import { errors } from "../error"
 
 import { PermissionNext } from "@/permission/next"
+import { PermissionID } from "@/permission/schema"
+import { ModelID, ProviderID } from "@/provider/schema"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Snapshot } from "@/snapshot"
@@ -117,7 +120,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         log.info("SEARCH", { url: c.req.url })
         const session = Session.get(sessionID)
         return c.json(session)
@@ -149,7 +152,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const session = Session.children(sessionID)
         return c.json(session)
       },
@@ -179,7 +182,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const todos = Todo.get(sessionID)
         return c.json(todos)
       },
@@ -234,7 +237,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         await Session.remove(sessionID)
         return c.json(true)
       },
@@ -275,7 +278,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const updates = c.req.valid("json")
 
         let session = Session.get(sessionID)
@@ -316,7 +319,7 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", Session.initialize.schema.omit({ sessionID: true })),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const body = c.req.valid("json")
         await Session.initialize({ ...body, sessionID })
         return c.json(true)
@@ -347,7 +350,7 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", Session.fork.schema.omit({ sessionID: true })),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const body = c.req.valid("json")
         const result = await Session.fork({ ...body, sessionID })
         return c.json(result)
@@ -378,7 +381,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       (c) => {
-        SessionPrompt.cancel(c.req.valid("param").sessionID)
+        SessionPrompt.cancel(SessionID.make(c.req.valid("param").sessionID))
         return c.json(true)
       },
     )
@@ -407,7 +410,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         await Session.share(sessionID)
         const session = Session.get(sessionID)
         return c.json(session)
@@ -477,7 +480,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         await Session.unshare(sessionID)
         const session = Session.get(sessionID)
         return c.json(session)
@@ -516,7 +519,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const body = c.req.valid("json")
         const session = Session.get(sessionID)
         await SessionRevert.cleanup(session)
@@ -533,8 +536,8 @@ export const SessionRoutes = lazy(() =>
           sessionID,
           agent: currentAgent,
           model: {
-            providerID: body.providerID,
-            modelID: body.modelID,
+            providerID: ProviderID.make(body.providerID),
+            modelID: ModelID.make(body.modelID),
           },
           auto: body.auto,
         })
@@ -563,22 +566,64 @@ export const SessionRoutes = lazy(() =>
       validator(
         "param",
         z.object({
-          sessionID: z.string().meta({ description: "Session ID" }),
+          sessionID: SessionID.zod,
         }),
       ),
       validator(
         "query",
-        z.object({
-          limit: z.coerce.number().optional(),
-        }),
+        z
+          .object({
+            limit: z.coerce
+              .number()
+              .int()
+              .min(0)
+              .optional()
+              .meta({ description: "Maximum number of messages to return" }),
+            before: z
+              .string()
+              .optional()
+              .meta({ description: "Opaque cursor for loading older messages" })
+              .refine(
+                (value) => {
+                  if (value === undefined) return true
+                  try {
+                    MessageV2.cursor.decode(value)
+                    return true
+                  } catch {
+                    return false
+                  }
+                },
+                { message: "Invalid cursor" },
+              ),
+          })
+          .refine((value) => value.before === undefined || value.limit !== undefined, {
+            message: "before requires limit",
+            path: ["before"],
+          }),
       ),
       (c) => {
         const query = c.req.valid("query")
-        const messages = Session.messages({
-          sessionID: c.req.valid("param").sessionID,
+        const sessionID = c.req.valid("param").sessionID
+        if (query.limit === undefined || query.limit === 0) {
+          Session.get(sessionID)
+          const messages = Session.messages({ sessionID })
+          return c.json(messages)
+        }
+
+        const page = MessageV2.page({
+          sessionID,
           limit: query.limit,
+          before: query.before,
         })
-        return c.json(messages)
+        if (page.cursor !== undefined) {
+          const url = new URL(c.req.url)
+          url.searchParams.set("limit", query.limit.toString())
+          url.searchParams.set("before", page.cursor)
+          c.header("Access-Control-Expose-Headers", "Link, X-Next-Cursor")
+          c.header("Link", `<${url.toString()}>; rel="next"`)
+          c.header("X-Next-Cursor", page.cursor)
+        }
+        return c.json(page.items)
       },
     )
     .get(
@@ -614,8 +659,8 @@ export const SessionRoutes = lazy(() =>
       (c) => {
         const params = c.req.valid("param")
         const message = MessageV2.get({
-          sessionID: params.sessionID,
-          messageID: params.messageID,
+          sessionID: SessionID.make(params.sessionID),
+          messageID: MessageID.make(params.messageID),
         })
         return c.json(message)
       },
@@ -648,10 +693,10 @@ export const SessionRoutes = lazy(() =>
       ),
       (c) => {
         const params = c.req.valid("param")
-        SessionPrompt.assertNotBusy(params.sessionID)
+        SessionPrompt.assertNotBusy(SessionID.make(params.sessionID))
         Session.removeMessage({
-          sessionID: params.sessionID,
-          messageID: params.messageID,
+          sessionID: SessionID.make(params.sessionID),
+          messageID: MessageID.make(params.messageID),
         })
         return c.json(true)
       },
@@ -684,9 +729,9 @@ export const SessionRoutes = lazy(() =>
       (c) => {
         const params = c.req.valid("param")
         Session.removePart({
-          sessionID: params.sessionID,
-          messageID: params.messageID,
-          partID: params.partID,
+          sessionID: SessionID.make(params.sessionID),
+          messageID: MessageID.make(params.messageID),
+          partID: PartID.make(params.partID),
         })
         return c.json(true)
       },
@@ -763,7 +808,7 @@ export const SessionRoutes = lazy(() =>
         c.status(200)
         c.header("Content-Type", "application/json")
         return stream(c, async (stream) => {
-          const sessionID = c.req.valid("param").sessionID
+          const sessionID = SessionID.make(c.req.valid("param").sessionID)
           const body = c.req.valid("json")
           const msg = await SessionPrompt.prompt({ ...body, sessionID })
           await stream.write(JSON.stringify(msg))
@@ -795,7 +840,7 @@ export const SessionRoutes = lazy(() =>
         c.status(204)
         c.header("Content-Type", "application/json")
         return stream(c, (): Promise<void> => {
-          const sessionID = c.req.valid("param").sessionID
+          const sessionID = SessionID.make(c.req.valid("param").sessionID)
           const body = c.req.valid("json")
           log.info("prompt_async received", { sessionID, agent: body.agent })
           void SessionPrompt.prompt({ ...body, sessionID })
@@ -834,7 +879,7 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionPrompt.CommandInput.omit({ sessionID: true })),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const body = c.req.valid("json")
         const msg = await SessionPrompt.command({ ...body, sessionID })
         return c.json(msg)
@@ -866,7 +911,7 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionPrompt.ShellInput.omit({ sessionID: true })),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const body = c.req.valid("json")
         const msg = await SessionPrompt.shell({ ...body, sessionID })
         return c.json(msg)
@@ -898,7 +943,7 @@ export const SessionRoutes = lazy(() =>
       ),
       validator("json", SessionRevert.RevertInput.omit({ sessionID: true })),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         log.info("revert", c.req.valid("json"))
         const session = await SessionRevert.revert({
           sessionID,
@@ -932,7 +977,7 @@ export const SessionRoutes = lazy(() =>
         }),
       ),
       async (c) => {
-        const sessionID = c.req.valid("param").sessionID
+        const sessionID = SessionID.make(c.req.valid("param").sessionID)
         const session = await SessionRevert.unrevert({ sessionID })
         return c.json(session)
       },
@@ -967,7 +1012,7 @@ export const SessionRoutes = lazy(() =>
       (c) => {
         const params = c.req.valid("param")
         PermissionNext.reply({
-          requestID: params.permissionID,
+          requestID: PermissionID.make(params.permissionID),
           reply: c.req.valid("json").response,
         })
         return c.json(true)

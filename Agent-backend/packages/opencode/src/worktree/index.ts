@@ -9,6 +9,7 @@ import { InstanceBootstrap } from "../project/bootstrap"
 import { Instance } from "../project/instance"
 import { Project } from "../project/project"
 import { ProjectTable } from "../project/project.sql"
+import { ProjectID } from "../project/schema"
 import { Database, eq } from "../storage/db"
 import { fn } from "../util/fn"
 import { git } from "../util/git"
@@ -316,7 +317,7 @@ export namespace Worktree {
     return false
   }
 
-  async function runStartScripts(directory: string, input: { projectID: string; extra?: string }): Promise<boolean> {
+  async function runStartScripts(directory: string, input: { projectID: ProjectID; extra?: string }): Promise<boolean> {
     const row = Database.use((db) => db.select().from(ProjectTable).where(eq(ProjectTable.id, input.projectID)).get())
     const project = row ? Project.fromRow(row) : undefined
     const startup = project?.commands?.start?.trim() ?? ""
@@ -328,7 +329,7 @@ export namespace Worktree {
     return true
   }
 
-  function queueStartScripts(directory: string, input: { projectID: string; extra?: string }): void {
+  function queueStartScripts(directory: string, input: { projectID: ProjectID; extra?: string }): void {
     setTimeout(() => {
       const start = async (): Promise<void> => {
         await runStartScripts(directory, input)

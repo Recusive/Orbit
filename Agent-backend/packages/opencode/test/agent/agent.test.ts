@@ -1,11 +1,9 @@
-import path from "path"
-
 import { test, expect } from "bun:test"
-
+import path from "path"
+import { tmpdir } from "../fixture/fixture"
+import { Instance } from "../../src/project/instance"
 import { Agent } from "../../src/agent/agent"
 import { PermissionNext } from "../../src/permission/next"
-import { Instance } from "../../src/project/instance"
-import { tmpdir } from "../fixture/fixture"
 
 // Helper to evaluate permission for a tool with wildcard pattern
 function evalPerm(agent: Agent.Info | undefined, permission: string): PermissionNext.Action | undefined {
@@ -46,7 +44,7 @@ test("build agent has correct default properties", async () => {
   })
 })
 
-test("plan agent denies edits except .orbit/plans/*", async () => {
+test("plan agent denies edits except .opencode/plans/*", async () => {
   await using tmp = await tmpdir()
   await Instance.provide({
     directory: tmp.path,
@@ -56,7 +54,7 @@ test("plan agent denies edits except .orbit/plans/*", async () => {
       // Wildcard is denied
       expect(evalPerm(plan, "edit")).toBe("deny")
       // But specific path is allowed
-      expect(PermissionNext.evaluate("edit", ".orbit/plans/foo.md", plan!.permission).action).toBe("allow")
+      expect(PermissionNext.evaluate("edit", ".opencode/plans/foo.md", plan!.permission).action).toBe("allow")
     },
   })
 })
@@ -68,7 +66,7 @@ test("explore agent denies edit and write", async () => {
     fn: async () => {
       const explore = await Agent.get("explore")
       expect(explore).toBeDefined()
-      expect(explore!.mode).toBe("subagent")
+      expect(explore?.mode).toBe("subagent")
       expect(evalPerm(explore, "edit")).toBe("deny")
       expect(evalPerm(explore, "write")).toBe("deny")
       expect(evalPerm(explore, "todoread")).toBe("deny")
@@ -139,8 +137,8 @@ test("custom agent from config creates new agent", async () => {
     fn: async () => {
       const custom = await Agent.get("my_custom_agent")
       expect(custom).toBeDefined()
-      expect(custom?.model?.providerID).toBe("openai")
-      expect(custom?.model?.modelID).toBe("gpt-4")
+      expect(String(custom?.model?.providerID)).toBe("openai")
+      expect(String(custom?.model?.modelID)).toBe("gpt-4")
       expect(custom?.description).toBe("My custom agent")
       expect(custom?.temperature).toBe(0.5)
       expect(custom?.topP).toBe(0.9)
@@ -168,8 +166,8 @@ test("custom agent config overrides native agent properties", async () => {
     fn: async () => {
       const build = await Agent.get("build")
       expect(build).toBeDefined()
-      expect(build?.model?.providerID).toBe("anthropic")
-      expect(build?.model?.modelID).toBe("claude-3")
+      expect(String(build?.model?.providerID)).toBe("anthropic")
+      expect(String(build?.model?.modelID)).toBe("claude-3")
       expect(build?.description).toBe("Custom build agent")
       expect(build?.temperature).toBe(0.7)
       expect(build?.color).toBe("#FF0000")
@@ -534,7 +532,7 @@ test("skill directories are allowed for external_directory", async () => {
   await using tmp = await tmpdir({
     git: true,
     init: async (dir) => {
-      const skillDir = path.join(dir, ".orbit", "skill", "perm-skill")
+      const skillDir = path.join(dir, ".opencode", "skill", "perm-skill")
       await Bun.write(
         path.join(skillDir, "SKILL.md"),
         `---
@@ -556,7 +554,7 @@ description: Permission skill.
       directory: tmp.path,
       fn: async () => {
         const build = await Agent.get("build")
-        const skillDir = path.join(tmp.path, ".orbit", "skill", "perm-skill")
+        const skillDir = path.join(tmp.path, ".opencode", "skill", "perm-skill")
         const target = path.join(skillDir, "reference", "notes.md")
         expect(PermissionNext.evaluate("external_directory", target, build!.permission).action).toBe("allow")
       },

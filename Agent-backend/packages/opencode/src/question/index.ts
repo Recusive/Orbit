@@ -1,9 +1,11 @@
 import z from "zod"
 
+import { QuestionID } from "./schema"
+
 import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
-import { Identifier } from "@/id/id"
 import { Instance } from "@/project/instance"
+import { MessageID, SessionID } from "@/session/schema"
 import { Log } from "@/util/log"
 
 export namespace Question {
@@ -34,12 +36,12 @@ export namespace Question {
 
   export const Request = z
     .object({
-      id: Identifier.schema("question"),
-      sessionID: Identifier.schema("session"),
+      id: QuestionID.zod,
+      sessionID: SessionID.zod,
       questions: z.array(Info).describe("Questions to ask"),
       tool: z
         .object({
-          messageID: z.string(),
+          messageID: MessageID.zod,
           callID: z.string(),
         })
         .optional(),
@@ -66,42 +68,37 @@ export namespace Question {
     Replied: BusEvent.define(
       "question.replied",
       z.object({
-        sessionID: z.string(),
-        requestID: z.string(),
+        sessionID: SessionID.zod,
+        requestID: QuestionID.zod,
         answers: z.array(Answer),
       }),
     ),
     Rejected: BusEvent.define(
       "question.rejected",
       z.object({
-        sessionID: z.string(),
-        requestID: z.string(),
+        sessionID: SessionID.zod,
+        requestID: QuestionID.zod,
       }),
     ),
   }
 
-  const state = Instance.state(() => {
-    const pending: Record<
-      string,
-      {
-        info: Request
-        resolve: (answers: Answer[]) => void
-        reject: (e: Error) => void
-      }
-    > = {}
+  interface PendingEntry {
+    info: Request
+    resolve: (answers: Answer[]) => void
+    reject: (e: Error) => void
+  }
 
-    return {
-      pending,
-    }
-  })
+  const state = Instance.state(() => ({
+    pending: new Map<QuestionID, PendingEntry>(),
+  }))
 
   export function ask(input: {
-    sessionID: string
+    sessionID: SessionID
     questions: Info[]
-    tool?: { messageID: string; callID: string }
+    tool?: { messageID: MessageID; callID: string }
   }): Promise<Answer[]> {
     const s = state()
-    const id = Identifier.ascending("question")
+    const id = QuestionID.ascending()
 
     log.info("asking", { id, questions: input.questions.length })
 
@@ -112,23 +109,23 @@ export namespace Question {
         questions: input.questions,
         tool: input.tool,
       }
-      s.pending[id] = {
+      s.pending.set(id, {
         info,
         resolve,
         reject,
-      }
+      })
       void Bus.publish(Event.Asked, info)
     })
   }
 
-  export function reply(input: { requestID: string; answers: Answer[] }): void {
+  export function reply(input: { requestID: QuestionID; answers: Answer[] }): void {
     const s = state()
-    if (!(input.requestID in s.pending)) {
+    const existing = s.pending.get(input.requestID)
+    if (existing === undefined) {
       log.warn("reply for unknown request", { requestID: input.requestID })
       return
     }
-    const existing = s.pending[input.requestID]
-    Reflect.deleteProperty(s.pending, input.requestID)
+    s.pending.delete(input.requestID)
 
     log.info("replied", { requestID: input.requestID, answers: input.answers })
 
@@ -141,14 +138,14 @@ export namespace Question {
     existing.resolve(input.answers)
   }
 
-  export function reject(requestID: string): void {
+  export function reject(requestID: QuestionID): void {
     const s = state()
-    if (!(requestID in s.pending)) {
+    const existing = s.pending.get(requestID)
+    if (existing === undefined) {
       log.warn("reject for unknown request", { requestID })
       return
     }
-    const existing = s.pending[requestID]
-    Reflect.deleteProperty(s.pending, requestID)
+    s.pending.delete(requestID)
 
     log.info("rejected", { requestID })
 
@@ -167,6 +164,6 @@ export namespace Question {
   }
 
   export function list(): Request[] {
-    return Object.values(state().pending).map((p) => p.info)
+    return Array.from(state().pending.values(), (p) => p.info)
   }
 }

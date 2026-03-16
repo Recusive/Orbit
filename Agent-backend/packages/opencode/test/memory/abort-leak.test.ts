@@ -1,31 +1,26 @@
-import path from "path"
-
 import { describe, test, expect } from "bun:test"
-
+import path from "path"
 import { Instance } from "../../src/project/instance"
 import { WebFetchTool } from "../../src/tool/webfetch"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const projectRoot = path.join(__dirname, "../..")
 
 const ctx = {
-  sessionID: "test",
-  messageID: "",
+  sessionID: SessionID.make("ses_test"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: new AbortController().signal,
   messages: [],
-  metadata: () => {
-    /* noop */
-  },
-  ask: async () => {
-    /* noop */
-  },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 const MB = 1024 * 1024
 const ITERATIONS = 50
 
-const getHeapMB = (): number => {
+const getHeapMB = () => {
   Bun.gc(true)
   return process.memoryUsage().heapUsed / MB
 }
@@ -38,29 +33,22 @@ describe("memory: abort controller leak", () => {
         const tool = await WebFetchTool.init()
 
         // Warm up
-        await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {
-          /* noop */
-        })
+        await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {})
 
         Bun.gc(true)
         const baseline = getHeapMB()
 
         // Run many fetches
         for (let i = 0; i < ITERATIONS; i++) {
-          await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {
-            /* noop */
-          })
+          await tool.execute({ url: "https://example.com", format: "text" }, ctx).catch(() => {})
         }
 
         Bun.gc(true)
         const after = getHeapMB()
         const growth = after - baseline
 
-        // eslint-disable-next-line no-console
         console.log(`Baseline: ${baseline.toFixed(2)} MB`)
-        // eslint-disable-next-line no-console
-        console.log(`After ${String(ITERATIONS)} fetches: ${after.toFixed(2)} MB`)
-        // eslint-disable-next-line no-console
+        console.log(`After ${ITERATIONS} fetches: ${after.toFixed(2)} MB`)
         console.log(`Growth: ${growth.toFixed(2)} MB`)
 
         // Memory growth should be minimal - less than 1MB per 10 requests
@@ -70,7 +58,7 @@ describe("memory: abort controller leak", () => {
     })
   }, 60000)
 
-  test("compare closure vs bind pattern directly", () => {
+  test("compare closure vs bind pattern directly", async () => {
     const ITERATIONS = 500
 
     // Test OLD pattern: arrow function closure
@@ -85,12 +73,12 @@ describe("memory: abort controller leak", () => {
 
     for (let i = 0; i < ITERATIONS; i++) {
       // Simulate large response body like webfetch would have
-      const content = `${String(i)}:${"x".repeat(50 * 1024)}` // 50KB unique per iteration
+      const content = `${i}:${"x".repeat(50 * 1024)}` // 50KB unique per iteration
       const controller = new AbortController()
       controllers.push(controller)
 
       // OLD pattern - closure captures `content`
-      const handler = (): void => {
+      const handler = () => {
         // Actually use content so it can't be optimized away
         if (content.length > 1000000000) controller.abort()
       }
@@ -104,14 +92,11 @@ describe("memory: abort controller leak", () => {
     const after = getHeapMB()
     const oldGrowth = after - baseline
 
-    // eslint-disable-next-line no-console
-    console.log(`OLD pattern (closure): ${oldGrowth.toFixed(2)} MB growth (${String(closureMap.size)} closures)`)
+    console.log(`OLD pattern (closure): ${oldGrowth.toFixed(2)} MB growth (${closureMap.size} closures)`)
 
     // Cleanup after measuring
     timers.forEach(clearTimeout)
-    controllers.forEach((c) => {
-      c.abort()
-    })
+    controllers.forEach((c) => c.abort())
     closureMap.clear()
 
     // Test NEW pattern: bind
@@ -123,7 +108,7 @@ describe("memory: abort controller leak", () => {
     const controllers2: AbortController[] = []
 
     for (let i = 0; i < ITERATIONS; i++) {
-      const _content = `${String(i)}:${"x".repeat(50 * 1024)}` // 50KB - won't be captured
+      const _content = `${i}:${"x".repeat(50 * 1024)}` // 50KB - won't be captured
       const controller = new AbortController()
       controllers2.push(controller)
 
@@ -141,14 +126,10 @@ describe("memory: abort controller leak", () => {
 
     // Cleanup after measuring
     timers2.forEach(clearTimeout)
-    controllers2.forEach((c) => {
-      c.abort()
-    })
+    controllers2.forEach((c) => c.abort())
     handlers2.length = 0
 
-    // eslint-disable-next-line no-console
     console.log(`NEW pattern (bind): ${newGrowth.toFixed(2)} MB growth`)
-    // eslint-disable-next-line no-console
     console.log(`Improvement: ${(oldGrowth - newGrowth).toFixed(2)} MB saved`)
 
     expect(newGrowth).toBeLessThanOrEqual(oldGrowth)

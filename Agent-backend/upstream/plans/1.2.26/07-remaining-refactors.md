@@ -1,4 +1,4 @@
-# Phase 7: Server Refactor + CLI Rename + Misc Refactors
+# ✅ Phase 7: Server Refactor + CLI Rename + Misc Refactors
 
 ## How to Execute
 

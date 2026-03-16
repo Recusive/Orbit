@@ -1,8 +1,6 @@
-import fs from "fs/promises"
-import path from "path"
-
 import { describe, test, expect } from "bun:test"
-
+import path from "path"
+import fs from "fs/promises"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
 
@@ -13,14 +11,14 @@ describe("filesystem", () => {
       const filepath = path.join(tmp.path, "test.txt")
       await fs.writeFile(filepath, "content", "utf-8")
 
-      expect(Filesystem.exists(filepath)).toBe(true)
+      expect(await Filesystem.exists(filepath)).toBe(true)
     })
 
     test("returns false for non-existent file", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "does-not-exist.txt")
 
-      expect(Filesystem.exists(filepath)).toBe(false)
+      expect(await Filesystem.exists(filepath)).toBe(false)
     })
 
     test("returns true for existing directory", async () => {
@@ -28,7 +26,7 @@ describe("filesystem", () => {
       const dirpath = path.join(tmp.path, "subdir")
       await fs.mkdir(dirpath)
 
-      expect(Filesystem.exists(dirpath)).toBe(true)
+      expect(await Filesystem.exists(dirpath)).toBe(true)
     })
   })
 
@@ -38,7 +36,7 @@ describe("filesystem", () => {
       const dirpath = path.join(tmp.path, "testdir")
       await fs.mkdir(dirpath)
 
-      expect(Filesystem.isDir(dirpath)).toBe(true)
+      expect(await Filesystem.isDir(dirpath)).toBe(true)
     })
 
     test("returns false for file", async () => {
@@ -46,14 +44,14 @@ describe("filesystem", () => {
       const filepath = path.join(tmp.path, "test.txt")
       await fs.writeFile(filepath, "content", "utf-8")
 
-      expect(Filesystem.isDir(filepath)).toBe(false)
+      expect(await Filesystem.isDir(filepath)).toBe(false)
     })
 
     test("returns false for non-existent path", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "does-not-exist")
 
-      expect(Filesystem.isDir(filepath)).toBe(false)
+      expect(await Filesystem.isDir(filepath)).toBe(false)
     })
   })
 
@@ -64,14 +62,14 @@ describe("filesystem", () => {
       const content = "Hello, World!"
       await fs.writeFile(filepath, content, "utf-8")
 
-      expect(Filesystem.size(filepath)).toBe(content.length)
+      expect(await Filesystem.size(filepath)).toBe(content.length)
     })
 
     test("returns 0 for non-existent file", async () => {
       await using tmp = await tmpdir()
       const filepath = path.join(tmp.path, "does-not-exist.txt")
 
-      expect(Filesystem.size(filepath)).toBe(0)
+      expect(await Filesystem.size(filepath)).toBe(0)
     })
 
     test("returns directory size", async () => {
@@ -80,7 +78,7 @@ describe("filesystem", () => {
       await fs.mkdir(dirpath)
 
       // Directories have size on some systems
-      const size = Filesystem.size(dirpath)
+      const size = await Filesystem.size(dirpath)
       expect(typeof size).toBe("number")
     })
   })
@@ -503,6 +501,58 @@ describe("filesystem", () => {
       await using tmp = await tmpdir()
       const drive = tmp.path[0].toLowerCase()
       expect(Filesystem.resolve(`/mnt/${drive}`)).toBe(Filesystem.resolve(`${drive.toUpperCase()}:/`))
+    })
+
+    test("resolves symlinked directory to canonical path", async () => {
+      await using tmp = await tmpdir()
+      const target = path.join(tmp.path, "real")
+      await fs.mkdir(target)
+      const link = path.join(tmp.path, "link")
+      await fs.symlink(target, link)
+      expect(Filesystem.resolve(link)).toBe(Filesystem.resolve(target))
+    })
+
+    test("returns unresolved path when target does not exist", async () => {
+      await using tmp = await tmpdir()
+      const missing = path.join(tmp.path, "does-not-exist-" + Date.now())
+      const result = Filesystem.resolve(missing)
+      expect(result).toBe(Filesystem.normalizePath(path.resolve(missing)))
+    })
+
+    test("throws ELOOP on symlink cycle", async () => {
+      await using tmp = await tmpdir()
+      const a = path.join(tmp.path, "a")
+      const b = path.join(tmp.path, "b")
+      await fs.symlink(b, a)
+      await fs.symlink(a, b)
+      expect(() => Filesystem.resolve(a)).toThrow()
+    })
+
+    // Windows: chmod(0o000) is a no-op, so EACCES cannot be triggered
+    test("throws EACCES on permission-denied symlink target", async () => {
+      if (process.platform === "win32") return
+      if (process.getuid?.() === 0) return // skip when running as root
+      await using tmp = await tmpdir()
+      const dir = path.join(tmp.path, "restricted")
+      await fs.mkdir(dir)
+      const link = path.join(tmp.path, "link")
+      await fs.symlink(dir, link)
+      await fs.chmod(dir, 0o000)
+      try {
+        expect(() => Filesystem.resolve(path.join(link, "child"))).toThrow()
+      } finally {
+        await fs.chmod(dir, 0o755)
+      }
+    })
+
+    // Windows: traversing through a file throws ENOENT (not ENOTDIR),
+    // which resolve() catches as a fallback instead of rethrowing
+    test("rethrows non-ENOENT errors", async () => {
+      if (process.platform === "win32") return
+      await using tmp = await tmpdir()
+      const file = path.join(tmp.path, "not-a-directory")
+      await fs.writeFile(file, "x")
+      expect(() => Filesystem.resolve(path.join(file, "child"))).toThrow()
     })
   })
 })

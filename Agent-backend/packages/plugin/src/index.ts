@@ -1,5 +1,5 @@
-import type { BunShell } from "./shell"
-import type { ToolDefinition } from "./tool"
+import type { BunShell } from "./shell.js"
+import type { ToolDefinition } from "./tool.js"
 import type {
   Event,
   createOpencodeClient,
@@ -14,7 +14,7 @@ import type {
   Config,
 } from "@orbit.build/sdk"
 
-export * from "./tool"
+export * from "./tool.js"
 
 export interface ProviderContext {
   source: "env" | "config" | "custom" | "api"

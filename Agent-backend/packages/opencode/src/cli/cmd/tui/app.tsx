@@ -23,7 +23,7 @@ import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { Clipboard } from "@tui/util/clipboard"
 import { Selection } from "@tui/util/selection"
 import open from "open"
-import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMount, batch, on } from "solid-js"
+import { Switch, Match, createEffect, ErrorBoundary, createSignal, onMount, batch, on } from "solid-js"
 
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptHistoryProvider } from "./component/prompt/history"
@@ -34,7 +34,6 @@ import { KVProvider, useKV } from "./context/kv"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiEvent } from "./event"
-import { DialogAlert } from "./ui/dialog-alert"
 import { DialogHelp } from "./ui/dialog-help"
 import { ToastProvider, useToast } from "./ui/toast"
 import { win32DisableProcessedInput, win32FlushInputBuffer, win32InstallCtrlCGuard } from "./win32"
@@ -428,9 +427,12 @@ function App(): JSX.Element {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current.input ? current.current : undefined
+        const workspaceID =
+          route.data.type === "session" ? sync.session.get(route.data.sessionID)?.workspaceID : undefined
         route.navigate({
           type: "home",
           initialPrompt: currentPrompt,
+          workspaceID,
         })
         dialog.clear()
       },
@@ -608,7 +610,7 @@ function App(): JSX.Element {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => {
+        open("https://orbit.build/docs").catch(() => {
           /* noop */
         })
         dialog.clear()
@@ -710,22 +712,6 @@ function App(): JSX.Element {
       },
     },
   ])
-
-  createEffect(() => {
-    const currentModel = local.model.current()
-    if (!currentModel) return
-    if (currentModel.providerID === "openrouter" && !kv.get<boolean>("openrouter_warning", false)) {
-      untrack(() => {
-        void DialogAlert.show(
-          dialog,
-          "Warning",
-          "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
-        ).then(() => {
-          kv.set("openrouter_warning", true)
-        })
-      })
-    }
-  })
 
   sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
     command.trigger(evt.properties.command)

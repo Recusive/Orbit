@@ -1,13 +1,13 @@
 import z from "zod"
 
 import { Bus } from "../bus"
-import { Identifier } from "../id/id"
 import { Snapshot } from "../snapshot"
 import { Database, eq } from "../storage/db"
 import { Log } from "../util/log"
 
 import { MessageV2 } from "./message-v2"
 import { SessionPrompt } from "./prompt"
+import { MessageID, PartID, SessionID } from "./schema"
 import { MessageTable, PartTable } from "./session.sql"
 import { SessionSummary } from "./summary"
 
@@ -19,9 +19,9 @@ export namespace SessionRevert {
   const log = Log.create({ service: "session.revert" })
 
   export const RevertInput = z.object({
-    sessionID: Identifier.schema("session"),
-    messageID: Identifier.schema("message"),
-    partID: Identifier.schema("part").optional(),
+    sessionID: SessionID.zod,
+    messageID: MessageID.zod,
+    partID: PartID.zod.optional(),
   })
   export type RevertInput = z.infer<typeof RevertInput>
 
@@ -81,7 +81,7 @@ export namespace SessionRevert {
     return session
   }
 
-  export async function unrevert(input: { sessionID: string }): Promise<Session.Info> {
+  export async function unrevert(input: { sessionID: SessionID }): Promise<Session.Info> {
     log.info("unreverting", input)
     SessionPrompt.assertNotBusy(input.sessionID)
     const session = Session.get(input.sessionID)

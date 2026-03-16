@@ -4,6 +4,7 @@ import z from "zod"
 
 import { Workspace } from "../../control-plane/workspace"
 import { Instance } from "../../project/instance"
+import { ProjectID } from "../../project/schema"
 import { lazy } from "../../util/lazy"
 import { errors } from "../error"
 
@@ -36,7 +37,7 @@ export const WorkspaceRoutes = lazy(() =>
       async (c) => {
         const body = c.req.valid("json")
         const workspace = await Workspace.create({
-          projectID: Instance.project.id,
+          projectID: ProjectID.make(Instance.project.id),
           ...body,
         })
         return c.json(workspace)

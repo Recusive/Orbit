@@ -1,15 +1,13 @@
-import { afterEach, describe, mock, test } from "bun:test"
-
-import { GlobalBus } from "../../src/bus/global"
-import * as adaptors from "../../src/control-plane/adaptors"
-import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
-import { Identifier } from "../../src/id/id"
+import { afterEach, describe, expect, mock, test } from "bun:test"
+import { WorkspaceID } from "../../src/control-plane/schema"
+import { Log } from "../../src/util/log"
+import { tmpdir } from "../fixture/fixture"
 import { Project } from "../../src/project/project"
 import { Database } from "../../src/storage/db"
-import { Log } from "../../src/util/log"
+import { WorkspaceTable } from "../../src/control-plane/workspace.sql"
+import { GlobalBus } from "../../src/bus/global"
 import { resetDatabase } from "../fixture/db"
-import { tmpdir } from "../fixture/fixture"
-
+import * as adaptors from "../../src/control-plane/adaptors"
 import type { Adaptor } from "../../src/control-plane/types"
 
 afterEach(async () => {
@@ -17,7 +15,7 @@ afterEach(async () => {
   await resetDatabase()
 })
 
-void Log.init({ print: false })
+Log.init({ print: false })
 
 const remote = { type: "testing", name: "remote-a" } as unknown as typeof WorkspaceTable.$inferInsert
 
@@ -25,13 +23,11 @@ const TestAdaptor: Adaptor = {
   configure(config) {
     return config
   },
-  create() {
+  async create() {
     throw new Error("not used")
   },
-  async remove() {
-    /* noop */
-  },
-  async fetch(_config, _input, _init?) {
+  async remove() {},
+  async fetch(_config: unknown, _input: RequestInfo | URL, _init?: RequestInit) {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
         const encoder = new TextEncoder()
@@ -56,11 +52,12 @@ describe("control-plane/workspace.startSyncing", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const id1 = Identifier.descending("workspace")
-    const id2 = Identifier.descending("workspace")
+    const id1 = WorkspaceID.ascending()
+    const id2 = WorkspaceID.ascending()
 
-    Database.use((db) => {
-      db.insert(WorkspaceTable)
+    Database.use((db) =>
+      db
+        .insert(WorkspaceTable)
         .values([
           {
             id: id1,
@@ -78,14 +75,13 @@ describe("control-plane/workspace.startSyncing", () => {
             name: "local",
           },
         ])
-        .run()
-    })
+        .run(),
+    )
 
     const done = new Promise<void>((resolve) => {
-      const listener = (event: { directory?: string; payload: unknown }): void => {
+      const listener = (event: { directory?: string; payload: unknown }) => {
         if (event.directory !== id1) return
-        const payload = event.payload as { type?: string }
-        if (payload.type !== "remote.ready") return
+        if ((event.payload as { type?: string }).type !== "remote.ready") return
         GlobalBus.off("event", listener)
         resolve()
       }
@@ -95,13 +91,9 @@ describe("control-plane/workspace.startSyncing", () => {
     const sync = Workspace.startSyncing(project)
     await Promise.race([
       done,
-      new Promise((_, reject) =>
-        setTimeout(() => {
-          reject(new Error("timed out waiting for sync event"))
-        }, 2000),
-      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timed out waiting for sync event")), 2000)),
     ])
 
-    sync.stop()
+    await sync.stop()
   })
 })

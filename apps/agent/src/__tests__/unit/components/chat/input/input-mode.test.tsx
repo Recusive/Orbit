@@ -258,7 +258,7 @@ describe('InputControls Mode Picker Button', () => {
       render(<InputControls {...createDefaultProps()} />, { wrapper: TestWrapper });
 
       await user.click(screen.getByRole('button', { name: 'OpenCode model selector' }));
-      await user.click(screen.getByRole('menuitem', { name: 'Connect a provider' }));
+      await user.click(screen.getByRole('button', { name: 'Connect a provider' }));
 
       expect(screen.getByText('Providers')).toBeInTheDocument();
       expect(screen.getByText('Anthropic')).toBeInTheDocument();
@@ -275,7 +275,7 @@ describe('InputControls Mode Picker Button', () => {
       );
 
       await user.click(screen.getByRole('button', { name: 'OpenCode thinking selector' }));
-      await user.click(screen.getByRole('menuitemradio', { name: 'Max' }));
+      await user.click(screen.getByRole('option', { name: 'Max' }));
 
       expect(useOcProviderStore.getState().variantSelections['anthropic/claude-sonnet-4-5']).toBe(
         'max'
@@ -322,14 +322,14 @@ describe('InputControls Mode Picker Button', () => {
   });
 
   describe('styling', () => {
-    it('should have muted styling for default mode', () => {
+    it('should have neutral styling for default mode', () => {
       render(<InputControls {...createDefaultProps({ inputMode: 'default' })} />, {
         wrapper: TestWrapper,
       });
 
       const button = getModePickerButton();
-      expect(button).toHaveClass('bg-lg-control');
-      expect(button).toHaveClass('text-foreground');
+      expect(button).toHaveClass('bg-transparent');
+      expect(button).toHaveClass('text-muted-foreground');
     });
 
     it('should have plan mode styling for plan mode', () => {
@@ -357,7 +357,7 @@ describe('InputControls Mode Picker Button', () => {
 
       const button = getModePickerButton();
       expect(button).toHaveClass('h-7');
-      expect(button).toHaveClass('rounded-[9px]');
+      expect(button).toHaveClass('rounded-full');
       expect(button).toHaveClass('transition-transform');
     });
   });
@@ -421,7 +421,7 @@ describe('InputControls Mode Picker Button', () => {
       // Initial state: default mode
       let button = getModePickerButton();
       expect(within(button).getByText('Default')).toBeInTheDocument();
-      expect(button).toHaveClass('bg-lg-control');
+      expect(button).toHaveClass('bg-transparent');
 
       // Change to plan mode
       rerender(

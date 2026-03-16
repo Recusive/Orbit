@@ -15,7 +15,7 @@ import type { Accessor, JSX } from "solid-js"
 export function useConnected(): Accessor<boolean> {
   const sync = useSync()
   return createMemo(() =>
-    sync.data.provider.some((x) => x.id !== "opencode" || Object.values(x.models).some((y) => y.cost.input !== 0)),
+    sync.data.provider.some((x) => x.id !== "orbit" || Object.values(x.models).some((y) => y.cost.input !== 0)),
   )
 }
 
@@ -62,8 +62,8 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
             title: model.name,
             description: provider.name,
             category,
-            disabled: provider.id === "opencode" && model.id.includes("-nano"),
-            footer: model.cost.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            disabled: provider.id === "orbit" && model.id.includes("-nano"),
+            footer: model.cost.input === 0 && provider.id === "orbit" ? "Free" : undefined,
             onSelect: () => {
               dialog.clear()
               local.model.set({ providerID: provider.id, modelID: model.id }, { recent: true })
@@ -84,7 +84,7 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
     const providerOptions = pipe(
       sync.data.provider,
       sortBy(
-        (provider) => provider.id !== "opencode",
+        (provider) => provider.id !== "orbit",
         (provider) => provider.name,
       ),
       flatMap((provider) =>
@@ -100,8 +100,8 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
               ? "(Favorite)"
               : undefined,
             category: connected() ? provider.name : undefined,
-            disabled: provider.id === "opencode" && model.includes("-nano"),
-            footer: info.cost.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            disabled: provider.id === "orbit" && model.includes("-nano"),
+            footer: info.cost.input === 0 && provider.id === "orbit" ? "Free" : undefined,
             onSelect() {
               dialog.clear()
               local.model.set({ providerID: provider.id, modelID: model }, { recent: true })

@@ -22,8 +22,8 @@ import { createVercel } from "@ai-sdk/vercel"
 import { createXai } from "@ai-sdk/xai"
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers"
 import { createGitLab, VERSION as GITLAB_PROVIDER_VERSION } from "@gitlab/gitlab-ai-provider"
-import { NamedError } from "@orbit.build/util/error"
 import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { NamedError } from "@orbit.build/util/error"
 import { NoSuchModelError } from "ai"
 import fuzzysort from "fuzzysort"
 import { GoogleAuth } from "google-auth-library"
@@ -67,8 +67,20 @@ interface ExtendedSDK extends SDK {
  */
 type SapSDK = ((modelId: string) => LanguageModelV2) & SDK
 
+const DEFAULT_CHUNK_TIMEOUT = 120_000
+
 export namespace Provider {
   const log = Log.create({ service: "provider" })
+  // "opencode" is the OpenCode Zen provider (external LLM service, like OpenRouter).
+  // It is NOT our app — do NOT remap it to "orbit".
+  // Both "opencode" and "orbit" provider IDs are supported via CUSTOM_LOADERS.
+  export function normalizeProviderID(providerID: string): string {
+    return providerID
+  }
+
+  export function isOrbitProviderID(providerID: string): boolean {
+    return providerID === "orbit" || providerID === "opencode" || providerID.startsWith("orbit-") || providerID.startsWith("opencode-")
+  }
 
   function isGpt5OrLater(modelID: string): boolean {
     const match = /^gpt-(\d+)/.exec(modelID)
@@ -80,6 +92,54 @@ export namespace Provider {
 
   function shouldUseCopilotResponsesApi(modelID: string): boolean {
     return isGpt5OrLater(modelID) && !modelID.startsWith("gpt-5-mini")
+  }
+
+  function wrapSSE(res: Response, ms: number, ctl: AbortController): Response {
+    if (typeof ms !== "number" || ms <= 0) return res
+    if (res.body === null) return res
+    if (res.headers.get("content-type")?.includes("text/event-stream") !== true) return res
+
+    const reader = res.body.getReader()
+    const body = new ReadableStream<Uint8Array>({
+      async pull(ctrl) {
+        const part = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
+          const id = setTimeout(() => {
+            const err = new Error("SSE read timed out")
+            ctl.abort(err)
+            void reader.cancel(err)
+            reject(err instanceof Error ? err : new Error(String(err)))
+          }, ms)
+
+          reader.read().then(
+            (part) => {
+              clearTimeout(id)
+              resolve(part)
+            },
+            (err: unknown) => {
+              clearTimeout(id)
+              reject(err instanceof Error ? err : new Error(String(err)))
+            },
+          )
+        })
+
+        if (part.done) {
+          ctrl.close()
+          return
+        }
+
+        ctrl.enqueue(part.value)
+      },
+      async cancel(reason) {
+        ctl.abort(reason)
+        await reader.cancel(reason)
+      },
+    })
+
+    return new Response(body, {
+      headers: new Headers(res.headers),
+      status: res.status,
+      statusText: res.statusText,
+    })
   }
 
   function googleVertexVars(options: Record<string, unknown>): {
@@ -108,7 +168,8 @@ export namespace Provider {
 
   function loadBaseURL(model: Model, options: Record<string, unknown>): unknown {
     const raw = (options.baseURL as string | undefined) ?? model.api.url
-    if (typeof raw !== "string" || raw === "") return raw === "" ? undefined : raw
+    if (typeof raw !== "string") return raw
+    if (raw === "") return undefined
     const vars = model.providerID === "google-vertex" ? googleVertexVars(options) : undefined
     return raw.replace(/\$\{([^}]+)\}/g, (match, key: string) => {
       const val = Env.get(key) ?? (vars !== undefined ? vars[key as keyof typeof vars] : undefined)
@@ -154,6 +215,34 @@ export namespace Provider {
     options?: Record<string, unknown>
   }>
 
+  async function loadOrbitProvider(input: Info): Promise<{
+    autoload: boolean
+    options?: Record<string, unknown>
+  }> {
+    const hasKey = await (async (): Promise<boolean> => {
+      const env = Env.all()
+      if (input.env.some((item) => env[item] !== undefined && env[item] !== "")) return true
+      if (await Auth.get(input.id)) return true
+      const config = await Config.get()
+      if (config.provider?.orbit?.options?.apiKey !== undefined) return true
+      if (config.provider?.opencode?.options?.apiKey !== undefined) return true
+      return false
+    })()
+
+    if (!hasKey) {
+      for (const [key, value] of Object.entries(input.models)) {
+        if (value.cost.input === 0) continue
+        const models = input.models
+        delete models[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+      }
+    }
+
+    return {
+      autoload: Object.keys(input.models).length > 0,
+      options: hasKey ? {} : { apiKey: "public" },
+    }
+  }
+
   const CUSTOM_LOADERS: Record<string, CustomLoader> = {
     anthropic() {
       return Promise.resolve({
@@ -166,28 +255,11 @@ export namespace Provider {
         },
       })
     },
+    async orbit(input) {
+      return loadOrbitProvider(input)
+    },
     async opencode(input) {
-      const hasKey = await (async (): Promise<boolean> => {
-        const env = Env.all()
-        if (input.env.some((item) => env[item] !== undefined && env[item] !== "")) return true
-        if (await Auth.get(input.id)) return true
-        const config = await Config.get()
-        if (config.provider?.opencode.options?.apiKey !== undefined) return true
-        return false
-      })()
-
-      if (!hasKey) {
-        for (const [key, value] of Object.entries(input.models)) {
-          if (value.cost.input === 0) continue
-          const models = input.models
-          delete models[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        }
-      }
-
-      return {
-        autoload: Object.keys(input.models).length > 0,
-        options: hasKey ? {} : { apiKey: "public" },
-      }
+      return loadOrbitProvider(input)
     },
     openai() {
       return Promise.resolve({
@@ -429,8 +501,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -440,8 +512,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://orbit.build/",
+            "x-title": "orbit",
           },
         },
       })
@@ -528,8 +600,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -548,7 +620,7 @@ export namespace Provider {
       const providerConfig = config.provider?.gitlab
 
       const aiGatewayHeaders: Record<string, string> = {
-        "User-Agent": `opencode/${Installation.VERSION} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
+        "User-Agent": `orbit/${Installation.VERSION} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
         "anthropic-beta": "context-1m-2025-08-07",
         ...((providerConfig?.options?.aiGatewayHeaders as Record<string, string> | undefined) ?? {}),
       }
@@ -669,7 +741,7 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "X-Cerebras-3rd-Party-Integration": "opencode",
+            "X-Cerebras-3rd-Party-Integration": "orbit",
           },
         },
       })
@@ -679,8 +751,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -873,7 +945,9 @@ export namespace Provider {
 
     log.info("init")
 
-    const configProviders = Object.entries(config.provider ?? {})
+    const configProviders = Object.entries(config.provider ?? {}).map(
+      ([providerID, provider]) => [normalizeProviderID(providerID), provider] as const,
+    )
 
     // Add GitHub Copilot Enterprise provider that inherits from GitHub Copilot
     if ("github-copilot" in database) {
@@ -902,17 +976,66 @@ export namespace Provider {
     // extend database from config
     for (const [providerID, provider] of configProviders) {
       const existing = database[providerID]
+      const existingProviderModel = Object.values(existing?.models ?? {})[0]
       const parsed: Info = {
         id: providerID,
-        name: provider.name ?? existing.name,
-        env: provider.env ?? existing.env,
-        options: mergeDeep(existing.options, provider.options ?? {}),
+        name: provider.name ?? existing?.name ?? providerID,
+        env: provider.env ?? existing?.env ?? [],
+        options: mergeDeep(existing?.options ?? {}, provider.options ?? {}),
         source: "config",
-        models: existing.models,
+        models: { ...(existing?.models ?? {}) },
       }
 
       for (const [modelID, model] of Object.entries(provider.models ?? {})) {
-        const existingModel = parsed.models[model.id ?? modelID]
+        const existingModel = parsed.models[model.id ?? modelID] ?? {
+          id: model.id ?? modelID,
+          api: {
+            id: model.id ?? modelID,
+            npm: model.provider?.npm ?? provider.npm ?? existingProviderModel?.api.npm ?? "",
+            url: model.provider?.api ?? provider.api ?? existingProviderModel?.api.url ?? "",
+          },
+          status: undefined,
+          name: modelID,
+          providerID,
+          capabilities: {
+            temperature: true,
+            reasoning: false,
+            attachment: false,
+            toolcall: true,
+            input: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              pdf: false,
+            },
+            output: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              pdf: false,
+            },
+            interleaved: false,
+          },
+          cost: {
+            input: 0,
+            output: 0,
+            cache: {
+              read: 0,
+              write: 0,
+            },
+          },
+          options: {},
+          limit: {
+            context: 0,
+            output: 0,
+          },
+          headers: {},
+          family: "",
+          release_date: "",
+          variants: {},
+        }
         const name = iife((): string => {
           if (model.name !== undefined) return model.name
           if (model.id !== undefined && model.id !== modelID) return modelID
@@ -957,12 +1080,12 @@ export namespace Provider {
               write: model.cost?.cache_write ?? existingModel.cost.cache.write,
             },
           },
-          options: mergeDeep(existingModel.options, model.options ?? {}),
+          options: mergeDeep(existingModel.options ?? {}, model.options ?? {}),
           limit: {
             context: model.limit?.context ?? existingModel.limit.context,
             output: model.limit?.output ?? existingModel.limit.output,
           },
-          headers: mergeDeep(existingModel.headers, model.headers ?? {}),
+          headers: mergeDeep(existingModel.headers ?? {}, model.headers ?? {}),
           family: model.family ?? existingModel.family ?? "",
           release_date: model.release_date ?? existingModel.release_date,
           variants: {},
@@ -1172,20 +1295,23 @@ export namespace Provider {
       const customFetch = options.fetch as
         | ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>)
         | undefined
+      const chunkTimeout = typeof options.chunkTimeout === "number" ? options.chunkTimeout : DEFAULT_CHUNK_TIMEOUT
+      delete options.chunkTimeout
 
       options.fetch = async (input: RequestInfo | URL, init?: BunFetchRequestInit): Promise<Response> => {
         // Preserve custom fetch if it exists, wrap it with timeout logic
         const fetchFn = customFetch ?? fetch
         const opts: BunFetchRequestInit = init ?? {}
+        const chunkAbortCtl = chunkTimeout > 0 ? new AbortController() : undefined
 
-        if (options.timeout !== undefined && options.timeout !== null) {
-          const signals: AbortSignal[] = []
-          if (opts.signal !== undefined && opts.signal !== null) signals.push(opts.signal)
-          if (options.timeout !== false) signals.push(AbortSignal.timeout(options.timeout as number))
-
-          const combined = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
-
-          opts.signal = combined
+        const signals: AbortSignal[] = []
+        if (opts.signal !== undefined && opts.signal !== null) signals.push(opts.signal)
+        if (chunkAbortCtl !== undefined) signals.push(chunkAbortCtl.signal)
+        if (options.timeout !== undefined && options.timeout !== null && options.timeout !== false) {
+          signals.push(AbortSignal.timeout(options.timeout as number))
+        }
+        if (signals.length > 0) {
+          opts.signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals)
         }
 
         // Strip openai itemId metadata following what codex does
@@ -1206,11 +1332,13 @@ export namespace Provider {
           }
         }
 
-        return fetchFn(input, {
+        const res = await fetchFn(input, {
           ...opts,
           // Bun-specific: disable fetch timeout (see: https://github.com/oven-sh/bun/issues/16682)
           timeout: false as unknown as number,
         } as RequestInit)
+        if (chunkAbortCtl === undefined) return res
+        return wrapSSE(res, chunkTimeout, chunkAbortCtl)
       }
 
       if (model.api.npm in BUNDLED_PROVIDERS) {
@@ -1251,11 +1379,12 @@ export namespace Provider {
   }
 
   export async function getProvider(providerID: string): Promise<Info | undefined> {
-    return state().then((s) => s.providers[providerID])
+    return state().then((s) => s.providers[normalizeProviderID(providerID)])
   }
 
   export async function getModel(providerID: string, modelID: string): Promise<Model> {
     const s = await state()
+    providerID = normalizeProviderID(providerID)
     if (!(providerID in s.providers)) {
       const availableProviders = Object.keys(s.providers)
       const matches = fuzzysort.go(providerID, availableProviders, { limit: 3, threshold: -10000 })
@@ -1312,6 +1441,7 @@ export namespace Provider {
     query: string[],
   ): Promise<{ providerID: string; modelID: string } | undefined> {
     const s = await state()
+    providerID = normalizeProviderID(providerID)
     if (!(providerID in s.providers)) return undefined
     const provider = s.providers[providerID]
     for (const item of query) {
@@ -1327,6 +1457,7 @@ export namespace Provider {
   }
 
   export async function getSmallModel(providerID: string): Promise<Model | undefined> {
+    providerID = normalizeProviderID(providerID)
     const cfg = await Config.get()
 
     if (cfg.small_model !== undefined) {
@@ -1346,7 +1477,7 @@ export namespace Provider {
         "gemini-2.5-flash",
         "gpt-5-nano",
       ]
-      if (providerID.startsWith("opencode")) {
+      if (isOrbitProviderID(providerID)) {
         priority = ["gpt-5-nano"]
       }
       if (providerID.startsWith("github-copilot")) {
@@ -1408,10 +1539,11 @@ export namespace Provider {
       .then((x) => (Array.isArray(x.recent) ? x.recent : []))
       .catch(() => [])) as { providerID: string; modelID: string }[]
     for (const entry of recent) {
-      if (!(entry.providerID in providers)) continue
-      const provider = providers[entry.providerID]
+      const normalizedProviderID = normalizeProviderID(entry.providerID)
+      if (!(normalizedProviderID in providers)) continue
+      const provider = providers[normalizedProviderID]
       if (!(entry.modelID in provider.models)) continue
-      return { providerID: entry.providerID, modelID: entry.modelID }
+      return { providerID: normalizedProviderID, modelID: entry.modelID }
     }
 
     const provider = Object.values(providers).find(
@@ -1430,7 +1562,7 @@ export namespace Provider {
   export function parseModel(model: string): { providerID: string; modelID: string } {
     const [providerID, ...rest] = model.split("/")
     return {
-      providerID: providerID,
+      providerID: normalizeProviderID(providerID),
       modelID: rest.join("/"),
     }
   }
