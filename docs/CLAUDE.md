@@ -82,7 +82,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (27 entries)
+## plans/tracked/done/ (28 entries)
 
 - `lexical-chat-input-migration.md` — Migrate chat input from raw contentEditable + overlay to Lexical editor (fixes WebKit cursor bug, unifies text/decoration/cursor)
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
@@ -112,6 +112,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `wire-compact-opencode-backend.md` — Wire OpenCode /compact command into frontend (store infra, interception, SSE settlement)
 - `fix-compact-rendering-and-tokens.md` — Fix /compact rendering (CompactIndicator instead of raw markdown) and token count (last-assistant snapshot)
 - `fix-opencode-streaming-performance.md` — Fix OpenCode streaming performance (RAF delta batching, time-gated reveal, ThinkingBlock reuse)
+- `fix-csp-opencode-backend.md` — Fix CSP blocking OpenCode backend in production builds (add `http://127.0.0.1:*` to `connect-src`, contract test, CSP doc update)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 
