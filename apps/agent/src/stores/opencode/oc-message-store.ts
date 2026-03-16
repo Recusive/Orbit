@@ -22,6 +22,14 @@ interface OcSessionMessages {
   deltaBufferByPart: Record<string, OcDeltaBuffer[]>;
 }
 
+export interface OcDeltaItem {
+  readonly sessionID: string;
+  readonly messageID: string;
+  readonly partID: string;
+  readonly field: string;
+  readonly delta: string;
+}
+
 interface OcMessageState {
   sessions: Record<string, OcSessionMessages>;
   setSessionMessages: (sessionId: string, entries: SessionMessagesResponses[200]) => void;
@@ -36,6 +44,7 @@ interface OcMessageState {
     field: string,
     delta: string
   ) => void;
+  appendDeltaBatch: (items: OcDeltaItem[]) => void;
   flushDeltaBuffer: (sessionId: string, messageId: string, partId: string) => void;
   clearSession: (sessionId: string) => void;
   clearAll: () => void;
@@ -204,6 +213,52 @@ export const useOcMessageStore = create<OcMessageState>()(
         session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
           (candidate) => (candidate.id === partId ? updatedPart : candidate)
         );
+      });
+    },
+    appendDeltaBatch: (items) => {
+      set((state) => {
+        // Group by sessionID + partID + field and concatenate deltas
+        const grouped = new Map<
+          string,
+          {
+            sessionID: string;
+            messageID: string;
+            partID: string;
+            field: string;
+            accumulated: string;
+          }
+        >();
+        for (const item of items) {
+          const key = `${item.sessionID}\0${item.partID}\0${item.field}`;
+          const existing = grouped.get(key);
+          if (existing) {
+            existing.accumulated += item.delta;
+          } else {
+            grouped.set(key, { ...item, accumulated: item.delta });
+          }
+        }
+
+        for (const entry of grouped.values()) {
+          const session = getOrCreateSession(state.sessions, entry.sessionID);
+          const part = session.partsById[entry.partID];
+          if (!part) {
+            session.deltaBufferByPart[entry.partID] = [
+              ...(session.deltaBufferByPart[entry.partID] ?? []),
+              { field: entry.field, delta: entry.accumulated },
+            ];
+            continue;
+          }
+          const currentField =
+            ((part as unknown as Record<string, unknown>)[entry.field] as string | undefined) ?? '';
+          const updatedPart = {
+            ...part,
+            [entry.field]: currentField + entry.accumulated,
+          } as OcPart;
+          session.partsById[entry.partID] = updatedPart;
+          session.partsByMessage[entry.messageID] = (
+            session.partsByMessage[entry.messageID] ?? []
+          ).map((candidate) => (candidate.id === entry.partID ? updatedPart : candidate));
+        }
       });
     },
     flushDeltaBuffer: (sessionId, messageId, partId) => {

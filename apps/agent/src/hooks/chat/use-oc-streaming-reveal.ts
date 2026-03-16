@@ -38,6 +38,21 @@ function getThinkingBlocks(message: ChatMessage): ThinkingBlock[] {
   return [];
 }
 
+function reuseThinkingBlocks(
+  previous: ThinkingBlock[] | undefined,
+  next: ThinkingBlock[]
+): ThinkingBlock[] {
+  if (previous?.length !== next.length) {
+    return next;
+  }
+  // Check if any block differs; if all match, return the previous array reference
+  const allMatch = next.every((block, index) => {
+    const prev = previous[index];
+    return prev?.content === block.content && prev.durationMs === block.durationMs;
+  });
+  return allMatch ? previous : next;
+}
+
 function needsReveal(message: ChatMessage, entry: RevealEntry | undefined): boolean {
   if (message.role !== 'assistant') {
     return false;
@@ -81,6 +96,8 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
   );
   const messagesRef = useRef(messages);
   const timerRef = useRef<number | null>(null);
+  const lastFlushRef = useRef(0);
+  const prevThinkingRef = useRef(new Map<string, ThinkingBlock[]>());
 
   messagesRef.current = messages;
 
@@ -93,6 +110,13 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
       if (!validIds.has(key)) {
         didChange = true;
         Reflect.deleteProperty(nextEntries, key);
+      }
+    }
+
+    // Evict stale ThinkingBlock cache entries for removed messages
+    for (const key of prevThinkingRef.current.keys()) {
+      if (!validIds.has(key)) {
+        prevThinkingRef.current.delete(key);
       }
     }
 
@@ -208,7 +232,14 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
       }
 
       if (didChange) {
-        setVersion((current) => current + 1);
+        const flushNow = Date.now();
+        const isAnyStreaming = messagesRef.current.some((m) => m.isStreaming === true);
+        // During streaming: batch ~2-3 word advances into 1 React render (~80ms intervals)
+        // During drain: flush immediately (isAnyStreaming is false → no gating)
+        if (!isAnyStreaming || flushNow - lastFlushRef.current >= 80) {
+          setVersion((current) => current + 1);
+          lastFlushRef.current = flushNow;
+        }
       }
 
       if (shouldContinue) {
@@ -241,10 +272,15 @@ export function useOcStreamingReveal(messages: ChatMessage[]): ChatMessage[] {
     const entry = entriesRef.current[message.id] ?? createEntry(message);
 
     const thinkingBlocks = getThinkingBlocks(message);
-    const revealedBlocks = thinkingBlocks.map((block, index) => ({
+    const rawRevealedBlocks = thinkingBlocks.map((block, index) => ({
       ...block,
       content: block.content.slice(0, entry.thinkingLengths[index] ?? block.content.length),
     }));
+    const revealedBlocks = reuseThinkingBlocks(
+      prevThinkingRef.current.get(message.id),
+      rawRevealedBlocks
+    );
+    prevThinkingRef.current.set(message.id, revealedBlocks);
     const revealedThinking =
       message.thinking !== undefined || revealedBlocks.length > 0
         ? revealedBlocks.map((block) => block.content).join('\n\n')

@@ -2,8 +2,11 @@ import { createLogger } from '@orbit/common/lib';
 
 import { ocSessionService } from './oc-session-service';
 
+import type { RafBatchHandler } from '@/lib/utils/event-batcher';
+import type { OcDeltaItem } from '@/stores/opencode/oc-message-store';
 import type { OcGlobalEvent } from '@/types/opencode';
 
+import { rafBatch } from '@/lib/utils/event-batcher';
 import { isDefaultOcTitle } from '@/services/opencode/oc-title-utils';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
@@ -11,6 +14,42 @@ import { useOcMessageStore, useOcPermissionStore, useOcSessionStore } from '@/st
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('OcEventCoordinator');
+
+// ---------------------------------------------------------------------------
+// Session-scoped RAF delta batchers
+// ---------------------------------------------------------------------------
+
+const deltaBatchers = new Map<string, RafBatchHandler<OcDeltaItem>>();
+
+function getDeltaBatcher(sessionId: string): RafBatchHandler<OcDeltaItem> {
+  const existing = deltaBatchers.get(sessionId);
+  if (existing) {
+    return existing;
+  }
+
+  const created = rafBatch<OcDeltaItem>((items: OcDeltaItem[]): void => {
+    useOcMessageStore.getState().appendDeltaBatch(items);
+  });
+  deltaBatchers.set(sessionId, created);
+  return created;
+}
+
+/** Flush and destroy a single session's batcher. Used on session.idle/deleted/error. */
+function cancelSessionDeltas(sessionId: string, flush = false): void {
+  deltaBatchers.get(sessionId)?.cancel(flush);
+  deltaBatchers.delete(sessionId);
+}
+
+/**
+ * Cancel all batchers without flushing — used during full OpenCode teardown.
+ * MUST be called BEFORE clearAll() to prevent zombie session recreation.
+ */
+export function cancelAllDeltaBatchers(): void {
+  for (const batcher of deltaBatchers.values()) {
+    batcher.cancel(false);
+  }
+  deltaBatchers.clear();
+}
 
 function isActiveDirectory(directory: string): boolean {
   const activeDirectory = useUIStore.getState().workspacePath;
@@ -65,6 +104,7 @@ export const ocEventCoordinator = {
           eventType: payload.type,
           sessionId: payload.properties.info.id,
         });
+        cancelSessionDeltas(payload.properties.info.id, true);
         useOcSessionStore.getState().removeSession(payload.properties.info.id);
         useOcMessageStore.getState().clearSession(payload.properties.info.id);
         useUIStore.getState().setTitleLoading(payload.properties.info.id, false);
@@ -86,12 +126,14 @@ export const ocEventCoordinator = {
           eventType: payload.type,
           sessionId: payload.properties.sessionID,
         });
+        cancelSessionDeltas(payload.properties.sessionID, true);
         useOcSessionStore.getState().setSessionStatus(payload.properties.sessionID, {
           type: 'idle',
         });
         break;
       case 'session.error':
         if (payload.properties.sessionID && payload.properties.error) {
+          cancelSessionDeltas(payload.properties.sessionID, true);
           logger.warn('Session error received', { sessionId: payload.properties.sessionID });
           const errorMessage = JSON.stringify(payload.properties.error.data);
           useOcSessionStore.getState().setSessionError(payload.properties.sessionID, errorMessage);
@@ -116,6 +158,8 @@ export const ocEventCoordinator = {
           sessionId: payload.properties.sessionID,
           messageId: payload.properties.messageID,
         });
+        // Flush pending deltas (preserves other messages' work), then remove
+        deltaBatchers.get(payload.properties.sessionID)?.cancel(true);
         useOcMessageStore
           .getState()
           .removeMessage(payload.properties.sessionID, payload.properties.messageID);
@@ -127,6 +171,8 @@ export const ocEventCoordinator = {
           messageId: payload.properties.part.messageID,
           partId: payload.properties.part.id,
         });
+        // Flush pending deltas for this session before upsertPart replaces with authoritative text
+        cancelSessionDeltas(payload.properties.part.sessionID, true);
         useOcMessageStore.getState().upsertPart(payload.properties.part);
         useOcMessageStore
           .getState()
@@ -138,15 +184,14 @@ export const ocEventCoordinator = {
         break;
       case 'message.part.delta':
         // Skip logging for delta events — fires per-character during streaming
-        useOcMessageStore
-          .getState()
-          .appendDelta(
-            payload.properties.sessionID,
-            payload.properties.messageID,
-            payload.properties.partID,
-            payload.properties.field,
-            payload.properties.delta
-          );
+        // Batched via RAF to coalesce ~200-400 deltas/sec into ~60 store updates/sec
+        getDeltaBatcher(payload.properties.sessionID)({
+          sessionID: payload.properties.sessionID,
+          messageID: payload.properties.messageID,
+          partID: payload.properties.partID,
+          field: payload.properties.field,
+          delta: payload.properties.delta,
+        });
         break;
       case 'message.part.removed':
         logger.debug('Event dispatched', {
@@ -154,6 +199,8 @@ export const ocEventCoordinator = {
           sessionId: payload.properties.sessionID,
           partId: payload.properties.partID,
         });
+        // Flush pending deltas (preserves other parts' work), then remove
+        deltaBatchers.get(payload.properties.sessionID)?.cancel(true);
         useOcMessageStore
           .getState()
           .removePart(payload.properties.sessionID, payload.properties.partID);

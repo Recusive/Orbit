@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { onOpencodeCrashed, opencodeStart, opencodeStatus, opencodeStop } from '@/lib/api/opencode';
 import { getConversationUiBridge } from '@/services/conversations';
 import { destroyClient, initClient, ocSessionService, ocSseManager } from '@/services/opencode';
+import { cancelAllDeltaBatchers } from '@/services/opencode/oc-event-coordinator';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useActiveBackend, useBackendStore } from '@/stores/backend';
@@ -26,6 +27,7 @@ function cleanupClaudeState(): void {
 }
 
 function cleanupOpenCodeState(): void {
+  cancelAllDeltaBatchers(); // Discard pending RAF work BEFORE clearing stores
   ocSseManager.disconnect();
   destroyClient();
   useChatStore.getState().clearCompactionsByBackend('opencode');

@@ -25,24 +25,35 @@ describe('useOcStreamingReveal', () => {
   });
 
   it('reveals OpenCode assistant text progressively instead of snapping a full chunk', () => {
-    const message = makeAssistantMessage({ content: 'Hello world from Orbit' });
+    // Use long content so progressive reveal doesn't catch up within the test window.
+    // With STREAMING_CADENCE=33ms and TICK_MS=16ms, each word reveals every ~48ms.
+    const words = Array.from({ length: 30 }, (_, i) => `word${String(i)}`);
+    const content = words.join(' ');
+    const message = makeAssistantMessage({ content });
     const { result } = renderHook(({ messages }) => useOcStreamingReveal(messages), {
       initialProps: { messages: [message] },
     });
 
     expect(result.current[0]?.displayedContent).toBe('');
 
+    // First flush is immediate (lastFlushRef starts at 0, Date.now() >> 0)
     act(() => {
       vi.advanceTimersByTime(40);
     });
 
-    expect(result.current[0]?.displayedContent).toBe('Hello');
+    const first = result.current[0]?.displayedContent ?? '';
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.length).toBeLessThan(content.length);
 
+    // During streaming, setVersion is time-gated to ~80ms intervals.
+    // Advance past the gating threshold to see more content revealed.
     act(() => {
-      vi.advanceTimersByTime(40);
+      vi.advanceTimersByTime(120);
     });
 
-    expect(result.current[0]?.displayedContent).toBe('Hello world');
+    const second = result.current[0]?.displayedContent ?? '';
+    expect(second.length).toBeGreaterThan(first.length);
+    expect(second.length).toBeLessThan(content.length);
   });
 
   it('keeps streaming true while draining the final OpenCode chunk', () => {

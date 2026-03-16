@@ -111,6 +111,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `slash-command-syntax-highlighting.md` — Slash command syntax highlighting via text overlay (shipped)
 - `wire-compact-opencode-backend.md` — Wire OpenCode /compact command into frontend (store infra, interception, SSE settlement)
 - `fix-compact-rendering-and-tokens.md` — Fix /compact rendering (CompactIndicator instead of raw markdown) and token count (last-assistant snapshot)
+- `fix-opencode-streaming-performance.md` — Fix OpenCode streaming performance (RAF delta batching, time-gated reveal, ThinkingBlock reuse)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 
