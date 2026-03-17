@@ -257,6 +257,15 @@ impl CrashManager {
         Some(Self { log_dir })
     }
 
+    /// Create a crash manager with an explicit log directory.
+    ///
+    /// This is useful for tests and for environments that need to override
+    /// the default platform-specific log location.
+    #[must_use]
+    pub fn with_log_dir(log_dir: PathBuf) -> Self {
+        Self { log_dir }
+    }
+
     /// Get the path to the crash log file.
     #[must_use]
     pub fn crash_log_path(&self) -> PathBuf {

@@ -61,13 +61,18 @@ vi.mock('@/stores/opencode', () => ({
   useOcProviderStore: (
     selector: (state: {
       selectedAgent: 'build' | 'plan' | 'explore';
+      selectedProviderId: string | null;
+      selectedModelId: string | null;
       setSelectedAgent: (agent: 'build' | 'plan' | 'explore') => void;
     }) => unknown
   ): unknown =>
     selector({
       selectedAgent: mockSelectedAgent,
+      selectedProviderId: null,
+      selectedModelId: null,
       setSelectedAgent: mockSetSelectedAgent,
     }),
+  useOcSelectedModelSupportsImageInput: (): boolean => true,
 }));
 
 vi.mock('@/components/chat/input/slash-command-popover', () => ({
