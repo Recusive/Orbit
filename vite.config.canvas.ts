@@ -45,6 +45,12 @@ export default defineConfig({
       // Canvas-specific imports use @canvas/ prefix
       '@': path.resolve(__dirname, './apps/agent/src'),
       '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
+      '@orbit.build/sdk/v2/client': path.resolve(
+        __dirname,
+        './packages/orbit-sdk/src/v2/client.js'
+      ),
+      '@orbit.build/sdk/v2': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
+      '@orbit.build/sdk': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
     },
   },
