@@ -103,33 +103,23 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none">
-        {/* Content — macOS 26 alert layout: padding 20px 16px 16px, gap 16px */}
-        <div
-          className="relative flex flex-col items-center"
-          style={{ padding: '20px 16px 16px', gap: 16 }}
-        >
-          {/* Icon + Title + Description + Close — tighter internal gap */}
-          <div
-            className="flex w-full flex-col items-start"
-            style={{ padding: '0 6px 2px', gap: 10 }}
-          >
-            {/* Close button — top-right inside padded area */}
+      <DialogContentGlass className="w-[360px] gap-0 overflow-hidden p-0 glass-surface">
+        <div className="relative flex flex-col items-center gap-4 px-4 pb-4 pt-5">
+          {/* Icon + Title + Description + Close */}
+          <div className="flex w-full flex-col items-start gap-2.5 px-1.5 pb-0.5">
+            {/* Close button */}
             <DialogClose className="absolute right-[22px] top-[20px] z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
               <X className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="sr-only">Close</span>
             </DialogClose>
-            <div
-              className="liquid-glass-icon flex shrink-0 items-center justify-center bg-accent-9/10"
-              style={{ filter: 'none' }}
-            >
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
               <svg
                 width="28"
                 height="28"
                 viewBox="0 0 24 24"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="text-accent-11"
+                className="text-primary"
                 aria-hidden="true"
               >
                 <path
@@ -144,8 +134,8 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
             </DialogDescription>
           </div>
 
-          {/* Textarea — glass input surface */}
-          <div className="w-full" style={{ padding: '0 6px' }}>
+          {/* Textarea */}
+          <div className="w-full px-1.5">
             <textarea
               ref={textareaRef}
               placeholder="What went wrong?"
@@ -161,8 +151,8 @@ export const FeedbackDialog: FC<FeedbackDialogProps> = ({
             />
           </div>
 
-          {/* Buttons — pill-shaped, 32px height, gap 8px */}
-          <div className="flex w-full items-center" style={{ gap: 8 }}>
+          {/* Buttons */}
+          <div className="flex w-full items-center gap-2">
             <button
               type="button"
               className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none"

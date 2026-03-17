@@ -1,187 +1,21 @@
 /**
  * UpdateToast — Rich card-style toast for the auto-update lifecycle.
  *
- * Uses plain CSS (scoped with `ot-` prefix) to guarantee pixel-perfect
- * rendering inside Sonner's `toast.custom()` portal.
+ * Uses the app's Liquid Glass design system (glass-surface, liquid-glass-*)
+ * to match the dialog UI language. Renders inside Sonner's toast.custom() portal.
  */
 
-import { AlertTriangle, Check, Download } from 'lucide-react';
+import { AlertTriangle, Check, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 
 import type { FC, ReactNode } from 'react';
-
-import updateBg from '@/assets/update-bg.png';
 
 // ── Constants ─────────────────────────────────────────────────────────
 
 const UPDATE_TOAST_ID = 'orbit-update';
 
-/** Sonner wrapper — transparent so .ot-card handles all styling. */
+/** Sonner wrapper — transparent so the card handles all styling. */
 const TOAST_WRAPPER_CLASS = '!p-0 !bg-transparent !border-0 !shadow-none w-full';
-
-/** Scoped CSS for the update toast card. */
-const TOAST_STYLES = `
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
-
-.ot-card {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 24rem;
-  border-radius: 0.75rem;
-  border: 3px solid var(--lg-separator);
-  background: var(--card);
-  overflow: hidden;
-  box-shadow: none;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-}
-
-.ot-image-wrapper {
-  position: relative;
-  margin: 6px 6px 0 6px;
-  width: calc(100% - 12px);
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-radius: 0.5rem;
-  background: var(--lg-control);
-}
-
-.ot-overlay-text {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: 'Instrument Serif', serif;
-  font-size: 1.5rem;
-  color: #1d1816;
-  text-align: center;
-  pointer-events: none;
-}
-
-.ot-image {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  -webkit-user-drag: none;
-  user-select: none;
-  pointer-events: none;
-}
-
-.ot-content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-  padding: 1.25rem 1rem 0.75rem;
-}
-
-.ot-title-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.ot-title-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 1.5rem;
-  width: 1.5rem;
-  border-radius: 0.375rem;
-  background: var(--lg-control);
-  color: var(--foreground);
-  flex-shrink: 0;
-}
-
-.ot-title-icon svg {
-  width: 0.875rem;
-  height: 0.875rem;
-}
-
-.ot-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--foreground);
-  letter-spacing: -0.01em;
-}
-
-.ot-description {
-  font-size: 0.75rem;
-  line-height: 1.5;
-  color: var(--muted-foreground);
-}
-
-.ot-progress-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.125rem;
-}
-
-.ot-progress-track {
-  flex: 1;
-  height: 0.375rem;
-  background: var(--lg-separator);
-  border-radius: 9999px;
-  overflow: hidden;
-}
-
-.ot-progress-fill {
-  height: 100%;
-  background: var(--foreground);
-  border-radius: 9999px;
-  transition: width 0.3s ease;
-}
-
-.ot-progress-label {
-  font-size: 0.6875rem;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted-foreground);
-  min-width: 2rem;
-  text-align: right;
-}
-
-.ot-footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem 1.25rem;
-}
-
-.ot-btn {
-  padding: 0.375rem 0.75rem;
-  border-radius: 9999px;
-  border: none;
-  font-family: inherit;
-  font-size: 0.75rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
-  outline: none;
-}
-
-.ot-btn:hover { opacity: 0.8; }
-
-.ot-btn-primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.ot-btn-ghost {
-  background: var(--muted);
-  color: var(--muted-foreground);
-}
-
-.ot-btn-ghost:hover {
-  background: var(--border);
-  opacity: 1;
-}
-`;
 
 // ── Inner card component ──────────────────────────────────────────────
 
@@ -189,7 +23,7 @@ interface UpdateCardProps {
   readonly icon: ReactNode;
   readonly title: string;
   readonly description: string;
-  readonly overlayText: string;
+  readonly overlayText: ReactNode;
   readonly progress?: number;
   readonly footer?: ReactNode;
 }
@@ -202,31 +36,54 @@ const UpdateCard: FC<UpdateCardProps> = ({
   progress,
   footer,
 }) => (
-  <>
-    <style>{TOAST_STYLES}</style>
-    <div className="ot-card">
-      <div className="ot-image-wrapper">
-        <img className="ot-image" src={updateBg} alt="Update background" draggable={false} />
-        <div className="ot-overlay-text">{overlayText}</div>
+  <div className="glass-surface w-full max-w-[24rem] overflow-hidden p-0 gap-0">
+    {/* Hero area */}
+    <div
+      className="relative mx-1.5 mt-1.5 overflow-hidden rounded-md bg-sidebar dark:bg-chat-area"
+      style={{ aspectRatio: '16 / 9' }}
+    >
+      <div
+        className="absolute inset-0 z-10 flex items-center justify-center text-center text-primary pointer-events-none"
+        style={{ fontFamily: "'Instrument Serif', serif", fontSize: '1.5rem' }}
+      >
+        {overlayText}
       </div>
-      <div className="ot-content">
-        <div className="ot-title-row">
-          <div className="ot-title-icon">{icon}</div>
-          <div className="ot-title">{title}</div>
-        </div>
-        <div className="ot-description">{description}</div>
-        {progress !== undefined ? (
-          <div className="ot-progress-wrapper">
-            <div className="ot-progress-track">
-              <div className="ot-progress-fill" style={{ width: `${String(progress)}%` }} />
-            </div>
-            <span className="ot-progress-label">{String(progress)}%</span>
-          </div>
-        ) : null}
-      </div>
-      {footer !== null && footer !== undefined ? <div className="ot-footer">{footer}</div> : null}
     </div>
-  </>
+
+    {/* Content */}
+    <div className="flex flex-col gap-2.5 px-4 pt-4 pb-1">
+      {/* Icon + Title */}
+      <div className="flex w-full items-center gap-3">
+        <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10 !w-8 !h-8 !rounded-lg">
+          <span className="text-primary">{icon}</span>
+        </div>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <div className="liquid-glass-title">{title}</div>
+          <div className="liquid-glass-desc">{description}</div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      {progress !== undefined ? (
+        <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-lg-separator">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+              style={{ width: `${String(progress)}%` }}
+            />
+          </div>
+          <span className="text-[11px] font-medium tabular-nums text-muted-foreground min-w-[2rem] text-right">
+            {String(progress)}%
+          </span>
+        </div>
+      ) : null}
+    </div>
+
+    {/* Footer buttons */}
+    {footer !== null && footer !== undefined ? (
+      <div className="flex w-full items-center gap-2 px-4 pt-2.5 pb-4">{footer}</div>
+    ) : null}
+  </div>
 );
 
 // ── Button primitives ─────────────────────────────────────────────────
@@ -234,14 +91,14 @@ const UpdateCard: FC<UpdateCardProps> = ({
 interface ToastButtonProps {
   readonly label: string;
   readonly onClick: () => void;
-  readonly variant?: 'primary' | 'ghost';
+  readonly variant?: 'primary' | 'secondary';
 }
 
 const ToastButton: FC<ToastButtonProps> = ({ label, onClick, variant = 'primary' }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`ot-btn ${variant === 'primary' ? 'ot-btn-primary' : 'ot-btn-ghost'}`}
+    className={`liquid-glass-btn flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] ${variant === 'primary' ? 'liquid-glass-btn-primary' : 'liquid-glass-btn-secondary'}`}
   >
     {label}
   </button>
@@ -258,15 +115,22 @@ export function showUpdateAvailable(
   toast.custom(
     () => (
       <UpdateCard
-        icon={<Download className="h-3.5 w-3.5" />}
+        icon={<Gift className="h-3.5 w-3.5" />}
         title={`Orbit v${version} available`}
         description="A new version is ready to download."
-        overlayText={`New Update · v${version}`}
+        overlayText={
+          <>
+            New Update{' '}
+            <span className="font-mono text-sm px-1.5 py-1 rounded bg-primary/12 ml-2 align-middle">
+              v{version}
+            </span>
+          </>
+        }
         footer={
           <>
             <ToastButton
               label="Later"
-              variant="ghost"
+              variant="secondary"
               onClick={() => {
                 toast.dismiss(UPDATE_TOAST_ID);
                 onDismiss?.();
@@ -291,7 +155,7 @@ export function showUpdateDownloading(progress: number): void {
   toast.custom(
     () => (
       <UpdateCard
-        icon={<Download className="h-3.5 w-3.5 animate-pulse" />}
+        icon={<Gift className="h-3.5 w-3.5 animate-pulse" />}
         title={`Downloading update... ${String(progress)}%`}
         description="Please wait while the update is downloaded."
         overlayText={`Downloading · ${String(progress)}%`}
@@ -320,7 +184,7 @@ export function showUpdateReady(onRestart: () => void, onDismiss?: () => void): 
           <>
             <ToastButton
               label="Later"
-              variant="ghost"
+              variant="secondary"
               onClick={() => {
                 toast.dismiss(UPDATE_TOAST_ID);
                 onDismiss?.();
@@ -353,7 +217,7 @@ export function showUpdateError(message: string, onRetry: () => void): void {
           <>
             <ToastButton
               label="Dismiss"
-              variant="ghost"
+              variant="secondary"
               onClick={() => {
                 toast.dismiss(UPDATE_TOAST_ID);
               }}

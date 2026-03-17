@@ -7,6 +7,7 @@ export {
   cn,
   formatTimestamp,
   truncatePath,
+  formatFileSize,
   isMac,
   getCommandKey,
   getModifierSymbols,
@@ -17,7 +18,7 @@ export {
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';
 
 // Image utilities
-export { compressImage } from './image-utils';
+export { compressImage, getImageMimeType, isImageFile, isSvgFile } from './image-utils';
 export type { CompressedImage } from './image-utils';
 
 // Constants

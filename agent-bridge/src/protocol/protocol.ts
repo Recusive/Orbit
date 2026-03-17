@@ -364,7 +364,6 @@ export interface EnhanceBugReportRequest {
 export interface GenerateTitleRequest {
   type: 'generate_title';
   userMessage: string;
-  assistantResponse: string;
 }
 
 /**

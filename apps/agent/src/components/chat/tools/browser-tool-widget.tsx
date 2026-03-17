@@ -7,6 +7,7 @@ import {
   Navigation,
   ScrollText,
   Type,
+  XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
@@ -173,29 +174,15 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
+        {/* Left: tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Globe
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
+          <span className={cn('text-base font-medium shrink-0', 'text-foreground')}>Browser</span>
 
-          <span
-            className={cn(
-              'text-sm font-medium shrink-0',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
-            Browser
-          </span>
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />

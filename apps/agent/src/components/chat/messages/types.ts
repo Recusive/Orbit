@@ -8,6 +8,8 @@ import type { ToolExecution } from '@/stores/agent/tool-store';
 export interface ThinkingBlock {
   content: string;
   durationMs: number;
+  contentOffset?: number | undefined;
+  ordinal?: number | undefined;
 }
 
 /**
@@ -99,4 +101,11 @@ export interface MessageItemProps {
 /** Segment type for interleaving content and tools */
 export type Segment =
   | { type: 'content'; text: string; key: string }
-  | { type: 'tool'; tool: ToolExecution; key: string };
+  | { type: 'tool'; tool: ToolExecution; key: string }
+  | {
+      type: 'thinking';
+      block: ThinkingBlock;
+      index: number;
+      isStreaming: boolean;
+      key: string;
+    };

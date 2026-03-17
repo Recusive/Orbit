@@ -218,8 +218,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
       <div className="relative flex flex-col items-center w-full max-w-[360px]" style={{ gap: 16 }}>
         {/* Icon */}
         <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
-          <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
-            <OrbitLogo size={40} className="text-foreground" />
+          <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
+            <OrbitLogo size={40} className="text-primary" />
           </div>
         </div>
 
@@ -251,8 +251,8 @@ export const ProviderStep: FC<ProviderStepProps> = ({ onComplete, className }) =
           /* Valid keychain credentials found */
           <>
             <div className="flex w-full items-center" style={{ padding: '0 6px', gap: 10 }}>
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-green-500/10">
-                <Check className="h-4 w-4 text-green-500" aria-hidden="true" />
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-success-muted">
+                <Check className="h-4 w-4 text-success" aria-hidden="true" />
               </div>
               <span className="text-sm font-medium text-foreground">Claude Code Detected</span>
             </div>

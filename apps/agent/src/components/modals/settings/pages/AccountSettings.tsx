@@ -92,19 +92,19 @@ function expiryColor(expiresAtMs: number): string {
   const diffMs = expiresAtMs - Date.now();
   if (diffMs <= 0) return 'text-destructive';
   if (diffMs < 5 * 60_000) return 'text-destructive';
-  if (diffMs < 60 * 60_000) return 'text-yellow-500';
-  return 'text-green-600';
+  if (diffMs < 60 * 60_000) return 'text-warning';
+  return 'text-success';
 }
 
 /** Dot indicator color class. */
 function dotColor(expiresAtMs: number | null, hasCredentials: boolean): string {
   if (!hasCredentials) return 'bg-muted-foreground/40';
-  if (expiresAtMs === null) return 'bg-green-600';
+  if (expiresAtMs === null) return 'bg-success';
   const diffMs = expiresAtMs - Date.now();
   if (diffMs <= 0) return 'bg-destructive';
   if (diffMs < 5 * 60_000) return 'bg-destructive';
-  if (diffMs < 60 * 60_000) return 'bg-yellow-500';
-  return 'bg-green-600';
+  if (diffMs < 60 * 60_000) return 'bg-warning';
+  return 'bg-success';
 }
 
 // ---------------------------------------------------------------------------
@@ -321,11 +321,11 @@ export const AccountSettings: FC = () => {
                 {/* Status icon */}
                 <div
                   className="flex items-center justify-center h-9 w-9 rounded-lg shrink-0"
-                  style={{ backgroundColor: isConnected ? 'var(--gray-a4)' : undefined }}
+                  style={{ backgroundColor: isConnected ? 'var(--orbit-alpha-200)' : undefined }}
                 >
                   <SiClaude
                     className={cn('h-4 w-4', isConnected ? undefined : 'text-muted-foreground/60')}
-                    style={isConnected ? { color: '#d97757' } : undefined}
+                    style={isConnected ? { color: 'var(--primary)' } : undefined}
                   />
                 </div>
 
@@ -337,7 +337,7 @@ export const AccountSettings: FC = () => {
                       className={cn(
                         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
                         isConnected
-                          ? 'bg-green-600/10 text-green-600'
+                          ? 'bg-success-muted text-success'
                           : 'bg-muted-foreground/10 text-muted-foreground'
                       )}
                     >
@@ -422,9 +422,9 @@ export const AccountSettings: FC = () => {
         <div className="rounded-[14px] border border-lg-separator p-4 bg-background">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="h-2.5 w-2.5 rounded-full bg-green-600 shrink-0" />
+              <div className="h-2.5 w-2.5 rounded-full bg-success shrink-0" />
               <div className="flex items-center gap-2 text-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-green-600" />
+                <ShieldCheck className="h-3.5 w-3.5 text-success" />
                 <span className="font-medium">Anthropic API Key</span>
                 <span className="text-muted-foreground/60">·</span>
                 <span className="text-muted-foreground font-mono text-xs">{storedApiKey}</span>

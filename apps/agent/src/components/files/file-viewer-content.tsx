@@ -1,4 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
+import { Code, Image as ImageIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { OutlineItem } from '@/components/editor/editor-breadcrumbs';
@@ -8,6 +9,7 @@ import type { FC } from 'react';
 import { EditorBreadcrumbs, EditorSkeleton, extractMarkdownOutline } from '@/components/editor';
 import { FileDiffViewer } from '@/components/git';
 import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
+import { useSvgSourceToggle } from '@/hooks/file/use-svg-source-toggle';
 import { writeFile } from '@/lib/api';
 import {
   useCursorPosition,
@@ -23,6 +25,9 @@ const LazyCodeMirrorEditor = lazy(() =>
 );
 const LazyMarkdownPreview = lazy(() =>
   import('@/components/files/markdown-preview').then((m) => ({ default: m.MarkdownPreview }))
+);
+const LazyImagePreview = lazy(() =>
+  import('@/components/files/image-preview').then((m) => ({ default: m.ImagePreview }))
 );
 
 // Hook to detect theme from DOM
@@ -57,6 +62,8 @@ interface FileViewerContentProps {
 export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   const theme = useDetectTheme();
   const isPreviewRendered = useIsPreviewRendered(file);
+  const { isSvg, isSourceView, handleViewSource, handleViewImage, sourceReadError } =
+    useSvgSourceToggle(file);
   const prevPreviewRef = useRef(false);
   // Cursor position is scoped by file path for split view support
   const cursorPosition = useCursorPosition(file.path);
@@ -152,6 +159,80 @@ export const FileViewerContent: FC<FileViewerContentProps> = ({ file }) => {
   // Render diff view when in diff mode with diff data
   if (file.viewMode === 'diff' && file.diffData) {
     return <FileDiffViewer diffData={file.diffData} filePath={file.path} />;
+  }
+
+  if (file.fileType === 'image' && file.imageData) {
+    const showSourceToggle = isSvg || isSourceView;
+
+    return (
+      <div className="h-full w-full flex flex-col">
+        <EditorBreadcrumbs
+          filePath={file.path}
+          outline={isSourceView ? outline : []}
+          activeOutlineIndex={isSourceView ? activeOutlineIndex : -1}
+          onOutlineClick={handleOutlineClick}
+        />
+
+        {showSourceToggle ? (
+          <div className="flex items-center gap-2 border-b border-divider bg-background px-3 py-1.5 text-sm">
+            <button
+              onClick={() => {
+                if (isSourceView) {
+                  handleViewImage();
+                  return;
+                }
+
+                void handleViewSource();
+              }}
+              className="inline-flex items-center gap-1.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={isSourceView ? 'View as image' : 'View source'}
+              title={isSourceView ? 'View as image' : 'View source'}
+            >
+              {isSourceView ? (
+                <>
+                  <ImageIcon className="h-4 w-4" />
+                  <span>View Image</span>
+                </>
+              ) : (
+                <>
+                  <Code className="h-4 w-4" />
+                  <span>View Source</span>
+                </>
+              )}
+            </button>
+
+            {sourceReadError ? (
+              <span className="truncate text-xs text-destructive">
+                Failed to read source: {sourceReadError}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="flex-1 relative min-h-0">
+          {isSourceView ? (
+            <Suspense fallback={<EditorSkeleton />}>
+              <LazyCodeMirrorEditor
+                value={file.content}
+                language={file.language}
+                filePath={file.path}
+                onChange={handleChange}
+                onSave={handleSave}
+                theme={theme}
+                gotoPosition={gotoForThisFile}
+                onGotoComplete={clearPendingGoto}
+                searchTrigger={searchTrigger}
+                wordWrap={wordWrap}
+              />
+            </Suspense>
+          ) : (
+            <Suspense fallback={<EditorSkeleton />}>
+              <LazyImagePreview file={file} onViewSource={handleViewSource} />
+            </Suspense>
+          )}
+        </div>
+      </div>
+    );
   }
 
   return (

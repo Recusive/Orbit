@@ -1,4 +1,4 @@
-import { ChevronRight, Globe, Loader2, Search } from 'lucide-react';
+import { ChevronRight, Globe, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -117,29 +117,17 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Web Search output' : 'Expand Web Search output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + count + spinner */}
+        {/* Left: tool name + count + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Search
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
+          <span className={cn('text-base font-medium truncate', 'text-foreground')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {!isRunning && !isFailed && resultCount > 0 ? (
             <span className="text-sm text-muted-foreground">
@@ -176,10 +164,10 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Query */}
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   query
                 </div>
                 <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground">

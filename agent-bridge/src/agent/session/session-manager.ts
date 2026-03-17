@@ -9,18 +9,22 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
+import Anthropic from '@anthropic-ai/sdk';
 import { formatZodError } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
-import { ClaudeCredentials } from '../../common/auth/credentials.js'; // [oauth-401-recovery] import — revert: remove this line
+import { ClaudeCredentials } from '../../common/auth/credentials.js';
 import { TextEventBatcher } from '../../common/batching/index.js';
+import { getShellEnvironment } from '../../common/env/shell-env.js';
 import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
+import { createIOSMcpServer } from '../../ios/index.js';
 import { OrbitAgent } from '../core/agent.js';
 
 import { getStorageDirPath, getStoredSessionsSnapshot } from './session-storage.js';
 
 import type { McpToolRequest, McpToolResponse } from '../../browser/index.js';
+import type { IOSService } from '../../ios/ios-service.js';
 import type { OrbitAgentConfig } from '../core/agent.js';
 import type { AttachmentContentBlock } from '../types/messages.js';
 
@@ -86,6 +90,35 @@ const GeneratedCommandSchema = z
   .strict();
 
 const logger = createLogger('SessionManager');
+const TITLE_MODEL = 'claude-haiku-4-5-20251001';
+const TITLE_QUERY_MODEL = 'haiku';
+
+function buildTitlePrompt(userMessage: string): string {
+  const maxTitleChars = 50;
+
+  return `Generate a short title (max ${String(maxTitleChars)} characters) for this conversation.
+The title should capture the main topic or intent.
+Do NOT use quotes, periods, or prefixes like "Title:".
+Do NOT exceed ${String(maxTitleChars)} characters. Just output the title text and nothing else.
+
+User: "${userMessage.slice(0, 300)}"`;
+}
+
+function cleanupGeneratedTitle(text: string, maxChars = 50): string {
+  let title = text
+    .replace(/^["']|["']$/g, '')
+    .replace(/^Title:\s*/i, '')
+    .replace(/\.$/, '')
+    .trim();
+
+  if (title.length > maxChars) {
+    const truncated = title.slice(0, maxChars);
+    const lastSpace = truncated.lastIndexOf(' ');
+    title = lastSpace > maxChars * 0.4 ? truncated.slice(0, lastSpace) : truncated;
+  }
+
+  return title;
+}
 
 /**
  * Agent message types sent to the frontend
@@ -195,6 +228,10 @@ export interface SessionConfig {
   resumeSessionAt?: string;
   /** Whether to fork the session (create new branch) vs continue original */
   forkSession?: boolean;
+}
+
+interface SessionManagerOptions {
+  iosService?: IOSService;
 }
 
 /**
@@ -786,8 +823,10 @@ async function hardLinkFileBackups(
  * Session Manager - orchestrates Claude Agent SDK sessions
  */
 export class SessionManager extends Disposable {
-  // Text event batcher - reduces ~200 events per response to ~4-8 batched events
-  // Batches at 50ms intervals to align with screen refresh and reduce IPC overhead
+  // Text event batcher - configured for immediate emission in production so
+  // short assistant replies do not collapse into whole-clause updates.
+  // The batcher still tracks accumulated lengths for contentOffset math and
+  // retains its drain/flush utilities for non-production intervals.
   private readonly textBatcher: TextEventBatcher;
 
   // Content loss tracking - monitors data loss due to SDK integration issues
@@ -898,6 +937,7 @@ export class SessionManager extends Disposable {
   private sessionInitFired = new Set<string>();
   private pendingDisplayNames = new Map<string, string>();
   private browserToolUnsubscribers = new Map<string, () => void>();
+  private readonly iosService?: IOSService;
 
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
@@ -906,12 +946,13 @@ export class SessionManager extends Disposable {
   // and results all share the same messageId for proper UI interleaving.
   private currentTurnId = new Map<string, string>();
 
-  constructor() {
+  constructor(options: SessionManagerOptions = {}) {
     super();
+    this.iosService = options.iosService;
 
-    // Initialize text batcher - fires batched text events every 16ms (~1 frame)
-    // Keep backend batching minimal; frontend RAF batching handles render smoothness.
-    // This gives fast feedback while frontend coalesces into 60fps renders.
+    // Initialize text batcher - fires batched text events every 16ms (~1 frame).
+    // Keep backend batching minimal; frontend CSS animation-delay handles render smoothness.
+    // This gives fast feedback while reducing IPC overhead vs per-token emission.
     this.textBatcher = new TextEventBatcher((event) => {
       this._onAgentMessage.fire({
         sessionId: event.sessionId,
@@ -969,6 +1010,10 @@ export class SessionManager extends Disposable {
 
   /**
    * Create a new agent session
+   *
+   * [warning] TESTED: This function is covered by integration-style session wiring tests.
+   *     If you modify this, run: cd agent-bridge && bun test
+   *     Test file: src/__tests__/ios-session-wiring.test.ts
    */
   async createSession(sessionId: string, config?: SessionConfig): Promise<void> {
     if (this.activeSessions.has(sessionId)) {
@@ -1090,6 +1135,13 @@ export class SessionManager extends Disposable {
         });
       },
     };
+
+    if (this.iosService) {
+      finalConfig.mcpServers = {
+        ...(finalConfig.mcpServers ?? {}),
+        'orbit-ios': createIOSMcpServer(this.iosService, sessionId),
+      };
+    }
 
     logger.info(
       {
@@ -1329,8 +1381,7 @@ export class SessionManager extends Disposable {
             // Get our stable turn ID for this session
             const streamMessageId = this.currentTurnId.get(sessionId);
 
-            // Handle text deltas - batch to reduce event flooding
-            // SDK emits ~200 events per response, we batch at 50ms intervals
+            // Handle text deltas - forward immediately so streaming cadence stays granular.
             if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
               const textDelta = event.delta.text;
               if (textDelta !== undefined) {
@@ -1468,11 +1519,8 @@ export class SessionManager extends Disposable {
               const initialStatus = wasAlreadyApproved ? 'running' : 'awaiting-permission';
 
               // CRITICAL: Flush buffered text BEFORE calculating contentOffset.
-              // The text batcher accumulates text at 50ms intervals. If we calculate
-              // contentOffset without flushing, it includes buffered text that hasn't
-              // been emitted yet. The frontend would receive tool:start BEFORE the
-              // text chunks, causing contentOffset > displayedContent.length → text
-              // split mid-word. Flushing ensures frontend has all text before tool arrives.
+              // In production the live path emits immediately, but keeping this flush
+              // makes tool ordering correct for any future non-zero batch interval.
               this.textBatcher.flushSession(sessionId);
 
               // Get the current accumulated text length - this is where the tool
@@ -1777,10 +1825,21 @@ export class SessionManager extends Disposable {
     }
 
     const agent = this.activeSessions.get(sessionId);
+    let stopError: unknown;
+
     if (agent) {
-      await agent.stopSession();
-      this.activeSessions.delete(sessionId);
+      try {
+        await agent.stopSession();
+      } catch (error) {
+        stopError = error;
+      }
     }
+
+    this.activeSessions.delete(sessionId);
+
+    await this.iosService?.forceRelease(sessionId).catch((error: unknown) => {
+      logger.warn({ sessionId, error }, 'iOS lease release failed during session deletion');
+    });
 
     this.pendingTools.delete(sessionId);
     this.approvedToolNames.delete(sessionId);
@@ -1788,6 +1847,13 @@ export class SessionManager extends Disposable {
     this.sessionInitFired.delete(sessionId);
     this.pendingDisplayNames.delete(sessionId);
     this.currentTurnId.delete(sessionId);
+
+    if (stopError !== undefined) {
+      if (stopError instanceof Error) {
+        throw stopError;
+      }
+      throw new Error('Session stop failed during deleteSession()', { cause: stopError });
+    }
   }
 
   /**
@@ -2525,63 +2591,77 @@ Example format:
   /**
    * Generate a concise AI title for a conversation.
    *
-   * Uses query() directly with minimal options — no tools, no system prompt,
-   * no MCP, maxTurns=1. This avoids the heavy OrbitAgent initialization
-   * (system prompt, MCP servers, file checkpointing, permissions) that caused
-   * ~10s latency. Direct query() completes in ~1-2s.
+   * [warning] TESTED: This function is covered by integration tests.
+   *     If you modify this, run: cd agent-bridge && bun test title-generation
+   *     Test file: src/__tests__/title-generation.e2e.test.ts
    */
-  async generateTitle(userMessage: string, assistantResponse: string): Promise<string> {
-    const maxTitleChars = 50;
-
-    const prompt = `Generate a short title (max ${String(maxTitleChars)} characters) for this conversation.
-The title should capture the main topic or intent.
-Do NOT use quotes, periods, or prefixes like "Title:".
-Do NOT exceed ${String(maxTitleChars)} characters. Just output the title text and nothing else.
-
-User: "${userMessage.slice(0, 300)}"
-
-Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
-
-    const envClaudePath = process.env.CLAUDE_CLI_PATH;
-    const claudePath =
-      envClaudePath !== undefined && envClaudePath !== '' ? envClaudePath : undefined;
-
-    const q = query({
-      prompt,
-      options: {
-        pathToClaudeCodeExecutable: claudePath,
-        model: 'haiku',
-        maxTurns: 1,
-      },
-    });
+  async generateTitle(userMessage: string): Promise<string> {
+    const credentials = await ClaudeCredentials.getCredentials();
+    if (!credentials.hasCredentials || credentials.token === undefined) {
+      throw new Error('No credentials available for title generation');
+    }
 
     let resultText = '';
 
-    for await (const message of q) {
-      const msg = message as Record<string, unknown>;
-      if (msg.type === 'result') {
-        if (typeof msg.result === 'string') {
-          resultText = msg.result;
+    if (credentials.type === 'oauth') {
+      const shellEnv = getShellEnvironment();
+      if (shellEnv.PATH) {
+        process.env.PATH = shellEnv.PATH;
+      }
+
+      process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.ANTHROPIC_AUTH_TOKEN;
+
+      const envClaudePath = process.env.CLAUDE_CLI_PATH;
+      const claudePath =
+        envClaudePath !== undefined && envClaudePath !== '' ? envClaudePath : undefined;
+
+      const q = query({
+        prompt: buildTitlePrompt(userMessage),
+        options: {
+          pathToClaudeCodeExecutable: claudePath,
+          model: TITLE_QUERY_MODEL,
+          maxTurns: 1,
+        },
+      });
+
+      for await (const message of q) {
+        const msg = message as Record<string, unknown>;
+        if (msg.type === 'result') {
+          if (typeof msg.result === 'string') {
+            resultText = msg.result;
+          }
+          break;
         }
-        break;
+      }
+    } else {
+      const client = new Anthropic({ apiKey: credentials.token, timeout: 15_000 });
+
+      const response = await client.messages.create({
+        model: TITLE_MODEL,
+        max_tokens: 80,
+        messages: [
+          {
+            role: 'user',
+            content: buildTitlePrompt(userMessage),
+          },
+        ],
+      });
+
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          resultText += block.text;
+        }
       }
     }
 
-    // Clean up: remove quotes, "Title:" prefix, trailing period
-    let title = resultText
-      .replace(/^["']|["']$/g, '')
-      .replace(/^Title:\s*/i, '')
-      .replace(/\.$/, '')
-      .trim();
-
-    // Hard cap: truncate at word boundary if Haiku exceeded the limit
-    if (title.length > maxTitleChars) {
-      const truncated = title.slice(0, maxTitleChars);
-      const lastSpace = truncated.lastIndexOf(' ');
-      title = lastSpace > maxTitleChars * 0.4 ? truncated.slice(0, lastSpace) : truncated;
+    const title = cleanupGeneratedTitle(resultText);
+    if (title.length === 0) {
+      throw new Error('Title generation returned no text');
     }
 
-    return title || 'Untitled';
+    return title;
   }
 
   /**
@@ -2605,47 +2685,89 @@ Assistant (truncated): "${assistantResponse.slice(0, 300)}"`;
     );
   }
 
+  async shutdownAsync(): Promise<void> {
+    if (this.isDisposed) {
+      return;
+    }
+
+    this.logContentLossIfNeeded();
+    this.textBatcher.destroy();
+    this.denyPendingPermissionRequests();
+    this.cancelSessionConsumers();
+    this.disposeBrowserToolSubscriptions();
+
+    for (const [sessionId, agent] of this.activeSessions.entries()) {
+      try {
+        await agent.stopSession();
+      } catch (error) {
+        logger.error({ sessionId, error }, 'Error stopping session');
+      }
+
+      await this.iosService?.release(sessionId).catch((error: unknown) => {
+        logger.warn({ sessionId, error }, 'iOS lease release failed during async shutdown');
+      });
+    }
+
+    this.activeSessions.clear();
+    super.dispose();
+  }
+
   /**
    * Dispose the session manager
    */
   override dispose(): void {
-    // Log content loss metrics on shutdown if any loss occurred
-    if (this.hasContentLoss()) {
-      logger.warn(
-        { metrics: this.contentLossMetrics },
-        'Content loss detected during session manager lifetime - this indicates SDK integration issues'
-      );
+    if (this.isDisposed) {
+      return;
     }
 
-    // Flush and destroy text batcher
+    this.logContentLossIfNeeded();
     this.textBatcher.destroy();
-
-    // Deny all pending permission requests
-    for (const [, resolver] of this.permissionResolvers.entries()) {
-      resolver({ decision: 'deny', always: false });
-    }
-    this.permissionResolvers.clear();
-
-    // Cancel all background consumers
-    for (const [, consumer] of this.sessionConsumers.entries()) {
-      consumer.cancel();
-    }
-    this.sessionConsumers.clear();
-
-    for (const [, unsubscribe] of this.browserToolUnsubscribers.entries()) {
-      unsubscribe();
-    }
-    this.browserToolUnsubscribers.clear();
+    this.denyPendingPermissionRequests();
+    this.cancelSessionConsumers();
+    this.disposeBrowserToolSubscriptions();
 
     // Stop all active sessions
     for (const [sessionId, agent] of this.activeSessions.entries()) {
       void agent.stopSession().catch((err: unknown) => {
         logger.error({ sessionId, error: err }, 'Error stopping session');
       });
+      void this.iosService?.forceRelease(sessionId).catch((error: unknown) => {
+        logger.warn({ sessionId, error }, 'iOS lease release failed during dispose');
+      });
     }
     this.activeSessions.clear();
 
     super.dispose();
+  }
+
+  private logContentLossIfNeeded(): void {
+    if (this.hasContentLoss()) {
+      logger.warn(
+        { metrics: this.contentLossMetrics },
+        'Content loss detected during session manager lifetime - this indicates SDK integration issues'
+      );
+    }
+  }
+
+  private denyPendingPermissionRequests(): void {
+    for (const [, resolver] of this.permissionResolvers.entries()) {
+      resolver({ decision: 'deny', always: false });
+    }
+    this.permissionResolvers.clear();
+  }
+
+  private cancelSessionConsumers(): void {
+    for (const [, consumer] of this.sessionConsumers.entries()) {
+      consumer.cancel();
+    }
+    this.sessionConsumers.clear();
+  }
+
+  private disposeBrowserToolSubscriptions(): void {
+    for (const [, unsubscribe] of this.browserToolUnsubscribers.entries()) {
+      unsubscribe();
+    }
+    this.browserToolUnsubscribers.clear();
   }
 }
 

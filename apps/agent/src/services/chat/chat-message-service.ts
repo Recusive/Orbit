@@ -5,8 +5,9 @@
  * Same logic, but writes to ChatStore instead of React setState.
  *
  * KEY ARCHITECTURAL DECISIONS:
- * 1. RAF batchers are per-session — rewind on session A cancels only A's batchers.
- *    Batchers are created lazily and deleted on agent:complete / destroySession.
+ * 1. Text chunks are applied immediately for cadence fidelity. Thinking/tool events
+ *    still use per-session RAF batchers — rewind on session A cancels only A's batchers.
+ *    Batcher maps are created lazily and deleted on agent:complete / destroySession.
  * 2. Store interactions via getState() — reads/writes ChatStore, ToolStore,
  *    CheckpointStore, FileStore, UIStore at call time (not captured deps).
  * 3. startTransition imported from 'react' — works outside React components.
@@ -14,11 +15,15 @@
  *    Do NOT downgrade Zustand below v4 without verifying startTransition still works.
  * 4. handleMessage() wraps dispatch in try-catch with structured error logging per
  *    session. Errors never propagate to the caller (use-tauri-message-listener).
+ *
+ * [warning] TESTED: The title remap and retry paths in this service are covered by
+ * integration tests. If you modify this, run: bun run test -- title-remap-and-retry
+ * Test file: src/__tests__/services/chat/title-remap-and-retry.test.ts
  */
 import { createLogger } from '@orbit/common/lib';
 import { startTransition } from 'react';
 
-import type { ChatMessage } from '@/components/chat';
+import type { ChatMessage, ThinkingBlock } from '@/components/chat';
 import type { RafBatchHandler } from '@/lib/utils/event-batcher';
 import type { ExtensionMessage } from '@/types/protocol';
 
@@ -27,11 +32,19 @@ import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-hand
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
-import { toConversationSummaries } from '@/lib/mappers';
+import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
-import { flushPendingTitle, generateAITitle } from '@/services/session';
+import { StreamingRevealController } from '@/services/chat/streaming-reveal-controller';
+import {
+  clearSessionTitleState,
+  flushPendingTitle,
+  generateAITitle,
+  getPreferredTitle,
+  remapSessionTitleState,
+  retryPendingPersistence,
+} from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
@@ -117,12 +130,72 @@ function scheduleSidebarRefresh(): void {
   }
 }
 
+function mapPersistedMessage(m: {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  thinking?: string | undefined;
+  thinkingDurationMs?: number | undefined;
+  thinkingPhases?:
+    | {
+        content: string;
+        contentOffset?: number | undefined;
+        ordinal?: number | undefined;
+        durationMs?: number | undefined;
+      }[]
+    | undefined;
+  isInterrupted?: boolean | undefined;
+  turnDurationMs?: number | undefined;
+  parentUuid?: string | null | undefined;
+  toolUses?: { name: string; success: boolean }[] | undefined;
+}): ChatMessage {
+  const thinkingPhases = m.thinkingPhases ?? [];
+  const thinkingBlocks: ThinkingBlock[] | undefined =
+    thinkingPhases.length > 0
+      ? thinkingPhases.map((phase, index) => ({
+          content: phase.content,
+          durationMs:
+            phase.durationMs ??
+            (index === thinkingPhases.length - 1 ? (m.thinkingDurationMs ?? 0) : 0),
+          contentOffset: phase.contentOffset,
+          ordinal: phase.ordinal,
+        }))
+      : m.thinking
+        ? [{ content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 }]
+        : undefined;
+
+  const base: ChatMessage = {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    displayedContent: m.content,
+    ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
+    ...(thinkingBlocks ? { thinkingBlocks } : {}),
+    ...(m.thinking ? { thinking: m.thinking } : {}),
+    ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
+    ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
+  };
+
+  if (m.isInterrupted === true) {
+    const hasRejectedQuestion = m.toolUses?.some(
+      (tool) => tool.name.toLowerCase() === 'askuserquestion' && !tool.success
+    );
+    return {
+      ...base,
+      isInterrupted: true,
+      ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
+    };
+  }
+
+  return base;
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Service Class
 // ────────────────────────────────────────────────────────────────────────────
 
 class ChatMessageService {
-  // Per-session RAF batchers (created lazily, deleted on agent:complete / destroy)
+  // Text chunks are applied immediately; thinking/tool events stay RAF-batched.
   private chunkBatchers = new Map<string, RafBatchHandler<TextChunkEvent>>();
   private thinkingBatchers = new Map<string, RafBatchHandler<ThinkingChunkEvent>>();
   private toolBatchers = new Map<string, RafBatchHandler<ToolEvent>>();
@@ -130,6 +203,7 @@ class ChatMessageService {
   // Per-message tracking
   private pendingChunkLengths = new Map<string, number>();
   private thinkingStartTimes = new Map<string, number>();
+  private markerOrdinals = new Map<string, number>();
 
   // Track whether the current turn used tools (for re-asserting isAgentRunning on tool:start)
   private turnHadTools = new Map<string, boolean>();
@@ -137,6 +211,9 @@ class ChatMessageService {
   private agentRunningTimers = new Map<string, ReturnType<typeof setTimeout>>();
   // Due timestamps for delayed clears (needed for session remap with remaining delay).
   private agentRunningTimerDueAt = new Map<string, number>();
+
+  /** Word-by-word reveal controller for streaming messages. */
+  private revealController = new StreamingRevealController();
 
   // Checkpoint batching — debounces rapid checkpoint events (100ms window)
   // Reduces ~30 checkpoint state updates per agent run to ~2-3
@@ -198,6 +275,7 @@ class ChatMessageService {
     this.chunkBatchers.get(sessionId)?.cancel();
     this.thinkingBatchers.get(sessionId)?.cancel();
     this.toolBatchers.get(sessionId)?.cancel();
+    this.revealController.stopAll(sessionId);
   }
 
   /** Full cleanup for a session — cancel batchers, timers, delete from Maps. */
@@ -219,9 +297,54 @@ class ChatMessageService {
     this.toolBatchers.clear();
     this.pendingChunkLengths.clear();
     this.thinkingStartTimes.clear();
+    this.markerOrdinals.clear();
     this.agentRunningTimers.clear();
     this.agentRunningTimerDueAt.clear();
+    this.revealController.destroyAll();
     this.turnHadTools.clear();
+  }
+
+  finalizeInterruptedMessage(message: ChatMessage): ChatMessage {
+    if (
+      message.isThinkingActive !== true ||
+      message.thinkingBlocks === undefined ||
+      message.thinkingBlocks.length === 0
+    ) {
+      return message;
+    }
+
+    const blocks = [...message.thinkingBlocks];
+    const lastBlock = blocks[blocks.length - 1];
+    if (!lastBlock) {
+      return message;
+    }
+
+    const startTime = this.thinkingStartTimes.get(message.id);
+    const finalDuration = startTime !== undefined ? Date.now() - startTime : lastBlock.durationMs;
+
+    blocks[blocks.length - 1] = {
+      ...lastBlock,
+      ...(lastBlock.contentOffset === undefined ? { contentOffset: message.content.length } : {}),
+      durationMs: finalDuration,
+    };
+
+    this.thinkingStartTimes.delete(message.id);
+
+    return {
+      ...message,
+      isThinkingActive: false,
+      thinkingBlocks: blocks,
+    };
+  }
+
+  private nextMarkerOrdinal(messageId: string): number {
+    const next = this.markerOrdinals.get(messageId) ?? 0;
+    this.markerOrdinals.set(messageId, next + 1);
+    return next;
+  }
+
+  private clearMarkerOrdinal(messageId: string): void {
+    this.markerOrdinals.delete(messageId);
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -410,6 +533,7 @@ class ChatMessageService {
       useUIStore.getState().remapConversation(frontendSessionId, sdkSessionId);
       // Migrate service-owned in-flight state (timers + tool flags).
       this.remapRunningState(frontendSessionId, sdkSessionId);
+      remapSessionTitleState(frontendSessionId, sdkSessionId);
 
       // Only update UI navigation if the user is still on this session.
       // remapSession() already conditionally updates activeSessionId in ChatStore
@@ -519,8 +643,18 @@ class ChatMessageService {
     // Clean up batcher Map entries (recreated lazily if session streams again)
     this.cleanupBatchers(sid);
 
+    // Accelerated drain — reveal remaining words at 10ms/word.
+    // When drain finishes, callback sets isStreaming: false (shimmer + content stay in sync).
+    this.revealController.beginDrain(sid, message.message_id, () => {
+      useChatStore.getState().updateMessage(sid, message.message_id, (m) => ({
+        ...m,
+        isStreaming: false,
+      }));
+    });
+
     // Clean up pending chunk tracking for this message
     this.pendingChunkLengths.delete(message.message_id);
+    this.clearMarkerOrdinal(message.message_id);
 
     // Calculate final thinking duration
     const thinkingStart = this.thinkingStartTimes.get(message.message_id);
@@ -548,13 +682,14 @@ class ChatMessageService {
           finalBlocks[finalBlocks.length - 1] = {
             ...lastBlock,
             durationMs: finalThinkingDuration,
+            contentOffset: lastMsg.content.length,
           };
         }
       }
 
       const completedMsg: ChatMessage = {
         ...lastMsg,
-        isStreaming: false,
+        // isStreaming stays true — drain callback sets false when all words are revealed
         isThinkingActive: false,
         ...(finalThinkingDuration !== undefined && lastMsg.thinking
           ? { thinkingDurationMs: finalThinkingDuration }
@@ -597,10 +732,13 @@ class ChatMessageService {
                   }
                 : {}),
               success: tool.success ?? true,
+              ...(tool.contentOffset !== undefined ? { contentOffset: tool.contentOffset } : {}),
+              ...(tool.ordinal !== undefined ? { ordinal: tool.ordinal } : {}),
             }))
           : undefined;
 
       const { workspacePath, activeWorktreePath } = useUIStore.getState();
+      const thinkingPhasesDto = serializeThinkingBlocks(completedMsg.thinkingBlocks);
 
       if (!wasMessagePersisted(sid, completedMsg.id)) {
         void conversationAddMessage(
@@ -613,6 +751,7 @@ class ChatMessageService {
             ...(completedMsg.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: completedMsg.thinkingDurationMs }
               : {}),
+            ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
             createdAt: Date.now(),
             ...(usageDto ? { usage: usageDto } : {}),
             ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
@@ -677,28 +816,24 @@ class ChatMessageService {
     // Schedule coalesced sidebar refresh
     scheduleSidebarRefresh();
 
-    // Generate AI title after a completed turn with at least 1 user + 1 assistant message.
-    // Uses >= 1 instead of === 1 so retries work on subsequent turns if the first attempt
-    // failed (e.g., Haiku call error, network issue). The aiTitleGenerated Set in
-    // session-title-service.ts prevents duplicate generation after success.
-    // Fire-and-forget — the placeholder title stays until Haiku responds (~1-2s).
+    // Retry AI title generation after a completed turn if the send-time attempt failed.
+    // This still uses only the first user message so the title is deterministic from
+    // send-time input rather than assistant output.
     {
       const currentSession = useChatStore.getState().sessions[sid];
       if (currentSession) {
         const msgs = currentSession.messages;
         const userMsgs = msgs.filter((m) => m.role === 'user');
-        const assistantMsgs = msgs.filter((m) => m.role === 'assistant');
-        if (userMsgs.length >= 1 && assistantMsgs.length >= 1) {
+        if (userMsgs.length >= 1) {
           const userText = userMsgs[0]?.content ?? '';
-          // Use first non-empty assistant message — tool-heavy first turns may have
-          // empty content on the first assistant message (only tool use, no text).
-          const assistantText = assistantMsgs.find((m) => m.content.length > 0)?.content ?? '';
-          if (userText.length > 0 && assistantText.length > 0) {
-            generateAITitle(sid, userText, assistantText);
+          if (userText.length > 0) {
+            generateAITitle(sid, userText);
           }
         }
       }
     }
+
+    retryPendingPersistence(sid);
   }
 
   private handleAgentError(message: Extract<ExtensionMessage, { type: 'agent:error' }>): void {
@@ -707,7 +842,10 @@ class ChatMessageService {
     // Flush pending batchers before handling error
     this.flushSession(sid);
     this.cleanupBatchers(sid);
+    // Errors are instant — snap displayedContent to full content
+    this.revealController.stopAll(sid);
     this.pendingChunkLengths.delete(message.message_id);
+    this.clearMarkerOrdinal(message.message_id);
 
     // Errors are always terminal — clear immediately, cancel any delayed clear
     this.forceCompleteOrphanedTools(sid);
@@ -715,6 +853,7 @@ class ChatMessageService {
     this.turnHadTools.delete(sid);
     useChatStore.getState().setAgentRunning(sid, false);
     useChatStore.getState().setStopPending(sid, false);
+    retryPendingPersistence(sid);
 
     // Detect auth-related errors
     const rawError = message.error;
@@ -822,17 +961,7 @@ class ChatMessageService {
 
       const newMessages: ChatMessage[] = conv.messages
         .filter((m) => activeChainIds.has(m.id))
-        .map((m) => ({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          displayedContent: m.content,
-          thinking: m.thinking ?? undefined,
-          thinkingDurationMs: m.thinkingDurationMs ?? undefined,
-          turnDurationMs: m.turnDurationMs ?? undefined,
-          isInterrupted: m.isInterrupted ?? undefined,
-          parentUuid: m.parentUuid ?? undefined,
-        }));
+        .map((m) => mapPersistedMessage({ ...m, role: m.role as 'user' | 'assistant' }));
 
       // Replace messages in store — full swap, no merge
       useChatStore.getState().setMessages(sessionId, newMessages);
@@ -970,9 +1099,12 @@ class ChatMessageService {
           sessionId: message.session_id,
         });
         if (!isStaleNavigation) {
+          const preferredTitle = getPreferredTitle(message.session_id);
           useFileStore.getState().switchSession(message.session_id);
           useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore.getState().setActiveConversation(message.session_id, message.title);
+          useUIStore
+            .getState()
+            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
           useToolStore.getState().switchSession(message.session_id);
         }
         useUIStore.getState().setLoadingConversation(false);
@@ -992,38 +1124,7 @@ class ChatMessageService {
             (m): m is typeof m & { role: 'user' | 'assistant' } =>
               m.role === 'user' || m.role === 'assistant'
           )
-          .map((m) => {
-            const base: ChatMessage = {
-              id: m.id,
-              role: m.role,
-              content: m.content,
-              displayedContent: m.content,
-              ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
-              ...(m.thinking
-                ? {
-                    thinking: m.thinking,
-                    thinkingBlocks: [
-                      { content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 },
-                    ],
-                  }
-                : {}),
-              ...(m.thinkingDurationMs !== undefined
-                ? { thinkingDurationMs: m.thinkingDurationMs }
-                : {}),
-              ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
-            };
-            if (m.isInterrupted === true) {
-              const hasRejectedQuestion = m.toolUses.some(
-                (t) => t.name.toLowerCase() === 'askuserquestion' && !t.success
-              );
-              return {
-                ...base,
-                isInterrupted: true as const,
-                ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
-              };
-            }
-            return base;
-          });
+          .map((m) => mapPersistedMessage(m));
 
         const backendMessages = getActiveChain(allBackendMessages);
 
@@ -1160,8 +1261,11 @@ class ChatMessageService {
         // handleLoadConversation sets activeSession immediately on sidebar click,
         // so this guard won't break sidebar navigation.
         if (!isStaleNavigation) {
+          const preferredTitle = getPreferredTitle(message.session_id);
           useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore.getState().setActiveConversation(message.session_id, message.title);
+          useUIStore
+            .getState()
+            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
           useToolStore.getState().switchSession(message.session_id);
         }
 
@@ -1177,6 +1281,7 @@ class ChatMessageService {
                 success: t.success,
                 ...(t.output !== undefined ? { output: t.output } : {}),
                 ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+                ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
               })),
               message.session_id
             );
@@ -1206,20 +1311,7 @@ class ChatMessageService {
     useChatStore.getState().bumpRewindEpoch();
 
     // Prepare rewound messages
-    const rewoundMessages: ChatMessage[] = message.messages.map((m) => ({
-      id: m.id,
-      role: m.role,
-      content: m.content,
-      displayedContent: m.content,
-      ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
-      ...(m.thinking
-        ? {
-            thinking: m.thinking,
-            thinkingBlocks: [{ content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 }],
-          }
-        : {}),
-      ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
-    }));
+    const rewoundMessages: ChatMessage[] = message.messages.map((m) => mapPersistedMessage(m));
 
     const isSameSession = message.new_session_id === message.session_id;
 
@@ -1253,6 +1345,7 @@ class ChatMessageService {
             success: t.success,
             ...(t.output !== undefined ? { output: t.output } : {}),
             ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+            ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
           }))
         );
       }
@@ -1264,6 +1357,7 @@ class ChatMessageService {
   ): void {
     useToolStore.getState().clearSessionTools(message.session_id);
     useFileStore.getState().clearSessionFiles(message.session_id);
+    clearSessionTitleState(message.session_id);
     useChatStore.getState().destroySession(message.session_id);
     this.destroySession(message.session_id);
   }
@@ -1309,14 +1403,25 @@ class ChatMessageService {
       message.content_offset ??
         (currentMsg?.content.length ?? 0) + (this.pendingChunkLengths.get(message.message_id) ?? 0)
     );
+    const toolOrdinal = this.nextMarkerOrdinal(message.message_id);
 
     // Call startTool synchronously for immediate widget rendering
     useToolStore
       .getState()
-      .startTool(toolId, message.message_id, toolName, message.tool_input, contentOffset, sid);
+      .startTool(
+        toolId,
+        message.message_id,
+        toolName,
+        message.tool_input,
+        contentOffset,
+        sid,
+        toolOrdinal
+      );
 
     // Finalize current thinking block and mark thinking phase complete
     if (currentMsg?.isThinkingActive === true) {
+      const thinkingContentOffset =
+        currentMsg.content.length + (this.pendingChunkLengths.get(message.message_id) ?? 0);
       useChatStore.getState().updateMessage(sid, message.message_id, (msg) => {
         let updatedBlocks = msg.thinkingBlocks;
         if (updatedBlocks !== undefined && updatedBlocks.length > 0) {
@@ -1327,6 +1432,7 @@ class ChatMessageService {
             updatedBlocks[updatedBlocks.length - 1] = {
               ...lastBlock,
               durationMs: Date.now() - startTime,
+              contentOffset: thinkingContentOffset,
             };
           }
         }
@@ -1495,7 +1601,7 @@ class ChatMessageService {
     let batcher = this.chunkBatchers.get(sessionId);
     if (batcher) return batcher;
 
-    batcher = rafBatch<TextChunkEvent>((events) => {
+    const processEvents = (events: TextChunkEvent[]): void => {
       if (events.length === 0) return;
 
       // Bail if session was destroyed during deferral
@@ -1523,6 +1629,7 @@ class ChatMessageService {
           // Fast path: append to last assistant message
           // Finalize thinking block if active
           let updatedBlocks = lastMsg.thinkingBlocks;
+          const thinkingContentOffset = lastMsg.content.length;
           if (
             lastMsg.isThinkingActive === true &&
             updatedBlocks !== undefined &&
@@ -1535,6 +1642,7 @@ class ChatMessageService {
               updatedBlocks[updatedBlocks.length - 1] = {
                 ...lastBlock,
                 durationMs: Date.now() - startTime,
+                contentOffset: thinkingContentOffset,
               };
             }
           }
@@ -1544,19 +1652,21 @@ class ChatMessageService {
             return {
               ...m,
               content: newContent,
-              displayedContent: newContent,
+              // displayedContent NOT updated — reveal controller advances it word-by-word
               isThinkingActive: false,
               ...(updatedBlocks !== undefined ? { thinkingBlocks: updatedBlocks } : {}),
             };
           });
+          this.revealController.startOrContinue(sessionId, messageId);
         } else {
           // Slow path or new message
           const existingMsg = msgs.find((m) => m.id === messageId && m.role === 'assistant');
           if (existingMsg) {
             useChatStore.getState().updateMessage(sessionId, messageId, (m) => {
               const newContent = m.content + accumulatedContent;
-              return { ...m, content: newContent, displayedContent: newContent };
+              return { ...m, content: newContent };
             });
+            this.revealController.startOrContinue(sessionId, messageId);
           } else {
             // First chunk of new response (possibly a new turn in multi-tool flow)
             const parentUuid = msgs.at(-1)?.id ?? null;
@@ -1564,7 +1674,7 @@ class ChatMessageService {
               id: messageId,
               role: 'assistant',
               content: accumulatedContent,
-              displayedContent: accumulatedContent,
+              displayedContent: '',
               isStreaming: true,
               parentUuid,
             });
@@ -1572,10 +1682,13 @@ class ChatMessageService {
             // may have set it to false before this chunk arrived. Without this,
             // the loading indicator disappears between multi-turn tool calls.
             useChatStore.getState().setAgentRunning(sessionId, true);
+            this.revealController.startOrContinue(sessionId, messageId);
           }
         }
       }
-    });
+    };
+
+    batcher = rafBatch<TextChunkEvent>(processEvents);
 
     this.chunkBatchers.set(sessionId, batcher);
     return batcher;
@@ -1613,7 +1726,11 @@ class ChatMessageService {
               if (blocks.length > 0) {
                 this.thinkingStartTimes.set(messageId, Date.now());
               }
-              blocks.push({ content: accumulatedThinking, durationMs: 0 });
+              blocks.push({
+                content: accumulatedThinking,
+                durationMs: 0,
+                ordinal: this.nextMarkerOrdinal(messageId),
+              });
             } else {
               const lastBlock = blocks[blocks.length - 1];
               if (lastBlock !== undefined) {
@@ -1625,7 +1742,11 @@ class ChatMessageService {
               }
             }
 
-            const newThinking = (m.thinking ?? '') + accumulatedThinking;
+            const existingThinking = m.thinking ?? '';
+            const newThinking =
+              needsNewBlock && existingThinking.length > 0
+                ? `${existingThinking}\n\n${accumulatedThinking}`
+                : existingThinking + accumulatedThinking;
             return {
               ...m,
               thinking: newThinking,
@@ -1644,7 +1765,13 @@ class ChatMessageService {
             displayedContent: '',
             isStreaming: true,
             thinking: accumulatedThinking,
-            thinkingBlocks: [{ content: accumulatedThinking, durationMs: 0 }],
+            thinkingBlocks: [
+              {
+                content: accumulatedThinking,
+                durationMs: 0,
+                ordinal: this.nextMarkerOrdinal(messageId),
+              },
+            ],
             isThinkingActive: true,
             parentUuid,
           });

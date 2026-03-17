@@ -96,6 +96,7 @@
     "@milkdown/crepe": "^7.18.0",
     "@milkdown/utils": "^7.18.0",
     "@orbit/shared-schemas": "workspace:*",
+    "@paper-design/shaders-react": "^0.0.71",
     "@pierre/diffs": "^1.0.11",
     "@pierre/precision-diffs": "^0.6.1",
     "@radix-ui/react-collapsible": "^1.1.12",

@@ -12,7 +12,7 @@ import type { FC } from 'react';
 import {
   Dialog,
   DialogClose,
-  DialogContent,
+  DialogContentGlass,
   DialogDescription,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -21,6 +21,7 @@ import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils';
+import { setFaceHover } from '@/lib/utils/facehash-utils';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -38,18 +39,6 @@ interface ProjectTileProps {
 // Folder silhouette clip-path for 56×56 Facehash icons
 const FOLDER_CLIP =
   'path("M6 0H18C20 0 21.5 1 22.5 3L25 9H50C53.3 9 56 11.7 56 15V50C56 53.3 53.3 56 50 56H6C2.7 56 0 53.3 0 50V6C0 2.7 2.7 0 6 0Z")';
-
-const setFaceHover = (e: React.MouseEvent, hovered: boolean): void => {
-  const face = e.currentTarget.querySelector('[data-facehash-face]');
-  if (face instanceof HTMLElement) {
-    if (hovered) {
-      face.dataset['savedTransform'] = face.style.transform;
-      face.style.transform = 'rotateX(0deg) rotateY(0deg) translateZ(12px)';
-    } else if (face.dataset['savedTransform']) {
-      face.style.transform = face.dataset['savedTransform'];
-    }
-  }
-};
 
 const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
   <button
@@ -72,7 +61,7 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       name={project.name}
       size={56}
       variant="solid"
-      colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
+      colorClasses={['bg-avatar-project']}
       className="shrink-0 text-white dark:text-black"
       style={{ pointerEvents: 'none', clipPath: FOLDER_CLIP }}
     />
@@ -217,7 +206,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:w-[640px] sm:max-w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 [&>button:last-child]:hidden">
+      <DialogContentGlass className="w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
         {/* Header — search bar + close */}
         <div className="flex items-center shrink-0 p-3">
           {/* Search */}
@@ -237,10 +226,10 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
               spellCheck={false}
               autoComplete="off"
               className={cn(
-                'w-full h-9 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-9 text-sm',
+                'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
                 'placeholder:text-muted-foreground/40 outline-none',
                 'transition-[background-color] duration-150',
-                'focus:bg-[var(--lg-control-bg)]'
+                'focus:bg-control-fill-hover'
               )}
             />
             <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
@@ -270,8 +259,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
               </p>
               <button
                 type="button"
-                className="liquid-glass-btn liquid-glass-btn-primary cursor-pointer transition-transform duration-75 active:scale-[0.97]"
-                style={{ padding: '0 16px' }}
+                className="liquid-glass-btn liquid-glass-btn-primary cursor-pointer px-4 transition-transform duration-75 active:scale-[0.97]"
                 onClick={() => void handleOpenFolder()}
               >
                 <span className="inline-flex items-center gap-1.5">
@@ -318,7 +306,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
             </ul>
           </div>
         </div>
-      </DialogContent>
+      </DialogContentGlass>
     </Dialog>
   );
 };

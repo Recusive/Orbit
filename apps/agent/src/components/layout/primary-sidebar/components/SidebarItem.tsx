@@ -46,9 +46,7 @@ export const SidebarItem: FC<SidebarItemProps> = ({
         <span
           className={cn(
             'ml-auto mr-2 shrink-0 inline-flex items-center h-5 rounded-full px-1.5 text-[11px] font-[510] select-none',
-            badgeVariant === 'primary'
-              ? ''
-              : 'bg-black/[0.04] text-[#4C4C4C] dark:bg-white/[0.08] dark:text-[#B0B0B0]'
+            badgeVariant === 'primary' ? '' : 'bg-black/[0.04] text-tag-text dark:bg-white/[0.08]'
           )}
           style={
             badgeVariant === 'primary'

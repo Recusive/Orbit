@@ -4,12 +4,14 @@ import type { WebviewMessage } from '@/types/protocol';
 const {
   mockBuildFileIndex,
   mockConversationList,
+  mockGetFileInfo,
   mockGetWorkspacePath,
   mockListDirectory,
   mockReadFile,
 } = vi.hoisted(() => ({
   mockBuildFileIndex: vi.fn<[string], Promise<void>>(),
   mockConversationList: vi.fn<[string], Promise<unknown[]>>(),
+  mockGetFileInfo: vi.fn<[string], Promise<{ size: number }>>(),
   mockGetWorkspacePath: vi.fn<[], Promise<string | null>>(),
   mockListDirectory: vi.fn<[string, boolean?], Promise<FileEntry[]>>(),
   mockReadFile: vi.fn<[string], Promise<string>>(),
@@ -19,13 +21,30 @@ const { mockInitFileWatcher } = vi.hoisted(() => ({
   mockInitFileWatcher: vi.fn<[string], Promise<void>>(),
 }));
 
+const { mockCloseTab, mockConvertFileSrc, mockSetImageFile, viewerStoreState } = vi.hoisted(() => ({
+  mockCloseTab: vi.fn<[string], undefined>(),
+  mockConvertFileSrc: vi.fn<[string], string>(),
+  mockSetImageFile: vi.fn<
+    [string, number, { assetUrl: string; mimeType: string; fileSize: number }],
+    undefined
+  >(),
+  viewerStoreState: {
+    openTabs: [] as { path: string; instanceId: number }[],
+  },
+}));
+
 vi.mock('@/hooks/agent/use-tauri-file-watcher', () => ({
   initFileWatcher: mockInitFileWatcher,
+}));
+
+vi.mock('@tauri-apps/api/core', () => ({
+  convertFileSrc: mockConvertFileSrc,
 }));
 
 vi.mock('@/lib/api', () => ({
   buildFileIndex: mockBuildFileIndex,
   conversationList: mockConversationList,
+  getFileInfo: mockGetFileInfo,
   getWorkspacePath: mockGetWorkspacePath,
   listDirectory: mockListDirectory,
   readFile: mockReadFile,
@@ -49,8 +68,18 @@ vi.mock('@/lib/mappers', () => ({
 
 vi.mock('@/stores/file/file-viewer-store', () => ({
   useFileViewerStore: {
-    getState: (): { closeTab: (path: string) => void } => ({
-      closeTab: vi.fn(),
+    getState: (): {
+      openTabs: { path: string; instanceId: number }[];
+      closeTab: (path: string) => undefined;
+      setImageFile: (
+        path: string,
+        instanceId: number,
+        imageData: { assetUrl: string; mimeType: string; fileSize: number }
+      ) => undefined;
+    } => ({
+      openTabs: viewerStoreState.openTabs,
+      closeTab: mockCloseTab,
+      setImageFile: mockSetImageFile,
     }),
   },
 }));
@@ -69,7 +98,7 @@ vi.mock('@/stores/ui/ui-store', () => ({
   },
 }));
 
-import { handleFileTreeRequest } from '@/hooks/agent/handlers/file-handlers';
+import { handleFileRead, handleFileTreeRequest } from '@/hooks/agent/handlers/file-handlers';
 
 describe('file-handlers', () => {
   beforeEach(() => {
@@ -77,8 +106,11 @@ describe('file-handlers', () => {
     mockGetWorkspacePath.mockResolvedValue('/workspace');
     mockConversationList.mockResolvedValue([]);
     mockBuildFileIndex.mockResolvedValue(undefined);
+    mockGetFileInfo.mockResolvedValue({ size: 4096 });
     mockInitFileWatcher.mockResolvedValue(undefined);
+    mockConvertFileSrc.mockImplementation((path: string) => `asset://${path}`);
     mockReadFile.mockResolvedValue('');
+    viewerStoreState.openTabs = [];
   });
 
   describe('handleFileTreeRequest', () => {
@@ -162,6 +194,82 @@ describe('file-handlers', () => {
         false
       );
       expect(response.children.find((child) => child.name === 'dist')?.isGitIgnored).toBe(true);
+
+      postMessageSpy.mockRestore();
+    });
+  });
+
+  describe('handleFileRead', () => {
+    it('posts file content for non-image files', async () => {
+      mockReadFile.mockResolvedValue('export const x = 1;');
+      const postMessageSpy = vi.spyOn(window, 'postMessage');
+      const message: Extract<WebviewMessage, { type: 'file:read' }> = {
+        type: 'file:read',
+        uuid: '00000000-0000-4000-8000-000000000010',
+        path: '/workspace/src/app.ts',
+      };
+
+      await handleFileRead(message);
+
+      expect(mockReadFile).toHaveBeenCalledWith(message.path);
+      expect(mockSetImageFile).not.toHaveBeenCalled();
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'file:content',
+          request_uuid: message.uuid,
+          path: message.path,
+          content: 'export const x = 1;',
+        }),
+        '*'
+      );
+
+      postMessageSpy.mockRestore();
+    });
+
+    it('short-circuits image files to setImageFile without posting file content', async () => {
+      viewerStoreState.openTabs = [{ path: '/workspace/assets/photo.png', instanceId: 7 }];
+      const postMessageSpy = vi.spyOn(window, 'postMessage');
+      const message: Extract<WebviewMessage, { type: 'file:read' }> = {
+        type: 'file:read',
+        uuid: '00000000-0000-4000-8000-000000000011',
+        path: '/workspace/assets/photo.png',
+      };
+
+      await handleFileRead(message);
+
+      expect(mockConvertFileSrc).toHaveBeenCalledWith(message.path);
+      expect(mockGetFileInfo).toHaveBeenCalledWith(message.path);
+      expect(mockReadFile).not.toHaveBeenCalled();
+      expect(mockSetImageFile).toHaveBeenCalledWith(message.path, 7, {
+        assetUrl: 'asset:///workspace/assets/photo.png',
+        mimeType: 'image/png',
+        fileSize: 4096,
+      });
+      expect(postMessageSpy).not.toHaveBeenCalled();
+
+      postMessageSpy.mockRestore();
+    });
+
+    it('closes the tab and posts an error when image metadata lookup fails', async () => {
+      viewerStoreState.openTabs = [{ path: '/workspace/assets/photo.png', instanceId: 8 }];
+      mockGetFileInfo.mockRejectedValueOnce(new Error('metadata failed'));
+      const postMessageSpy = vi.spyOn(window, 'postMessage');
+      const message: Extract<WebviewMessage, { type: 'file:read' }> = {
+        type: 'file:read',
+        uuid: '00000000-0000-4000-8000-000000000012',
+        path: '/workspace/assets/photo.png',
+      };
+
+      await handleFileRead(message);
+
+      expect(mockCloseTab).toHaveBeenCalledWith(message.path);
+      expect(postMessageSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          message: 'metadata failed',
+        }),
+        '*'
+      );
 
       postMessageSpy.mockRestore();
     });

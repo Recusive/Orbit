@@ -2,7 +2,8 @@
  * Text Event Batcher - Reduces event flooding from Claude Agent SDK
  *
  * The SDK emits ~200 text events per response (one per token/word).
- * This batcher accumulates them at 50ms intervals before forwarding to frontend.
+ * This batcher can accumulate them over a short interval before forwarding to
+ * frontend, or emit immediately when configured with a non-positive interval.
  *
  * Result: ~200 events → ~4-8 batched events per response
  *
@@ -68,6 +69,20 @@ export class TextEventBatcher {
     if (content === '') return;
 
     const key = `${sessionId}${KEY_DELIMITER}${messageId}`;
+
+    // Track total accumulated length (for contentOffset calculation)
+    const currentLength = this.accumulatedLengths.get(key) ?? 0;
+    this.accumulatedLengths.set(key, currentLength + content.length);
+
+    if (this.BATCH_INTERVAL <= 0) {
+      try {
+        this.emitFn({ sessionId, messageId, content });
+      } catch (error) {
+        logger.error({ sessionId, error }, 'Failed to emit immediate text event');
+      }
+      return;
+    }
+
     const existing = this.buffer.get(key);
 
     if (existing) {
@@ -80,10 +95,6 @@ export class TextEventBatcher {
       // New entry
       this.buffer.set(key, { sessionId, messageId, content });
     }
-
-    // Track total accumulated length (for contentOffset calculation)
-    const currentLength = this.accumulatedLengths.get(key) ?? 0;
-    this.accumulatedLengths.set(key, currentLength + content.length);
 
     // Schedule flush if not already scheduled (nullish coalescing assignment)
     this.timer ??= setTimeout(() => {

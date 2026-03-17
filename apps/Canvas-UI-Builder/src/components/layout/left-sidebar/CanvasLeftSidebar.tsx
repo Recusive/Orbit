@@ -191,7 +191,7 @@ export const CanvasLeftSidebar: FC<CanvasLeftSidebarProps> = ({ width, onCompone
         }}
       >
         <button
-          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-gray-5 w-full bg-muted/40 hover:bg-muted/60 hover:border-gray-6 transition-[background-color,border-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          className="flex items-center h-8 rounded-lg text-muted-foreground hover:text-foreground overflow-hidden border border-orbit-300 w-full bg-muted/40 hover:bg-muted/60 hover:border-orbit-400 transition-[background-color,border-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           aria-label="Search components"
           role="searchbox"
           aria-readonly="true"

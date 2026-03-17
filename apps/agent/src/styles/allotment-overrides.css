@@ -13,7 +13,7 @@
    --focus-border: uses gray-8 instead of allotment's default blue (#007fd4). */
 :root {
   --separator-border: color-mix(in oklch, var(--border) 50%, transparent) !important;
-  --focus-border: var(--gray-9) !important; /* Gray - visible focus without accent (+1 bump) */
+  --focus-border: var(--orbit-700) !important; /* Gray - visible focus without accent (+1 bump) */
 }
 
 html.dark {

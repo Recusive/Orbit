@@ -209,6 +209,22 @@ describe('git-store', () => {
 
       expect(useGitStore.getState().error).toBeNull();
     });
+
+    it('should filter .DS_Store from untracked entries', () => {
+      const { setStatus } = useGitStore.getState();
+      const status = createGitStatus({
+        untracked: [
+          createStatusEntry('.DS_Store', 'untracked'),
+          createStatusEntry('src/.DS_Store', 'untracked'),
+          createStatusEntry('src/new-file.ts', 'untracked'),
+        ],
+      });
+
+      setStatus(status);
+
+      const untracked = useGitStore.getState().status?.untracked ?? [];
+      expect(untracked.map((entry) => entry.path)).toEqual(['src/new-file.ts']);
+    });
   });
 
   // ============================================================================

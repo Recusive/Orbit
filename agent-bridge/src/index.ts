@@ -60,9 +60,11 @@ import {
 } from './agent/session/session-storage.js';
 import { CanvasSessionManager } from './canvas/index.js';
 import { createLogger } from './common/logging/logger.js';
+import { canEnableIOS } from './ios/ios-service.js';
 import { BridgeRequestSchema } from './protocol/schemas.js';
 import { captureAgentError, captureFatalError, initSentry } from './sentry/index.js';
 
+import type { IOSService } from './ios/ios-service.js';
 import type {
   BridgeCommandResponse,
   BridgeEvent,
@@ -118,7 +120,7 @@ function setupGlobalErrorHandlers(): void {
 /**
  * Main entry point
  */
-function main(): void {
+async function main(): Promise<void> {
   // Initialize Sentry FIRST for early error capture
   initSentry();
 
@@ -131,8 +133,14 @@ function main(): void {
   // This handles cases where the bridge process was killed and restarted
   invalidateSessionCache();
 
+  let iosService: IOSService | undefined;
+  if (await canEnableIOS()) {
+    const { IOSService } = await import('./ios/ios-service.js');
+    iosService = new IOSService();
+  }
+
   // Create session managers
-  const sessionManager = new SessionManager();
+  const sessionManager = new SessionManager({ iosService });
   const canvasSessionManager = new CanvasSessionManager();
 
   // Wire up agent session event handlers
@@ -329,21 +337,23 @@ function main(): void {
 
     logger.info({ requestType: request.type }, 'Received request');
 
-    handleRequest(request, sessionManager, canvasSessionManager).catch((error: unknown) => {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
-      // Capture request handler errors to Sentry
-      const handlerError = error instanceof Error ? error : new Error(errorMessage);
-      captureAgentError(handlerError, {
-        source: 'request_handler',
-        extra: { requestType: request.type },
-      });
-      sendResponse({
-        type: 'error',
-        requestType: request.type,
-        error: errorMessage,
-      });
-    });
+    handleRequest(request, sessionManager, canvasSessionManager, iosService).catch(
+      (error: unknown) => {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
+        // Capture request handler errors to Sentry
+        const handlerError = error instanceof Error ? error : new Error(errorMessage);
+        captureAgentError(handlerError, {
+          source: 'request_handler',
+          extra: { requestType: request.type },
+        });
+        sendResponse({
+          type: 'error',
+          requestType: request.type,
+          error: errorMessage,
+        });
+      }
+    );
   });
 
   /**
@@ -354,39 +364,42 @@ function main(): void {
   const SHUTDOWN_GRACE_MS = 500;
 
   let shuttingDown = false;
-  function gracefulShutdown(reason: string): void {
+  async function gracefulShutdown(reason: string): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     logger.info(`${reason}, shutting down...`);
-    // Wrap dispose calls in try/catch — if dispose throws synchronously,
-    // the process could exit with code 1 before the grace timeout fires,
-    // potentially corrupting session state files.
-    // (Code review: Opus cycle 1, issue #11)
+
     try {
-      sessionManager.dispose();
+      await sessionManager.shutdownAsync();
     } catch (e) {
-      logger.error({ error: e }, 'sessionManager.dispose() failed');
+      logger.error({ error: e }, 'sessionManager.shutdownAsync() failed');
+      sessionManager.dispose();
     }
     try {
       canvasSessionManager.dispose();
     } catch (e) {
       logger.error({ error: e }, 'canvasSessionManager.dispose() failed');
     }
-    // Allow async disposal (stopSession/interrupt) to complete before hard exit
+    try {
+      await iosService?.dispose();
+    } catch (e) {
+      logger.error({ error: e }, 'iosService.dispose() failed');
+    }
+
     setTimeout(() => process.exit(0), SHUTDOWN_GRACE_MS);
   }
 
   rl.on('close', () => {
-    gracefulShutdown('stdin closed');
+    void gracefulShutdown('stdin closed');
   });
 
   // Handle process signals
   process.on('SIGTERM', () => {
-    gracefulShutdown('SIGTERM received');
+    void gracefulShutdown('SIGTERM received');
   });
 
   process.on('SIGINT', () => {
-    gracefulShutdown('SIGINT received');
+    void gracefulShutdown('SIGINT received');
   });
 
   // Clean up old sessions on startup (30 days default)
@@ -415,7 +428,8 @@ function main(): void {
 async function handleRequest(
   request: BridgeRequest,
   sessionManager: SessionManager,
-  canvasSessionManager: CanvasSessionManager
+  canvasSessionManager: CanvasSessionManager,
+  iosService?: IOSService
 ): Promise<void> {
   switch (request.type) {
     case 'create_session': {
@@ -680,10 +694,7 @@ async function handleRequest(
     }
 
     case 'generate_title': {
-      const title = await sessionManager.generateTitle(
-        request.userMessage,
-        request.assistantResponse
-      );
+      const title = await sessionManager.generateTitle(request.userMessage);
       sendResponse({ type: 'string', requestType: request.type, value: title });
       break;
     }
@@ -728,8 +739,16 @@ async function handleRequest(
     case 'shutdown': {
       logger.info('Shutdown requested');
       sendResponse({ type: 'success', requestType: request.type });
-      sessionManager.dispose();
+      try {
+        await sessionManager.shutdownAsync();
+      } catch (error) {
+        logger.error({ error }, 'sessionManager.shutdownAsync() failed during shutdown request');
+        sessionManager.dispose();
+      }
       canvasSessionManager.dispose();
+      await iosService?.dispose().catch((error: unknown) => {
+        logger.error({ error }, 'iosService.dispose() failed during shutdown request');
+      });
       process.exit(0);
       // Note: process.exit() never returns, but break needed to satisfy linter
     }
@@ -747,12 +766,10 @@ async function handleRequest(
 }
 
 // Run main with Sentry error capture
-try {
-  main();
-} catch (error: unknown) {
+void main().catch((error: unknown) => {
   // Capture fatal error and flush Sentry before exit
   void captureFatalError(error, 'startup').finally(() => {
     logger.error({ error }, 'Fatal error');
     process.exit(1);
   });
-}
+});

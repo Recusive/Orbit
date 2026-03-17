@@ -260,7 +260,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   {/* Name */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                      Name <span className="text-red-500/70">*</span>
+                      Name <span className="text-destructive/70">*</span>
                     </label>
                     <Input
                       value={name}
@@ -297,7 +297,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                   {/* Prompt */}
                   <div>
                     <label className="text-sm font-medium text-muted-foreground/90 uppercase tracking-tight">
-                      System Prompt <span className="text-red-500/70">*</span>
+                      System Prompt <span className="text-destructive/70">*</span>
                     </label>
                     <Textarea
                       value={prompt}
@@ -355,7 +355,7 @@ const AgentEditor: FC<AgentEditorProps> = ({
                             'text-sm px-2.5 py-1.5 rounded-full border-0 transition-[background-color,transform] duration-150 active:scale-[0.98]',
                             tools.includes(tool)
                               ? 'bg-[rgba(0,122,255,0.85)] text-white'
-                              : 'bg-[var(--lg-alert-secondary-bg)] text-[var(--lg-alert-secondary-text)] hover:bg-[var(--lg-alert-secondary-bg-hover)]'
+                              : 'bg-control-fill text-control-text hover:bg-control-fill-hover'
                           )}
                         >
                           {tool}

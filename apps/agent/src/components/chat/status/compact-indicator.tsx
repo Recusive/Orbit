@@ -21,7 +21,7 @@ export const CompactIndicator: FC<CompactIndicatorProps> = ({ messageId }) => {
   const isCompacting = useChatStore((s) => s.compactingMessageId === messageId);
 
   return (
-    <div className="flex w-full items-center gap-3 py-1.5">
+    <div className="flex w-full items-center gap-3 py-1.5 select-none cursor-default">
       {/* Left line */}
       <div className="flex-1 border-t border-dashed border-muted-foreground/15" />
 

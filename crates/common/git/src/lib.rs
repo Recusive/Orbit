@@ -2,6 +2,7 @@
 //!
 //! This crate provides git functionality using the git2 library.
 
+use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -321,7 +322,10 @@ pub fn status(path: &Path) -> Result<GitStatus> {
         }
 
         // === UNTRACKED FILES ===
-        if s.is_wt_new() {
+        // Guard: libgit2 can misclassify gitignored files as WT_NEW instead of
+        // IGNORED when ignore rules drift. Re-check via the ignore API before
+        // surfacing the file as untracked.
+        if s.is_wt_new() && !repo.is_path_ignored(&path_str).unwrap_or(false) {
             result
                 .untracked
                 .push(StatusEntry::new(&path_str, FileStatus::Untracked));
@@ -523,7 +527,12 @@ pub fn get_diff(path: &Path, include_untracked: bool) -> Result<Vec<FileDiff>> {
         .diff_index_to_workdir(None, Some(&mut opts))
         .map_err(|e| Error::Git(format!("Failed to get diff: {e}")))?;
 
-    parse_diff(&diff)
+    let mut diffs = parse_diff(&diff)?;
+    if include_untracked {
+        diffs.retain(|file_diff| !repo.is_path_ignored(&file_diff.path).unwrap_or(false));
+    }
+
+    Ok(diffs)
 }
 
 /// Get the diff of staged changes.
@@ -650,14 +659,81 @@ pub fn branch_diff_stats(path: &Path, _base_branch: &str) -> Result<BranchDiffSt
         .diff_tree_to_workdir_with_index(head_tree.as_ref(), Some(&mut opts))
         .map_err(|e| Error::Git(format!("Failed to compute diff: {e}")))?;
 
-    let stats = diff
-        .stats()
-        .map_err(|e| Error::Git(format!("Failed to get diff stats: {e}")))?;
+    let mut ignored_paths = HashSet::new();
+    let mut visible_delta_paths = HashSet::new();
+    for delta in diff.deltas() {
+        let file_path = delta
+            .new_file()
+            .path()
+            .or_else(|| delta.old_file().path())
+            .map(|path| path.to_string_lossy().to_string());
+
+        if let Some(file_path) = file_path {
+            if repo.is_path_ignored(&file_path).unwrap_or(false) {
+                let _inserted = ignored_paths.insert(file_path);
+            } else {
+                let _inserted = visible_delta_paths.insert(file_path);
+            }
+        }
+    }
+
+    if ignored_paths.is_empty() {
+        let stats = diff
+            .stats()
+            .map_err(|e| Error::Git(format!("Failed to get diff stats: {e}")))?;
+        if stats.files_changed() == visible_delta_paths.len() {
+            return Ok(BranchDiffStats {
+                additions: stats.insertions(),
+                deletions: stats.deletions(),
+                files_changed: stats.files_changed(),
+            });
+        }
+    }
+
+    let mut additions = 0usize;
+    let mut deletions = 0usize;
+    let mut changed_paths = HashSet::new();
+
+    diff.foreach(
+        &mut |delta, _progress| {
+            let file_path = delta
+                .new_file()
+                .path()
+                .or_else(|| delta.old_file().path())
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            if !ignored_paths.contains(&file_path) {
+                let _inserted = changed_paths.insert(file_path);
+            }
+            true
+        },
+        None,
+        None,
+        Some(&mut |delta, _hunk, line| {
+            let file_path = delta
+                .new_file()
+                .path()
+                .or_else(|| delta.old_file().path())
+                .map(|path| path.to_string_lossy().to_string())
+                .unwrap_or_default();
+
+            if !ignored_paths.contains(&file_path) {
+                match line.origin() {
+                    '+' => additions += 1,
+                    '-' => deletions += 1,
+                    _ => {},
+                }
+            }
+            true
+        }),
+    )
+    .map_err(|e| Error::Git(format!("Failed to walk diff: {e}")))?;
 
     Ok(BranchDiffStats {
-        additions: stats.insertions(),
-        deletions: stats.deletions(),
-        files_changed: stats.files_changed(),
+        additions,
+        deletions,
+        files_changed: changed_paths.len(),
     })
 }
 
@@ -1922,13 +1998,448 @@ fn format_diffs_as_string(diffs: &[FileDiff]) -> String {
 }
 
 #[cfg(test)]
+#[expect(
+    clippy::panic_in_result_fn,
+    reason = "Tests use assert!() inside -> Result<()> for standard Rust test ergonomics"
+)]
 mod tests {
     use super::*;
+    use std::collections::HashSet;
+    use std::path::Path;
+    use std::time::{Duration, Instant};
+
+    use tempfile::tempdir;
+
+    fn init_test_repo(repo_path: &Path) -> Result<Repository> {
+        Repository::init(repo_path).map_err(|e| Error::Git(format!("init failed: {e}")))
+    }
+
+    fn commit_all(repo: &Repository, message: &str) -> Result<()> {
+        let mut index = repo
+            .index()
+            .map_err(|e| Error::Git(format!("index failed: {e}")))?;
+        index
+            .add_all(["*"], IndexAddOption::DEFAULT, None)
+            .map_err(|e| Error::Git(format!("add failed: {e}")))?;
+        index
+            .write()
+            .map_err(|e| Error::Git(format!("write failed: {e}")))?;
+
+        let tree_id = index
+            .write_tree()
+            .map_err(|e| Error::Git(format!("write_tree failed: {e}")))?;
+        let tree = repo
+            .find_tree(tree_id)
+            .map_err(|e| Error::Git(format!("find_tree failed: {e}")))?;
+        let sig = git2::Signature::now("test", "test@test.com")
+            .map_err(|e| Error::Git(format!("sig failed: {e}")))?;
+
+        let parent = repo.head().ok().and_then(|head| head.peel_to_commit().ok());
+        if let Some(parent_commit) = parent.as_ref() {
+            let _oid = repo
+                .commit(Some("HEAD"), &sig, &sig, message, &tree, &[parent_commit])
+                .map_err(|e| Error::Git(format!("commit failed: {e}")))?;
+        } else {
+            let _oid = repo
+                .commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                .map_err(|e| Error::Git(format!("commit failed: {e}")))?;
+        }
+
+        Ok(())
+    }
 
     #[test]
     fn test_git_manager_new() {
         let manager = GitManager::new();
         // Just ensure it creates successfully
         let _debug = format!("{manager:?}");
+    }
+
+    #[test]
+    fn status_excludes_gitignored_wt_new_entries() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\n").map_err(Error::Io)?;
+        fs::write(repo_path.join(".DS_Store"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("visible.txt"), "visible").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != ".DS_Store"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "visible.txt"));
+        Ok(())
+    }
+
+    #[test]
+    fn status_respects_negated_ignore_patterns() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), "*.log\n!keep.log\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("debug.log"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("keep.log"), "visible").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != "debug.log"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "keep.log"));
+        Ok(())
+    }
+
+    #[test]
+    fn status_respects_nested_gitignore() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\n").map_err(Error::Io)?;
+        fs::create_dir_all(repo_path.join("sub")).map_err(Error::Io)?;
+        fs::write(repo_path.join("sub/.gitignore"), "*.tmp\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("sub/.DS_Store"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("sub/scratch.tmp"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("sub/real.txt"), "visible").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != "sub/.DS_Store"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != "sub/scratch.tmp"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "sub/real.txt"));
+        Ok(())
+    }
+
+    #[test]
+    fn status_handles_malformed_gitignore_gracefully() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), "[invalid-bracket\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("file.txt"), "content").map_err(Error::Io)?;
+        fs::write(repo_path.join("other.txt"), "content").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(
+            git_status
+                .untracked
+                .iter()
+                .any(|entry| entry.path == "file.txt"),
+            "file.txt must appear as untracked despite malformed .gitignore"
+        );
+        assert!(
+            git_status
+                .untracked
+                .iter()
+                .any(|entry| entry.path == "other.txt"),
+            "other.txt must appear as untracked despite malformed .gitignore"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn status_respects_git_info_exclude() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        let info_dir = repo_path.join(".git/info");
+        fs::create_dir_all(&info_dir).map_err(Error::Io)?;
+        fs::write(info_dir.join("exclude"), "secret.key\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("secret.key"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("public.txt"), "visible").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != "secret.key"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "public.txt"));
+        Ok(())
+    }
+
+    #[test]
+    fn status_respects_core_excludes_file() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+
+        let excludes_path = repo_path.join("my-global-excludes");
+        fs::write(&excludes_path, "*.secret\n").map_err(Error::Io)?;
+
+        let mut config = repo
+            .config()
+            .map_err(|e| Error::Git(format!("config failed: {e}")))?;
+        config
+            .set_str("core.excludesFile", &excludes_path.to_string_lossy())
+            .map_err(|e| Error::Git(format!("config set failed: {e}")))?;
+        drop(config);
+        drop(repo);
+
+        fs::write(repo_path.join("api.secret"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("readme.txt"), "visible").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != "api.secret"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "readme.txt"));
+        Ok(())
+    }
+
+    #[test]
+    fn status_perf_large_ignored_directory() -> Result<()> {
+        use std::fs;
+
+        let baseline_dir = tempdir().map_err(Error::Io)?;
+        let baseline_path = baseline_dir.path();
+        let repo = init_test_repo(baseline_path)?;
+        drop(repo);
+        fs::write(baseline_path.join("index.js"), "console.log('hello');").map_err(Error::Io)?;
+
+        let start = Instant::now();
+        let _status = status(baseline_path)?;
+        let baseline_elapsed = start.elapsed();
+
+        let test_dir = tempdir().map_err(Error::Io)?;
+        let test_path = test_dir.path();
+        let repo = init_test_repo(test_path)?;
+        drop(repo);
+
+        fs::write(test_path.join(".gitignore"), "node_modules/\n").map_err(Error::Io)?;
+        let node_modules_dir = test_path.join("node_modules");
+        fs::create_dir_all(&node_modules_dir).map_err(Error::Io)?;
+        for i in 0_u32..500_u32 {
+            fs::write(
+                node_modules_dir.join(format!("pkg-{i}.js")),
+                "module.exports = {};",
+            )
+            .map_err(Error::Io)?;
+        }
+        fs::write(test_path.join("index.js"), "console.log('hello');").map_err(Error::Io)?;
+
+        let start = Instant::now();
+        let git_status = status(test_path)?;
+        let test_elapsed = start.elapsed();
+
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| !entry.path.starts_with("node_modules/")));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "index.js"));
+
+        let max_allowed = baseline_elapsed
+            .saturating_mul(20)
+            .max(Duration::from_secs(5));
+        assert!(
+            test_elapsed < max_allowed,
+            "status() took {test_elapsed:?} vs baseline {baseline_elapsed:?} (>20x multiplier)",
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn status_works_on_unborn_repo() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\n").map_err(Error::Io)?;
+        fs::write(repo_path.join(".DS_Store"), "ignored").map_err(Error::Io)?;
+        fs::write(repo_path.join("hello.txt"), "content").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != ".DS_Store"));
+        assert!(git_status
+            .untracked
+            .iter()
+            .any(|entry| entry.path == "hello.txt"));
+
+        let stats = branch_diff_stats(repo_path, "main")?;
+        assert!(stats.files_changed > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn diff_stats_counts_renames_correctly() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("old-name.txt"), "content to rename").map_err(Error::Io)?;
+        fs::write(repo_path.join("regular.txt"), "will be modified").map_err(Error::Io)?;
+        commit_all(&repo, "initial")?;
+        drop(repo);
+
+        fs::remove_file(repo_path.join("old-name.txt")).map_err(Error::Io)?;
+        fs::write(repo_path.join("new-name.txt"), "content to rename").map_err(Error::Io)?;
+        fs::write(repo_path.join("regular.txt"), "modified content").map_err(Error::Io)?;
+        fs::write(repo_path.join(".DS_Store"), "ignored").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != ".DS_Store"));
+
+        let diffs = get_diff(repo_path, true)?;
+        assert!(diffs.iter().all(|diff| diff.path != ".DS_Store"));
+
+        let stats = branch_diff_stats(repo_path, "main")?;
+        assert!(
+            stats.files_changed >= 2 && stats.files_changed <= 3,
+            "branch_diff_stats.files_changed = {}, expected 2-3 (rename + modify, no ignored files)",
+            stats.files_changed
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn diff_stats_counts_typechange_correctly() -> Result<()> {
+        use std::fs;
+        use std::os::unix::fs::symlink;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("config.txt"), "real config content").map_err(Error::Io)?;
+        fs::write(repo_path.join("stable.txt"), "unchanged").map_err(Error::Io)?;
+        commit_all(&repo, "initial")?;
+        drop(repo);
+
+        fs::remove_file(repo_path.join("config.txt")).map_err(Error::Io)?;
+        symlink("stable.txt", repo_path.join("config.txt")).map_err(Error::Io)?;
+        fs::write(repo_path.join(".DS_Store"), "ignored").map_err(Error::Io)?;
+
+        let git_status = status(repo_path)?;
+        assert!(git_status
+            .untracked
+            .iter()
+            .all(|entry| entry.path != ".DS_Store"));
+        assert!(
+            git_status
+                .modified
+                .iter()
+                .any(|entry| entry.path == "config.txt"),
+            "config.txt typechange not detected in status: {:?}",
+            git_status.modified
+        );
+
+        let stats = branch_diff_stats(repo_path, "main")?;
+        assert_eq!(
+            stats.files_changed, 1,
+            "branch_diff_stats.files_changed = {}, expected 1 (typechange only, no ignored files)",
+            stats.files_changed
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn diff_and_stats_exclude_ignored_files() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join(".gitignore"), ".DS_Store\nbuild/\n").map_err(Error::Io)?;
+        fs::write(repo_path.join(".DS_Store"), "ignored content").map_err(Error::Io)?;
+        fs::create_dir_all(repo_path.join("build")).map_err(Error::Io)?;
+        fs::write(repo_path.join("build/output.js"), "ignored content").map_err(Error::Io)?;
+        fs::write(repo_path.join("real.txt"), "visible content").map_err(Error::Io)?;
+
+        let diffs = get_diff(repo_path, true)?;
+        let diff_paths: HashSet<&str> = diffs.iter().map(|diff| diff.path.as_str()).collect();
+        assert!(
+            !diff_paths.contains(".DS_Store"),
+            "get_diff leaked .DS_Store: {diff_paths:?}"
+        );
+        assert!(
+            diff_paths.iter().all(|path| !path.starts_with("build/")),
+            "get_diff leaked build/: {diff_paths:?}"
+        );
+        assert_eq!(
+            diffs.len(),
+            2,
+            "get_diff returned {} files, expected 2: {diff_paths:?}",
+            diffs.len()
+        );
+
+        let stats = branch_diff_stats(repo_path, "main")?;
+        assert_eq!(
+            stats.files_changed, 2,
+            "branch_diff_stats.files_changed = {}, expected 2 (ignored files leaking)",
+            stats.files_changed
+        );
+        assert!(
+            stats.additions <= 4,
+            "branch_diff_stats.additions = {}, expected ~3 (ignored file lines leaking)",
+            stats.additions
+        );
+        assert_eq!(
+            stats.deletions, 0,
+            "branch_diff_stats.deletions = {}, expected 0",
+            stats.deletions
+        );
+        Ok(())
     }
 }

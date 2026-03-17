@@ -191,7 +191,7 @@ export const CrashNotification: FC<CrashNotificationProps> = ({
                 onClick={handleCopy}
                 className={cn(
                   'text-xs flex items-center gap-1 transition-colors',
-                  copied ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'
+                  copied ? 'text-success' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 <Copy className="h-3 w-3" />

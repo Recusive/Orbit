@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 
 use agent::SessionManager;
 use commands::agent::lifecycle as agent_cmd;
-use commands::agent::{ai, conversations};
+use commands::agent::{ai, conversations, marketplace};
 use commands::browser::{self, BrowserResultState, BrowserWindowState};
 use commands::canvas::download as canvas_download;
 use commands::canvas::lifecycle as canvas_cmd;
@@ -28,7 +28,7 @@ use commands::canvas::setup as canvas_setup;
 use commands::canvas::transform as canvas_transform;
 use commands::canvas::PreviewServerState;
 use commands::common::{
-    credentials, dev_monitor, diagnostics, files, git, lsp, providers,
+    credentials, dev_monitor, diagnostics, files, git, icons, lsp, providers,
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
@@ -264,6 +264,7 @@ pub fn run() {
     // Initialize browser window state
     let browser_state = Arc::new(BrowserWindowState::new());
     let browser_result_state = Arc::new(BrowserResultState::new());
+    let browser_result_state_for_events = Arc::clone(&browser_result_state);
 
     // Clone browser state for the main-window focus listener (Arc is moved into .manage())
     #[cfg(target_os = "macos")]
@@ -280,6 +281,7 @@ pub fn run() {
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(PreviewServerState::new())
+        .manage(marketplace::MarketplaceCache::new())
         .manage(file_index_state)
         // Plugins
         .plugin(build_log_plugin().build())
@@ -295,6 +297,12 @@ pub fn run() {
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+            #[cfg(target_os = "macos")]
+            icons::reapply_persisted_icon(app.handle());
+            browser::register_browser_large_eval_result_listener(
+                app.handle(),
+                Arc::clone(&browser_result_state_for_events),
+            );
 
             #[cfg(target_os = "macos")]
             {
@@ -337,6 +345,15 @@ pub fn run() {
                         // (checks NSWindow.isVisible before calling orderFront:).
                         orbit_plugin_decorum::order_child_windows_front();
                     });
+
+                    // Re-apply the Dock icon when the system theme changes so the
+                    // correct light/dark rendition is shown automatically.
+                    let theme_app = app.handle().clone();
+                    window.on_window_event(move |event| {
+                        if matches!(event, tauri::WindowEvent::ThemeChanged(_)) {
+                            icons::reapply_persisted_icon(&theme_app);
+                        }
+                    });
                 }
             }
 
@@ -372,6 +389,10 @@ pub fn run() {
             agent_cmd::agent_delete_agent,
             // Skill definition commands
             agent_cmd::agent_list_skills,
+            marketplace::skills_marketplace_search,
+            marketplace::skills_marketplace_browse,
+            marketplace::skills_marketplace_install,
+            marketplace::skills_marketplace_installed,
             // Command definition commands
             agent_cmd::agent_list_commands,
             agent_cmd::agent_get_command,
@@ -549,6 +570,8 @@ pub fn run() {
             settings::remove_ssh_host,
             settings::clear_ssh_hosts,
             settings::pick_directory,
+            icons::list_app_icons,
+            icons::set_app_icon,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
@@ -584,8 +607,15 @@ pub fn run() {
             browser::browser_has,
             browser::browser_info,
             browser::browser_eval,
+            browser::browser_invoke_runtime,
+            browser::browser_runtime_version,
+            browser::browser_ensure_runtime,
+            browser::browser_get_url,
+            browser::browser_get_title,
             browser::browser_js_callback,
             browser::browser_eval_async,
+            browser::browser_wait_for_selector,
+            browser::browser_wait_for_url,
             browser::browser_screenshot,
             browser::browser_open_devtools,
             browser::app_open_devtools,

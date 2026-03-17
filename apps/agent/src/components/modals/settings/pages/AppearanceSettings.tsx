@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-import { SectionDivider, SectionHeader, SettingItem } from '../components';
+import { AppIconPicker, SectionDivider, SectionHeader, SettingItem } from '../components';
 
 import type { WindowMode } from '@/providers/theme-provider';
 import type { IconThemeId } from '@/stores/ui/icon-theme-store';
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { isMac } from '@/lib/utils';
 import { useTheme } from '@/providers/theme-provider';
 import { selectChatFullWidth, useChatWidthStore } from '@/stores/ui/chat-width-store';
 import { AVAILABLE_THEMES, selectIconTheme, useIconThemeStore } from '@/stores/ui/icon-theme-store';
@@ -69,6 +70,18 @@ export const AppearanceSettings: FC = () => {
 
   return (
     <div>
+      {isMac() ? (
+        <>
+          <SectionHeader title="App Icon">Choose your Orbit dock icon</SectionHeader>
+
+          <div className="mb-2">
+            <AppIconPicker />
+          </div>
+
+          <SectionDivider />
+        </>
+      ) : null}
+
       <SectionHeader title="Theme">Customize the look of the application</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

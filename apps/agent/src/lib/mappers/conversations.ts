@@ -5,7 +5,8 @@
  * backend DTOs and frontend types.
  */
 
-import type { ConversationSummaryDto } from '@/lib/api/conversations';
+import type { ThinkingBlock } from '@/components/chat/messages/types';
+import type { ConversationSummaryDto, ThinkingPhaseDto } from '@/lib/api/conversations';
 
 /**
  * Converts an array of ConversationSummaryDto from the backend
@@ -32,5 +33,16 @@ export function toConversationSummaries(dtos: ConversationSummaryDto[]): {
     messageCount: c.messageCount,
     ...(c.workspacePath !== undefined ? { workspacePath: c.workspacePath } : {}),
     ...(c.worktreePath !== undefined ? { worktreePath: c.worktreePath } : {}),
+  }));
+}
+
+export function serializeThinkingBlocks(blocks?: ThinkingBlock[]): ThinkingPhaseDto[] | undefined {
+  if (!blocks || blocks.length === 0) return undefined;
+
+  return blocks.map((block) => ({
+    content: block.content,
+    ...(block.contentOffset !== undefined ? { contentOffset: block.contentOffset } : {}),
+    ...(block.ordinal !== undefined ? { ordinal: block.ordinal } : {}),
+    ...(block.durationMs > 0 ? { durationMs: block.durationMs } : {}),
   }));
 }

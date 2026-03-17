@@ -70,9 +70,9 @@ const CommandInput = React.forwardRef<
       <CommandPrimitive.Input
         ref={ref}
         className={cn(
-          'w-full h-9 rounded-[9px] bg-[var(--lg-alert-secondary-bg)] pl-9 pr-9 text-sm',
+          'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
           'placeholder:text-muted-foreground/40 outline-none',
-          'focus:bg-[var(--lg-control-bg)]',
+          'focus:bg-control-fill-hover',
           className
         )}
         {...props}

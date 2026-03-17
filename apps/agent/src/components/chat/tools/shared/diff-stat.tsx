@@ -1,8 +1,8 @@
 /**
- * DiffStat - Proportional bar showing additions vs deletions.
+ * DiffStat - Vertical blocks showing additions vs deletions.
  *
- * Renders +N / -N counts alongside a thin horizontal bar where
- * the green/red ratio reflects the proportion of changes.
+ * Renders +N / -N counts alongside vertical bars (max 4 each)
+ * where green = additions and red = deletions.
  */
 
 import type { FC } from 'react';
@@ -12,49 +12,37 @@ interface DiffStatProps {
   readonly deletions: number;
 }
 
-/** Minimum visible percentage so a tiny slice is never invisible */
-const MIN_PERCENT = 8;
-const BAR_WIDTH = 32;
+const MAX_BLOCKS = 4;
+
+/** Map a count to 0–4 filled blocks proportionally */
+function getBlockCount(count: number, total: number): number {
+  if (count === 0) return 0;
+  // At least 1 block if non-zero
+  return Math.max(1, Math.round((count / total) * MAX_BLOCKS));
+}
 
 export const DiffStat: FC<DiffStatProps> = ({ additions, deletions }) => {
   const total = additions + deletions;
 
-  // Calculate percentages with minimum visibility guarantee
-  let addPercent = 0;
-  let delPercent = 0;
-
-  if (total > 0) {
-    addPercent = (additions / total) * 100;
-    delPercent = (deletions / total) * 100;
-
-    // Clamp so both sides are visible when non-zero
-    if (additions > 0 && addPercent < MIN_PERCENT) addPercent = MIN_PERCENT;
-    if (deletions > 0 && delPercent < MIN_PERCENT) delPercent = MIN_PERCENT;
-
-    // Re-normalize to 100
-    const scale = 100 / (addPercent + delPercent);
-    addPercent = addPercent * scale;
-    delPercent = delPercent * scale;
-  }
+  const addBlocks = total > 0 ? getBlockCount(additions, total) : 0;
+  const delBlocks = total > 0 ? getBlockCount(deletions, total) : 0;
 
   return (
     <div className="flex items-center gap-1.5">
       {additions > 0 ? (
-        <span className="text-[11px] font-medium tabular-nums text-success/70">+{additions}</span>
+        <span className="text-[11px] font-medium tabular-nums text-success">+{additions}</span>
       ) : null}
       {deletions > 0 ? (
-        <span className="text-[11px] font-medium tabular-nums text-destructive/70">
-          -{deletions}
-        </span>
+        <span className="text-[11px] font-medium tabular-nums text-destructive">-{deletions}</span>
       ) : null}
       {total > 0 ? (
-        <div className="h-[5px] rounded-full overflow-hidden flex" style={{ width: BAR_WIDTH }}>
-          {additions > 0 ? (
-            <div className="h-full bg-success/60" style={{ width: `${String(addPercent)}%` }} />
-          ) : null}
-          {deletions > 0 ? (
-            <div className="h-full bg-destructive/60" style={{ width: `${String(delPercent)}%` }} />
-          ) : null}
+        <div className="flex items-center gap-px">
+          {Array.from({ length: addBlocks }, (_, i) => (
+            <div key={`a${String(i)}`} className="w-[3px] h-[10px] rounded-[1px] bg-success" />
+          ))}
+          {Array.from({ length: delBlocks }, (_, i) => (
+            <div key={`d${String(i)}`} className="w-[3px] h-[10px] rounded-[1px] bg-destructive" />
+          ))}
         </div>
       ) : null}
     </div>

@@ -537,7 +537,7 @@ export const PropertiesPanel: FC<PropertiesPanelProps> = ({
 
       {/* Feedback */}
       {copyFeedback ? (
-        <div className="rounded-md bg-muted/50 px-2 py-1.5 text-center text-xs text-green-500">
+        <div className="rounded-md bg-muted/50 px-2 py-1.5 text-center text-xs text-success">
           {copyFeedback}
         </div>
       ) : null}

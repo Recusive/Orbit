@@ -13,7 +13,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronRight,
-  Download,
+  Gift,
   FlaskConical,
   FolderOpen,
   GitBranch,
@@ -341,7 +341,7 @@ export const PrimarySidebar: FC = () => {
   return (
     <aside
       data-sidebar="primary"
-      className="h-full flex flex-col overflow-hidden"
+      className="h-full flex flex-col overflow-hidden select-none cursor-default"
       style={{ contain: 'layout style' }}
     >
       {/* Header — collapse button next to macOS traffic lights (x:11 + ~54px for 3 buttons) */}
@@ -633,7 +633,7 @@ export const PrimarySidebar: FC = () => {
                     name={project.name}
                     size={24}
                     variant="solid"
-                    colorClasses={['bg-[#945036] dark:bg-[#e9ad97]']}
+                    colorClasses={['bg-avatar-project']}
                     className="rounded-md shrink-0 text-white dark:text-black"
                     style={{ pointerEvents: 'none' }}
                   />
@@ -725,11 +725,10 @@ export const PrimarySidebar: FC = () => {
         {/* Update indicator — visible after user dismisses the update toast */}
         {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
           <SidebarItem
-            icon={Download}
+            icon={Gift}
             label={updateStatus === 'ready' ? 'Restart to update' : 'Update available'}
             badge={updateStatus === 'ready' ? 'Restart' : 'Update'}
             badgeVariant="primary"
-            className="border border-dashed border-lg-separator"
             onClick={() => {
               const store = useUpdateStore.getState();
               if (store.status === 'ready') {

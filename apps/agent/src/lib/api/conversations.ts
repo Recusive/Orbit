@@ -16,6 +16,7 @@ export interface ConversationMessageDto {
   content: string;
   thinking?: string;
   thinkingDurationMs?: number;
+  thinkingPhases?: ThinkingPhaseDto[];
   /** Whether this assistant message was interrupted by the user (Stop button). */
   isInterrupted?: boolean;
   /** Wall-clock duration of the entire assistant turn in milliseconds. */
@@ -39,6 +40,14 @@ export interface ToolUseDto {
   output?: string;
   success: boolean;
   contentOffset?: number;
+  ordinal?: number;
+}
+
+export interface ThinkingPhaseDto {
+  content: string;
+  contentOffset?: number;
+  ordinal?: number;
+  durationMs?: number;
 }
 
 export interface TokenUsageDto {
@@ -111,8 +120,8 @@ export async function conversationUpdateTitle(
   sessionId: string,
   title: string,
   workspacePath?: string
-): Promise<void> {
-  return invoke('conversation_update_title', { sessionId, title, workspacePath });
+): Promise<boolean> {
+  return invoke<boolean>('conversation_update_title', { sessionId, title, workspacePath });
 }
 
 export async function conversationAddMessage(

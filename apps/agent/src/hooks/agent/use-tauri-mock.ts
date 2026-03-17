@@ -1,6 +1,6 @@
 import type { WebviewMessage } from '@/types/protocol';
 
-import { DEMO_SESSION_ID, isDemoConversationActive } from '@/hooks/agent/demo-conversation';
+import { DEMO_SESSION_ID, isDemoConversationActive } from '@/demo/conversation-playback';
 
 // ═══════════════════════════════════════════════════════════════
 // Mock handler for browser development
@@ -517,7 +517,39 @@ export function handleMockMessage(message: WebviewMessage): void {
             uuid: crypto.randomUUID(),
             request_uuid: message.uuid,
             path: message.path,
+            // Mock mode has no asset protocol or file metadata access, so image files
+            // intentionally stay on the plain text path for browser-only development.
             content: getMockFileContent(message.path),
+          },
+          '*'
+        );
+      }, delay);
+      break;
+    }
+
+    case 'skills:list': {
+      setTimeout(() => {
+        window.postMessage(
+          {
+            type: 'skills:list:response',
+            uuid: crypto.randomUUID(),
+            request_uuid: message.uuid,
+            skills: [
+              {
+                name: 'vercel-react-best-practices',
+                description: 'Performance and rendering guidance for React applications',
+                source: 'project',
+                triggers: ['react', 'performance', 'bundle'],
+                filePath: `${MOCK_ROOT}/.claude/skills/vercel-react-best-practices/SKILL.md`,
+              },
+              {
+                name: 'web-animation-best-practices',
+                description: 'Motion principles for accessible and performant UI animation',
+                source: 'user',
+                triggers: ['animation', 'motion', 'transition'],
+                filePath: `${MOCK_ROOT}/.claude/skills/web-animation-best-practices/SKILL.md`,
+              },
+            ],
           },
           '*'
         );
@@ -550,7 +582,6 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'file:reject_all':
     case 'diff:open':
     case 'url:open':
-    case 'permission:response':
     case 'inputMode:set':
     case 'thinking:set':
     case 'effort:set':
@@ -608,7 +639,7 @@ export function handleMockMessage(message: WebviewMessage): void {
     case 'commands:delete':
     case 'subagents:generate':
     case 'commands:generate':
-    case 'skills:list':
+    case 'permission:response':
       break;
   }
 }

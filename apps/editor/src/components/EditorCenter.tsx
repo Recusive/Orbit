@@ -71,10 +71,10 @@ const EditorTab: FC<EditorTabProps> = ({ file, isActive, onSelect, onClose }) =>
       tabIndex={isActive ? 0 : -1}
       className={cn(
         'group relative flex items-center h-full px-3 text-base cursor-pointer select-none shrink-0',
-        'border-r border-gray-5',
+        'border-r border-orbit-300',
         isActive
           ? 'bg-editor-bg text-foreground border-t-2 border-t-primary'
-          : 'bg-gray-4 dark:bg-gray-1 text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
+          : 'bg-orbit-200 dark:bg-orbit-background-100 text-muted-foreground hover:text-foreground border-t-2 border-t-transparent'
       )}
       style={{ maxWidth: 180 }}
     >
@@ -244,7 +244,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   return (
     <div
       data-tauri-drag-region
-      className="flex shrink-0 bg-gray-4 dark:bg-gray-1 relative"
+      className="flex shrink-0 bg-orbit-200 dark:bg-orbit-background-100 relative"
       style={{ height: ACTIVITY_PANEL.TABS_HEADER_HEIGHT }}
       onMouseEnter={() => {
         setIsHovered(true);
@@ -312,7 +312,7 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       {/* Editor actions */}
       <div
         data-tauri-drag-region={false}
-        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-gray-4 dark:bg-gray-1"
+        className="flex items-center h-full px-2 gap-0.5 shrink-0 border-l border-divider bg-orbit-200 dark:bg-orbit-background-100"
       >
         <button
           onClick={() => {

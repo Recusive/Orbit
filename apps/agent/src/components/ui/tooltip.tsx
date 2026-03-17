@@ -114,11 +114,7 @@ const TooltipArrow = React.forwardRef<
   React.ComponentRef<typeof TooltipPrimitive.Arrow>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Arrow>
 >(({ className, ...props }, ref) => (
-  <TooltipPrimitive.Arrow
-    ref={ref}
-    className={cn('fill-[var(--chat-area)] dark:fill-[oklch(23%_0_0)]', className)}
-    {...props}
-  />
+  <TooltipPrimitive.Arrow ref={ref} className={cn('fill-[var(--menu-bg)]', className)} {...props} />
 ));
 TooltipArrow.displayName = TooltipPrimitive.Arrow.displayName;
 

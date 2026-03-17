@@ -1,6 +1,6 @@
 import { createLogger } from '@orbit/common/lib';
 import { BookOpen, Code, Ellipsis, Search, X } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
 import type { FC } from 'react';
@@ -10,6 +10,7 @@ import { SourceControlTab } from '@/components/git';
 import { StatusBar } from '@/components/layout/status-bar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
+import { BrowserPlaceholder } from '@/demo/components/browser-placeholder';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import { useSmoothScroll } from '@/hooks/ui';
@@ -249,6 +250,9 @@ const TabsHeader: FC<TabsHeaderProps> = ({
   // Show scrollbar when hovered or dragging
   const showScrollbar = isHovered || isDragging;
   const isMarkdown = activeFile?.language === 'markdown';
+  const isImageTab =
+    activeFile?.fileType === 'image' && !(activeFile.imageData?.svgSourceView ?? false);
+  const isSearchDisabled = isPreviewRendered || isImageTab;
   const isThresholdBlocked = markdownPreview && !isPreviewRendered;
   const previewToggleLabel = isThresholdBlocked
     ? 'Preview unavailable - file too large'
@@ -332,19 +336,19 @@ const TabsHeader: FC<TabsHeaderProps> = ({
       >
         <button
           onClick={() => {
-            if (activeTabPath && !isPreviewRendered) {
+            if (activeTabPath && !isSearchDisabled) {
               onToggleSearch(activeTabPath);
             }
           }}
-          disabled={isPreviewRendered}
+          disabled={isSearchDisabled}
           className={cn(
             'h-6 w-6 flex items-center justify-center rounded transition-colors',
-            isPreviewRendered
+            isSearchDisabled
               ? 'cursor-not-allowed text-muted-foreground/40'
               : 'text-muted-foreground hover:text-foreground hover:bg-accent'
           )}
           aria-label="Search in file"
-          title={isPreviewRendered ? 'Search unavailable in preview' : 'Search (⌘F)'}
+          title={isSearchDisabled ? 'Search unavailable in preview' : 'Search (⌘F)'}
         >
           <Search className="h-4 w-4" />
         </button>
@@ -404,6 +408,10 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
   const prevHasOpenFiles = useRef(hasOpenFiles);
   const isBrowserActive = useBrowserIsActive();
   const { postMessage } = useTauri({});
+  const isDemoMode = useMemo(
+    () => new URLSearchParams(window.location.search).get('demo') === 'true',
+    []
+  );
 
   // Auto-switch to File tab only when files are first opened
   useEffect(() => {
@@ -487,7 +495,11 @@ export const ActivityPanel: FC<ActivityPanelProps> = ({ canManageBrowser = true 
         {activeTab === 'file' ? (
           <FileViewer />
         ) : activeTab === 'browser' ? (
-          <BrowserPanel />
+          isDemoMode ? (
+            <BrowserPlaceholder />
+          ) : (
+            <BrowserPanel />
+          )
         ) : (
           <div ref={smoothScrollRef} className="h-full overflow-y-auto overscroll-y-contain">
             <SourceControlTab isVisible={isSourceTabVisible} />

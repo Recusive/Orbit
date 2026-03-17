@@ -9,13 +9,9 @@ import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
-import {
-  conversationDelete,
-  conversationUpdateTitle,
-  gitWorktreeList,
-  gitWorktreeRemove,
-} from '@/lib/api';
+import { conversationDelete, gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
 import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
+import { applyManualSessionTitle, clearSessionTitleState } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -368,21 +364,27 @@ export const useSidebarActions = ({
     [workspacePath, worktreeToDelete, removeWorktree]
   );
 
-  // Conversation rename handler
+  /**
+   * Conversation rename handler.
+   *
+   * [warning] TESTED: This rename/delete flow is covered by integration tests.
+   *     If you modify this, run: bun test apps/agent/src/__tests__/integration/hooks/primary-sidebar/use-sidebar-actions.test.tsx
+   *     Test file: apps/agent/src/__tests__/integration/hooks/primary-sidebar/use-sidebar-actions.test.tsx
+   */
   const handleRenameConversation = useCallback(
     (sessionId: string, newTitle: string): void => {
       const previousTitle = useUIStore
         .getState()
         .conversations.find((c) => c.sessionId === sessionId)?.title;
 
-      // Optimistic in-memory update
-      updateConversationTitle(sessionId, newTitle);
       setEditingConversationId(null);
 
-      const workspacePathForPersist = useUIStore.getState().workspacePath ?? undefined;
-      void conversationUpdateTitle(sessionId, newTitle, workspacePathForPersist)
-        .then(() => {
-          toast.success('Conversation renamed');
+      void applyManualSessionTitle(sessionId, newTitle)
+        .then((written: boolean) => {
+          toast.success(written ? 'Conversation renamed' : 'Conversation renamed (pending save)');
+          if (!written) {
+            logger.debug('Rename deferred: JSONL not found yet', { sessionId });
+          }
         })
         .catch((err: unknown) => {
           if (previousTitle !== undefined) {
@@ -395,7 +397,7 @@ export const useSidebarActions = ({
     [setEditingConversationId, updateConversationTitle]
   );
 
-  // Conversation delete handler
+  /** Conversation delete handler. See integration test warning above. */
   const handleDeleteConversation = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
@@ -408,6 +410,7 @@ export const useSidebarActions = ({
         // (mirrors cleanup in ChatMessageService conversation:deleted handler)
         useToolStore.getState().clearSessionTools(sessionId);
         useFileStore.getState().clearSessionFiles(sessionId);
+        clearSessionTitleState(sessionId);
 
         // Persist to backend
         await conversationDelete(sessionId);

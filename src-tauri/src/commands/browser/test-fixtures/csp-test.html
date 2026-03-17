@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; object-src 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orbit CSP Fixture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+      }
+
+      body {
+        margin: 0;
+        padding: 32px;
+        background: #f4f1ea;
+        color: #1d2421;
+      }
+
+      main {
+        max-width: 960px;
+        margin: 0 auto;
+        display: grid;
+        gap: 20px;
+      }
+
+      section {
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(29, 36, 33, 0.12);
+        border-radius: 16px;
+        padding: 20px;
+      }
+
+      h1,
+      h2 {
+        margin: 0 0 12px;
+      }
+
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        border-radius: 999px;
+        padding: 10px 16px;
+        background: #0b5d4b;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      input,
+      select,
+      textarea,
+      [contenteditable='true'] {
+        width: min(100%, 320px);
+        padding: 10px 12px;
+        border: 1px solid rgba(29, 36, 33, 0.18);
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      [contenteditable='true'] {
+        min-height: 60px;
+      }
+
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      a {
+        color: #0b5d4b;
+      }
+    </style>
+    <script src="./csp-test.js" defer></script>
+  </head>
+  <body>
+    <main>
+      <section>
+        <h1>Orbit CSP Fixture</h1>
+        <p id="fixture-description">
+          Strict CSP page for validating browser tools on sites that disallow dynamic code eval.
+        </p>
+        <div class="row">
+          <span>Current URL:</span>
+          <code id="current-url"></code>
+        </div>
+        <div class="row">
+          <span>Current title:</span>
+          <code id="current-title"></code>
+        </div>
+      </section>
+
+      <section>
+        <h2>Navigation Parity</h2>
+        <div class="row">
+          <button id="push-state">Push State</button>
+          <button id="replace-state">Replace State</button>
+          <button id="hash-nav">Hash Navigation</button>
+        </div>
+        <p id="nav-status">Use the buttons above to trigger same-document navigation changes.</p>
+      </section>
+
+      <section>
+        <h2>Interactive Targets</h2>
+        <div class="row">
+          <a id="fixture-link" href="https://example.com/">Example link</a>
+          <button id="fixture-button">Primary action</button>
+        </div>
+        <div class="row">
+          <label for="fixture-input">Text input</label>
+          <input id="fixture-input" type="text" value="orbit" />
+        </div>
+        <div class="row">
+          <label for="fixture-textarea">Textarea</label>
+          <textarea id="fixture-textarea">csp fixture text</textarea>
+        </div>
+        <div class="row">
+          <label for="fixture-checkbox">Checkbox</label>
+          <input id="fixture-checkbox" type="checkbox" />
+        </div>
+        <div class="row">
+          <label for="fixture-select">Select</label>
+          <select id="fixture-select">
+            <option value="alpha">Alpha</option>
+            <option value="beta">Beta</option>
+            <option value="gamma">Gamma</option>
+          </select>
+        </div>
+        <div class="row">
+          <div id="fixture-editable" contenteditable="true">Editable content</div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Event Log</h2>
+        <pre id="event-log"></pre>
+      </section>
+    </main>
+  </body>
+</html>

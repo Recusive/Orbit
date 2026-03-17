@@ -108,6 +108,9 @@ export async function handleConversationLoad(
             ...(m.thinkingDurationMs !== undefined
               ? { thinkingDurationMs: m.thinkingDurationMs }
               : {}),
+            ...(m.thinkingPhases && m.thinkingPhases.length > 0
+              ? { thinkingPhases: m.thinkingPhases }
+              : {}),
             ...(m.isInterrupted === true ? { isInterrupted: true } : {}),
             ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
@@ -123,7 +126,9 @@ export async function handleConversationLoad(
     } else {
       // Conversation not found on disk — likely a cache-only session
       // (created via "New Session" but SDK hasn't written the JSONL file yet).
-      // Return empty messages but preserve whatever title the sidebar already has.
+      // Return empty messages with an 'Untitled' fallback. The header will use
+      // getPreferredTitle() to prefer the in-memory title (AI or manual) if one exists,
+      // so this fallback only appears when no title has been applied yet.
       logger.debug('Conversation not found on disk (cache-only?)', {
         sessionId: message.session_id,
       });
@@ -378,6 +383,9 @@ export async function handleConversationRewind(
               role: m.role,
               content: m.content,
               timestamp: m.createdAt,
+              thinking: m.thinking,
+              thinkingDurationMs: m.thinkingDurationMs,
+              thinkingPhases: m.thinkingPhases,
               toolUses: m.toolUses,
               parentUuid: m.parentUuid,
             })),
@@ -399,6 +407,13 @@ export async function handleConversationRewind(
             role: m.role,
             content: m.content,
             timestamp: Date.now(),
+            ...(m.thinking ? { thinking: m.thinking } : {}),
+            ...(m.thinkingDurationMs !== undefined
+              ? { thinkingDurationMs: m.thinkingDurationMs }
+              : {}),
+            ...(m.thinkingPhases && m.thinkingPhases.length > 0
+              ? { thinkingPhases: m.thinkingPhases }
+              : {}),
             toolUses: m.toolUses,
             parentUuid: m.parentUuid,
           })),

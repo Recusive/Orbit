@@ -17,6 +17,7 @@ import { useBranchDiffStats } from '@/stores/git/git-store';
 import {
   useWorkspaceName,
   useActiveConversationTitle,
+  useIsTitleLoading,
   useVaultOpen,
   useUIStore,
   useReviewPanelOpen,
@@ -93,6 +94,8 @@ interface ChatHeaderProps {
 export const ChatHeader: FC<ChatHeaderProps> = ({ hideGitControls }) => {
   const workspaceName = useWorkspaceName();
   const activeConversationTitle = useActiveConversationTitle();
+  const activeConversationId = useUIStore((state) => state.activeConversationId);
+  const isTitleLoading = useIsTitleLoading(activeConversationId);
   const vaultOpen = useVaultOpen();
   const reviewPanelOpen = useReviewPanelOpen();
   const activityTab = useActivityTab();
@@ -125,15 +128,19 @@ export const ChatHeader: FC<ChatHeaderProps> = ({ hideGitControls }) => {
             <span className="opacity-70 cursor-pointer hover:opacity-100 transition-opacity shrink-0">
               {workspaceName ?? 'No workspace'}
             </span>
-            {activeConversationTitle ? (
+            {activeConversationTitle || isTitleLoading ? (
               <>
                 <span className="mx-2 opacity-30 shrink-0">/</span>
-                <span
-                  className="opacity-70 truncate flex-1 min-w-0"
-                  title={activeConversationTitle}
-                >
-                  {activeConversationTitle}
-                </span>
+                {isTitleLoading ? (
+                  <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
+                ) : (
+                  <span
+                    className="opacity-70 truncate flex-1 min-w-0 animate-title-in"
+                    title={activeConversationTitle ?? undefined}
+                  >
+                    {activeConversationTitle}
+                  </span>
+                )}
               </>
             ) : null}
           </>

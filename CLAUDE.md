@@ -510,6 +510,18 @@ Rust commands in src-tauri/src/commands/canvas/. Frontend in apps/Canvas-UI-Buil
 <feature name="ProMotion 120fps" file="docs/architecture/PROMOTION-120FPS.md" description="120Hz rendering in WKWebView via CADisplayLink + WebKit _WKFeature private API"/>
 </feature_documentation>
 
+<plan_tracking importance="critical">
+Plans live in `docs/plans/` with this structure:
+
+| Folder            | Purpose                                                                                                                                                                                                |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tracked/todo/`   | Plans queued for implementation                                                                                                                                                                        |
+| `tracked/done/`   | Completed plans                                                                                                                                                                                        |
+| `others/<topic>/` | Uncategorized plans grouped by topic (browser, canvas, vault, file-system, diffs-and-code, sessions, worktree, ui-and-animations, skills-marketplace, agent, architecture, auth, navigation, feedback) |
+
+**After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If the user confirms (or says the plan is done/shipped/complete), move the plan file from its current location to `docs/plans/tracked/done/` and update `docs/CLAUDE.md` index accordingly. If the user doesn't respond to the prompt, move it anyway — default to marking done after successful implementation.
+</plan_tracking>
+
 <sdk_documentation importance="high">
 Claude Agent SDK docs are in `SDK/` folder (18 markdown files) and indexed in local RAG vector database.
 

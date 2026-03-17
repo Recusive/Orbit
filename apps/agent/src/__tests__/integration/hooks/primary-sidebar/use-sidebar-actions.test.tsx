@@ -32,8 +32,9 @@ import { useUIStore } from '@/stores/ui/ui-store';
  * Mock postMessage function to capture Tauri messages.
  */
 const {
+  mockApplyManualSessionTitle,
+  mockClearSessionTitleState,
   mockConversationDelete,
-  mockConversationUpdateTitle,
   mockGitWorktreeList,
   mockGitWorktreeRemove,
   mockPostMessage,
@@ -42,8 +43,9 @@ const {
   mockToastSuccess,
   mockToastWarning,
 } = vi.hoisted(() => ({
+  mockApplyManualSessionTitle: vi.fn().mockResolvedValue(true),
+  mockClearSessionTitleState: vi.fn(),
   mockConversationDelete: vi.fn().mockResolvedValue(undefined),
-  mockConversationUpdateTitle: vi.fn().mockResolvedValue(undefined),
   mockGitWorktreeList: vi.fn().mockResolvedValue([]),
   mockGitWorktreeRemove: vi.fn().mockResolvedValue({ branchDeleteFailed: null }),
   mockPostMessage: vi.fn(),
@@ -69,9 +71,13 @@ vi.mock('@/hooks/agent/use-tauri', () => ({
  */
 vi.mock('@/lib/api', () => ({
   conversationDelete: mockConversationDelete,
-  conversationUpdateTitle: mockConversationUpdateTitle,
   gitWorktreeList: mockGitWorktreeList,
   gitWorktreeRemove: mockGitWorktreeRemove,
+}));
+
+vi.mock('@/services/session', () => ({
+  applyManualSessionTitle: mockApplyManualSessionTitle,
+  clearSessionTitleState: mockClearSessionTitleState,
 }));
 
 vi.mock('sonner', () => ({
@@ -703,8 +709,7 @@ describe('useSidebarActions', () => {
   // =============================================================================
 
   describe('handleRenameConversation', () => {
-    it('should update conversation title in store optimistically', () => {
-      // Pre-populate store with a conversation
+    it('should delegate renames through applyManualSessionTitle', () => {
       const conversation = createMockConversation({
         sessionId: 'rename-me',
         title: 'Old Title',
@@ -726,11 +731,7 @@ describe('useSidebarActions', () => {
         result.current.handleRenameConversation('rename-me', 'New Title');
       });
 
-      const updatedConversations = useUIStore.getState().conversations;
-      const updated = updatedConversations.find(
-        (c: ConversationSummary) => c.sessionId === 'rename-me'
-      );
-      expect(updated?.title).toBe('New Title');
+      expect(mockApplyManualSessionTitle).toHaveBeenCalledWith('rename-me', 'New Title');
     });
 
     it('should clear editing state after rename', () => {
@@ -779,6 +780,27 @@ describe('useSidebarActions', () => {
       expect(
         remaining.find((c: ConversationSummary) => c.sessionId === 'delete-me')
       ).toBeUndefined();
+    });
+
+    it('should clear session title state during delete cleanup', async () => {
+      const conversation = createMockConversation({
+        sessionId: 'delete-me',
+        title: 'To Delete',
+      });
+
+      const { result } = renderHook(() =>
+        useSidebarActions(
+          createDefaultHookProps({
+            conversations: [conversation],
+          })
+        )
+      );
+
+      await act(async () => {
+        await result.current.handleDeleteConversation('delete-me');
+      });
+
+      expect(mockClearSessionTitleState).toHaveBeenCalledWith('delete-me');
     });
 
     it('should close delete dialog after deletion', async () => {

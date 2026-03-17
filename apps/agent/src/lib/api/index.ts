@@ -31,9 +31,13 @@ export * from './search';
 
 // Settings operations
 export * from './settings';
+export * from './icons';
 
 // Window operations
 export * from './window';
 
 // Browser operations (embedded Chromium + CDP)
 export * from './browser';
+
+// Marketplace operations
+export * from './marketplace';

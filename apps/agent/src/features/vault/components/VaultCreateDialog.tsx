@@ -100,28 +100,22 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
-        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
-          <X className="h-3.5 w-3.5" />
+      <DialogContentGlass className="w-[360px] gap-0 overflow-hidden p-0 glass-surface [&>.absolute]:hidden">
+        <DialogClose className="absolute right-3 top-3 z-10 rounded-[9px] p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
+          <X className="h-3 w-3" aria-hidden="true" />
           <span className="sr-only">Close</span>
         </DialogClose>
 
-        <div
-          className="relative flex flex-col items-center"
-          style={{ padding: '20px 16px 16px', gap: 16 }}
-        >
+        <div className="relative flex flex-col items-center gap-4 px-4 pb-4 pt-5">
           {/* Icon */}
-          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
-            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
-              <IconNoteText className="h-7 w-7 text-foreground" />
+          <div className="flex w-full items-center px-1.5">
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
+              <IconNoteText className="h-7 w-7 text-primary" />
             </div>
           </div>
 
           {/* Title + Description */}
-          <div
-            className="flex w-full flex-col items-start"
-            style={{ padding: '0 6px 2px', gap: 10 }}
-          >
+          <div className="flex w-full flex-col items-start gap-2.5 px-1.5 pb-0.5">
             <DialogTitle className="liquid-glass-title w-full">
               Create new {mode === 'file' ? 'document' : 'folder'}
             </DialogTitle>
@@ -133,7 +127,7 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
           </div>
 
           {/* Mode toggle */}
-          <div className="flex w-full items-center" style={{ padding: '0 6px', gap: 8 }}>
+          <div className="flex w-full items-center gap-2 px-1.5">
             <button
               type="button"
               className={`liquid-glass-btn flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97] ${
@@ -159,7 +153,7 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
           </div>
 
           {/* Name input */}
-          <div className="w-full" style={{ padding: '0 6px' }}>
+          <div className="w-full px-1.5">
             <div className="relative">
               <IconNoteText className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
               <input
@@ -171,8 +165,7 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder={mode === 'file' ? 'my-notes.md' : 'folder-name'}
-                className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
-                style={{ paddingLeft: 36 }}
+                className="liquid-glass-textarea liquid-glass-textarea-icon h-9 w-full rounded-[9px] text-sm outline-none"
                 aria-label={mode === 'file' ? 'Document name' : 'Folder name'}
                 disabled={isCreating}
               />
@@ -183,7 +176,7 @@ export const VaultCreateDialog: FC<VaultCreateDialogProps> = ({
           </div>
 
           {/* Buttons */}
-          <div className="flex w-full items-center" style={{ gap: 8 }}>
+          <div className="flex w-full items-center gap-2">
             <button
               type="button"
               className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"

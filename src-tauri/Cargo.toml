@@ -33,6 +33,7 @@ orbit-search = { path = "../crates/common/search" }
 orbit-settings = { path = "../crates/common/settings" }
 orbit-conversations = { path = "../crates/common/conversations" }
 orbit-sf-symbols = { path = "../crates/common/sf-symbols" }
+orbit-app-icons = { path = "../crates/common/app-icons" }
 
 # Core dependencies
 tokio = { workspace = true }
@@ -57,9 +58,10 @@ hashbrown = { workspace = true }
 hostname = "0.4"  # For non-macOS device ID generation
 regex = "1"  # Component name validation
 ignore = { workspace = true } # Workspace doc discovery for Vault
+tempfile = { workspace = true }
 
 # Tauri
-tauri = { workspace = true, features = ["tray-icon", "macos-private-api"] }
+tauri = { workspace = true, features = ["tray-icon", "macos-private-api", "protocol-asset"] }
 tauri-plugin-log = { workspace = true }
 tauri-plugin-fs = { workspace = true }
 tauri-plugin-shell = { workspace = true }
@@ -79,5 +81,4 @@ sentry = { workspace = true }
 tauri-plugin-liquid-glass = "0.1"
 
 [dev-dependencies]
-tempfile = "3.10"
 tokio-test = "0.4"

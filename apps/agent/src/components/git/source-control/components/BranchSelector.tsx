@@ -79,7 +79,7 @@ export const BranchSelector: FC<BranchSelectorProps> = ({
 
         <PopoverContent
           align="start"
-          className="w-[260px] p-0 bg-white/70 dark:bg-lg-control/80 backdrop-blur-sm dark:backdrop-blur-xl border-white dark:border-white/5 rounded-[9px] shadow-[0_4px_12px_-2px_rgba(0,0,0,0.1),0_8px_24px_-4px_rgba(0,0,0,0.08)] dark:shadow-md"
+          className="w-[260px] p-0"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
           }}

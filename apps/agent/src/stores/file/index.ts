@@ -29,6 +29,7 @@ export {
 export type {
   ViewedFileDiff,
   FileViewMode,
+  ImageData,
   ViewedFile,
   GotoPosition,
   CursorPosition,

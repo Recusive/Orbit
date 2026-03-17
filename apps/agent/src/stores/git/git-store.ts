@@ -88,6 +88,26 @@ function listSignature(entries: readonly StatusEntry[]): string {
     .join('\x01');
 }
 
+function isIgnoredNoiseUntrackedPath(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/').toLowerCase();
+  return normalized === '.ds_store' || normalized.endsWith('/.ds_store');
+}
+
+function sanitizeStatus(status: GitStatus): GitStatus {
+  const filteredUntracked = status.untracked.filter(
+    (entry) => !isIgnoredNoiseUntrackedPath(entry.path)
+  );
+
+  if (filteredUntracked.length === status.untracked.length) {
+    return status;
+  }
+
+  return {
+    ...status,
+    untracked: filteredUntracked,
+  };
+}
+
 const STATUS_PRIORITY: Record<FileStatus, number> = {
   conflicted: 8,
   modified: 7,
@@ -200,17 +220,19 @@ export const useGitStore = create<GitStore>()(
 
       setStatus: (status): void => {
         set((state) => {
+          const sanitizedStatus = sanitizeStatus(status);
+
           // Skip update if status hasn't meaningfully changed
           const prev = state.status;
           if (prev) {
             const unchanged =
-              prev.branch === status.branch &&
-              prev.ahead === status.ahead &&
-              prev.behind === status.behind &&
-              listSignature(prev.staged) === listSignature(status.staged) &&
-              listSignature(prev.modified) === listSignature(status.modified) &&
-              listSignature(prev.untracked) === listSignature(status.untracked) &&
-              listSignature(prev.conflicted) === listSignature(status.conflicted);
+              prev.branch === sanitizedStatus.branch &&
+              prev.ahead === sanitizedStatus.ahead &&
+              prev.behind === sanitizedStatus.behind &&
+              listSignature(prev.staged) === listSignature(sanitizedStatus.staged) &&
+              listSignature(prev.modified) === listSignature(sanitizedStatus.modified) &&
+              listSignature(prev.untracked) === listSignature(sanitizedStatus.untracked) &&
+              listSignature(prev.conflicted) === listSignature(sanitizedStatus.conflicted);
             if (unchanged) {
               // Only update lastUpdated for background refreshes, don't trigger re-renders
               state.lastUpdated = Date.now();
@@ -218,11 +240,11 @@ export const useGitStore = create<GitStore>()(
             }
           }
           logger.debug(`Git status updated`, {
-            branch: status.branch,
-            ahead: status.ahead,
-            behind: status.behind,
+            branch: sanitizedStatus.branch,
+            ahead: sanitizedStatus.ahead,
+            behind: sanitizedStatus.behind,
           });
-          state.status = status;
+          state.status = sanitizedStatus;
           state.error = null;
           state.isLoading = false;
           state.lastUpdated = Date.now();

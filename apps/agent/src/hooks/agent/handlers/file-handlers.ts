@@ -1,4 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 import { initFileWatcher } from '../use-tauri-file-watcher';
 
@@ -7,11 +8,13 @@ import type { WebviewMessage } from '@/types/protocol';
 import {
   buildFileIndex,
   conversationList,
+  getFileInfo,
   getWorkspacePath,
   listDirectory,
   readFile,
 } from '@/lib/api';
 import { toConversationSummaries, toFileNodes } from '@/lib/mappers';
+import { getImageMimeType, isImageFile } from '@/lib/utils';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -142,6 +145,25 @@ export async function handleFileRead(
   message: Extract<WebviewMessage, { type: 'file:read' }>
 ): Promise<void> {
   try {
+    if (isImageFile(message.path)) {
+      const viewerStore = useFileViewerStore.getState();
+      const tab = viewerStore.openTabs.find((t) => t.path === message.path);
+      if (!tab) {
+        return;
+      }
+
+      const assetUrl = convertFileSrc(message.path);
+      const mimeType = getImageMimeType(message.path);
+      const fileInfo = await getFileInfo(message.path);
+
+      viewerStore.setImageFile(message.path, tab.instanceId, {
+        assetUrl,
+        mimeType,
+        fileSize: fileInfo.size,
+      });
+      return;
+    }
+
     const content = await readFile(message.path);
     window.postMessage(
       {

@@ -6,6 +6,8 @@ import { FileViewer } from '@/components/files/file-viewer';
 import { MAX_PREVIEW_LINES } from '@/hooks/file/use-is-preview-rendered';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 
+let nextInstanceId = 0;
+
 vi.mock('@/components/files/file-viewer-content', () => ({
   FileViewerContent: () => <div data-testid="mock-file-viewer-content">Content</div>,
 }));
@@ -33,10 +35,12 @@ function resetStore(): void {
 
 function createFile(overrides: Partial<ViewedFile> = {}): ViewedFile {
   return {
+    instanceId: ++nextInstanceId,
     path: '/docs/README.md',
     content: '# Title\n\ncontent',
     originalContent: '# Title\n\ncontent',
     language: 'markdown',
+    fileType: 'text',
     viewMode: 'file',
     isModified: false,
     isExternal: false,
@@ -72,6 +76,7 @@ function pressCmdF(): void {
 
 describe('FileViewer Cmd+F behavior', () => {
   beforeEach(() => {
+    nextInstanceId = 0;
     resetStore();
     vi.clearAllMocks();
   });
@@ -125,6 +130,53 @@ describe('FileViewer Cmd+F behavior', () => {
       originalContent: 'export const x = 1;',
     });
     mountWithFile(file, toggleSearchMock, true);
+
+    act(() => {
+      pressCmdF();
+    });
+
+    expect(toggleSearchMock).toHaveBeenCalledWith(file.path);
+  });
+
+  it('does not trigger search for image preview tabs', () => {
+    const toggleSearchMock = vi.fn();
+    const file = createFile({
+      path: '/assets/photo.png',
+      language: 'plaintext',
+      content: '',
+      originalContent: '',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/photo.png',
+        mimeType: 'image/png',
+        fileSize: 1024,
+      },
+    });
+    mountWithFile(file, toggleSearchMock, false);
+
+    act(() => {
+      pressCmdF();
+    });
+
+    expect(toggleSearchMock).not.toHaveBeenCalled();
+  });
+
+  it('re-enables search for image tabs in source view mode', () => {
+    const toggleSearchMock = vi.fn();
+    const file = createFile({
+      path: '/assets/diagram.svg',
+      language: 'xml',
+      content: '<svg />',
+      originalContent: '<svg />',
+      fileType: 'image',
+      imageData: {
+        assetUrl: 'http://asset.localhost/assets/diagram.svg',
+        mimeType: 'image/svg+xml',
+        fileSize: 1024,
+        svgSourceView: true,
+      },
+    });
+    mountWithFile(file, toggleSearchMock, false);
 
     act(() => {
       pressCmdF();

@@ -7,34 +7,61 @@ import type { WebviewMessage } from '@/types/protocol';
 import {
   browserBack,
   browserClose,
+  browserEnsureRuntime,
   browserEval,
-  browserEvalAsync,
   browserForward,
+  browserGetTitle,
+  browserGetUrl,
   browserHas,
+  browserInfo,
+  browserInvokeRuntime,
   browserNavigate,
   browserReload,
+  browserScreenshot,
   browserToolResponse,
+  browserWaitForSelector,
+  browserWaitForUrl,
 } from '@/lib/api/browser';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('BrowserToolHandler');
-const DEFAULT_OPEN_URL = 'about:blank';
+const DEFAULT_OPEN_URL = 'https://example.com';
 const BROWSER_READY_TIMEOUT_MS = 10000;
 const BROWSER_READY_POLL_MS = 250;
-
-// Browser API detection state with promise coalescing to prevent race conditions
-let browserHasTauriApi: boolean | null = null;
-let detectionPromise: Promise<boolean> | null = null;
+const DEFAULT_WAIT_TIMEOUT_MS = 30000;
+const MAX_WAIT_TIMEOUT_MS = 120000;
+const RUNTIME_UNAVAILABLE_MESSAGE = 'Orbit runtime unavailable.';
+const NO_TARGET_MESSAGE = 'Provide ref (from snapshot) or selector (CSS)';
 
 // AbortController for canceling browser ready polling
 let browserReadyAbortController: AbortController | null = null;
+
+// Snapshot epoch cache for blank/degraded fallback responses.
+let browserSnapshotEpoch = 0;
 
 interface BrowserToolExecutionResult {
   success: boolean;
   result?: unknown;
   error?: string;
+}
+
+interface BrowserToolTarget {
+  ref?: string;
+  selector?: string;
+}
+
+interface SnapshotResponse {
+  epoch: number;
+  snapshot: string;
+  refCount: number;
+  totalElements: number;
+  emittedElements: number;
+  truncated: boolean;
+  url: string;
+  title: string;
+  durationMs: number;
 }
 
 /**
@@ -43,6 +70,21 @@ interface BrowserToolExecutionResult {
  * attacks via data:text/html URLs containing malicious scripts.
  */
 const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:'];
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function extractErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function isRuntimeUnavailableMessage(message: string): boolean {
+  return (
+    message.includes(RUNTIME_UNAVAILABLE_MESSAGE) ||
+    message.includes('Orbit runtime injection failed')
+  );
+}
 
 /**
  * Validate a URL for browser navigation.
@@ -53,7 +95,6 @@ const ALLOWED_URL_PROTOCOLS = ['http:', 'https:', 'about:'];
 function validateBrowserUrl(
   url: string
 ): { valid: true; url: string } | { valid: false; error: string } {
-  // Allow about:blank and similar special URLs
   if (url === 'about:blank' || url.startsWith('about:')) {
     return { valid: true, url };
   }
@@ -70,7 +111,6 @@ function validateBrowserUrl(
 
     return { valid: true, url: parsed.href };
   } catch {
-    // If URL parsing fails, try prepending https://
     try {
       const withProtocol = `https://${url}`;
       const parsed = new URL(withProtocol);
@@ -86,27 +126,52 @@ function validateBrowserUrl(
   }
 }
 
-/**
- * Safely serialize a value for injection into JavaScript.
- * Uses JSON.stringify which handles all escaping cases properly.
- */
-function safeStringify(value: string): string {
-  return JSON.stringify(value);
-}
-
 function parseEvalResult(raw: string): unknown {
   const parsed: unknown = JSON.parse(raw);
-  if (parsed !== null && typeof parsed === 'object' && '__error' in parsed) {
-    const errorValue = (parsed as { __error?: unknown }).__error;
+  if (isRecord(parsed) && '__error' in parsed) {
+    const errorValue = parsed['__error'];
     throw new Error(typeof errorValue === 'string' ? errorValue : JSON.stringify(errorValue));
   }
   return parsed;
 }
 
+function getTargetInput(toolInput: Record<string, unknown>): BrowserToolTarget {
+  const target: BrowserToolTarget = {};
+  if (typeof toolInput['ref'] === 'string') {
+    target.ref = toolInput['ref'];
+  }
+  if (typeof toolInput['selector'] === 'string') {
+    target.selector = toolInput['selector'];
+  }
+  return target;
+}
+
+function hasRefTarget(target: BrowserToolTarget): target is BrowserToolTarget & { ref: string } {
+  return typeof target.ref === 'string' && target.ref.length > 0;
+}
+
+function hasSelectorTarget(
+  target: BrowserToolTarget
+): target is BrowserToolTarget & { selector: string } {
+  return typeof target.selector === 'string' && target.selector.length > 0;
+}
+
+function getRequiredTarget(toolInput: Record<string, unknown>): BrowserToolTarget | null {
+  const target = getTargetInput(toolInput);
+  return hasRefTarget(target) || hasSelectorTarget(target) ? target : null;
+}
+
+function getOptionalTarget(toolInput: Record<string, unknown>): BrowserToolTarget | null {
+  const target = getTargetInput(toolInput);
+  return hasRefTarget(target) || hasSelectorTarget(target) ? target : null;
+}
+
+/** Default to document body when no ref or selector is provided. */
+function getTargetOrBody(toolInput: Record<string, unknown>): BrowserToolTarget {
+  return getOptionalTarget(toolInput) ?? { selector: 'body' };
+}
+
 function resetBrowserApiCache(): void {
-  browserHasTauriApi = null;
-  detectionPromise = null;
-  // Cancel any pending browser ready polling
   if (browserReadyAbortController) {
     browserReadyAbortController.abort();
     browserReadyAbortController = null;
@@ -119,55 +184,15 @@ function resetBrowserApiCache(): void {
  * may leave state in an inconsistent state.
  */
 export function resetBrowserToolState(): void {
+  browserSnapshotEpoch = 0;
   resetBrowserApiCache();
 }
 
-async function detectBrowserTauriApi(): Promise<boolean> {
-  // Return cached result if available
-  if (browserHasTauriApi !== null) {
-    return browserHasTauriApi;
-  }
-
-  // Coalesce concurrent detection calls to prevent race conditions
-  // Use ??= to only create promise if none exists
-  detectionPromise ??= (async (): Promise<boolean> => {
-    try {
-      // Check for the full Tauri API, not just window.__TAURI__ existence
-      // A page could define window.__TAURI__ without having the actual Tauri API
-      const raw = await browserEval('return typeof window.__TAURI__?.core?.invoke === "function"');
-      browserHasTauriApi = parseEvalResult(raw) === true;
-    } catch (error) {
-      logger.warn('Browser Tauri API probe failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      browserHasTauriApi = false;
-    }
-    // browserHasTauriApi is guaranteed to be boolean at this point
-    return browserHasTauriApi;
-  })();
-
-  return detectionPromise;
-}
-
 async function evalScript(script: string): Promise<string> {
-  const hasTauriApi = await detectBrowserTauriApi();
-  if (!hasTauriApi) return browserEval(script);
-
-  // Try async eval first, fall back to sync if it fails
-  // This handles edge cases where detection succeeded but API isn't fully available
-  try {
-    return await browserEvalAsync(script);
-  } catch (error) {
-    logger.warn('browserEvalAsync failed, falling back to sync eval', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    resetBrowserApiCache();
-    return browserEval(script);
-  }
+  return browserEval(script);
 }
 
 async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
-  // Cancel any previous polling
   if (browserReadyAbortController) {
     browserReadyAbortController.abort();
   }
@@ -176,7 +201,6 @@ async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    // Check if aborted (e.g., browser closed, navigation changed)
     if (signal.aborted) {
       return false;
     }
@@ -186,7 +210,7 @@ async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
       }
     } catch (error) {
       logger.warn('Browser readiness check failed', {
-        error: error instanceof Error ? error.message : String(error),
+        error: extractErrorMessage(error),
       });
     }
     await new Promise((resolve) => setTimeout(resolve, BROWSER_READY_POLL_MS));
@@ -194,51 +218,78 @@ async function waitForBrowserReady(timeoutMs: number): Promise<boolean> {
   return false;
 }
 
-async function ensureConsoleCapture(): Promise<void> {
-  // Console capture script with circular reference handling
-  const captureScript = `
-    if (!window.__orbitConsoleLogs) {
-      window.__orbitConsoleLogs = [];
-      const orig = { ...console };
+async function warmOrbitRuntimeIfPossible(url: string): Promise<void> {
+  if (url === 'about:blank') {
+    return;
+  }
 
-      // Safe stringify that handles circular references
-      const safeStringify = (obj) => {
-        if (obj === null || obj === undefined) return String(obj);
-        if (typeof obj !== 'object') return String(obj);
-        try {
-          return JSON.stringify(obj);
-        } catch {
-          // Handle circular references, DOM nodes, etc.
-          if (obj instanceof Error) {
-            return obj.stack || obj.message || String(obj);
-          }
-          if (obj instanceof Element) {
-            return obj.outerHTML.slice(0, 200) + (obj.outerHTML.length > 200 ? '...' : '');
-          }
-          return '[Object with circular reference]';
-        }
-      };
+  try {
+    await browserEnsureRuntime();
+  } catch (error) {
+    logger.warn('Orbit runtime warm-up failed', {
+      error: extractErrorMessage(error),
+    });
+  }
+}
 
-      ['log', 'warn', 'error', 'info', 'debug'].forEach((m) => {
-        console[m] = (...args) => {
-          window.__orbitConsoleLogs.push({
-            type: m,
-            timestamp: Date.now(),
-            args: args.map(safeStringify),
-          });
-          if (window.__orbitConsoleLogs.length > 1000) {
-            window.__orbitConsoleLogs.shift();
-          }
-          orig[m](...args);
-        };
-      });
-    }
-    return true;
-  `;
+async function invokeOrbitRuntimeMethod<T>(
+  methodName: Parameters<typeof browserInvokeRuntime>[0],
+  args: unknown[] = []
+): Promise<T> {
+  await browserEnsureRuntime();
+  const raw = await browserInvokeRuntime(methodName, args);
+  return parseEvalResult(raw) as T;
+}
 
-  const raw = await evalScript(captureScript);
+function clampWaitTimeout(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_WAIT_TIMEOUT_MS;
+  }
+  if (value <= 0) {
+    return DEFAULT_WAIT_TIMEOUT_MS;
+  }
+  return Math.min(Math.trunc(value), MAX_WAIT_TIMEOUT_MS);
+}
 
-  parseEvalResult(raw);
+function buildDegradedSnapshot(url: string): SnapshotResponse {
+  browserSnapshotEpoch += 1;
+  return {
+    epoch: browserSnapshotEpoch,
+    snapshot: '- document [Orbit runtime unavailable]',
+    refCount: 0,
+    totalElements: 0,
+    emittedElements: 0,
+    truncated: false,
+    url,
+    title: '',
+    durationMs: 0,
+  };
+}
+
+function buildBlankSnapshot(url: string): SnapshotResponse {
+  browserSnapshotEpoch += 1;
+  return {
+    epoch: browserSnapshotEpoch,
+    snapshot: '- document (empty)',
+    refCount: 0,
+    totalElements: 0,
+    emittedElements: 0,
+    truncated: false,
+    url,
+    title: '',
+    durationMs: 0,
+  };
+}
+
+function trackSnapshotEpoch(result: unknown): void {
+  if (isRecord(result) && typeof result['epoch'] === 'number') {
+    browserSnapshotEpoch = result['epoch'];
+  }
+}
+
+function getActiveBrowserUrl(info: Awaited<ReturnType<typeof browserInfo>>): string {
+  const storeUrl = useBrowserStore.getState().navigation.url;
+  return info?.url ?? (storeUrl.length > 0 ? storeUrl : 'about:blank');
 }
 
 export async function executeBrowserTool(
@@ -251,22 +302,23 @@ export async function executeBrowserTool(
     switch (toolName) {
       case 'browser_open': {
         const rawUrl = typeof toolInput['url'] === 'string' ? toolInput['url'] : DEFAULT_OPEN_URL;
-
-        // Validate URL for security (only allow safe protocols)
         const urlValidation = validateBrowserUrl(rawUrl);
         if (!urlValidation.valid) {
           return { success: false, error: urlValidation.error };
         }
         const url = urlValidation.url;
 
-        const browserState = useBrowserStore.getState();
-
         useUIStore.getState().openBrowserTab();
         resetBrowserApiCache();
 
-        if (browserState.isActive) {
+        const exists = await browserHas();
+        if (exists) {
           await browserNavigate(url);
         } else {
+          if (useBrowserStore.getState().isActive) {
+            useBrowserStore.getState().reset();
+            useBrowserLifecycleStore.getState().reset();
+          }
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
@@ -278,14 +330,7 @@ export async function executeBrowserTool(
           };
         }
 
-        try {
-          await ensureConsoleCapture();
-        } catch (error) {
-          logger.warn('Console capture injection failed', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
+        await warmOrbitRuntimeIfPossible(url);
         return { success: true, result: { opened: true, url } };
       }
 
@@ -294,25 +339,26 @@ export async function executeBrowserTool(
           return { success: false, error: 'Missing url for browser_navigate' };
         }
 
-        // Validate URL for security (only allow safe protocols)
         const urlValidation = validateBrowserUrl(toolInput['url']);
         if (!urlValidation.valid) {
           return { success: false, error: urlValidation.error };
         }
         const url = urlValidation.url;
 
-        const browserState = useBrowserStore.getState();
-
         useUIStore.getState().openBrowserTab();
         resetBrowserApiCache();
 
-        if (browserState.isActive) {
+        const exists = await browserHas();
+        if (exists) {
           await browserNavigate(url);
         } else {
+          if (useBrowserStore.getState().isActive) {
+            useBrowserStore.getState().reset();
+            useBrowserLifecycleStore.getState().reset();
+          }
           useBrowserStore.getState().setPendingNavigationUrl(url);
         }
 
-        // Re-inject console capture after navigation (new page wipes window.__orbitConsoleLogs)
         const browserReady = await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS);
         if (!browserReady) {
           return {
@@ -321,115 +367,120 @@ export async function executeBrowserTool(
           };
         }
 
-        try {
-          await ensureConsoleCapture();
-        } catch (error) {
-          logger.warn('Console capture injection failed after navigate', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
+        await warmOrbitRuntimeIfPossible(url);
         return { success: true, result: { navigated: true, url } };
       }
 
-      case 'browser_click': {
-        if (typeof toolInput['selector'] !== 'string') {
-          return { success: false, error: 'Missing selector for browser_click' };
+      case 'browser_snapshot': {
+        const info = await browserInfo().catch(() => null);
+        const currentUrl = getActiveBrowserUrl(info);
+
+        if (currentUrl === 'about:blank') {
+          const blankSnapshot = buildBlankSnapshot(currentUrl);
+          return { success: true, result: blankSnapshot };
         }
-        // Use JSON.stringify for defense-in-depth escaping
-        const selectorJson = safeStringify(toolInput['selector']);
-        const script = `
-          const el = document.querySelector(${selectorJson});
-          if (el instanceof HTMLElement) {
-            el.click();
-            return true;
+
+        try {
+          const result = await invokeOrbitRuntimeMethod<SnapshotResponse>('snapshot', [
+            {
+              interactive: toolInput['interactive'] !== false,
+              cursor: toolInput['cursor'] === true,
+              compact: toolInput['compact'] === true,
+            },
+          ]);
+          trackSnapshotEpoch(result);
+          return { success: true, result };
+        } catch (error) {
+          const message = extractErrorMessage(error);
+          if (isRuntimeUnavailableMessage(message)) {
+            return { success: true, result: buildDegradedSnapshot(currentUrl) };
           }
-          return false;
-        `;
-        const raw = await evalScript(script);
-        const clicked = parseEvalResult(raw);
-        return { success: true, result: { clicked } };
+          return { success: false, error: message };
+        }
+      }
+
+      case 'browser_get_url': {
+        const raw = await browserGetUrl();
+        return { success: true, result: parseEvalResult(raw) };
+      }
+
+      case 'browser_get_title': {
+        const raw = await browserGetTitle();
+        return { success: true, result: parseEvalResult(raw) };
+      }
+
+      case 'browser_click': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('click', [target]);
+        return { success: true, result };
       }
 
       case 'browser_type': {
-        if (typeof toolInput['selector'] !== 'string' || typeof toolInput['text'] !== 'string') {
-          return { success: false, error: 'Missing selector or text for browser_type' };
+        const target = getRequiredTarget(toolInput);
+        if (!target || typeof toolInput['text'] !== 'string') {
+          return { success: false, error: 'Missing ref/selector or text for browser_type' };
         }
-        // Use JSON.stringify for defense-in-depth escaping
-        const selectorJson = safeStringify(toolInput['selector']);
-        const textJson = safeStringify(toolInput['text']);
-        const script = `
-          const el = document.querySelector(${selectorJson});
-          if (el && 'value' in el) {
-            el.focus?.();
-            el.value = ${textJson};
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
-          }
-          return false;
-        `;
-        const raw = await evalScript(script);
-        const typed = parseEvalResult(raw);
-        return { success: true, result: { typed } };
+        const result = await invokeOrbitRuntimeMethod('type', [target, toolInput['text']]);
+        return { success: true, result };
+      }
+
+      case 'browser_fill': {
+        const target = getRequiredTarget(toolInput);
+        if (!target || typeof toolInput['value'] !== 'string') {
+          return { success: false, error: 'Missing ref/selector or value for browser_fill' };
+        }
+        const result = await invokeOrbitRuntimeMethod('fill', [target, toolInput['value']]);
+        return { success: true, result };
       }
 
       case 'browser_get_text': {
-        const selector = typeof toolInput['selector'] === 'string' ? toolInput['selector'] : 'body';
-        const selectorJson = safeStringify(selector);
-        const script = `return document.querySelector(${selectorJson})?.innerText ?? ''`;
-        const raw = await evalScript(script);
-        const text = parseEvalResult(raw);
-        return { success: true, result: text };
+        const target = getTargetOrBody(toolInput);
+        const result = await invokeOrbitRuntimeMethod('getText', [target]);
+        return { success: true, result };
       }
 
       case 'browser_get_html': {
-        const selector = typeof toolInput['selector'] === 'string' ? toolInput['selector'] : 'body';
-        const selectorJson = safeStringify(selector);
-        const script = `return document.querySelector(${selectorJson})?.innerHTML ?? ''`;
-        const raw = await evalScript(script);
-        const html = parseEvalResult(raw);
-        return { success: true, result: html };
+        const outer = toolInput['outer'] === true;
+        const target = getTargetOrBody(toolInput);
+        const result = await invokeOrbitRuntimeMethod('getHtml', [target, outer]);
+        return { success: true, result };
       }
 
       case 'browser_console_logs': {
-        // Check if console capture exists, if not inject it first
-        // This handles cases where user navigated via clicking links
-        const checkScript = 'return typeof window.__orbitConsoleLogs !== "undefined"';
-        const checkRaw = await evalScript(checkScript);
-        const hasCapture = parseEvalResult(checkRaw);
-
-        if (hasCapture !== true) {
-          logger.info('Console capture not found, injecting now (future logs will be captured)');
-          try {
-            await ensureConsoleCapture();
-          } catch (error) {
-            logger.warn('Console capture injection failed', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        }
-
-        const raw = await evalScript('return window.__orbitConsoleLogs || []');
-        const logs = parseEvalResult(raw);
-        return { success: true, result: logs };
+        const level = typeof toolInput['level'] === 'string' ? toolInput['level'] : undefined;
+        const result = await invokeOrbitRuntimeMethod('getConsoleLogs', [level]);
+        return { success: true, result };
       }
 
       case 'browser_screenshot': {
-        const script = `
+        try {
+          const raw = await browserScreenshot();
+          const result: unknown = JSON.parse(raw);
+          return { success: true, result };
+        } catch (error) {
+          const message = extractErrorMessage(error);
+          if (
+            message.includes('No browser exists') ||
+            message.includes('Browser window not found')
+          ) {
+            return { success: false, error: message };
+          }
+
+          const info = await browserInfo().catch(() => null);
           return {
-            url: window.location.href,
-            title: document.title,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            devicePixelRatio: window.devicePixelRatio,
+            success: true,
+            result: {
+              filePath: null,
+              metadata: {
+                url: getActiveBrowserUrl(info),
+                error: `Screenshot capture failed: ${message}`,
+              },
+            },
           };
-        `;
-        const raw = await evalScript(script);
-        const info = parseEvalResult(raw);
-        return { success: true, result: info };
+        }
       }
 
       case 'browser_back': {
@@ -445,18 +496,8 @@ export async function executeBrowserTool(
       case 'browser_reload': {
         await browserReload();
         resetBrowserApiCache();
-
-        // Re-inject console capture after reload (page reload wipes window.__orbitConsoleLogs)
-        if (await waitForBrowserReady(BROWSER_READY_TIMEOUT_MS)) {
-          try {
-            await ensureConsoleCapture();
-          } catch (error) {
-            logger.warn('Console capture injection failed after reload', {
-              error: error instanceof Error ? error.message : String(error),
-            });
-          }
-        }
-
+        const info = await browserInfo().catch(() => null);
+        await warmOrbitRuntimeIfPossible(getActiveBrowserUrl(info));
         return { success: true };
       }
 
@@ -474,15 +515,229 @@ export async function executeBrowserTool(
           return { success: false, error: 'Missing script for browser_eval' };
         }
         const raw = await evalScript(toolInput['script']);
-        const result = parseEvalResult(raw);
+        return { success: true, result: parseEvalResult(raw) };
+      }
+
+      case 'browser_check': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('check', [target]);
         return { success: true, result };
+      }
+
+      case 'browser_uncheck': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('uncheck', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_select': {
+        const target = getRequiredTarget(toolInput);
+        if (!target || !Array.isArray(toolInput['values'])) {
+          return { success: false, error: 'Missing ref/selector or values for browser_select' };
+        }
+        const values = toolInput['values'].filter(
+          (value): value is string => typeof value === 'string'
+        );
+        const result = await invokeOrbitRuntimeMethod('select', [target, values]);
+        return { success: true, result };
+      }
+
+      case 'browser_hover': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('hover', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_focus': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('focus', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_scroll': {
+        const target = getOptionalTarget(toolInput);
+        const direction =
+          typeof toolInput['direction'] === 'string' ? toolInput['direction'] : null;
+        if (!direction) {
+          return { success: false, error: 'Missing direction for browser_scroll' };
+        }
+        const amount =
+          typeof toolInput['amount'] === 'number' && Number.isFinite(toolInput['amount'])
+            ? toolInput['amount']
+            : undefined;
+        const result = await invokeOrbitRuntimeMethod(
+          'scroll',
+          target ? [target, direction, amount] : [null, direction, amount]
+        );
+        return { success: true, result };
+      }
+
+      case 'browser_scroll_into_view': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('scrollIntoView', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_wait_for_selector': {
+        if (typeof toolInput['selector'] !== 'string') {
+          return { success: false, error: 'Missing selector for browser_wait_for_selector' };
+        }
+        await browserWaitForSelector(
+          toolInput['selector'],
+          typeof toolInput['state'] === 'string' ? toolInput['state'] : undefined,
+          clampWaitTimeout(toolInput['timeout'])
+        );
+        return { success: true, result: { matched: true } };
+      }
+
+      case 'browser_wait_for_url': {
+        if (typeof toolInput['url'] !== 'string') {
+          return { success: false, error: 'Missing url for browser_wait_for_url' };
+        }
+        await browserWaitForUrl(toolInput['url'], clampWaitTimeout(toolInput['timeout']));
+        return { success: true, result: { matched: true } };
+      }
+
+      case 'browser_is_visible': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('isVisible', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_is_enabled': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('isEnabled', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_get_attribute': {
+        const target = getRequiredTarget(toolInput);
+        if (!target || typeof toolInput['name'] !== 'string') {
+          return {
+            success: false,
+            error: 'Missing ref/selector or name for browser_get_attribute',
+          };
+        }
+        const result = await invokeOrbitRuntimeMethod('getAttribute', [target, toolInput['name']]);
+        return { success: true, result };
+      }
+
+      case 'browser_bounding_box': {
+        const target = getRequiredTarget(toolInput);
+        if (!target) {
+          return { success: false, error: NO_TARGET_MESSAGE };
+        }
+        const result = await invokeOrbitRuntimeMethod('boundingBox', [target]);
+        return { success: true, result };
+      }
+
+      case 'browser_count': {
+        if (typeof toolInput['selector'] !== 'string') {
+          return { success: false, error: 'Missing selector for browser_count' };
+        }
+        const result = await invokeOrbitRuntimeMethod('count', [toolInput['selector']]);
+        return { success: true, result };
+      }
+
+      case 'browser_cookies_get': {
+        const result = await invokeOrbitRuntimeMethod('getCookies', [
+          {
+            name: typeof toolInput['name'] === 'string' ? toolInput['name'] : undefined,
+            domain: typeof toolInput['domain'] === 'string' ? toolInput['domain'] : undefined,
+          },
+        ]);
+        return { success: true, result };
+      }
+
+      case 'browser_cookies_clear': {
+        const result = await invokeOrbitRuntimeMethod('clearCookies', [
+          {
+            name: typeof toolInput['name'] === 'string' ? toolInput['name'] : undefined,
+            domain: typeof toolInput['domain'] === 'string' ? toolInput['domain'] : undefined,
+          },
+        ]);
+        return { success: true, result };
+      }
+
+      case 'browser_storage_get': {
+        if (typeof toolInput['key'] !== 'string') {
+          return { success: false, error: 'Missing key for browser_storage_get' };
+        }
+        const result = await invokeOrbitRuntimeMethod('storageGet', [
+          toolInput['key'],
+          typeof toolInput['store'] === 'string' ? toolInput['store'] : undefined,
+        ]);
+        return { success: true, result };
+      }
+
+      case 'browser_storage_set': {
+        if (typeof toolInput['key'] !== 'string' || typeof toolInput['value'] !== 'string') {
+          return { success: false, error: 'Missing key or value for browser_storage_set' };
+        }
+        const result = await invokeOrbitRuntimeMethod('storageSet', [
+          toolInput['key'],
+          toolInput['value'],
+          typeof toolInput['store'] === 'string' ? toolInput['store'] : undefined,
+        ]);
+        return { success: true, result };
+      }
+
+      case 'browser_storage_clear': {
+        const result = await invokeOrbitRuntimeMethod('storageClear', [
+          typeof toolInput['store'] === 'string' ? toolInput['store'] : undefined,
+        ]);
+        return { success: true, result };
+      }
+
+      case 'browser_network_requests': {
+        const result = await invokeOrbitRuntimeMethod('getNetworkRequests', [toolInput['filter']]);
+        return { success: true, result };
+      }
+
+      case 'browser_runtime_info': {
+        const hasBrowser = await browserHas().catch(() => false);
+        if (!hasBrowser) {
+          return { success: true, result: { available: false, reason: 'No browser open' } };
+        }
+
+        try {
+          const result = await invokeOrbitRuntimeMethod('runtimeInfo');
+          return { success: true, result };
+        } catch (error) {
+          const message = extractErrorMessage(error);
+          if (isRuntimeUnavailableMessage(message)) {
+            return { success: true, result: { available: false, reason: 'Runtime unavailable' } };
+          }
+          return { success: false, error: message };
+        }
       }
 
       default:
         return { success: false, error: `Unknown tool: ${toolName}` };
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorMessage = extractErrorMessage(error);
     logger.error('Browser tool execution failed', {
       error: errorMessage,
     });
@@ -497,13 +752,11 @@ export async function handleBrowserToolResponse(
     await browserToolResponse(message.session_id, message.response);
   } catch (error) {
     logger.error('Failed to send browser tool response', {
-      error: error instanceof Error ? error.message : String(error),
+      error: extractErrorMessage(error),
     });
   }
 }
 
-// HMR cleanup: Reset module-level state when module is hot-replaced
-// This prevents stale cached state from causing issues during development
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     resetBrowserToolState();

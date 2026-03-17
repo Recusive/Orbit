@@ -87,28 +87,22 @@ export const CreateBranchDialog: FC<CreateBranchDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContentGlass className="liquid-glass-dialog gap-0 overflow-hidden p-0 bg-chat-area border-0 shadow-none [&>.absolute]:hidden">
-        <DialogClose className="liquid-glass-close absolute right-2 top-2 z-10 rounded-full p-1 opacity-60 transition-opacity duration-150 hover:opacity-100">
+      <DialogContentGlass className="w-[360px] gap-0 overflow-hidden p-0 glass-surface [&>.absolute]:hidden">
+        <DialogClose className="absolute right-3 top-3 z-10 rounded-[9px] p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
           <X className="h-3.5 w-3.5" />
           <span className="sr-only">Close</span>
         </DialogClose>
 
-        <div
-          className="relative flex flex-col items-center"
-          style={{ padding: '20px 16px 16px', gap: 16 }}
-        >
+        <div className="relative flex flex-col items-center gap-4 px-4 pb-4 pt-5">
           {/* Icon */}
-          <div className="flex w-full items-center" style={{ padding: '0 6px' }}>
-            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-foreground/5">
-              <IconBranch className="h-7 w-7 text-foreground" />
+          <div className="flex w-full items-center px-1.5">
+            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
+              <IconBranch className="h-7 w-7 text-primary" />
             </div>
           </div>
 
           {/* Title + Description */}
-          <div
-            className="flex w-full flex-col items-start"
-            style={{ padding: '0 6px 2px', gap: 10 }}
-          >
+          <div className="flex w-full flex-col items-start gap-2.5 px-1.5 pb-0.5">
             <DialogTitle className="liquid-glass-title w-full">Create new branch</DialogTitle>
             <DialogDescription className="liquid-glass-desc w-full">
               Enter a name for the new branch. It will be created from the current HEAD and checked
@@ -117,7 +111,7 @@ export const CreateBranchDialog: FC<CreateBranchDialogProps> = ({
           </div>
 
           {/* Branch name input */}
-          <div className="w-full" style={{ padding: '0 6px' }}>
+          <div className="w-full px-1.5">
             <div className="relative">
               <IconBranch className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
               <input
@@ -129,8 +123,7 @@ export const CreateBranchDialog: FC<CreateBranchDialogProps> = ({
                 }}
                 onKeyDown={handleKeyDown}
                 placeholder="new-branch-name"
-                className="liquid-glass-textarea w-full h-9 rounded-[9px] text-sm outline-none"
-                style={{ paddingLeft: 36 }}
+                className="liquid-glass-textarea liquid-glass-textarea-icon h-9 w-full rounded-[9px] text-sm outline-none"
                 aria-label="New branch name"
                 disabled={isCreating}
               />
@@ -141,7 +134,7 @@ export const CreateBranchDialog: FC<CreateBranchDialogProps> = ({
           </div>
 
           {/* Buttons */}
-          <div className="flex w-full items-center" style={{ gap: 8 }}>
+          <div className="flex w-full items-center gap-2">
             <button
               type="button"
               className="liquid-glass-btn liquid-glass-btn-secondary flex-1 cursor-pointer transition-transform duration-75 active:scale-[0.97]"

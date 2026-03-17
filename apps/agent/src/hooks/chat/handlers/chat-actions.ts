@@ -11,7 +11,9 @@ import type {
 
 import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
-import { applySessionTitle, generateFallbackTitle } from '@/services/session';
+import { serializeThinkingBlocks } from '@/lib/mappers';
+import { chatMessageService } from '@/services/chat/chat-message-service';
+import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -54,6 +56,11 @@ interface ChatActionsReturn {
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   const { postMessage } = deps;
 
+  /**
+   * [warning] TESTED: Send-time title generation in this action creator is covered by
+   * integration tests. If you modify this, run: bun run test -- chat-actions-title-generation
+   * Test file: src/__tests__/unit/hooks/chat/chat-actions-title-generation.test.ts
+   */
   const handleSend = (
     text: string,
     contextFiles?: string[],
@@ -146,6 +153,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
           applySessionTitle(sessionId, generateFallbackTitle(text));
+          generateAITitle(sessionId, text);
         }
 
         // Always send current thinking mode and model BEFORE message:send
@@ -291,14 +299,16 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         const lastMsg = messages[messages.length - 1];
 
         if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+          const finalized = chatMessageService.finalizeInterruptedMessage(lastMsg);
           const interruptedMsg: ChatMessage = {
-            ...lastMsg,
+            ...finalized,
             isStreaming: false,
             isInterrupted: true,
           };
 
           // Persist interrupted assistant message
           if (interruptedMsg.content) {
+            const thinkingPhasesDto = serializeThinkingBlocks(interruptedMsg.thinkingBlocks);
             void conversationAddMessage(
               sessionId,
               {
@@ -306,6 +316,10 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
                 role: 'assistant',
                 content: interruptedMsg.content,
                 ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+                ...(interruptedMsg.thinkingDurationMs !== undefined
+                  ? { thinkingDurationMs: interruptedMsg.thinkingDurationMs }
+                  : {}),
+                ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
                 createdAt: Date.now(),
                 ...(interruptedMsg.parentUuid !== undefined
                   ? { parentUuid: interruptedMsg.parentUuid }
@@ -386,13 +400,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
               success: t.success ?? false,
               ...(typeof t.toolOutput === 'string' ? { output: t.toolOutput } : {}),
               ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
+              ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
             }));
+          const thinkingPhasesDto = serializeThinkingBlocks(m.thinkingBlocks);
           return {
             id: m.id,
             role: m.role,
             content: m.content,
             parentUuid: m.parentUuid ?? null,
             ...(tools.length > 0 ? { toolUses: tools } : {}),
+            ...(m.thinking ? { thinking: m.thinking } : {}),
+            ...(m.thinkingDurationMs !== undefined
+              ? { thinkingDurationMs: m.thinkingDurationMs }
+              : {}),
+            ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
           };
         });
 
@@ -483,14 +504,16 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     const lastMsg = messages[messages.length - 1];
 
     if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
+      const finalized = chatMessageService.finalizeInterruptedMessage(lastMsg);
       const interruptedMsg: ChatMessage = {
-        ...lastMsg,
+        ...finalized,
         isStreaming: false,
         isInterrupted: true,
         interruptReason,
       };
 
       if (interruptedMsg.content) {
+        const thinkingPhasesDto = serializeThinkingBlocks(interruptedMsg.thinkingBlocks);
         void conversationAddMessage(
           sessionId,
           {
@@ -498,6 +521,10 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
             role: 'assistant',
             content: interruptedMsg.content,
             ...(interruptedMsg.thinking ? { thinking: interruptedMsg.thinking } : {}),
+            ...(interruptedMsg.thinkingDurationMs !== undefined
+              ? { thinkingDurationMs: interruptedMsg.thinkingDurationMs }
+              : {}),
+            ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
             createdAt: Date.now(),
             ...(interruptedMsg.parentUuid !== undefined
               ? { parentUuid: interruptedMsg.parentUuid }

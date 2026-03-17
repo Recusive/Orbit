@@ -24,6 +24,7 @@ export {
   useHasWorkspace,
   useActiveConversationId,
   useActiveConversationTitle,
+  useIsTitleLoading,
   useIsLoadingConversation,
   useIsConversationTransitioning,
   useConversations,

@@ -441,6 +441,7 @@ pub async fn agent_rewind_files(
 }
 
 /// Fork a session at a specific message point.
+///
 /// Creates a new SDK session that has context only UP TO the specified message.
 /// Used for rewind operations - Claude only sees the conversation history up to that point.
 #[tauri::command]
@@ -481,12 +482,9 @@ pub async fn agent_enhance_bug_report(
 #[tauri::command]
 pub async fn agent_generate_title(
     user_message: String,
-    assistant_response: String,
     state: State<'_, Arc<SessionManager>>,
 ) -> Result<String> {
-    state
-        .generate_title(&user_message, &assistant_response)
-        .map_err(to_error)
+    state.generate_title(&user_message).map_err(to_error)
 }
 
 /// Generate a command definition from a natural language description

@@ -561,32 +561,42 @@ export interface GitStatusStyle {
  * Styling for each git file status type
  */
 export const GIT_STATUS_STYLES = {
-  added: { label: 'A', color: 'text-green-500', fileColor: 'text-green-500', title: 'Added' },
+  added: { label: 'A', color: 'text-git-added', fileColor: 'text-git-added', title: 'Added' },
   modified: {
     label: 'M',
-    color: 'text-[#c18533] dark:text-[#f0b367]',
-    fileColor: 'text-[#c18533] dark:text-[#f0b367]',
+    color: 'text-git-modified',
+    fileColor: 'text-git-modified',
     title: 'Modified',
   },
-  deleted: { label: 'D', color: 'text-red-500', fileColor: 'text-red-500', title: 'Deleted' },
-  renamed: { label: 'R', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Renamed' },
-  copied: { label: 'C', color: 'text-blue-500', fileColor: 'text-blue-500', title: 'Copied' },
+  deleted: {
+    label: 'D',
+    color: 'text-git-deleted',
+    fileColor: 'text-git-deleted',
+    title: 'Deleted',
+  },
+  renamed: {
+    label: 'R',
+    color: 'text-git-renamed',
+    fileColor: 'text-git-renamed',
+    title: 'Renamed',
+  },
+  copied: { label: 'C', color: 'text-git-copied', fileColor: 'text-git-copied', title: 'Copied' },
   untracked: {
     label: 'U',
-    color: 'text-[#0d87ff] dark:text-[#99ceff]',
-    fileColor: 'text-[#0d87ff] dark:text-[#99ceff]',
+    color: 'text-git-untracked',
+    fileColor: 'text-git-untracked',
     title: 'Untracked',
   },
   conflicted: {
     label: '!',
-    color: 'text-orange-500',
-    fileColor: 'text-orange-500',
+    color: 'text-git-conflicted',
+    fileColor: 'text-git-conflicted',
     title: 'Conflict',
   },
   typechange: {
     label: 'T',
-    color: 'text-purple-500',
-    fileColor: 'text-purple-500',
+    color: 'text-git-typechange',
+    fileColor: 'text-git-typechange',
     title: 'Type Changed',
   },
 } as const satisfies Record<string, GitStatusStyle>;

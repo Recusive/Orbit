@@ -113,7 +113,7 @@ export const EffortLevelButton: FC<EffortLevelButtonProps> = ({
       <HoverCardContent
         side="top"
         align="center"
-        className="w-auto p-2.5 rounded-lg border border-lg-separator"
+        className="w-auto p-2.5"
         onMouseEnter={() => {
           setEffortHoverOpen(true);
         }}

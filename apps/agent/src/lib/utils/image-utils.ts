@@ -3,6 +3,18 @@
  * Ensures images are within Claude's size limits before sending
  */
 
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'svg',
+  'ico',
+  'bmp',
+  'avif',
+]);
+
 /** Maximum dimension (width or height) for images */
 const MAX_DIMENSION = 2048;
 
@@ -22,6 +34,32 @@ export interface CompressedImage {
   height: number;
   originalSize: number;
   compressedSize: number;
+}
+
+export function isImageFile(path: string): boolean {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  return IMAGE_EXTENSIONS.has(ext);
+}
+
+export function isSvgFile(path: string): boolean {
+  return (path.split('.').pop()?.toLowerCase() ?? '') === 'svg';
+}
+
+export function getImageMimeType(path: string): string {
+  const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  const mimeMap: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    webp: 'image/webp',
+    svg: 'image/svg+xml',
+    ico: 'image/x-icon',
+    bmp: 'image/bmp',
+    avif: 'image/avif',
+  };
+
+  return mimeMap[ext] ?? 'application/octet-stream';
 }
 
 /**

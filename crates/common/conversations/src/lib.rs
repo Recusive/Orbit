@@ -62,6 +62,9 @@ pub struct Message {
     /// Duration of the thinking phase in milliseconds (for UI display on reload)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub thinking_duration_ms: Option<u64>,
+    /// Individual thinking phases with offsets for interleaved rendering.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub thinking_phases: Vec<ThinkingPhase>,
     /// Whether this message was interrupted by the user
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_interrupted: Option<bool>,
@@ -103,6 +106,26 @@ pub struct ToolUse {
     /// Used by the frontend to interleave tool widgets between text segments.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_offset: Option<u32>,
+    /// Stable ordering key shared with `ThinkingPhase::ordinal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordinal: Option<u32>,
+}
+
+/// A single thinking phase within an assistant turn.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThinkingPhase {
+    /// Thinking text content
+    pub content: String,
+    /// UTF-16 content offset at the point this thinking phase appeared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_offset: Option<u32>,
+    /// Stable ordering key shared with `ToolUse::ordinal`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ordinal: Option<u32>,
+    /// Duration of this specific thinking phase in milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }
 
 /// Token usage statistics for a message
@@ -132,7 +155,8 @@ pub struct TokenUsage {
 
 /// Per-message metadata that the SDK doesn't persist to JSONL.
 ///
-/// Currently stores `thinking_duration_ms` (computed client-side during streaming).
+/// Currently stores `thinking_duration_ms` (computed client-side during streaming)
+/// plus per-phase duration arrays aligned to `thinking_phases`.
 /// Designed for future per-message fields that originate from the frontend.
 ///
 /// # ID Mismatch & Fingerprint Matching
@@ -141,14 +165,16 @@ pub struct TokenUsage {
 /// generated per turn for stable event grouping). The SDK JSONL uses its own UUIDs
 /// for each line. These are deliberately different ID namespaces.
 ///
-/// To bridge this gap, we store a `thinking_prefix` — the first 64 chars of thinking
+/// To bridge this gap, we store a `thinking_prefix` — the first 128 bytes of thinking
 /// text — as a fingerprint. During load, if a direct ID match fails for an assistant
 /// message with thinking, we fall back to matching by this prefix.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct MessageMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     thinking_duration_ms: Option<u64>,
-    /// First 64 characters of thinking text, used as a fingerprint for matching
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    phase_durations: Option<Vec<u64>>,
+    /// First 128 bytes of thinking text, used as a fingerprint for matching
     /// when the frontend message ID differs from the SDK JSONL UUID.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     thinking_prefix: Option<String>,
@@ -241,16 +267,13 @@ impl UserContent {
         }
     }
 
-    /// Check if this content is purely tool_result blocks (SDK protocol, not real user text).
-    fn is_tool_result_only(&self) -> bool {
+    /// Check if this content contains ANY tool_result block (SDK protocol, not real user text).
+    fn has_any_tool_result(&self) -> bool {
         match self {
             Self::Text(_) => false,
-            Self::Blocks(blocks) => {
-                !blocks.is_empty()
-                    && blocks.iter().all(|b| {
-                        b.get("type").and_then(serde_json::Value::as_str) == Some("tool_result")
-                    })
-            },
+            Self::Blocks(blocks) => blocks
+                .iter()
+                .any(|b| b.get("type").and_then(serde_json::Value::as_str) == Some("tool_result")),
         }
     }
 }
@@ -647,35 +670,11 @@ impl ConversationManager {
         let mut messages =
             merge_consecutive_assistants(parsed.raw_messages, &parsed.turn_start_ids);
 
-        // Merge per-message metadata from sidecar (e.g., thinking_duration_ms).
-        //
-        // The sidecar is keyed by the frontend's message ID (agent-bridge turn ID),
-        // which differs from the SDK JSONL UUID. We try direct ID match first, then
-        // fall back to matching by thinking content prefix fingerprint.
+        // Merge per-message metadata from sidecar (e.g., thinking_duration_ms,
+        // per-phase duration arrays).
         let metadata = read_message_metadata(&path);
         if !metadata.is_empty() {
-            for msg in &mut messages {
-                if msg.thinking_duration_ms.is_some() {
-                    continue;
-                }
-                // Try direct ID match first
-                if let Some(meta) = metadata.get(&msg.id) {
-                    msg.thinking_duration_ms = meta.thinking_duration_ms;
-                    continue;
-                }
-                // Fallback: match by thinking content prefix fingerprint
-                if let Some(thinking) = &msg.thinking {
-                    let msg_prefix = truncate_to_char_boundary(thinking, 64);
-                    for meta in metadata.values() {
-                        if let Some(stored_prefix) = &meta.thinking_prefix {
-                            if !stored_prefix.is_empty() && stored_prefix == msg_prefix {
-                                msg.thinking_duration_ms = meta.thinking_duration_ms;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            merge_sidecar_metadata(&mut messages, &metadata);
         }
 
         let now = current_timestamp();
@@ -771,8 +770,21 @@ impl ConversationManager {
         workspace_path: Option<&str>,
         _worktree_path: Option<&str>,
     ) -> Result<()> {
+        let phase_durations: Option<Vec<u64>> = {
+            let durations: Vec<u64> = message
+                .thinking_phases
+                .iter()
+                .map(|phase| phase.duration_ms.unwrap_or(0))
+                .collect();
+            if durations.iter().all(|&duration| duration == 0) {
+                None
+            } else {
+                Some(durations)
+            }
+        };
+
         // Only write sidecar if there's metadata worth persisting
-        if message.thinking_duration_ms.is_some() {
+        if message.thinking_duration_ms.is_some() || phase_durations.is_some() {
             let jsonl_path = self.conversation_path(session_id, workspace_path);
             // Store a thinking content prefix as a fingerprint for matching.
             // The frontend message ID (bridge turn ID) differs from the SDK JSONL
@@ -780,12 +792,13 @@ impl ConversationManager {
             let thinking_prefix = message
                 .thinking
                 .as_ref()
-                .map(|t| truncate_to_char_boundary(t, 64).to_owned());
+                .map(|t| truncate_to_char_boundary(t, 128).to_owned());
             write_message_metadata(
                 &jsonl_path,
                 &message.id,
                 MessageMetadata {
                     thinking_duration_ms: message.thinking_duration_ms,
+                    phase_durations,
                     thinking_prefix,
                 },
             )?;
@@ -813,7 +826,7 @@ impl ConversationManager {
         session_id: &str,
         title: &str,
         workspace_path: Option<&str>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         // Use find_conversation_path (searches all workspaces) instead of
         // conversation_path (single workspace). Matches how delete() works.
         // This prevents silent skips when the workspace path doesn't match
@@ -821,7 +834,7 @@ impl ConversationManager {
         let Some(jsonl_path) = self.find_conversation_path(session_id, workspace_path) else {
             // JSONL doesn't exist yet — the CLI hasn't created it.
             // Creating it prematurely would trigger the CLI's "Session ID already in use" guard.
-            return Ok(());
+            return Ok(false);
         };
 
         let line = serde_json::json!({
@@ -856,7 +869,7 @@ impl ConversationManager {
             ))
         })?;
 
-        Ok(())
+        Ok(true)
     }
 
     // ----------------------------------------
@@ -1050,7 +1063,7 @@ fn dedup_insert(
 
 /// Build a `Message` from an assistant JSONL line.
 fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Message {
-    let (text, thinking, tool_uses) = extract_assistant_content(value);
+    let (text, thinking, thinking_phases, tool_uses) = extract_assistant_content(value);
     let usage = extract_usage(value);
     let is_interrupted = value
         .get("stop_reason")
@@ -1063,6 +1076,7 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
         content: text,
         thinking,
         thinking_duration_ms: None,
+        thinking_phases,
         is_interrupted: is_interrupted.then_some(true),
         turn_duration_ms: None,
         created_at: ts,
@@ -1297,7 +1311,7 @@ impl ParseContext {
     }
 
     fn process_user_line(&mut self, uuid: String, payload: &UserMessagePayload, timestamp: &str) {
-        if payload.content.is_tool_result_only() {
+        if payload.content.has_any_tool_result() {
             extract_tool_results(&payload.content, &mut self.tool_results);
             return;
         }
@@ -1329,6 +1343,7 @@ impl ParseContext {
             content: text,
             thinking: None,
             thinking_duration_ms: None,
+            thinking_phases: Vec::new(),
             is_interrupted: None,
             turn_duration_ms: None,
             created_at: ts,
@@ -1572,8 +1587,15 @@ fn absorb_assistant_message(target: &mut Message, incoming: Message) {
             target.content.push_str(&incoming.content);
         }
     }
-    if target.thinking.is_none() {
-        target.thinking = incoming.thinking;
+    match (&mut target.thinking, incoming.thinking) {
+        (Some(existing), Some(incoming_text)) => {
+            existing.push_str("\n\n");
+            existing.push_str(&incoming_text);
+        },
+        (None, some @ Some(_)) => {
+            target.thinking = some;
+        },
+        _ => {},
     }
 
     // Shift tool content_offsets by the existing text length
@@ -1583,9 +1605,27 @@ fn absorb_assistant_message(target: &mut Message, incoming: Message) {
     } else {
         base_len
     };
+    let ordinal_shift = target
+        .thinking_phases
+        .iter()
+        .filter_map(|phase| phase.ordinal)
+        .chain(target.tool_uses.iter().filter_map(|tool| tool.ordinal))
+        .max()
+        .map_or(0, |max| max + 1);
+
     for mut tool in incoming.tool_uses {
         tool.content_offset = Some(tool.content_offset.unwrap_or(0).saturating_add(shift));
+        tool.ordinal = tool
+            .ordinal
+            .map(|ordinal| ordinal.saturating_add(ordinal_shift));
         target.tool_uses.push(tool);
+    }
+    for mut phase in incoming.thinking_phases {
+        phase.content_offset = Some(phase.content_offset.unwrap_or(0).saturating_add(shift));
+        phase.ordinal = phase
+            .ordinal
+            .map(|ordinal| ordinal.saturating_add(ordinal_shift));
+        target.thinking_phases.push(phase);
     }
 
     if incoming.usage.is_some() {
@@ -1614,6 +1654,167 @@ fn remap_parent_uuids(messages: &mut [Message], uuid_remap: &HashMap<String, Str
             }
         }
     }
+}
+
+/// Merge per-message metadata from the sidecar into loaded messages.
+///
+/// The sidecar is keyed by the frontend's message ID (agent-bridge turn ID),
+/// which differs from the SDK JSONL UUID. We try direct ID match first, then
+/// fall back to matching by thinking content prefix fingerprint.
+fn merge_sidecar_metadata(messages: &mut [Message], metadata: &HashMap<String, MessageMetadata>) {
+    for msg in messages {
+        if msg.thinking_duration_ms.is_some() {
+            continue;
+        }
+
+        let matched_fragment_meta =
+            collect_fragment_metadata_matches(&msg.thinking_phases, metadata);
+        let unique_fragment_starts: HashSet<usize> = matched_fragment_meta
+            .iter()
+            .map(|(start_index, _)| *start_index)
+            .collect();
+        let use_fragment_stitching = unique_fragment_starts.len() > 1
+            || unique_fragment_starts
+                .iter()
+                .next()
+                .is_some_and(|start| *start > 0);
+
+        if use_fragment_stitching {
+            for (start_index, meta) in &matched_fragment_meta {
+                apply_phase_durations_from(
+                    &mut msg.thinking_phases,
+                    *start_index,
+                    meta.phase_durations.as_deref(),
+                );
+            }
+            msg.thinking_duration_ms = matched_fragment_meta
+                .iter()
+                .max_by_key(|(start_index, _)| *start_index)
+                .and_then(|(_, meta)| meta.thinking_duration_ms);
+            continue;
+        }
+
+        // Try direct ID match first
+        if let Some(meta) = metadata.get(&msg.id) {
+            msg.thinking_duration_ms = meta.thinking_duration_ms;
+            apply_phase_durations(&mut msg.thinking_phases, meta.phase_durations.as_deref());
+            continue;
+        }
+        // Fallback: match by thinking content prefix fingerprint
+        if let Some(thinking) = &msg.thinking {
+            let (duration, phase_durs) = match_by_thinking_prefix(thinking, metadata);
+            msg.thinking_duration_ms = duration;
+            apply_phase_durations(&mut msg.thinking_phases, phase_durs);
+        }
+    }
+}
+
+/// Match a message's thinking text against sidecar entries by prefix fingerprint.
+///
+/// Returns `(thinking_duration_ms, phase_durations)` from the best match.
+/// Prefers exact 128-byte prefix match; falls back to longest prefix match
+/// (for old 64-char sidecars). Rejects ambiguous ties.
+fn match_by_thinking_prefix<'a>(
+    thinking: &str,
+    metadata: &'a HashMap<String, MessageMetadata>,
+) -> (Option<u64>, Option<&'a [u64]>) {
+    let msg_prefix = truncate_to_char_boundary(thinking, 128);
+
+    // Prefer exact matches first to avoid ambiguity in mixed-version sidecars.
+    for meta in metadata.values() {
+        if let Some(stored_prefix) = &meta.thinking_prefix {
+            if !stored_prefix.is_empty() && stored_prefix == msg_prefix {
+                return (meta.thinking_duration_ms, meta.phase_durations.as_deref());
+            }
+        }
+    }
+
+    // Fall back to longest prefix match so old 64-char sidecars still work.
+    let mut best_len: usize = 0;
+    let mut best_duration: Option<u64> = None;
+    let mut best_phase_durations: Option<&[u64]> = None;
+    let mut tie = false;
+
+    for meta in metadata.values() {
+        if let Some(stored_prefix) = &meta.thinking_prefix {
+            if !stored_prefix.is_empty() && msg_prefix.starts_with(stored_prefix.as_str()) {
+                let len = stored_prefix.len();
+                if len > best_len {
+                    best_len = len;
+                    best_duration = meta.thinking_duration_ms;
+                    best_phase_durations = meta.phase_durations.as_deref();
+                    tie = false;
+                } else if len == best_len {
+                    tie = true;
+                }
+            }
+        }
+    }
+
+    if tie {
+        (None, None)
+    } else {
+        (best_duration, best_phase_durations)
+    }
+}
+
+fn apply_phase_durations(phases: &mut [ThinkingPhase], durations: Option<&[u64]>) {
+    apply_phase_durations_from(phases, 0, durations);
+}
+
+fn apply_phase_durations_from(
+    phases: &mut [ThinkingPhase],
+    start_index: usize,
+    durations: Option<&[u64]>,
+) {
+    if let Some(durations) = durations {
+        for (offset, &duration) in durations.iter().enumerate() {
+            if let Some(phase) = phases.get_mut(start_index + offset) {
+                phase.duration_ms = Some(duration);
+            }
+        }
+    }
+}
+
+fn collect_fragment_metadata_matches<'a>(
+    phases: &[ThinkingPhase],
+    metadata: &'a HashMap<String, MessageMetadata>,
+) -> Vec<(usize, &'a MessageMetadata)> {
+    let mut matches: Vec<(usize, &'a MessageMetadata)> = metadata
+        .values()
+        .filter_map(|meta| {
+            let stored_prefix = meta.thinking_prefix.as_deref()?;
+            if stored_prefix.is_empty() {
+                return None;
+            }
+            find_matching_phase_start(phases, stored_prefix).map(|start| (start, meta))
+        })
+        .collect();
+    matches.sort_by_key(|(start, _)| *start);
+    matches
+}
+
+fn find_matching_phase_start(phases: &[ThinkingPhase], stored_prefix: &str) -> Option<usize> {
+    let mut matched_start: Option<usize> = None;
+
+    for start_index in 0..phases.len() {
+        let suffix = phases
+            .get(start_index..)
+            .unwrap_or_default()
+            .iter()
+            .map(|phase| phase.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+
+        if suffix.starts_with(stored_prefix) {
+            if matched_start.is_some() {
+                return None;
+            }
+            matched_start = Some(start_index);
+        }
+    }
+
+    matched_start
 }
 
 /// Extract tool results from a `tool_result`-only user message into the collector map.
@@ -1682,20 +1883,24 @@ fn backfill_tool_outputs(
     }
 }
 
-/// Extract text content, thinking, and tool uses from an assistant message.
+/// Extract text content, thinking, thinking phases, and tool uses from an assistant message.
 ///
-/// Tracks the running byte length of concatenated text so each `ToolUse`
+/// Tracks the running UTF-16 length of concatenated text so each `ToolUse`
 /// records the `content_offset` where it appeared in the text stream.
 /// The frontend uses this offset to interleave tool widgets between text
 /// segments (via `buildSegments`).
-fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<String>, Vec<ToolUse>) {
+fn extract_assistant_content(
+    value: &serde_json::Value,
+) -> (String, Option<String>, Vec<ThinkingPhase>, Vec<ToolUse>) {
     let mut text_parts: Vec<String> = Vec::new();
     let mut thinking: Option<String> = None;
+    let mut thinking_phases: Vec<ThinkingPhase> = Vec::new();
     let mut tool_uses: Vec<ToolUse> = Vec::new();
     // Running UTF-16 code unit count of all text parts joined so far.
     // Must use UTF-16 (not UTF-8 bytes) because the frontend uses JavaScript
     // string.slice() which indexes by UTF-16 code units.
     let mut text_utf16_len: u32 = 0;
+    let mut ordinal_counter: u32 = 0;
 
     let content = value.get("content");
 
@@ -1715,7 +1920,22 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
                 },
                 Some("thinking") => {
                     if let Some(text) = block.get("thinking").and_then(serde_json::Value::as_str) {
-                        thinking = Some(text.to_owned());
+                        thinking_phases.push(ThinkingPhase {
+                            content: text.to_owned(),
+                            content_offset: Some(text_utf16_len),
+                            ordinal: Some(ordinal_counter),
+                            duration_ms: None,
+                        });
+                        ordinal_counter = ordinal_counter.saturating_add(1);
+                        match &mut thinking {
+                            Some(existing) => {
+                                existing.push_str("\n\n");
+                                existing.push_str(text);
+                            },
+                            None => {
+                                thinking = Some(text.to_owned());
+                            },
+                        }
                     }
                 },
                 Some("tool_use") => {
@@ -1741,7 +1961,9 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
                         output: None,
                         success: true,
                         content_offset: Some(text_utf16_len),
+                        ordinal: Some(ordinal_counter),
                     });
+                    ordinal_counter = ordinal_counter.saturating_add(1);
                 },
                 _ => {},
             }
@@ -1750,7 +1972,7 @@ fn extract_assistant_content(value: &serde_json::Value) -> (String, Option<Strin
         text_parts.push(s.clone());
     }
 
-    (text_parts.join("\n"), thinking, tool_uses)
+    (text_parts.join("\n"), thinking, thinking_phases, tool_uses)
 }
 
 /// Extract token usage from an assistant message.
@@ -2002,6 +2224,7 @@ fn truncate_to_char_boundary(s: &str, max_len: usize) -> &str {
 )]
 mod tests {
     use super::*;
+    use serde_json::json;
     use tempfile::TempDir;
 
     /// Join lines and append a trailing newline for JSONL test files.
@@ -2015,6 +2238,23 @@ mod tests {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let manager = ConversationManager::with_data_dir(temp_dir.path().to_path_buf());
         (manager, temp_dir)
+    }
+
+    #[test]
+    fn test_thinking_phase_serialization_with_duration() {
+        let phase = ThinkingPhase {
+            content: String::from("phase 1"),
+            content_offset: Some(4),
+            ordinal: Some(2),
+            duration_ms: Some(1500),
+        };
+
+        let serialized = serde_json::to_value(&phase).expect("serialize phase");
+        assert_eq!(serialized["durationMs"], json!(1500_u64));
+
+        let round_trip: ThinkingPhase =
+            serde_json::from_value(serialized).expect("deserialize phase");
+        assert_eq!(round_trip.duration_ms, Some(1500));
     }
 
     #[test]
@@ -2044,6 +2284,7 @@ mod tests {
             content: "Hello".to_owned(),
             thinking: None,
             thinking_duration_ms: None,
+            thinking_phases: Vec::new(),
             is_interrupted: None,
             turn_duration_ms: None,
             created_at: current_timestamp(),
@@ -2080,6 +2321,26 @@ mod tests {
             content: "Response".to_owned(),
             thinking: Some("Deep thought".to_owned()),
             thinking_duration_ms: Some(1234),
+            thinking_phases: vec![
+                ThinkingPhase {
+                    content: String::from("phase 1"),
+                    content_offset: Some(0),
+                    ordinal: Some(0),
+                    duration_ms: Some(250),
+                },
+                ThinkingPhase {
+                    content: String::from("phase 2"),
+                    content_offset: Some(8),
+                    ordinal: Some(1),
+                    duration_ms: None,
+                },
+                ThinkingPhase {
+                    content: String::from("phase 3"),
+                    content_offset: Some(16),
+                    ordinal: Some(2),
+                    duration_ms: Some(875),
+                },
+            ],
             is_interrupted: None,
             turn_duration_ms: None,
             created_at: current_timestamp(),
@@ -2102,6 +2363,7 @@ mod tests {
         let session_meta: SessionMetadata = serde_json::from_str(&data).expect("parse sidecar");
         let meta = session_meta.messages.get("a1").expect("message entry");
         assert_eq!(meta.thinking_duration_ms, Some(1234));
+        assert_eq!(meta.phase_durations.as_deref(), Some(&[250, 0, 875][..]));
         assert_eq!(
             meta.thinking_prefix.as_deref(),
             Some("Deep thought"),
@@ -2120,7 +2382,7 @@ mod tests {
         let lines = [
             r#"{"type":"summary","summary":"Test","leafUuid":""}"#,
             r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
-            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Deep thought"},{"type":"text","text":"Hi!"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 1"},{"type":"text","text":"Hi"},{"type":"thinking","thinking":"phase 2"},{"type":"text","text":"there"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
         ];
         fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
 
@@ -2133,7 +2395,8 @@ mod tests {
                     "a1".to_owned(),
                     MessageMetadata {
                         thinking_duration_ms: Some(5678),
-                        thinking_prefix: Some("Deep thought".to_owned()),
+                        phase_durations: Some(vec![111, 222]),
+                        thinking_prefix: Some("phase 1\n\nphase 2".to_owned()),
                     },
                 );
                 m
@@ -2159,9 +2422,12 @@ mod tests {
             Some(5678),
             "thinking_duration_ms should be merged from sidecar"
         );
+        assert_eq!(assistant_msg.thinking_phases.len(), 2);
+        assert_eq!(assistant_msg.thinking_phases[0].duration_ms, Some(111));
+        assert_eq!(assistant_msg.thinking_phases[1].duration_ms, Some(222));
         assert_eq!(
             assistant_msg.thinking.as_deref(),
-            Some("Deep thought"),
+            Some("phase 1\n\nphase 2"),
             "thinking text should come from JSONL"
         );
     }
@@ -2181,7 +2447,7 @@ mod tests {
         let lines = [
             r#"{"type":"summary","summary":"Fingerprint Test","leafUuid":""}"#,
             r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
-            r#"{"type":"assistant","uuid":"sdk-uuid-abc","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Analyzing the request carefully"},{"type":"text","text":"Hi!"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"sdk-uuid-abc","message":{"role":"assistant","content":[{"type":"thinking","thinking":"Analyzing the request carefully"},{"type":"text","text":"Hi"},{"type":"thinking","thinking":"Checking another angle"},{"type":"text","text":"!"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
         ];
         fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
 
@@ -2194,7 +2460,10 @@ mod tests {
                     "bridge-turn-xyz".to_owned(),
                     MessageMetadata {
                         thinking_duration_ms: Some(3456),
-                        thinking_prefix: Some("Analyzing the request carefully".to_owned()),
+                        phase_durations: Some(vec![333, 444]),
+                        thinking_prefix: Some(
+                            "Analyzing the request carefully\n\nChecking another angle".to_owned(),
+                        ),
                     },
                 );
                 m
@@ -2221,10 +2490,748 @@ mod tests {
             Some(3456),
             "thinking_duration_ms should be merged via fingerprint fallback"
         );
+        assert_eq!(assistant_msg.thinking_phases.len(), 2);
+        assert_eq!(assistant_msg.thinking_phases[0].duration_ms, Some(333));
+        assert_eq!(assistant_msg.thinking_phases[1].duration_ms, Some(444));
         assert_eq!(
             assistant_msg.thinking.as_deref(),
-            Some("Analyzing the request carefully"),
+            Some("Analyzing the request carefully\n\nChecking another angle"),
         );
+    }
+
+    #[test]
+    fn test_load_handles_short_phase_duration_arrays() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("session-short-phase-durations.jsonl");
+        let lines = [
+            r#"{"type":"summary","summary":"Short Durations","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 1"},{"type":"text","text":"Hi"},{"type":"thinking","thinking":"phase 2"},{"type":"text","text":"there"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("a1"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(2000),
+                        phase_durations: Some(vec![777]),
+                        thinking_prefix: Some(String::from("phase 1\n\nphase 2")),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-short-phase-durations", None)
+            .expect("load")
+            .expect("conversation exists");
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_phases.len(), 2);
+        assert_eq!(assistant_msg.thinking_phases[0].duration_ms, Some(777));
+        assert_eq!(assistant_msg.thinking_phases[1].duration_ms, None);
+    }
+
+    #[test]
+    fn test_load_merges_fragment_phase_durations_across_single_merged_turn() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("session-fragment-phase-durations.jsonl");
+        let lines = [
+            r#"{"type":"summary","summary":"Fragment Durations","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 1"}]},"timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Hi"}]},"timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a3","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 2"}]},"timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a4","message":{"role":"assistant","content":[{"type":"text","text":"there"}]},"timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("bridge-fragment-1"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(111),
+                        phase_durations: Some(vec![111]),
+                        thinking_prefix: Some(String::from("phase 1")),
+                    },
+                );
+                let _ = m.insert(
+                    String::from("bridge-fragment-2"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(222),
+                        phase_durations: Some(vec![222]),
+                        thinking_prefix: Some(String::from("phase 2")),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-fragment-phase-durations", None)
+            .expect("load")
+            .expect("conversation exists");
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_duration_ms, Some(222));
+        assert_eq!(assistant_msg.thinking_phases.len(), 2);
+        assert_eq!(assistant_msg.thinking_phases[0].duration_ms, Some(111));
+        assert_eq!(assistant_msg.thinking_phases[1].duration_ms, Some(222));
+    }
+
+    #[test]
+    fn test_has_any_tool_result_detects_mixed_blocks() {
+        assert!(!UserContent::Text(String::from("hello")).has_any_tool_result());
+        assert!(
+            !UserContent::Blocks(vec![json!({ "type": "text", "text": "hello" })])
+                .has_any_tool_result()
+        );
+        assert!(UserContent::Blocks(vec![json!({
+            "type": "tool_result",
+            "tool_use_id": "t1",
+            "content": "done"
+        })])
+        .has_any_tool_result());
+        assert!(UserContent::Blocks(vec![
+            json!({
+                "type": "tool_result",
+                "tool_use_id": "t1",
+                "content": "done"
+            }),
+            json!({ "type": "text", "text": "Tool loaded." }),
+        ])
+        .has_any_tool_result());
+    }
+
+    #[test]
+    fn test_extract_assistant_content_tracks_thinking_phases_and_ordinals() {
+        let value = json!({
+            "content": [
+                { "type": "thinking", "thinking": "phase 1" },
+                { "type": "text", "text": "Hi" },
+                { "type": "tool_use", "id": "t1", "name": "Bash", "input": { "command": "ls" } },
+                { "type": "thinking", "thinking": "phase 2" },
+                { "type": "text", "text": "there" }
+            ]
+        });
+
+        let (text, thinking, thinking_phases, tool_uses) = extract_assistant_content(&value);
+
+        assert_eq!(text, "Hi\nthere");
+        assert_eq!(thinking.as_deref(), Some("phase 1\n\nphase 2"));
+        assert_eq!(thinking_phases.len(), 2);
+        assert_eq!(thinking_phases[0].content, "phase 1");
+        assert_eq!(thinking_phases[0].content_offset, Some(0));
+        assert_eq!(thinking_phases[0].ordinal, Some(0));
+        assert_eq!(thinking_phases[0].duration_ms, None);
+        assert_eq!(tool_uses.len(), 1);
+        assert_eq!(tool_uses[0].content_offset, Some(2));
+        assert_eq!(tool_uses[0].ordinal, Some(1));
+        assert_eq!(thinking_phases[1].content, "phase 2");
+        assert_eq!(thinking_phases[1].content_offset, Some(2));
+        assert_eq!(thinking_phases[1].ordinal, Some(2));
+        assert_eq!(thinking_phases[1].duration_ms, None);
+    }
+
+    #[test]
+    fn test_absorb_assistant_message_shifts_shared_ordinals() {
+        let mut target = Message {
+            id: String::from("a1"),
+            role: MessageRole::Assistant,
+            content: String::from("Hi"),
+            thinking: Some(String::from("phase 1")),
+            thinking_duration_ms: None,
+            thinking_phases: vec![ThinkingPhase {
+                content: String::from("phase 1"),
+                content_offset: Some(0),
+                ordinal: Some(0),
+                duration_ms: Some(100),
+            }],
+            is_interrupted: None,
+            turn_duration_ms: None,
+            created_at: 1,
+            tool_uses: vec![ToolUse {
+                id: String::from("t1"),
+                name: String::from("Bash"),
+                input: json!({ "command": "pwd" }),
+                output: None,
+                success: true,
+                content_offset: Some(2),
+                ordinal: Some(1),
+            }],
+            usage: None,
+            parent_uuid: None,
+        };
+        let incoming = Message {
+            id: String::from("a2"),
+            role: MessageRole::Assistant,
+            content: String::from("there"),
+            thinking: Some(String::from("phase 2")),
+            thinking_duration_ms: None,
+            thinking_phases: vec![ThinkingPhase {
+                content: String::from("phase 2"),
+                content_offset: Some(0),
+                ordinal: Some(0),
+                duration_ms: Some(200),
+            }],
+            is_interrupted: None,
+            turn_duration_ms: None,
+            created_at: 2,
+            tool_uses: vec![ToolUse {
+                id: String::from("t2"),
+                name: String::from("Read"),
+                input: json!({ "file_path": "/tmp/test.txt" }),
+                output: None,
+                success: true,
+                content_offset: Some(0),
+                ordinal: Some(1),
+            }],
+            usage: None,
+            parent_uuid: None,
+        };
+
+        absorb_assistant_message(&mut target, incoming);
+
+        assert_eq!(target.content, "Hi\nthere");
+        assert_eq!(target.thinking.as_deref(), Some("phase 1\n\nphase 2"));
+        assert_eq!(target.thinking_phases.len(), 2);
+        assert_eq!(target.thinking_phases[1].content_offset, Some(3));
+        assert_eq!(target.thinking_phases[1].ordinal, Some(2));
+        assert_eq!(target.thinking_phases[0].duration_ms, Some(100));
+        assert_eq!(target.thinking_phases[1].duration_ms, Some(200));
+        assert_eq!(target.tool_uses.len(), 2);
+        assert_eq!(target.tool_uses[1].content_offset, Some(3));
+        assert_eq!(target.tool_uses[1].ordinal, Some(3));
+    }
+
+    #[test]
+    fn test_mixed_tool_result_with_text_is_treated_as_protocol_artifact() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("mixed-tool-result.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"run ls"},"cwd":"/test","sessionId":"mixed-tool-result","timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Checking..."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]},"cwd":"/test","sessionId":"mixed-tool-result","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt"},{"type":"text","text":"Tool loaded."}]},"cwd":"/test","sessionId":"mixed-tool-result","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"Found file1.txt"}]},"cwd":"/test","sessionId":"mixed-tool-result","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("mixed-tool-result", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 2);
+        assert_eq!(conv.messages[0].id, "u1");
+        let assistant = &conv.messages[1];
+        assert!(assistant.content.contains("Checking..."));
+        assert!(assistant.content.contains("Found file1.txt"));
+        assert_eq!(assistant.tool_uses.len(), 1);
+        assert_eq!(assistant.tool_uses[0].output.as_deref(), Some("file1.txt"));
+    }
+
+    #[test]
+    fn test_tool_output_backfill_multiple_tools_with_error() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("multi-tool-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"check files"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Let me check."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"/missing.txt"}}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt\nfile2.txt"},{"type":"tool_result","tool_use_id":"t2","content":"Error: file not found","is_error":true}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"The file doesn't exist."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("multi-tool-session", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 2);
+        let assistant = &conv.messages[1];
+        assert_eq!(assistant.tool_uses.len(), 2);
+        assert_eq!(
+            assistant.tool_uses[0].output.as_deref(),
+            Some("file1.txt\nfile2.txt")
+        );
+        assert!(assistant.tool_uses[0].success);
+        assert_eq!(
+            assistant.tool_uses[1].output.as_deref(),
+            Some("Error: file not found")
+        );
+        assert!(!assistant.tool_uses[1].success);
+    }
+
+    #[test]
+    fn test_multi_phase_thinking_survives_merge_with_shifted_offsets_and_ordinals() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("thinking-merge-session.jsonl");
+        let lines = [
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"do work"},"cwd":"/test","sessionId":"thinking-merge-session","timestamp":"2026-01-11T18:00:01.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 1"},{"type":"text","text":"Hello"},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}}]},"cwd":"/test","sessionId":"thinking-merge-session","timestamp":"2026-01-11T18:00:02.000Z"}"#,
+            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt"}]},"cwd":"/test","sessionId":"thinking-merge-session","timestamp":"2026-01-11T18:00:03.000Z"}"#,
+            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"thinking","thinking":"phase 2"},{"type":"text","text":"World"},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"a.txt"}}]},"cwd":"/test","sessionId":"thinking-merge-session","timestamp":"2026-01-11T18:00:04.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("thinking-merge-session", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 2);
+        let assistant = &conv.messages[1];
+        assert_eq!(assistant.content, "Hello\nWorld");
+        assert_eq!(assistant.thinking.as_deref(), Some("phase 1\n\nphase 2"));
+        assert_eq!(assistant.thinking_phases.len(), 2);
+        assert_eq!(assistant.thinking_phases[0].content_offset, Some(0));
+        assert_eq!(assistant.thinking_phases[0].ordinal, Some(0));
+        assert_eq!(assistant.thinking_phases[1].content_offset, Some(6));
+        assert_eq!(assistant.thinking_phases[1].ordinal, Some(2));
+        assert_eq!(assistant.tool_uses.len(), 2);
+        assert_eq!(assistant.tool_uses[0].content_offset, Some(5));
+        assert_eq!(assistant.tool_uses[0].ordinal, Some(1));
+        assert_eq!(assistant.tool_uses[1].content_offset, Some(11));
+        assert_eq!(assistant.tool_uses[1].ordinal, Some(3));
+    }
+
+    #[test]
+    fn test_fingerprint_prefers_exact_match_over_shorter_prefix() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let thinking = format!("{}{}", "A".repeat(128), " exact tail");
+        let path = ws_dir.join("fingerprint-exact.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-a1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": thinking },
+                    { "type": "text", "text": "Hi" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Fingerprint Exact","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let short_prefix = truncate_to_char_boundary(&thinking, 64).to_owned();
+        let exact_prefix = truncate_to_char_boundary(&thinking, 128).to_owned();
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("legacy-short"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(111),
+                        phase_durations: None,
+                        thinking_prefix: Some(short_prefix),
+                    },
+                );
+                let _ = m.insert(
+                    String::from("exact-new"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(222),
+                        phase_durations: None,
+                        thinking_prefix: Some(exact_prefix),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("fingerprint-exact", None)
+            .expect("load")
+            .expect("not found");
+
+        let assistant = conv
+            .messages
+            .iter()
+            .find(|msg| msg.role == MessageRole::Assistant)
+            .expect("assistant");
+        assert_eq!(assistant.thinking_duration_ms, Some(222));
+    }
+
+    #[test]
+    fn test_fingerprint_skips_ambiguous_prefix_ties() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let thinking = "A".repeat(80);
+        let path = ws_dir.join("fingerprint-ambiguous.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-a1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": thinking },
+                    { "type": "text", "text": "Hi" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Fingerprint Ambiguous","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let ambiguous_prefix = truncate_to_char_boundary(&thinking, 64).to_owned();
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("legacy-a"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(111),
+                        phase_durations: None,
+                        thinking_prefix: Some(ambiguous_prefix.clone()),
+                    },
+                );
+                let _ = m.insert(
+                    String::from("legacy-b"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(222),
+                        phase_durations: None,
+                        thinking_prefix: Some(ambiguous_prefix),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("fingerprint-ambiguous", None)
+            .expect("load")
+            .expect("not found");
+
+        let assistant = conv
+            .messages
+            .iter()
+            .find(|msg| msg.role == MessageRole::Assistant)
+            .expect("assistant");
+        assert_eq!(assistant.thinking_duration_ms, None);
+    }
+
+    #[test]
+    fn test_load_prefers_exact_128_prefix_match_over_shorter_match() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let long_thinking = format!("{}{}tail", "A".repeat(64), "B".repeat(70));
+        let path = ws_dir.join("session-ranked-prefix.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-uuid-1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": long_thinking },
+                    { "type": "text", "text": "Hi!" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Ranked Prefix","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let short_prefix = truncate_to_char_boundary(&long_thinking, 64).to_owned();
+        let exact_prefix = truncate_to_char_boundary(&long_thinking, 128).to_owned();
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("old-64"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(1111),
+                        phase_durations: None,
+                        thinking_prefix: Some(short_prefix),
+                    },
+                );
+                let _ = m.insert(
+                    String::from("new-128"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(2222),
+                        phase_durations: None,
+                        thinking_prefix: Some(exact_prefix),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-ranked-prefix", None)
+            .expect("load")
+            .expect("conversation exists");
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_duration_ms, Some(2222));
+    }
+
+    #[test]
+    fn test_load_skips_ambiguous_prefix_ties() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let long_thinking = format!("{}{}tail", "A".repeat(64), "B".repeat(70));
+        let path = ws_dir.join("session-prefix-tie.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-uuid-1",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": long_thinking },
+                    { "type": "text", "text": "Hi!" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Prefix Tie","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let shared_prefix = truncate_to_char_boundary(&long_thinking, 64).to_owned();
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("old-a"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(1111),
+                        phase_durations: None,
+                        thinking_prefix: Some(shared_prefix.clone()),
+                    },
+                );
+                let _ = m.insert(
+                    String::from("old-b"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(2222),
+                        phase_durations: None,
+                        thinking_prefix: Some(shared_prefix),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-prefix-tie", None)
+            .expect("load")
+            .expect("conversation exists");
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_duration_ms, None);
+    }
+
+    #[test]
+    fn test_load_merges_thinking_duration_via_legacy_short_prefix() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let long_thinking = format!("{}\n\nphase two", "a".repeat(80));
+        let legacy_prefix = truncate_to_char_boundary(&long_thinking, 64).to_owned();
+
+        let path = ws_dir.join("session-fp-legacy.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-uuid-legacy",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": &long_thinking },
+                    { "type": "text", "text": "Hi!" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Fingerprint Legacy Test","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    "bridge-turn-legacy".to_owned(),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(4321),
+                        phase_durations: None,
+                        thinking_prefix: Some(legacy_prefix),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-fp-legacy", None)
+            .expect("load")
+            .expect("conversation exists");
+
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_duration_ms, Some(4321));
+        assert_eq!(
+            assistant_msg.thinking.as_deref(),
+            Some(long_thinking.as_str())
+        );
+    }
+
+    #[test]
+    fn test_fingerprint_non_ascii() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let thinking = "🙂界".repeat(30);
+        assert!(thinking.len() > 128);
+
+        let path = ws_dir.join("session-fingerprint-non-ascii.jsonl");
+        let assistant_line = serde_json::json!({
+            "type": "assistant",
+            "uuid": "sdk-uuid-non-ascii",
+            "message": {
+                "role": "assistant",
+                "content": [
+                    { "type": "thinking", "thinking": &thinking },
+                    { "type": "text", "text": "Hi!" }
+                ]
+            },
+            "timestamp": "2026-01-11T18:00:01.000Z"
+        })
+        .to_string();
+        let lines = [
+            r#"{"type":"summary","summary":"Fingerprint Non ASCII","leafUuid":""}"#,
+            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"Hello"},"timestamp":"2026-01-11T18:00:00.000Z"}"#,
+            assistant_line.as_str(),
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write jsonl");
+
+        let meta_path = path.with_extension("metadata.json");
+        let meta = SessionMetadata {
+            messages: {
+                let mut m = HashMap::new();
+                let _ = m.insert(
+                    String::from("bridge-non-ascii"),
+                    MessageMetadata {
+                        thinking_duration_ms: Some(2468),
+                        phase_durations: Some(vec![1357]),
+                        thinking_prefix: Some(truncate_to_char_boundary(&thinking, 128).to_owned()),
+                    },
+                );
+                m
+            },
+        };
+        fs::write(&meta_path, serde_json::to_string(&meta).expect("serialize"))
+            .expect("write sidecar");
+
+        let conv = manager
+            .load_from_workspace("session-fingerprint-non-ascii", None)
+            .expect("load")
+            .expect("conversation exists");
+        let assistant_msg = conv
+            .messages
+            .iter()
+            .find(|m| m.role == MessageRole::Assistant)
+            .expect("assistant message");
+
+        assert_eq!(assistant_msg.thinking_duration_ms, Some(2468));
+        assert_eq!(assistant_msg.thinking_phases.len(), 1);
+        assert_eq!(assistant_msg.thinking_phases[0].duration_ms, Some(1357));
+        assert_eq!(assistant_msg.thinking.as_deref(), Some(thinking.as_str()));
     }
 
     #[test]
@@ -2232,9 +3239,32 @@ mod tests {
         let (manager, _temp) = create_test_manager();
 
         // No JSONL file exists — update_title should silently skip (no error).
-        manager
+        let written = manager
             .update_title("session-1", "New Title", None)
             .expect("update_title should skip when JSONL doesn't exist");
+
+        assert!(!written);
+    }
+
+    #[test]
+    fn test_update_title_returns_true_when_file_exists() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("session-1.jsonl");
+        fs::write(
+            &path,
+            jsonl_content(&[r#"{"type":"summary","summary":"Original","leafUuid":""}"#]),
+        )
+        .expect("write");
+
+        let written = manager
+            .update_title("session-1", "Updated Title", None)
+            .expect("update_title should append to an existing JSONL");
+
+        assert!(written);
+        assert_eq!(read_last_summary(&path).as_deref(), Some("Updated Title"));
     }
 
     #[test]
@@ -2501,54 +3531,6 @@ mod tests {
         assert!(
             conv.messages[1].tool_uses[0].success,
             "Tool without is_error should default to success"
-        );
-    }
-
-    #[test]
-    fn test_tool_output_backfill_multiple_tools_with_error() {
-        let (manager, _temp) = create_test_manager();
-        let ws_dir = manager.workspace_dir(None);
-        fs::create_dir_all(&ws_dir).expect("mkdir");
-
-        // Assistant uses two tools: Bash (succeeds) and Read (fails with is_error).
-        // Both tool_result lines appear as separate user messages.
-        let path = ws_dir.join("multi-tool-session.jsonl");
-        let lines = [
-            r#"{"type":"user","uuid":"u1","message":{"role":"user","content":"check files"},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:01.000Z"}"#,
-            r#"{"type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"Let me check."},{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"ls"}},{"type":"tool_use","id":"t2","name":"Read","input":{"file_path":"/missing.txt"}}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:02.000Z"}"#,
-            // Both tool results in one user message (SDK batches them)
-            r#"{"type":"user","uuid":"tr1","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"file1.txt\nfile2.txt"},{"type":"tool_result","tool_use_id":"t2","content":"Error: file not found","is_error":true}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:03.000Z"}"#,
-            r#"{"type":"assistant","uuid":"a2","message":{"role":"assistant","content":[{"type":"text","text":"The file doesn't exist."}]},"cwd":"/test","sessionId":"s","timestamp":"2026-01-11T18:00:04.000Z"}"#,
-        ];
-        fs::write(&path, jsonl_content(&lines)).expect("write");
-
-        let conv = manager
-            .load_from_workspace("multi-tool-session", None)
-            .expect("load")
-            .expect("not found");
-
-        // user + merged assistant
-        assert_eq!(conv.messages.len(), 2);
-        let assistant = &conv.messages[1];
-        assert_eq!(assistant.tool_uses.len(), 2);
-
-        // First tool: Bash succeeded
-        assert_eq!(assistant.tool_uses[0].name, "Bash");
-        assert_eq!(
-            assistant.tool_uses[0].output.as_deref(),
-            Some("file1.txt\nfile2.txt")
-        );
-        assert!(assistant.tool_uses[0].success);
-
-        // Second tool: Read failed
-        assert_eq!(assistant.tool_uses[1].name, "Read");
-        assert_eq!(
-            assistant.tool_uses[1].output.as_deref(),
-            Some("Error: file not found")
-        );
-        assert!(
-            !assistant.tool_uses[1].success,
-            "Tool with is_error:true should have success=false"
         );
     }
 

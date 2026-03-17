@@ -190,7 +190,7 @@ export const ActionsBar: FC = () => {
         <div className="flex items-center justify-center h-8 w-8 text-muted-foreground/40 cursor-default">
           <CircleAlert className="h-4 w-4" />
         </div>
-        <div className="pointer-events-none absolute bottom-full right-full mb-[-8px] mr-[-6px] w-[170px] rounded-[12px] bg-[var(--chat-area)] dark:bg-[oklch(23%_0_0)] border border-[rgba(0,0,0,0.15)] dark:border-white/5 px-3 py-2.5 text-[11px] font-[510] leading-snug text-muted-foreground shadow-md opacity-0 scale-95 origin-bottom-right transition-all duration-150 ease-out group-hover/disclaimer:opacity-100 group-hover/disclaimer:scale-100">
+        <div className="pointer-events-none absolute bottom-full right-full mb-[-8px] mr-[-6px] w-[170px] rounded-[12px] bg-menu-bg border border-border-tool px-3 py-2.5 text-[11px] font-[510] leading-snug text-muted-foreground shadow-menu opacity-0 scale-95 origin-bottom-right transition-all duration-150 ease-out group-hover/disclaimer:opacity-100 group-hover/disclaimer:scale-100">
           AI may make mistakes. Double-check all generated code.
         </div>
       </div>

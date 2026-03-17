@@ -9,6 +9,7 @@ import type { FC } from 'react';
 
 import { ConversationContextMenu, ConversationDropdownMenu } from '@/components/sidebar';
 import { cn } from '@/lib/utils';
+import { useIsTitleLoading } from '@/stores/ui';
 
 /**
  * Format a timestamp into a compact relative time string.
@@ -51,6 +52,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   const [isHovered, setIsHovered] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [editValue, setEditValue] = useState(conversation.title);
+  const isTitleLoading = useIsTitleLoading(conversation.sessionId);
   const inputRef = useRef<HTMLInputElement>(null);
   const submittedRef = useRef(false);
 
@@ -159,7 +161,8 @@ export const ConversationItem: FC<ConversationItemProps> = ({
             ? 'bg-foreground/10 text-foreground hover:bg-foreground/15'
             : 'text-lg-text-secondary hover:text-foreground hover:bg-lg-sidebar-hover'
         )}
-        title={conversation.title}
+        title={isTitleLoading ? undefined : conversation.title}
+        aria-label={conversation.title}
         onClick={onClick}
         onDoubleClick={(e) => {
           e.preventDefault();
@@ -170,11 +173,12 @@ export const ConversationItem: FC<ConversationItemProps> = ({
         <span
           className={cn(
             'text-base overflow-hidden flex-1 text-left',
-            !isHovered && 'truncate',
-            isHovered && 'whitespace-nowrap'
+            isTitleLoading && 'flex items-center',
+            !isTitleLoading && !isHovered && 'truncate',
+            !isTitleLoading && isHovered && 'whitespace-nowrap'
           )}
           style={
-            isHovered
+            isHovered && !isTitleLoading
               ? {
                   maskImage: TITLE_HOVER_MASK,
                   WebkitMaskImage: TITLE_HOVER_MASK,
@@ -182,7 +186,16 @@ export const ConversationItem: FC<ConversationItemProps> = ({
               : undefined
           }
         >
-          {conversation.title}
+          {isTitleLoading ? (
+            <span
+              className={cn(
+                'inline-block h-3.5 w-28 rounded animate-pulse',
+                active ? 'bg-foreground/20' : 'bg-foreground/10'
+              )}
+            />
+          ) : (
+            <span className="animate-title-in">{conversation.title}</span>
+          )}
         </span>
       </button>
       {/* Right area: timestamp when not hovering/menu closed, dropdown menu when hovering or open */}

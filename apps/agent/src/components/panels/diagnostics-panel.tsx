@@ -30,10 +30,10 @@ const SEVERITY_ICONS: Record<Diagnostic['severity'], FC<{ className?: string }>>
 };
 
 const SEVERITY_COLORS: Record<Diagnostic['severity'], string> = {
-  error: 'text-red-400',
-  warning: 'text-yellow-400',
-  info: 'text-blue-400',
-  hint: 'text-gray-400',
+  error: 'text-destructive',
+  warning: 'text-warning',
+  info: 'text-info',
+  hint: 'text-muted-foreground',
 };
 
 /**
@@ -93,13 +93,13 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
       <div className="flex items-center gap-4 px-3 py-2 border-b border-border">
         <span className="font-medium text-sm">Problems</span>
         {totalErrors > 0 ? (
-          <span className="flex items-center gap-1 text-xs text-red-400">
+          <span className="flex items-center gap-1 text-xs text-destructive">
             <AlertCircle className="h-3.5 w-3.5" />
             {totalErrors}
           </span>
         ) : null}
         {totalWarnings > 0 ? (
-          <span className="flex items-center gap-1 text-xs text-yellow-400">
+          <span className="flex items-center gap-1 text-xs text-warning">
             <AlertTriangle className="h-3.5 w-3.5" />
             {totalWarnings}
           </span>
@@ -138,10 +138,10 @@ export const DiagnosticsPanel: FC<DiagnosticsPanelProps> = ({ onDiagnosticClick,
                   </span>
                   <div className="ml-auto flex items-center gap-2">
                     {fileErrors > 0 ? (
-                      <span className="text-xs text-red-400">{fileErrors}</span>
+                      <span className="text-xs text-destructive">{fileErrors}</span>
                     ) : null}
                     {fileWarnings > 0 ? (
-                      <span className="text-xs text-yellow-400">{fileWarnings}</span>
+                      <span className="text-xs text-warning">{fileWarnings}</span>
                     ) : null}
                   </div>
                 </button>

@@ -176,6 +176,14 @@ describe('tool-store', () => {
       expect(useToolStore.getState().activeTools['tool-1']?.contentOffset).toBe(100);
     });
 
+    it('should set ordinal when provided', () => {
+      const { startTool } = useToolStore.getState();
+
+      startTool('tool-1', 'msg-1', 'bash', createMockToolInput(), 100, 'session-1', 7);
+
+      expect(useToolStore.getState().activeTools['tool-1']?.ordinal).toBe(7);
+    });
+
     it('should track startedAt timestamp', () => {
       const { startTool } = useToolStore.getState();
 
@@ -563,15 +571,32 @@ describe('tool-store', () => {
       const { restoreToolsForMessage } = useToolStore.getState();
 
       restoreToolsForMessage('msg-1', [
-        { id: 'tool-1', name: 'bash', input: { command: 'ls' }, output: 'file1', success: true },
-        { id: 'tool-2', name: 'write', input: { path: '/test' }, success: false },
+        {
+          id: 'tool-1',
+          name: 'bash',
+          input: { command: 'ls' },
+          output: 'file1',
+          success: true,
+          contentOffset: 12,
+          ordinal: 3,
+        },
+        {
+          id: 'tool-2',
+          name: 'write',
+          input: { path: '/test' },
+          success: false,
+          ordinal: 4,
+        },
       ]);
 
       const completed = useToolStore.getState().completedTools;
       expect(completed).toHaveLength(2);
       expect(completed[0]?.toolName).toBe('bash');
       expect(completed[0]?.status).toBe('success');
+      expect(completed[0]?.contentOffset).toBe(12);
+      expect(completed[0]?.ordinal).toBe(3);
       expect(completed[1]?.status).toBe('error');
+      expect(completed[1]?.ordinal).toBe(4);
     });
 
     it('should not add duplicate tools', () => {

@@ -1,4 +1,4 @@
-import { ChevronRight, File, Loader2, Search } from 'lucide-react';
+import { ChevronRight, File, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -111,8 +111,6 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
 
   const fileCount = isContentMode ? Object.keys(groupedMatches).length : matchCount;
 
-  const statusLabel = isRunning ? 'Searching content' : 'Grep';
-
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
@@ -123,29 +121,20 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Grep output' : 'Expand Grep output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + count + spinner */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Search
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-lg-text-secondary'
-            )}
-          >
-            {statusLabel}
+        {/* Left: verb + pattern + count + spinner */}
+        <div className="flex items-center gap-2 shrink-0 min-w-0">
+          <span className="text-base font-medium text-foreground">
+            {isRunning ? 'Searching' : 'Searched'}
           </span>
+          <span className="text-base font-medium truncate text-lg-text-secondary" title={pattern}>
+            {pattern}
+          </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {!isRunning && !isFailed && fileCount > 0 ? (
             <span className="text-sm text-muted-foreground">
@@ -183,10 +172,10 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Pattern & filters */}
               <div className="px-3 py-2">
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1.5">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   pattern
                 </div>
                 <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
@@ -194,7 +183,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                 </code>
                 {path ? (
                   <>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1 mt-2">
                       in
                     </div>
                     <span className="text-sm text-lg-text-secondary font-mono truncate block">
@@ -204,7 +193,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                 ) : null}
                 {glob ? (
                   <>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1 mt-2">
                       glob
                     </div>
                     <code className="text-sm text-lg-text-secondary font-mono">{glob}</code>
@@ -212,7 +201,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
                 ) : null}
                 {fileType ? (
                   <>
-                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1 mt-2">
+                    <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1 mt-2">
                       type
                     </div>
                     <span className="text-sm text-lg-text-secondary font-mono">{fileType}</span>

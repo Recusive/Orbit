@@ -1,7 +1,6 @@
-import { IconWrite } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconWrite';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
-import { AlertCircle, ChevronRight, Loader2 } from 'lucide-react';
+import { AlertCircle, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -134,27 +133,21 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         }
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon, filename, badges, spinner, diff */}
+        {/* Left: label + filename, badges, spinner, diff */}
         <div className="flex items-center gap-2 shrink-0 min-w-0">
-          <IconWrite
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
+          <span className="text-base font-medium text-foreground">
+            {isRunning ? 'Editing' : 'Edited'}
+          </span>
           <a
             role="link"
             tabIndex={0}
             className={cn(
-              'text-sm font-medium truncate cursor-pointer hover:underline',
-              isFailed ? 'text-lg-text-secondary line-through' : 'text-foreground'
+              'text-base font-medium truncate cursor-pointer hover:underline',
+              isFailed ? 'text-lg-text-secondary' : 'text-git-untracked'
             )}
             onClick={handleFileClick}
             onKeyDown={(e): void => {
@@ -166,14 +159,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             {fileName}
           </a>
 
-          <span
-            className={cn(
-              'text-sm shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-muted-foreground'
-            )}
-          >
-            {isFailed ? '(failed)' : '(modified)'}
-          </span>
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />

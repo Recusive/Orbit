@@ -51,19 +51,30 @@
     reason = "We intentionally ignore some Results"
 )]
 
+#[cfg(target_os = "macos")]
+use std::env;
+use std::fs;
+use std::path::PathBuf;
 use std::result::Result as StdResult;
+use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "macos")]
+use std::sync::mpsc::sync_channel;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+#[cfg(target_os = "macos")]
+use tokio::task::spawn_blocking;
 
 use hashbrown::HashMap;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use tauri::webview::{PageLoadEvent, PageLoadPayload, WebviewWindowBuilder};
 use tauri::{
-    AppHandle, Emitter as _, LogicalPosition, LogicalSize, Manager as _, State, WebviewUrl,
+    AppHandle, Emitter as _, Listener as _, LogicalPosition, LogicalSize, Manager as _, State,
+    WebviewUrl,
 };
 use tokio::sync::oneshot;
-use tokio::time::timeout;
+use tokio::time::{interval, sleep, timeout};
 use uuid::Uuid;
 
 use crate::core::sentry_utils::SentryCapture as _;
@@ -104,9 +115,42 @@ fn to_screen_coords(
 
 /// Timeout for waiting on JavaScript evaluation results.
 const JS_EVAL_TIMEOUT: Duration = Duration::from_secs(30);
+const SMALL_EVAL_RESULT_LIMIT_CHARS: usize = 100_000;
+const LARGE_EVAL_RESULT_LIMIT_CHARS: usize = 500_000;
+const DEFAULT_WAIT_TIMEOUT_MS: u64 = 30_000;
+const MAX_WAIT_TIMEOUT_MS: u64 = 120_000;
+const WAIT_POLL_INTERVAL_MS: u64 = 100;
+const ORBIT_RUNTIME_SCRIPT: &str = include_str!("orbit_runtime.js");
 
 /// The label for the browser window.
 const BROWSER_WINDOW_LABEL: &str = "browser-window";
+const LARGE_EVAL_TIMEOUT_MESSAGE: &str =
+    "Large eval result not received within timeout. The page may have navigated or script execution was interrupted.";
+const BROWSER_BOOTSTRAP_SCRIPT: &str = concat!(
+    include_str!("browser_init.js"),
+    "\n",
+    include_str!("orbit_runtime.js"),
+    "\n",
+    r#"
+(function () {
+    window.__orbit_eval_channel = window.__orbit_eval_channel || {
+        async postResult(evalId, data) {
+            const emitter = window.__TAURI__?.event?.emit;
+            if (typeof emitter !== 'function') {
+                throw new Error('Large eval result transport unavailable.');
+            }
+            await emitter('browser:eval-large-result', { evalId, data });
+        },
+    };
+})();
+"#
+);
+
+/// Max tracked screenshot files per browser session.
+///
+/// Oldest file is evicted when capacity is reached.
+#[cfg(any(target_os = "macos", test))]
+const MAX_SCREENSHOT_FILES: usize = 20;
 
 /// Corner radius for the browser window, matching the activity card's CSS
 /// `--content-card-radius` (10px). On macOS, a CALayer mask clips the native
@@ -126,6 +170,7 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
     if let Some(query) = url.query() {
         let mut id = None;
         let mut success = false;
+        let mut large = false;
         let mut data = None;
         let mut error = None;
 
@@ -134,6 +179,7 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
                 match key {
                     "id" => id = Some(value.to_owned()),
                     "success" => success = value == "true",
+                    "large" => large = value == "true",
                     "data" => {
                         if let Ok(decoded) = urlencoding::decode(value) {
                             data = Some(decoded.into_owned());
@@ -151,7 +197,11 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
 
         if let Some(req_id) = id {
             if success {
-                result_state.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
+                if large {
+                    result_state.mark_awaiting_large_payload(&req_id);
+                } else {
+                    result_state.complete_ok(&req_id, data.unwrap_or_else(|| "null".to_owned()));
+                }
             } else {
                 result_state
                     .complete_err(&req_id, error.unwrap_or_else(|| "Unknown error".to_owned()));
@@ -163,6 +213,16 @@ fn handle_eval_result_url(url: &tauri::Url, result_state: &BrowserResultState) -
         log::warn!("Malformed eval result URL: no query string in {url_str}");
     }
     true
+}
+
+/// Register the large-result event listener used by `browser_eval`.
+pub fn register_browser_large_eval_result_listener(
+    app: &AppHandle,
+    result_state: Arc<BrowserResultState>,
+) {
+    let _ = app.listen_any("browser:eval-large-result", move |event| {
+        handle_large_eval_result_payload(event.payload(), &result_state);
+    });
 }
 
 /// Handle an `orbit-eval://element-selected?data=...` navigation callback.
@@ -211,6 +271,28 @@ pub struct BrowserLoadingPayload {
     pub is_loading: bool,
 }
 
+#[derive(Debug)]
+struct PendingEvalRequest {
+    sender: oneshot::Sender<StdResult<String, String>>,
+    awaiting_large_payload: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct LargeEvalResultPayload {
+    #[serde(rename = "evalId")]
+    eval_id: String,
+    data: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct UrlWaitResult {
+    matched: bool,
+    #[serde(rename = "currentUrl")]
+    current_url: String,
+    #[serde(rename = "regexError")]
+    regex_error: Option<String>,
+}
+
 /// State for managing the browser child window.
 #[derive(Debug, Default)]
 pub struct BrowserWindowState {
@@ -223,6 +305,10 @@ pub struct BrowserWindowState {
     hidden: Mutex<bool>,
     /// Last known bounds for restoring after hide.
     last_bounds: Mutex<Option<BrowserBounds>>,
+    /// Whether a screenshot request is currently in-flight.
+    screenshot_in_progress: AtomicBool,
+    /// Screenshot temp files tracked for cleanup on browser close/recreate.
+    screenshot_files: Mutex<Vec<PathBuf>>,
 }
 
 impl BrowserWindowState {
@@ -243,6 +329,29 @@ impl BrowserWindowState {
     }
 }
 
+/// Delete all tracked screenshot temp files for a browser session.
+///
+/// Must not be called while holding `exists.lock()`. This function may spin
+/// while waiting for an in-flight screenshot to complete, and that screenshot
+/// can need `exists.lock()` to finish teardown.
+async fn cleanup_screenshot_files(state: &BrowserWindowState) {
+    // Native capture has a 10s recv timeout. Wait slightly longer here so
+    // cleanup doesn't block forever on exceptional paths.
+    let deadline = Instant::now() + Duration::from_secs(12);
+    while state.screenshot_in_progress.load(Ordering::Acquire) {
+        if Instant::now() >= deadline {
+            log::warn!("Timed out waiting for in-flight screenshot during cleanup");
+            break;
+        }
+        sleep(Duration::from_millis(10)).await;
+    }
+
+    let paths: Vec<_> = state.screenshot_files.lock().drain(..).collect();
+    for path in paths {
+        let _ = fs::remove_file(path);
+    }
+}
+
 /// Last known bounds for the browser.
 #[derive(Debug, Clone, Copy)]
 struct BrowserBounds {
@@ -256,7 +365,7 @@ struct BrowserBounds {
 #[derive(Debug, Default)]
 pub struct BrowserResultState {
     /// Map of pending evaluation request IDs to their result senders.
-    pending: Mutex<HashMap<String, oneshot::Sender<StdResult<String, String>>>>,
+    pending: Mutex<HashMap<String, PendingEvalRequest>>,
 }
 
 impl BrowserResultState {
@@ -269,15 +378,21 @@ impl BrowserResultState {
     /// Register a new evaluation request and return the receiver.
     pub fn register(&self, id: String) -> oneshot::Receiver<StdResult<String, String>> {
         let (tx, rx) = oneshot::channel();
-        let _ = self.pending.lock().insert(id, tx);
+        let _ = self.pending.lock().insert(
+            id,
+            PendingEvalRequest {
+                sender: tx,
+                awaiting_large_payload: false,
+            },
+        );
         rx
     }
 
     /// Complete an evaluation request with a successful result.
     pub fn complete_ok(&self, id: &str, result: String) {
-        let maybe_tx = self.pending.lock().remove(id);
-        if let Some(tx) = maybe_tx {
-            let _ = tx.send(Ok(result));
+        let maybe_pending = self.pending.lock().remove(id);
+        if let Some(pending) = maybe_pending {
+            let _ = pending.sender.send(Ok(result));
         } else {
             log::warn!("Received result for unknown eval request: {id}");
         }
@@ -285,17 +400,191 @@ impl BrowserResultState {
 
     /// Complete an evaluation request with an error.
     pub fn complete_err(&self, id: &str, error: String) {
-        let maybe_tx = self.pending.lock().remove(id);
-        if let Some(tx) = maybe_tx {
-            let _ = tx.send(Err(error));
+        let maybe_pending = self.pending.lock().remove(id);
+        if let Some(pending) = maybe_pending {
+            let _ = pending.sender.send(Err(error));
         } else {
             log::warn!("Received error for unknown eval request: {id}");
         }
     }
 
+    /// Mark a pending request as waiting for a large event payload.
+    pub fn mark_awaiting_large_payload(&self, id: &str) {
+        if let Some(pending) = self.pending.lock().get_mut(id) {
+            pending.awaiting_large_payload = true;
+        } else {
+            log::warn!("Received large-result marker for unknown eval request: {id}");
+        }
+    }
+
     /// Cancel a pending evaluation request.
-    pub fn cancel(&self, id: &str) {
-        let _ = self.pending.lock().remove(id);
+    #[must_use]
+    pub fn cancel(&self, id: &str) -> bool {
+        self.pending
+            .lock()
+            .remove(id)
+            .is_some_and(|pending| pending.awaiting_large_payload)
+    }
+}
+
+fn handle_large_eval_result_payload(payload: &str, result_state: &BrowserResultState) {
+    match serde_json::from_str::<LargeEvalResultPayload>(payload) {
+        Ok(message) => result_state.complete_ok(&message.eval_id, message.data),
+        Err(error) => log::warn!("Failed to parse browser:eval-large-result payload: {error}"),
+    }
+}
+
+#[must_use]
+fn normalize_wait_timeout(timeout_ms: Option<u64>) -> Duration {
+    match timeout_ms {
+        Some(0) | None => Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS),
+        Some(value) => Duration::from_millis(value.min(MAX_WAIT_TIMEOUT_MS)),
+    }
+}
+
+fn ensure_browser_exists(state: &BrowserWindowState) -> Result<()> {
+    if !*state.exists.lock() {
+        return Err("No browser exists".to_owned());
+    }
+    Ok(())
+}
+
+fn expected_orbit_runtime_version() -> Result<&'static str> {
+    ORBIT_RUNTIME_SCRIPT
+        .lines()
+        .find_map(|line| {
+            let trimmed = line.trim();
+            trimmed
+                .strip_prefix("const RUNTIME_VERSION = '")
+                .and_then(|rest| rest.strip_suffix("';"))
+        })
+        .ok_or_else(|| "Orbit runtime version not found".to_owned())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OrbitRuntimeMethod {
+    Snapshot,
+    Click,
+    Type,
+    Fill,
+    GetText,
+    GetHtml,
+    Count,
+    Check,
+    Uncheck,
+    Select,
+    Hover,
+    Focus,
+    Scroll,
+    ScrollIntoView,
+    IsVisible,
+    IsEnabled,
+    GetAttribute,
+    BoundingBox,
+    GetCookies,
+    ClearCookies,
+    StorageGet,
+    StorageSet,
+    StorageClear,
+    GetNetworkRequests,
+    GetConsoleLogs,
+    RuntimeInfo,
+}
+
+impl OrbitRuntimeMethod {
+    fn from_input(value: &str) -> Result<Self> {
+        match value {
+            "snapshot" => Ok(Self::Snapshot),
+            "click" => Ok(Self::Click),
+            "type" => Ok(Self::Type),
+            "fill" => Ok(Self::Fill),
+            "getText" => Ok(Self::GetText),
+            "getHtml" => Ok(Self::GetHtml),
+            "count" => Ok(Self::Count),
+            "check" => Ok(Self::Check),
+            "uncheck" => Ok(Self::Uncheck),
+            "select" => Ok(Self::Select),
+            "hover" => Ok(Self::Hover),
+            "focus" => Ok(Self::Focus),
+            "scroll" => Ok(Self::Scroll),
+            "scrollIntoView" => Ok(Self::ScrollIntoView),
+            "isVisible" => Ok(Self::IsVisible),
+            "isEnabled" => Ok(Self::IsEnabled),
+            "getAttribute" => Ok(Self::GetAttribute),
+            "boundingBox" => Ok(Self::BoundingBox),
+            "getCookies" => Ok(Self::GetCookies),
+            "clearCookies" => Ok(Self::ClearCookies),
+            "storageGet" => Ok(Self::StorageGet),
+            "storageSet" => Ok(Self::StorageSet),
+            "storageClear" => Ok(Self::StorageClear),
+            "getNetworkRequests" => Ok(Self::GetNetworkRequests),
+            "getConsoleLogs" => Ok(Self::GetConsoleLogs),
+            "runtimeInfo" => Ok(Self::RuntimeInfo),
+            _ => Err(format!("Unsupported Orbit runtime method: {value}")),
+        }
+    }
+
+    fn as_js_name(self) -> &'static str {
+        match self {
+            Self::Snapshot => "snapshot",
+            Self::Click => "click",
+            Self::Type => "type",
+            Self::Fill => "fill",
+            Self::GetText => "getText",
+            Self::GetHtml => "getHtml",
+            Self::Count => "count",
+            Self::Check => "check",
+            Self::Uncheck => "uncheck",
+            Self::Select => "select",
+            Self::Hover => "hover",
+            Self::Focus => "focus",
+            Self::Scroll => "scroll",
+            Self::ScrollIntoView => "scrollIntoView",
+            Self::IsVisible => "isVisible",
+            Self::IsEnabled => "isEnabled",
+            Self::GetAttribute => "getAttribute",
+            Self::BoundingBox => "boundingBox",
+            Self::GetCookies => "getCookies",
+            Self::ClearCookies => "clearCookies",
+            Self::StorageGet => "storageGet",
+            Self::StorageSet => "storageSet",
+            Self::StorageClear => "storageClear",
+            Self::GetNetworkRequests => "getNetworkRequests",
+            Self::GetConsoleLogs => "getConsoleLogs",
+            Self::RuntimeInfo => "runtimeInfo",
+        }
+    }
+
+    #[cfg(test)]
+    fn all() -> &'static [Self] {
+        &[
+            Self::Snapshot,
+            Self::Click,
+            Self::Type,
+            Self::Fill,
+            Self::GetText,
+            Self::GetHtml,
+            Self::Count,
+            Self::Check,
+            Self::Uncheck,
+            Self::Select,
+            Self::Hover,
+            Self::Focus,
+            Self::Scroll,
+            Self::ScrollIntoView,
+            Self::IsVisible,
+            Self::IsEnabled,
+            Self::GetAttribute,
+            Self::BoundingBox,
+            Self::GetCookies,
+            Self::ClearCookies,
+            Self::StorageGet,
+            Self::StorageSet,
+            Self::StorageClear,
+            Self::GetNetworkRequests,
+            Self::GetConsoleLogs,
+            Self::RuntimeInfo,
+        ]
     }
 }
 
@@ -318,9 +607,9 @@ pub async fn browser_create(
 ) -> Result<BrowserInfo> {
     let initial_url = url.unwrap_or_else(|| "https://example.com".to_owned());
 
-    // Close existing browser window if any
-    // Use a single lock scope to prevent race conditions between check and update
-    {
+    // Close existing browser window if any, then cleanup tracked screenshot files.
+    // Run cleanup outside of exists.lock() to avoid deadlock with in-flight captures.
+    let needs_cleanup = {
         let mut exists = state.exists.lock();
         if *exists {
             if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
@@ -328,7 +617,13 @@ pub async fn browser_create(
                 let _ = window.close();
             }
             *exists = false;
+            true
+        } else {
+            false
         }
+    };
+    if needs_cleanup {
+        cleanup_screenshot_files(state.inner().as_ref()).await;
     }
 
     // Get the main webview window to use as parent
@@ -374,8 +669,9 @@ pub async fn browser_create(
         .position(screen_x, screen_y)
         // Don't show in taskbar/dock as separate window
         .skip_taskbar(true)
-        // Initialization script to block DevTools shortcuts in the browser
-        .initialization_script(include_str!("browser_init.js"))
+        // Initialization script to block DevTools shortcuts, preload the
+        // Orbit runtime, and install the large-eval result transport hook.
+        .initialization_script(BROWSER_BOOTSTRAP_SCRIPT)
         // Navigation handler for eval result interception
         .on_navigation(move |url: &tauri::Url| {
             // Intercept orbit-eval:// callback URLs (eval results, element selection)
@@ -430,6 +726,7 @@ pub async fn browser_create(
         width,
         height,
     });
+    state.screenshot_in_progress.store(false, Ordering::Release);
 
     log::info!("Created browser child window at ({x}, {y}) size ({width}x{height})");
 
@@ -526,19 +823,39 @@ pub async fn browser_close(
     app: AppHandle,
     state: State<'_, Arc<BrowserWindowState>>,
 ) -> Result<()> {
-    if !*state.exists.lock() {
+    // Phase 1: mark closed while holding lock
+    let had_browser = {
+        let mut exists = state.exists.lock();
+        if !*exists {
+            false
+        } else {
+            *exists = false;
+            true
+        }
+    };
+
+    if !had_browser {
+        // Cleanup stale screenshot files from previously torn-down sessions.
+        cleanup_screenshot_files(state.inner().as_ref()).await;
         return Err("No browser exists".to_owned());
     }
 
+    // Phase 2: cleanup any tracked screenshot files.
+    cleanup_screenshot_files(state.inner().as_ref()).await;
+
+    // Phase 3: close the browser window. If close fails, restore exists=true
+    // so other commands can still reach the live window.
     if let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) {
-        window
-            .close()
-            .map_err(|e| format!("Failed to close browser: {e}"))?;
+        if let Err(error) = window.close() {
+            *state.exists.lock() = true;
+            return Err(format!("Failed to close browser: {error}"));
+        }
     }
 
-    *state.exists.lock() = false;
+    // Phase 4: reset remaining state.
     *state.hidden.lock() = false;
     *state.last_bounds.lock() = None;
+    state.screenshot_in_progress.store(false, Ordering::Release);
     log::info!("Closed browser window");
     Ok(())
 }
@@ -601,9 +918,16 @@ pub async fn browser_eval(
     state: State<'_, Arc<BrowserWindowState>>,
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
-    if !*state.exists.lock() {
-        return Err("No browser exists".to_owned());
-    }
+    browser_eval_inner(&script, &app, &state, &result_state).await
+}
+
+async fn browser_eval_inner(
+    script: &str,
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    ensure_browser_exists(state.inner().as_ref())?;
 
     let window = app
         .get_webview_window(BROWSER_WINDOW_LABEL)
@@ -615,13 +939,13 @@ pub async fn browser_eval(
     // Wrap script to capture result and send via navigation.
     //
     // SECURITY: The script is JSON-encoded to prevent injection attacks.
-    // Using `new Function(scriptString)()` instead of direct interpolation ensures
-    // that characters like `}})();` or template literal escapes cannot break out
-    // of the wrapper. JSON.parse safely decodes the script before execution.
+    // `new Function(scriptString)()` treats the body as a FunctionBody (so
+    // `return` statements are valid) and prevents injection because the
+    // script is passed as a JSON-encoded string variable, not interpolated.
     //
     // Code review cycle 1, issue #12: Previously used direct format!() interpolation
     // which was vulnerable to script breakout attacks.
-    let script_json = serde_json::to_string(&script).unwrap_or_else(|_| {
+    let script_json = serde_json::to_string(script).unwrap_or_else(|_| {
         // Fallback: manual escaping for edge cases (should never happen with valid UTF-8)
         format!(
             "\"{}\"",
@@ -638,26 +962,40 @@ pub async fn browser_eval(
             const __evalId = {eval_id_json};
             const __scriptSource = {script_json};
             try {{
-                const __result = await (async () => {{ return eval(__scriptSource); }})();
+                const __result = await (new Function(__scriptSource))();
                 const __json = JSON.stringify(__result ?? null);
-                if (__json.length > 100000) {{
-                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 100000)`);
+                if (__json.length <= {small_limit}) {{
+                    const __data = encodeURIComponent(__json);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
+                    return;
+                }}
+                if (__json.length <= {large_limit}) {{
+                    const __channel = window.__orbit_eval_channel;
+                    if (!__channel || typeof __channel.postResult !== 'function') {{
+                        throw new Error('Large eval result transport unavailable.');
+                    }}
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&large=true`;
+                    await __channel.postResult(__evalId, __json);
+                    return;
+                }}
+                {{
+                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 500000). Use compact:true or target a subtree.`);
                     window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
                     return;
                 }}
-                const __data = encodeURIComponent(__json);
-                window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
             }} catch (__error) {{
                 const __errorMsg = encodeURIComponent(__error.message || String(__error));
                 window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
             }}
         }})();",
         eval_id_json = serde_json::to_string(&eval_id).unwrap_or_else(|_| format!("\"{eval_id}\"")),
-        script_json = script_json
+        script_json = script_json,
+        small_limit = SMALL_EVAL_RESULT_LIMIT_CHARS,
+        large_limit = LARGE_EVAL_RESULT_LIMIT_CHARS,
     );
 
     if let Err(e) = window.eval(&wrapped_script) {
-        result_state.cancel(&eval_id);
+        let _ = result_state.cancel(&eval_id);
         return Err(format!("JavaScript execution failed: {e}"));
     }
 
@@ -666,34 +1004,363 @@ pub async fn browser_eval(
         Ok(Ok(Err(err))) => Err(err),
         Ok(Err(_)) => Err("JavaScript evaluation was cancelled".to_owned()),
         Err(_) => {
-            result_state.cancel(&eval_id);
-            Err(format!(
-                "JavaScript evaluation timed out after {} seconds",
-                JS_EVAL_TIMEOUT.as_secs()
-            ))
+            let awaiting_large_payload = result_state.cancel(&eval_id);
+            if awaiting_large_payload {
+                Err(LARGE_EVAL_TIMEOUT_MESSAGE.to_owned())
+            } else {
+                Err(format!(
+                    "JavaScript evaluation timed out after {} seconds",
+                    JS_EVAL_TIMEOUT.as_secs()
+                ))
+            }
         },
     }
 }
 
-/// Capture screenshot metadata from the browser.
+fn build_browser_eval_direct_wrapper(
+    eval_id_json: &str,
+    script_body: &str,
+    small_limit: usize,
+    large_limit: usize,
+) -> String {
+    // SAFETY: `script_body` is embedded directly into JavaScript. This helper is
+    // only used by trusted Rust call sites that construct scripts from internal
+    // code and JSON-serialized values, never from arbitrary user input.
+    format!(
+        "(async () => {{
+            const __evalId = {eval_id_json};
+            try {{
+                const __result = await (async function() {{
+{script_body}
+                }})();
+                const __json = JSON.stringify(__result ?? null);
+                if (__json.length <= {small_limit}) {{
+                    const __data = encodeURIComponent(__json);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&data=${{__data}}`;
+                    return;
+                }}
+                if (__json.length <= {large_limit}) {{
+                    const __channel = window.__orbit_eval_channel;
+                    if (!__channel || typeof __channel.postResult !== 'function') {{
+                        throw new Error('Large eval result transport unavailable.');
+                    }}
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=true&large=true`;
+                    await __channel.postResult(__evalId, __json);
+                    return;
+                }}
+                {{
+                    const __errorMsg = encodeURIComponent(`Result too large (${{__json.length}} chars, max 500000). Use compact:true or target a subtree.`);
+                    window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
+                    return;
+                }}
+            }} catch (__error) {{
+                const __errorMsg = encodeURIComponent(__error?.message || String(__error));
+                window.location.href = `orbit-eval://result?id=${{__evalId}}&success=false&error=${{__errorMsg}}`;
+            }}
+        }})();",
+    )
+}
+
+async fn browser_eval_direct_inner(
+    script: &str,
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    ensure_browser_exists(state.inner().as_ref())?;
+
+    let window = app
+        .get_webview_window(BROWSER_WINDOW_LABEL)
+        .ok_or("Browser window not found")?;
+
+    let eval_id = Uuid::new_v4().to_string();
+    let result_rx = result_state.register(eval_id.clone());
+    let eval_id_json = serde_json::to_string(&eval_id).unwrap_or_else(|_| format!("\"{eval_id}\""));
+    let wrapped_script = build_browser_eval_direct_wrapper(
+        &eval_id_json,
+        script,
+        SMALL_EVAL_RESULT_LIMIT_CHARS,
+        LARGE_EVAL_RESULT_LIMIT_CHARS,
+    );
+
+    if let Err(error) = window.eval(&wrapped_script) {
+        let _ = result_state.cancel(&eval_id);
+        return Err(format!("JavaScript execution failed: {error}"));
+    }
+
+    match timeout(JS_EVAL_TIMEOUT, result_rx).await {
+        Ok(Ok(Ok(result))) => Ok(result),
+        Ok(Ok(Err(err))) => Err(err),
+        Ok(Err(_)) => Err("JavaScript evaluation was cancelled".to_owned()),
+        Err(_) => {
+            let awaiting_large_payload = result_state.cancel(&eval_id);
+            if awaiting_large_payload {
+                Err(LARGE_EVAL_TIMEOUT_MESSAGE.to_owned())
+            } else {
+                Err(format!(
+                    "JavaScript evaluation timed out after {} seconds",
+                    JS_EVAL_TIMEOUT.as_secs()
+                ))
+            }
+        },
+    }
+}
+
+async fn browser_runtime_version_inner(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<Option<String>> {
+    let raw = browser_eval_direct_inner(
+        "return window.__orbit?.VERSION ?? null;",
+        app,
+        state,
+        result_state,
+    )
+    .await?;
+    serde_json::from_str::<Option<String>>(&raw)
+        .map_err(|error| format!("Failed to parse Orbit runtime version: {error}"))
+}
+
+async fn browser_ensure_runtime_inner(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+    result_state: &State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let expected_version = expected_orbit_runtime_version()?;
+    let current_version = browser_runtime_version_inner(app, state, result_state).await?;
+    if current_version.as_deref() == Some(expected_version) {
+        return Ok(());
+    }
+
+    let inject_script = format!("{ORBIT_RUNTIME_SCRIPT}\nreturn window.__orbit?.VERSION ?? null;");
+    let raw = browser_eval_direct_inner(&inject_script, app, state, result_state).await?;
+    let injected_version = serde_json::from_str::<Option<String>>(&raw)
+        .map_err(|error| format!("Failed to parse injected Orbit runtime version: {error}"))?;
+
+    if injected_version.as_deref() != Some(expected_version) {
+        return Err(format!(
+            "Orbit runtime injection failed (expected {expected_version}, received {})",
+            injected_version.unwrap_or_else(|| "null".to_owned())
+        ));
+    }
+
+    Ok(())
+}
+
+/// Invoke a typed Orbit runtime method from the embedded browser.
 #[tauri::command]
-pub async fn browser_screenshot(
+pub async fn browser_invoke_runtime(
+    method: String,
+    args_json: String,
     app: AppHandle,
     state: State<'_, Arc<BrowserWindowState>>,
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
-    let script = "
-        return {
-            url: window.location.href,
-            title: document.title,
-            width: window.innerWidth,
-            height: window.innerHeight,
-            scrollX: window.scrollX,
-            scrollY: window.scrollY,
-            devicePixelRatio: window.devicePixelRatio
+    let runtime_method = OrbitRuntimeMethod::from_input(&method)?;
+    let method_name_json = serde_json::to_string(runtime_method.as_js_name())
+        .map_err(|error| format!("Failed to encode Orbit runtime method name: {error}"))?;
+    let args_json_literal = serde_json::to_string(&args_json)
+        .map_err(|error| format!("Failed to encode Orbit runtime args: {error}"))?;
+    let script = format!(
+        "const __orbit = window.__orbit;
+        if (!__orbit || typeof __orbit[{method_name_json}] !== 'function') {{
+            throw new Error('Orbit runtime unavailable.');
+        }}
+        // NOTE: `args_json` is already a JSON string from the frontend. Encode
+        // that string again for safe JS injection, then parse it back here.
+        return __orbit[{method_name_json}](...JSON.parse({args_json_literal}));",
+    );
+
+    browser_eval_direct_inner(&script, &app, &state, &result_state).await
+}
+
+/// Return the currently installed Orbit runtime version from the page.
+#[tauri::command]
+pub async fn browser_runtime_version(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<Option<String>> {
+    browser_runtime_version_inner(&app, &state, &result_state).await
+}
+
+/// Ensure the Orbit runtime is installed and matches the bundled version.
+#[tauri::command]
+pub async fn browser_ensure_runtime(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    browser_ensure_runtime_inner(&app, &state, &result_state).await
+}
+
+/// Return the current browser URL without executing page JavaScript.
+#[tauri::command]
+pub async fn browser_get_url(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+) -> Result<String> {
+    ensure_browser_exists(state.inner().as_ref())?;
+
+    let Some(window) = app.get_webview_window(BROWSER_WINDOW_LABEL) else {
+        *state.exists.lock() = false;
+        return Err("Browser window not found".to_owned());
+    };
+
+    let url = window
+        .url()
+        .map_err(|error| format!("Failed to read browser URL: {error}"))?;
+
+    Ok(serde_json::json!({ "url": url.to_string() }).to_string())
+}
+
+/// Return the current document title using the CSP-safe eval transport.
+#[tauri::command]
+pub async fn browser_get_title(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<String> {
+    browser_eval_direct_inner(
+        "return { title: document.title ?? '' };",
+        &app,
+        &state,
+        &result_state,
+    )
+    .await
+}
+
+/// Capture a screenshot of the embedded browser.
+#[tauri::command]
+pub async fn browser_screenshot(
+    app: AppHandle,
+    state: State<'_, Arc<BrowserWindowState>>,
+) -> Result<String> {
+    if !*state.exists.lock() {
+        return Err("No browser exists".to_owned());
+    }
+
+    if state.screenshot_in_progress.swap(true, Ordering::Acquire) {
+        return Err("Screenshot already in progress".to_owned());
+    }
+
+    let result = {
+        #[cfg(target_os = "macos")]
+        {
+            browser_screenshot_native(&app, &state).await
+        }
+
+        #[cfg(not(target_os = "macos"))]
+        {
+            app.get_webview_window(BROWSER_WINDOW_LABEL).map_or_else(
+                || {
+                    *state.exists.lock() = false;
+                    Err("Browser window not found".to_owned())
+                },
+                |window| {
+                    let url = window
+                        .url()
+                        .map_or_else(|_| "unknown".to_owned(), |value| value.to_string());
+                    let size = window
+                        .inner_size()
+                        .ok()
+                        .map(|inner| (f64::from(inner.width), f64::from(inner.height)));
+
+                    Ok(serde_json::json!({
+                        "filePath": null,
+                        "metadata": {
+                            "url": url,
+                            "width": size.map(|(width, _)| width),
+                            "height": size.map(|(_, height)| height),
+                            "captureMethod": "metadata_fallback"
+                        }
+                    })
+                    .to_string())
+                },
+            )
+        }
+    };
+
+    state.screenshot_in_progress.store(false, Ordering::Release);
+    result
+}
+
+/// macOS-only native screenshot path using `WKWebView.takeSnapshot`.
+#[cfg(target_os = "macos")]
+async fn browser_screenshot_native(
+    app: &AppHandle,
+    state: &State<'_, Arc<BrowserWindowState>>,
+) -> Result<String> {
+    let (tx, rx) = sync_channel::<StdResult<Vec<u8>, String>>(1);
+    let app_for_main = app.clone();
+
+    app.run_on_main_thread(move || {
+        let Some(window) = app_for_main.get_webview_window(BROWSER_WINDOW_LABEL) else {
+            let _ = tx.send(Err("Browser window not found".to_owned()));
+            return;
         };
-    ";
-    browser_eval(script.to_owned(), app, state, result_state).await
+
+        match window.ns_window() {
+            Ok(ns_window) => {
+                orbit_plugin_decorum::capture_browser_screenshot(ns_window, tx);
+            },
+            Err(e) => {
+                let _ = tx.send(Err(format!("Failed to get NSWindow handle: {e}")));
+            },
+        }
+    })
+    .map_err(|e| format!("Failed to dispatch to main thread: {e}"))?;
+
+    let result = spawn_blocking(move || rx.recv_timeout(Duration::from_secs(10)))
+        .await
+        .map_err(|e| format!("Screenshot task panicked: {e}"))?
+        .map_err(|_timeout| "Screenshot capture timed out after 10 seconds".to_owned())?;
+
+    let bytes = result.map_err(|e| {
+        if e.contains("Browser window not found") {
+            *state.exists.lock() = false;
+        }
+        format!("Screenshot capture failed: {e}")
+    })?;
+
+    let tmp = tempfile::Builder::new()
+        .prefix("orbit-screenshot-")
+        .suffix(".jpg")
+        .tempfile_in(env::temp_dir())
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+
+    fs::write(tmp.path(), &bytes).map_err(|e| format!("Failed to write screenshot: {e}"))?;
+
+    let (_, file_path) = tmp
+        .keep()
+        .map_err(|e| format!("Failed to persist temp file: {e}"))?;
+
+    // Browser may have been closed while capture was running.
+    if !*state.exists.lock() {
+        let _ = fs::remove_file(&file_path);
+        return Err("Browser closed during screenshot capture".to_owned());
+    }
+
+    let evicted = {
+        let mut files = state.screenshot_files.lock();
+        let old = (files.len() >= MAX_SCREENSHOT_FILES).then(|| files.remove(0));
+        files.push(file_path.clone());
+        old
+    };
+    if let Some(path) = evicted {
+        let _ = fs::remove_file(path);
+    }
+
+    Ok(serde_json::json!({
+        "filePath": file_path.to_string_lossy(),
+        "metadata": {
+            "captureMethod": "native_wkwebview",
+            "byteLength": bytes.len(),
+            "mimeType": "image/jpeg"
+        }
+    })
+    .to_string())
 }
 
 /// Open DevTools for the browser.
@@ -967,4 +1634,411 @@ pub async fn browser_eval_async(
     result_state: State<'_, Arc<BrowserResultState>>,
 ) -> Result<String> {
     browser_eval(script, app, state, result_state).await
+}
+
+fn build_wait_for_selector_script(selector: &str, state: &str) -> Result<String> {
+    let selector_json =
+        serde_json::to_string(selector).map_err(|e| format!("Invalid selector: {e}"))?;
+    let state_json = serde_json::to_string(state).map_err(|e| format!("Invalid state: {e}"))?;
+
+    Ok(format!(
+        "return (() => {{
+            const element = document.querySelector({selector_json});
+            const desiredState = {state_json};
+            const isVisible = (node) => {{
+                if (!(node instanceof Element)) {{
+                    return false;
+                }}
+                const style = window.getComputedStyle(node);
+                if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity || '1') === 0) {{
+                    return false;
+                }}
+                const rect = node.getBoundingClientRect();
+                return rect.width > 0 && rect.height > 0;
+            }};
+
+            switch (desiredState) {{
+                case 'attached':
+                    return element !== null;
+                case 'detached':
+                    return element === null;
+                case 'hidden':
+                    return element !== null && !isVisible(element);
+                case 'visible':
+                    return element !== null && isVisible(element);
+                default:
+                    throw new Error(`Invalid wait state: ${{desiredState}}`);
+            }}
+        }})();"
+    ))
+}
+
+fn build_wait_for_url_script(url_pattern: &str) -> Result<String> {
+    let pattern_json =
+        serde_json::to_string(url_pattern).map_err(|e| format!("Invalid URL pattern: {e}"))?;
+
+    Ok(format!(
+        "return (() => {{
+            const currentUrl = location.href;
+            const pattern = {pattern_json};
+            const lastSlash = pattern.lastIndexOf('/');
+            const looksLikeRegex = pattern.startsWith('/') && lastSlash > 0;
+
+            if (looksLikeRegex) {{
+                const source = pattern.slice(1, lastSlash);
+                const flags = pattern.slice(lastSlash + 1);
+                try {{
+                    const regex = new RegExp(source, flags);
+                    return {{
+                        matched: regex.test(currentUrl),
+                        currentUrl,
+                        regexError: null,
+                    }};
+                }} catch (error) {{
+                    return {{
+                        matched: false,
+                        currentUrl,
+                        regexError: error?.message || String(error),
+                    }};
+                }}
+            }}
+
+            return {{
+                matched: currentUrl === pattern,
+                currentUrl,
+                regexError: null,
+            }};
+        }})();"
+    ))
+}
+
+/// Wait until a selector reaches the requested DOM state.
+#[tauri::command]
+pub async fn browser_wait_for_selector(
+    selector: String,
+    state: Option<String>,
+    timeout: Option<u64>,
+    app: AppHandle,
+    browser_state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let desired_state = state.unwrap_or_else(|| "visible".to_owned());
+    let timeout_duration = normalize_wait_timeout(timeout);
+    let poll_script = build_wait_for_selector_script(&selector, &desired_state)?;
+    let poll_interval = Duration::from_millis(WAIT_POLL_INTERVAL_MS);
+    let started_at = Instant::now();
+    let mut ticker = interval(poll_interval);
+
+    loop {
+        let raw =
+            browser_eval_direct_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let matched = serde_json::from_str::<bool>(&raw)
+            .map_err(|e| format!("Failed to parse selector wait result: {e}"))?;
+        if matched {
+            return Ok(());
+        }
+
+        if started_at.elapsed() >= timeout_duration {
+            return Err(format!(
+                "browser_wait_for_selector: selector '{selector}' not found after {}ms (state: {desired_state})",
+                timeout_duration.as_millis()
+            ));
+        }
+
+        let _ = ticker.tick().await;
+    }
+}
+
+/// Wait until the current browser URL matches an exact string or regex pattern.
+#[tauri::command]
+pub async fn browser_wait_for_url(
+    url: String,
+    timeout: Option<u64>,
+    app: AppHandle,
+    browser_state: State<'_, Arc<BrowserWindowState>>,
+    result_state: State<'_, Arc<BrowserResultState>>,
+) -> Result<()> {
+    let timeout_duration = normalize_wait_timeout(timeout);
+    let poll_script = build_wait_for_url_script(&url)?;
+    let poll_interval = Duration::from_millis(WAIT_POLL_INTERVAL_MS);
+    let started_at = Instant::now();
+    let mut ticker = interval(poll_interval);
+
+    loop {
+        let raw =
+            browser_eval_direct_inner(&poll_script, &app, &browser_state, &result_state).await?;
+        let poll_result = serde_json::from_str::<UrlWaitResult>(&raw)
+            .map_err(|e| format!("Failed to parse URL wait result: {e}"))?;
+
+        if let Some(error) = poll_result.regex_error {
+            return Err(format!("Invalid URL pattern: {error}"));
+        }
+        if poll_result.matched {
+            return Ok(());
+        }
+
+        if started_at.elapsed() >= timeout_duration {
+            return Err(format!(
+                "browser_wait_for_url: URL did not match '{url}' after {}ms (current: {})",
+                timeout_duration.as_millis(),
+                poll_result.current_url
+            ));
+        }
+
+        let _ = ticker.tick().await;
+    }
+}
+
+#[cfg(test)]
+mod screenshot_cleanup_tests {
+    use super::*;
+    use std::fs;
+
+    fn make_state() -> BrowserWindowState {
+        BrowserWindowState::default()
+    }
+
+    #[tokio::test]
+    async fn cleanup_deletes_tracked_files() {
+        let state = make_state();
+        let tempdir = tempfile::tempdir().ok();
+        assert!(tempdir.is_some());
+        let Some(tempdir) = tempdir else {
+            return;
+        };
+
+        let p1 = tempdir.path().join("a.jpg");
+        let p2 = tempdir.path().join("b.jpg");
+        let _ = fs::write(&p1, b"img1");
+        let _ = fs::write(&p2, b"img2");
+        assert!(p1.exists());
+        assert!(p2.exists());
+
+        {
+            let mut files = state.screenshot_files.lock();
+            files.push(p1.clone());
+            files.push(p2.clone());
+        }
+
+        cleanup_screenshot_files(&state).await;
+
+        assert!(!p1.exists());
+        assert!(!p2.exists());
+        assert!(state.screenshot_files.lock().is_empty());
+    }
+
+    #[tokio::test]
+    async fn eviction_deletes_oldest_at_capacity() {
+        let state = make_state();
+        let tempdir = tempfile::tempdir().ok();
+        assert!(tempdir.is_some());
+        let Some(tempdir) = tempdir else {
+            return;
+        };
+
+        for i in 0..MAX_SCREENSHOT_FILES {
+            let path = tempdir.path().join(format!("{i}.jpg"));
+            let _ = fs::write(&path, b"img");
+            state.screenshot_files.lock().push(path);
+        }
+
+        let new_path = tempdir.path().join("new.jpg");
+        let _ = fs::write(&new_path, b"img");
+        assert!(new_path.exists());
+        let evicted = {
+            let mut files = state.screenshot_files.lock();
+            let old = (files.len() >= MAX_SCREENSHOT_FILES).then(|| files.remove(0));
+            files.push(new_path);
+            old
+        };
+        if let Some(path) = evicted {
+            let _ = fs::remove_file(path);
+        }
+
+        let files = state.screenshot_files.lock();
+        assert_eq!(files.len(), MAX_SCREENSHOT_FILES);
+        assert!(!tempdir.path().join("0.jpg").exists());
+        let head = files.first();
+        assert!(head.is_some());
+        let Some(head) = head else {
+            return;
+        };
+        assert_eq!(*head, tempdir.path().join("1.jpg"));
+    }
+
+    #[tokio::test]
+    async fn cleanup_is_noop_when_empty() {
+        let state = make_state();
+        cleanup_screenshot_files(&state).await;
+        assert!(state.screenshot_files.lock().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod eval_result_tests {
+    use super::*;
+    use regex::Regex;
+
+    #[tokio::test]
+    async fn handle_eval_result_url_completes_small_results() {
+        let state = BrowserResultState::new();
+        let receiver = state.register("req-small".to_owned());
+        let url = tauri::Url::parse(
+            "orbit-eval://result?id=req-small&success=true&data=%7B%22ok%22%3Atrue%7D",
+        );
+        assert!(url.is_ok());
+        let Some(url) = url.ok() else {
+            return;
+        };
+
+        assert!(handle_eval_result_url(&url, &state));
+
+        let result = receiver.await;
+        assert!(result.is_ok());
+        let Some(result) = result.ok() else {
+            return;
+        };
+        assert_eq!(result, Ok("{\"ok\":true}".to_owned()));
+    }
+
+    #[tokio::test]
+    async fn large_result_flow_waits_for_event_payload() {
+        let state = BrowserResultState::new();
+        let receiver = state.register("req-large".to_owned());
+        let url = tauri::Url::parse("orbit-eval://result?id=req-large&success=true&large=true");
+        assert!(url.is_ok());
+        let Some(url) = url.ok() else {
+            return;
+        };
+
+        assert!(handle_eval_result_url(&url, &state));
+        handle_large_eval_result_payload(
+            r#"{"evalId":"req-large","data":"{\"snapshot\":true}"}"#,
+            &state,
+        );
+
+        let result = receiver.await;
+        assert!(result.is_ok());
+        let Some(result) = result.ok() else {
+            return;
+        };
+        assert_eq!(result, Ok("{\"snapshot\":true}".to_owned()));
+    }
+
+    #[test]
+    fn normalize_wait_timeout_uses_default_and_cap() {
+        assert_eq!(
+            normalize_wait_timeout(None),
+            Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(0)),
+            Duration::from_millis(DEFAULT_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(MAX_WAIT_TIMEOUT_MS + 5_000)),
+            Duration::from_millis(MAX_WAIT_TIMEOUT_MS)
+        );
+        assert_eq!(
+            normalize_wait_timeout(Some(42_000)),
+            Duration::from_millis(42_000)
+        );
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_omits_new_function() {
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-1\"",
+            "return { ok: true };",
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(!wrapper.contains("new Function"));
+        assert!(wrapper.contains("const __result = await (async function() {"));
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_round_trips_runtime_source() {
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-2\"",
+            ORBIT_RUNTIME_SCRIPT,
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(wrapper.contains("const RUNTIME_VERSION = '1.0.0';"));
+        assert!(wrapper.contains("window.__orbit = runtime;"));
+    }
+
+    #[test]
+    fn build_browser_eval_direct_wrapper_handles_closing_tokens_in_script_body() {
+        let script_body = "const marker = '})();'; return marker;";
+        let wrapper = build_browser_eval_direct_wrapper(
+            "\"eval-3\"",
+            script_body,
+            SMALL_EVAL_RESULT_LIMIT_CHARS,
+            LARGE_EVAL_RESULT_LIMIT_CHARS,
+        );
+
+        assert!(wrapper.contains(script_body));
+        assert!(wrapper.ends_with("})();"));
+    }
+
+    #[test]
+    fn orbit_runtime_method_round_trips_all_variants() {
+        for method in OrbitRuntimeMethod::all() {
+            let round_trip = OrbitRuntimeMethod::from_input(method.as_js_name());
+            assert_eq!(round_trip, Ok(*method));
+        }
+    }
+
+    #[test]
+    fn orbit_runtime_method_rejects_unknown_and_adversarial_inputs() {
+        assert_eq!(
+            OrbitRuntimeMethod::from_input("unknown"),
+            Err("Unsupported Orbit runtime method: unknown".to_owned())
+        );
+        assert_eq!(
+            OrbitRuntimeMethod::from_input("'); process.exit(1); //"),
+            Err("Unsupported Orbit runtime method: '); process.exit(1); //".to_owned())
+        );
+    }
+
+    #[test]
+    fn runtime_allowlist_matches_runtime_public_methods() {
+        let pattern = Regex::new(r"(?m)^ {4}([A-Za-z][A-Za-z0-9]*)\([^)]*\) \{$");
+        assert!(pattern.is_ok());
+        let Some(pattern) = pattern.ok() else {
+            return;
+        };
+
+        let mut runtime_methods = pattern
+            .captures_iter(ORBIT_RUNTIME_SCRIPT)
+            .filter_map(|captures| captures.get(1).map(|capture| capture.as_str().to_owned()))
+            .filter(|name| name != "getUrl" && name != "getTitle")
+            .collect::<Vec<_>>();
+        let mut allowlist_methods = OrbitRuntimeMethod::all()
+            .iter()
+            .map(|method| method.as_js_name().to_owned())
+            .collect::<Vec<_>>();
+
+        runtime_methods.sort_unstable();
+        runtime_methods.dedup();
+        allowlist_methods.sort_unstable();
+
+        assert_eq!(runtime_methods, allowlist_methods);
+    }
+
+    #[test]
+    fn expected_runtime_version_matches_bundled_runtime() {
+        assert_eq!(expected_orbit_runtime_version(), Ok("1.0.0"));
+    }
+
+    #[test]
+    fn browser_get_url_requires_existing_browser_state() {
+        let state = BrowserWindowState::default();
+        let result = ensure_browser_exists(&state);
+        assert_eq!(result, Err("No browser exists".to_owned()));
+    }
 }

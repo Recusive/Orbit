@@ -10,7 +10,7 @@
  * Answers come from `toolInput.answers` (merged at approval time by
  * `mergeToolInputAnswers`) with `toolOutput` JSON as fallback.
  */
-import { ChevronRight, MessageCircleQuestion, XCircle } from 'lucide-react';
+import { ChevronRight, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 
@@ -115,24 +115,17 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse question details' : 'Expand question details'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name */}
+        {/* Left: tool name */}
         <div className="flex items-center gap-2 shrink-0">
-          <MessageCircleQuestion
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span className={cn('text-sm font-medium truncate', 'text-lg-text-secondary')}>
+          <span className={cn('text-base font-medium truncate', 'text-foreground')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           <ChevronRight
             className={cn(

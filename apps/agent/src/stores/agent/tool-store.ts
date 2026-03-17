@@ -108,6 +108,7 @@ const StoredToolExecutionSchema = z.object({
   completedAt: z.number().optional(),
   success: z.boolean().optional(),
   contentOffset: z.number().optional(),
+  ordinal: z.number().optional(),
 });
 
 /** Schema for validating array of persisted tools */
@@ -145,6 +146,9 @@ function toToolExecution(stored: StoredToolExecution): ToolExecution {
   }
   if (stored.contentOffset !== undefined) {
     tool.contentOffset = stored.contentOffset;
+  }
+  if (stored.ordinal !== undefined) {
+    tool.ordinal = stored.ordinal;
   }
 
   return tool;
@@ -193,6 +197,9 @@ function sanitizeToolForPersistence(tool: ToolExecution): ToolExecution {
   if (tool.contentOffset !== undefined) {
     sanitized.contentOffset = tool.contentOffset;
   }
+  if (tool.ordinal !== undefined) {
+    sanitized.ordinal = tool.ordinal;
+  }
 
   return sanitized;
 }
@@ -229,6 +236,7 @@ export interface ToolExecution {
   success?: boolean;
   // Content offset - where in the message content this tool was invoked
   contentOffset?: number | undefined;
+  ordinal?: number | undefined;
   // Session this tool belongs to — prevents cross-session cache contamination
   // when tools arrive for a background streaming session while viewing another.
   sessionId?: string | undefined;
@@ -298,7 +306,8 @@ export interface ToolState {
     toolName: string,
     toolInput: Record<string, unknown>,
     contentOffset?: number,
-    sessionId?: string
+    sessionId?: string,
+    ordinal?: number
   ) => void;
   completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
 
@@ -343,6 +352,8 @@ export interface ToolState {
       input: Record<string, unknown>;
       output?: string | undefined;
       success: boolean;
+      contentOffset?: number | undefined;
+      ordinal?: number | undefined;
     }[],
     sessionId?: string
   ) => void;
@@ -442,7 +453,8 @@ export const useToolStore = create<ToolState>()(
         toolName: string,
         toolInput: Record<string, unknown>,
         contentOffset?: number,
-        sessionId?: string
+        sessionId?: string,
+        ordinal?: number
       ) => {
         logger.debug(`Tool started: ${toolName}`, { id, messageId });
         set((state) => {
@@ -454,6 +466,7 @@ export const useToolStore = create<ToolState>()(
             status: 'running',
             startedAt: Date.now(),
             contentOffset,
+            ordinal,
             sessionId,
           };
           state.activeTools[id] = tool;
@@ -776,6 +789,7 @@ export const useToolStore = create<ToolState>()(
           output?: string | undefined;
           success: boolean;
           contentOffset?: number | undefined;
+          ordinal?: number | undefined;
         }[],
         sessionId?: string
       ) => {
@@ -802,6 +816,7 @@ export const useToolStore = create<ToolState>()(
               completedAt: 0, // Not available from persisted data
               success: tool.success,
               contentOffset: tool.contentOffset,
+              ordinal: tool.ordinal,
               sessionId: sessionId ?? state.currentSessionId ?? undefined,
             };
 

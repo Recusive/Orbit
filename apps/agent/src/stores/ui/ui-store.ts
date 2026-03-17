@@ -101,6 +101,7 @@ interface UIState {
   conversations: ConversationSummary[];
   // Conversation editing state (for inline rename)
   editingConversationId: string | null;
+  titleLoadingSessions: Set<string>;
   // Left Sidebar
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
@@ -156,6 +157,7 @@ interface UIActions {
   remapConversation: (oldSessionId: string, newSessionId: string) => void;
   updateConversationTitle: (sessionId: string, title: string) => void;
   setEditingConversationId: (id: string | null) => void;
+  setTitleLoading: (sessionId: string, loading: boolean) => void;
   // Sidebar actions
   toggleLeftSidebar: () => void;
   expandLeftSidebar: () => void;
@@ -210,6 +212,63 @@ interface UIActions {
 type UIStore = UIState & UIActions;
 
 // Conversations are loaded from disk (JSONL files) — no localStorage persistence needed.
+
+// ============================================
+// Demo Mode Panel Overrides (synchronous, before store creation)
+// ============================================
+
+/**
+ * Read demo panel params from URL at module load time.
+ * Returns overrides only when `?demo=true` is present.
+ *
+ * This runs ONCE at module evaluation — before any React render.
+ * Prevents the "panel flash" where DEFAULT_UI_STATE renders one frame
+ * then the useEffect applies URL param overrides 800ms later.
+ */
+function getDemoPanelOverrides(): Partial<UIState> {
+  if (typeof window === 'undefined') return {};
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('demo') !== 'true') return {};
+
+  const overrides: Partial<UIState> = {};
+
+  const sidebar = params.get('sidebar');
+  if (sidebar !== null) {
+    const width = Number(sidebar);
+    overrides.leftSidebarWidth = width;
+    overrides.leftSidebarOpen = width > SIDEBAR.collapsed;
+    overrides.lastExpandedSidebarWidth = width > SIDEBAR.collapsed ? width : SIDEBAR.expanded;
+  }
+
+  const rightPanel = params.get('rightPanel');
+  if (rightPanel !== null) {
+    overrides.rightSidebarOpen = rightPanel === 'true';
+  }
+
+  const bottomPanel = params.get('bottomPanel');
+  if (bottomPanel !== null) {
+    overrides.bottomPanelOpen = bottomPanel === 'true';
+  }
+
+  const reviewPanel = params.get('reviewPanel');
+  if (reviewPanel !== null) {
+    overrides.reviewPanelOpen = reviewPanel === 'true';
+  }
+
+  const rightPanelWidth = params.get('rightPanelWidth');
+  if (rightPanelWidth !== null) {
+    const width = Number(rightPanelWidth);
+    overrides.reviewPanelWidth = Math.max(
+      PANEL_SIZES.review.min,
+      Math.min(PANEL_SIZES.review.max, width)
+    );
+  }
+
+  return overrides;
+}
+
+/** Evaluated once at module load — empty object for non-demo usage */
+const DEMO_PANEL_OVERRIDES = getDemoPanelOverrides();
 
 // Helper to load worktrees from localStorage
 // Uses Zod validation to prevent runtime errors from malformed data
@@ -280,13 +339,15 @@ export const useUIStore = create<UIStore>()(
     isConversationTransitioning: false,
     conversations: [],
     editingConversationId: null,
-    leftSidebarOpen: DEFAULT_UI_STATE.leftSidebarOpen,
-    leftSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    lastExpandedSidebarWidth: DEFAULT_UI_STATE.leftSidebarWidth,
-    reviewPanelOpen: DEFAULT_UI_STATE.reviewPanelOpen,
-    reviewPanelWidth: DEFAULT_UI_STATE.reviewPanelWidth,
-    rightSidebarOpen: DEFAULT_UI_STATE.rightSidebarOpen,
-    bottomPanelOpen: DEFAULT_UI_STATE.bottomPanelOpen,
+    titleLoadingSessions: new Set<string>(),
+    leftSidebarOpen: DEMO_PANEL_OVERRIDES.leftSidebarOpen ?? DEFAULT_UI_STATE.leftSidebarOpen,
+    leftSidebarWidth: DEMO_PANEL_OVERRIDES.leftSidebarWidth ?? DEFAULT_UI_STATE.leftSidebarWidth,
+    lastExpandedSidebarWidth:
+      DEMO_PANEL_OVERRIDES.lastExpandedSidebarWidth ?? DEFAULT_UI_STATE.leftSidebarWidth,
+    reviewPanelOpen: DEMO_PANEL_OVERRIDES.reviewPanelOpen ?? DEFAULT_UI_STATE.reviewPanelOpen,
+    reviewPanelWidth: DEMO_PANEL_OVERRIDES.reviewPanelWidth ?? DEFAULT_UI_STATE.reviewPanelWidth,
+    rightSidebarOpen: DEMO_PANEL_OVERRIDES.rightSidebarOpen ?? DEFAULT_UI_STATE.rightSidebarOpen,
+    bottomPanelOpen: DEMO_PANEL_OVERRIDES.bottomPanelOpen ?? DEFAULT_UI_STATE.bottomPanelOpen,
     bottomPanelHeight: DEFAULT_UI_STATE.bottomPanelHeight,
     bottomPanelTab: 'terminal' as BottomPanelTab,
     terminalPosition: 'activity' as TerminalPosition,
@@ -487,6 +548,16 @@ export const useUIStore = create<UIStore>()(
     setEditingConversationId: (id: string | null): void => {
       set((state) => {
         state.editingConversationId = id;
+      });
+    },
+
+    setTitleLoading: (sessionId: string, loading: boolean): void => {
+      set((state) => {
+        if (loading) {
+          state.titleLoadingSessions.add(sessionId);
+        } else {
+          state.titleLoadingSessions.delete(sessionId);
+        }
       });
     },
 
@@ -873,6 +944,12 @@ export const useActiveConversationId = (): string | null => {
 
 export const useActiveConversationTitle = (): string | null => {
   return useUIStore((state) => state.activeConversationTitle);
+};
+
+export const useIsTitleLoading = (sessionId: string | null): boolean => {
+  return useUIStore((state) =>
+    sessionId !== null ? state.titleLoadingSessions.has(sessionId) : false
+  );
 };
 
 export const useIsLoadingConversation = (): boolean => {

@@ -81,7 +81,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               aria-describedby={undefined}
               className={cn(
                 'relative z-10 w-[720px] max-w-[90vw] h-[600px] max-h-[85vh]',
-                'bg-sidebar border-0 shadow-none',
+                'glass-surface',
                 'rounded-[14px] overflow-hidden flex flex-col',
                 'duration-200',
                 'data-[state=open]:animate-in data-[state=closed]:animate-out',
@@ -95,7 +95,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
               </DialogPrimitive.Title>
 
               {/* Title bar */}
-              <div className="flex items-center justify-between px-4 py-2.5 bg-sidebar">
+              <div className="flex items-center justify-between px-4 py-2.5">
                 <div className="flex items-center gap-2 font-medium text-base">
                   <SFSymbol
                     name="gear"
@@ -109,7 +109,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                   <span>{activeItem.icon}</span>
                   <span>{activeItem.label}</span>
                 </div>
-                <DialogPrimitive.Close className="rounded-md p-1 text-lg-text-secondary hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[opacity,background-color,color,transform] duration-150">
+                <DialogPrimitive.Close className="rounded-[9px] p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:scale-95">
                   <X className="h-4 w-4" />
                   <span className="sr-only">Close</span>
                 </DialogPrimitive.Close>
@@ -121,7 +121,7 @@ export const SettingsDialog: FC<SettingsDialogProps> = ({
                 <SettingsSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
 
                 {/* Main content */}
-                <div className="flex-1 overflow-auto bg-sidebar relative">
+                <div className="flex-1 overflow-auto relative">
                   {/* Static sections - render via lazy components (unmounted when inactive) */}
                   {!isAsyncSection && (
                     <div

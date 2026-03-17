@@ -66,6 +66,9 @@ export interface CommandsState {
   /** Whether skills have been successfully fetched at least once */
   hasSkillsFetched: boolean;
 
+  /** Monotonic counter to prevent stale refresh responses from overwriting newer data */
+  skillsRefreshSeq: number;
+
   /** Error message if fetch failed */
   error: string | null;
 
@@ -80,6 +83,9 @@ export interface CommandsState {
 
   /** Force refresh commands (ignores cache) */
   refreshCommands: () => Promise<void>;
+
+  /** Force refresh skills (ignores cache, sequenced to prevent stale overwrites) */
+  refreshSkills: () => Promise<void>;
 
   /** Clear error state and allow immediate retry */
   clearError: () => void;
@@ -105,6 +111,7 @@ export const useCommandsStore = create<CommandsState>()(
     isLoading: false,
     hasFetched: false,
     hasSkillsFetched: false,
+    skillsRefreshSeq: 0,
     error: null,
     lastFetchAttempt: null,
 
@@ -183,6 +190,45 @@ export const useCommandsStore = create<CommandsState>()(
         set((draft) => {
           draft.isLoading = false;
           draft.error = errorMessage;
+        });
+      }
+    },
+
+    refreshSkills: async () => {
+      const refreshSeq = get().skillsRefreshSeq + 1;
+
+      set((draft) => {
+        draft.skillsRefreshSeq = refreshSeq;
+        draft.isLoading = true;
+        draft.error = null;
+      });
+
+      try {
+        const workspacePath = await getWorkspacePathSafe();
+        const skills = await fetchSkillsFromBackend(workspacePath);
+
+        logger.info(`Skills refreshed successfully (${String(skills.length)} skills)`);
+
+        set((draft) => {
+          if (draft.skillsRefreshSeq !== refreshSeq) {
+            return;
+          }
+
+          draft.skills = skills;
+          draft.isLoading = false;
+          draft.hasSkillsFetched = true;
+        });
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : 'Failed to refresh skills';
+        logger.warn(`Failed to refresh skills: ${errorMessage}`);
+
+        set((draft) => {
+          if (draft.skillsRefreshSeq !== refreshSeq) {
+            return;
+          }
+
+          draft.isLoading = false;
+          // Skills are non-critical — don't set error to avoid blocking command UI
         });
       }
     },

@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -94,29 +94,17 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
         aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
         aria-expanded={isExpanded}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 text-sm',
-          'cursor-pointer w-full text-left rounded-xl',
-          isFailed && 'border-2 border-dotted border-destructive/40'
+          'group flex items-center gap-1.5 py-1.5 text-base',
+          'cursor-pointer w-full text-left rounded-xl'
         )}
       >
-        {/* Left: icon + tool name + spinner */}
+        {/* Left: tool name + spinner */}
         <div className="flex items-center gap-2 shrink-0">
-          <Bot
-            className={cn(
-              'h-4 w-4 shrink-0',
-              isFailed ? 'text-destructive/60' : 'text-foreground',
-              isRunning && 'animate-pulse'
-            )}
-          />
-
-          <span
-            className={cn(
-              'text-sm font-medium truncate',
-              isFailed ? 'text-foreground line-through' : 'text-foreground'
-            )}
-          >
+          <span className={cn('text-base font-medium truncate', 'text-foreground')}>
             {statusLabel}
           </span>
+
+          {isFailed ? <XCircle className="h-3 w-3 text-destructive/60 shrink-0" /> : null}
 
           {isRunning ? (
             <Loader2 className="h-2.5 w-2.5 animate-spin text-lg-text-secondary shrink-0" />
@@ -147,11 +135,11 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
             style={{ overflow: 'hidden' }}
           >
             {/* Content box */}
-            <div className="min-w-0 my-1.5 rounded-xl border border-black/10 dark:border-white/5 bg-chat-area dark:bg-[oklch(23%_0_0)] overflow-hidden">
+            <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">
               {/* Task details */}
               <div className="px-3 py-2">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase">
+                  <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize">
                     agent
                   </div>
                   <span className="px-1 py-0.5 rounded bg-lg-control text-sm font-medium text-foreground">
@@ -159,7 +147,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                   </span>
                   {model ? <span className="text-sm text-muted-foreground">({model})</span> : null}
                 </div>
-                <div className="text-[9px] font-medium tracking-wide text-muted-foreground uppercase mb-1">
+                <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1">
                   prompt
                 </div>
                 <div className="text-sm text-lg-text-secondary line-clamp-3" title={prompt}>

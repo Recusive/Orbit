@@ -52,23 +52,41 @@ export interface BrowserToolResponsePayload {
   error?: string | undefined;
 }
 
-/** Screenshot/page info response */
+/** Browser screenshot response payload */
 export interface BrowserScreenshotInfo {
-  /** Current URL */
-  url: string;
-  /** Page title */
-  title: string;
-  /** Viewport width */
-  width: number;
-  /** Viewport height */
-  height: number;
-  /** Horizontal scroll position */
-  scrollX: number;
-  /** Vertical scroll position */
-  scrollY: number;
-  /** Device pixel ratio (for retina displays) */
-  devicePixelRatio: number;
+  /** Path to saved JPEG file when capture succeeds */
+  filePath: string | null;
+  /** Capture metadata (always present) */
+  metadata: Record<string, unknown>;
 }
+
+export type OrbitRuntimeMethod =
+  | 'snapshot'
+  | 'click'
+  | 'type'
+  | 'fill'
+  | 'getText'
+  | 'getHtml'
+  | 'count'
+  | 'check'
+  | 'uncheck'
+  | 'select'
+  | 'hover'
+  | 'focus'
+  | 'scroll'
+  | 'scrollIntoView'
+  | 'isVisible'
+  | 'isEnabled'
+  | 'getAttribute'
+  | 'boundingBox'
+  | 'getCookies'
+  | 'clearCookies'
+  | 'storageGet'
+  | 'storageSet'
+  | 'storageClear'
+  | 'getNetworkRequests'
+  | 'getConsoleLogs'
+  | 'runtimeInfo';
 
 // ============================================
 // Embedded Browser Operations
@@ -177,35 +195,62 @@ export async function browserEvalAsync(script: string, timeoutMs?: number): Prom
 }
 
 /**
- * Capture browser screenshot (page info).
+ * Invoke an allowlisted Orbit runtime method inside the embedded browser.
+ */
+export async function browserInvokeRuntime(
+  method: OrbitRuntimeMethod,
+  args: unknown[]
+): Promise<string> {
+  logger.debug('Invoking Orbit runtime method', { method });
+  return invoke<string>('browser_invoke_runtime', {
+    method,
+    argsJson: JSON.stringify(args),
+  });
+}
+
+/**
+ * Read the current Orbit runtime version from the page, if present.
+ */
+export async function browserRuntimeVersion(): Promise<string | null> {
+  return invoke<string | null>('browser_runtime_version');
+}
+
+/**
+ * Ensure the Orbit runtime is installed and up to date.
+ */
+export async function browserEnsureRuntime(): Promise<void> {
+  return invoke('browser_ensure_runtime');
+}
+
+/**
+ * Return the current page URL from the embedded browser.
+ */
+export async function browserGetUrl(): Promise<string> {
+  return invoke<string>('browser_get_url');
+}
+
+/**
+ * Return the current document title from the embedded browser.
+ */
+export async function browserGetTitle(): Promise<string> {
+  return invoke<string>('browser_get_title');
+}
+
+/**
+ * Capture browser screenshot payload.
  *
- * Currently returns page metadata (URL, title, dimensions).
- * Full pixel capture would require html2canvas or native webview API.
- *
- * @returns JSON-serialized page information
+ * Returns JSON with `filePath` (temp JPEG path or null) and `metadata`.
  *
  * @example
  * ```ts
- * const infoJson = await browserScreenshot();
- * const info: BrowserScreenshotInfo = JSON.parse(infoJson);
- * console.log(`${info.title} (${info.width}x${info.height})`);
+ * const screenshotJson = await browserScreenshot();
+ * const screenshot: BrowserScreenshotInfo = JSON.parse(screenshotJson);
+ * console.log(screenshot.filePath ? 'saved to file' : 'metadata only');
  * ```
  */
 export async function browserScreenshot(): Promise<string> {
   logger.debug('Capturing browser screenshot');
   return invoke<string>('browser_screenshot');
-}
-
-/**
- * Capture browser screenshot and parse the result.
- *
- * Convenience wrapper around `browserScreenshot` that parses the JSON.
- *
- * @returns Parsed page information
- */
-export async function browserScreenshotInfo(): Promise<BrowserScreenshotInfo> {
-  const json = await browserScreenshot();
-  return JSON.parse(json) as BrowserScreenshotInfo;
 }
 
 /**
@@ -249,6 +294,24 @@ export async function browserReload(): Promise<void> {
  */
 export async function browserStop(): Promise<void> {
   return invoke('browser_stop');
+}
+
+/**
+ * Wait for a selector to reach the requested state in the embedded browser.
+ */
+export async function browserWaitForSelector(
+  selector: string,
+  state?: string,
+  timeout?: number
+): Promise<void> {
+  return invoke('browser_wait_for_selector', { selector, state, timeout });
+}
+
+/**
+ * Wait for the current browser URL to match the requested pattern.
+ */
+export async function browserWaitForUrl(url: string, timeout?: number): Promise<void> {
+  return invoke('browser_wait_for_url', { url, timeout });
 }
 
 // ============================================

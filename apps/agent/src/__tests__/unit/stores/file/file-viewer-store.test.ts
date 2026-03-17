@@ -50,6 +50,25 @@ function createMockDiffData(oldContent: string, newContent: string): ViewedFileD
   return { oldContent, newContent, diff };
 }
 
+function createMockImageData(overrides?: {
+  assetUrl?: string;
+  mimeType?: string;
+  fileSize?: number;
+  svgSourceView?: boolean;
+}): {
+  assetUrl: string;
+  mimeType: string;
+  fileSize: number;
+  svgSourceView?: boolean;
+} {
+  return {
+    assetUrl: 'http://asset.localhost/assets/photo.png',
+    mimeType: 'image/png',
+    fileSize: 2048,
+    ...overrides,
+  };
+}
+
 describe('file-viewer-store', () => {
   beforeEach(() => {
     resetStore();
@@ -201,9 +220,11 @@ describe('file-viewer-store', () => {
         content: 'const x = 1;',
         originalContent: 'const x = 1;',
         language: 'typescript',
+        fileType: 'text',
         viewMode: 'file',
         isModified: false,
       });
+      expect(state.openTabs[0]?.instanceId).toBeGreaterThan(0);
       expect(state.activeTabPath).toBe('/src/file.ts');
     });
 
@@ -265,6 +286,21 @@ describe('file-viewer-store', () => {
       openFile('/src/file.ts');
 
       expect(useFileViewerStore.getState().openTabs[0]?.content).toBe('');
+    });
+
+    it('should assign a new instanceId when the same path is reopened', () => {
+      const { closeTab, openFile } = useFileViewerStore.getState();
+
+      openFile('/src/file.ts');
+      const firstInstanceId = useFileViewerStore.getState().openTabs[0]?.instanceId;
+
+      closeTab('/src/file.ts');
+      openFile('/src/file.ts');
+      const secondInstanceId = useFileViewerStore.getState().openTabs[0]?.instanceId;
+
+      expect(firstInstanceId).toBeDefined();
+      expect(secondInstanceId).toBeDefined();
+      expect(secondInstanceId).not.toBe(firstInstanceId);
     });
   });
 
@@ -551,6 +587,63 @@ describe('file-viewer-store', () => {
       const state = useFileViewerStore.getState();
       expect(state.isLoading).toBe(false);
       expect(state.loadingPath).toBeNull();
+    });
+  });
+
+  // ============================================================================
+  // setImageFile / updateImageData
+  // ============================================================================
+
+  describe('image tabs', () => {
+    it('should update an existing tab with image metadata', () => {
+      const { openFile, setImageFile } = useFileViewerStore.getState();
+
+      openFile('/assets/photo.png');
+      const tab = useFileViewerStore.getState().openTabs[0];
+      expect(tab).toBeDefined();
+
+      setImageFile('/assets/photo.png', tab?.instanceId ?? 0, createMockImageData());
+
+      const updatedTab = useFileViewerStore.getState().openTabs[0];
+      expect(updatedTab?.fileType).toBe('image');
+      expect(updatedTab?.imageData).toEqual(createMockImageData());
+    });
+
+    it('should drop a stale image result when instanceId does not match', () => {
+      const { openFile, setImageFile, setLoading } = useFileViewerStore.getState();
+
+      openFile('/assets/photo.png');
+      setLoading(true, '/assets/photo.png');
+
+      setImageFile('/assets/photo.png', 999_999, createMockImageData());
+
+      const state = useFileViewerStore.getState();
+      expect(state.openTabs[0]?.fileType).toBe('text');
+      expect(state.openTabs[0]?.imageData).toBeUndefined();
+      expect(state.isLoading).toBe(false);
+      expect(state.loadingPath).toBeNull();
+    });
+
+    it('should update image data in place', () => {
+      const { openFile, setImageFile, updateImageData } = useFileViewerStore.getState();
+
+      openFile('/assets/diagram.svg');
+      const tab = useFileViewerStore.getState().openTabs[0];
+      expect(tab).toBeDefined();
+
+      setImageFile(
+        '/assets/diagram.svg',
+        tab?.instanceId ?? 0,
+        createMockImageData({
+          assetUrl: 'http://asset.localhost/assets/diagram.svg',
+          mimeType: 'image/svg+xml',
+          svgSourceView: false,
+        })
+      );
+
+      updateImageData('/assets/diagram.svg', { svgSourceView: true });
+
+      expect(useFileViewerStore.getState().openTabs[0]?.imageData?.svgSourceView).toBe(true);
     });
   });
 
