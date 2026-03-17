@@ -6,6 +6,7 @@ import { createChatOpenHandlers } from './handlers/chat-actions';
 import { useOcChat } from './use-oc-chat';
 import { useOcStreamingReveal } from './use-oc-streaming-reveal';
 
+import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage, ThinkingBlock } from '@/components/chat/messages';
 import type {
   PermissionRequest,
@@ -541,7 +542,7 @@ interface UseOcChatAdapterResult {
   handleSend: (
     text: string,
     contextFiles?: string[],
-    images?: unknown[],
+    images?: ImageAttachment[],
     elements?: unknown[],
     skills?: string[]
   ) => void;
@@ -672,7 +673,7 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
   const open = useMemo(() => createChatOpenHandlers({ postMessage }), [postMessage]);
 
   const handleSend = useCallback(
-    (text: string): void => {
+    (text: string, _contextFiles?: string[], images?: ImageAttachment[]): void => {
       const trimmed = text.trim();
       if (trimmed === '/compact' || trimmed === '/summarize') {
         if (sessionId === null) {
@@ -708,11 +709,17 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
         return;
       }
 
+      const modelSupportsImages =
+        useOcProviderStore.getState().providers.find((provider) => provider.id === providerId)
+          ?.models[modelId ?? '']?.supportsImageInput ?? true;
+      const safeImages = modelSupportsImages ? images : undefined;
+
       void send(text, {
         agent,
         ...(providerId ? { providerId } : {}),
         ...(modelId ? { modelId } : {}),
         ...(variant ? { variant } : {}),
+        ...(safeImages && safeImages.length > 0 ? { images: safeImages } : {}),
       });
     },
     [agent, modelId, providerId, send, sessionId, variant]

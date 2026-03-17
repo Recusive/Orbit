@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
+import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QuestionRequest } from '@orbit.build/sdk/v2/client';
 
@@ -617,6 +618,110 @@ describe('useOcChatAdapter', () => {
 
     await waitFor(() => {
       expect(handleSend).toHaveBeenCalledWith('Hello', {
+        agent: 'build',
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        variant: 'high',
+      });
+    });
+  });
+
+  it('forwards images to send() when provided', async () => {
+    const handleSend = vi.fn(() => Promise.resolve());
+    const images: ImageAttachment[] = [
+      {
+        name: 'test.png',
+        mimeType: 'image/png',
+        data: 'abc',
+        previewUrl: '',
+      },
+    ];
+
+    mockUseOcChat.mockReturnValue({
+      sessionId: 'oc-session',
+      activeSessionTitle: 'OpenCode Session',
+      revertMessageId: null,
+      messages: [],
+      permissions: [],
+      questions: [],
+      status: { type: 'idle' },
+      isAgentBusy: false,
+      handleSend,
+      handleStop: vi.fn(() => Promise.resolve()),
+      handlePermissionReply: vi.fn(() => Promise.resolve()),
+      handleQuestionReply: vi.fn(() => Promise.resolve()),
+      handleQuestionReject: vi.fn(() => Promise.resolve()),
+    });
+
+    const { result } = renderHook(() => useOcChatAdapter());
+
+    result.current.handleSend('describe this', undefined, images);
+
+    await waitFor(() => {
+      expect(handleSend).toHaveBeenCalledWith('describe this', {
+        agent: 'build',
+        providerId: 'anthropic',
+        modelId: 'claude-sonnet-4-5',
+        variant: 'high',
+        images,
+      });
+    });
+  });
+
+  it('strips images before send() when the selected model does not support image input', async () => {
+    const handleSend = vi.fn(() => Promise.resolve());
+    const images: ImageAttachment[] = [
+      {
+        name: 'test.png',
+        mimeType: 'image/png',
+        data: 'abc',
+        previewUrl: '',
+      },
+    ];
+
+    useOcProviderStore.setState({
+      providers: [
+        {
+          id: 'anthropic',
+          name: 'Anthropic',
+          env: [],
+          models: {
+            'claude-sonnet-4-5': {
+              id: 'claude-sonnet-4-5',
+              name: 'Claude Sonnet 4.5',
+              supportsImageInput: false,
+              variants: {
+                high: {},
+                max: {},
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    mockUseOcChat.mockReturnValue({
+      sessionId: 'oc-session',
+      activeSessionTitle: 'OpenCode Session',
+      revertMessageId: null,
+      messages: [],
+      permissions: [],
+      questions: [],
+      status: { type: 'idle' },
+      isAgentBusy: false,
+      handleSend,
+      handleStop: vi.fn(() => Promise.resolve()),
+      handlePermissionReply: vi.fn(() => Promise.resolve()),
+      handleQuestionReply: vi.fn(() => Promise.resolve()),
+      handleQuestionReject: vi.fn(() => Promise.resolve()),
+    });
+
+    const { result } = renderHook(() => useOcChatAdapter());
+
+    result.current.handleSend('describe this', undefined, images);
+
+    await waitFor(() => {
+      expect(handleSend).toHaveBeenCalledWith('describe this', {
         agent: 'build',
         providerId: 'anthropic',
         modelId: 'claude-sonnet-4-5',

@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useContainerWidth } from '@/hooks/ui';
 import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
 import { useActiveBackend } from '@/stores/backend';
-import { useOcProviderStore } from '@/stores/opencode';
+import { useOcProviderStore, useOcSelectedModelSupportsImageInput } from '@/stores/opencode';
 import { getCapabilities } from '@/types/backend';
 
 type OcAgent = 'build' | 'plan' | 'explore';
@@ -80,6 +80,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
 }) {
   const activeBackend = useActiveBackend();
   const capabilities = getCapabilities(activeBackend);
+  const ocSupportsImages = useOcSelectedModelSupportsImageInput();
   const ocAgent = useOcProviderStore((state) => state.selectedAgent);
   const setOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
   const ocProviders = useOcProviderStore((state) => state.providers);
@@ -105,6 +106,8 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   const showThinkingControl = capabilities.thinkingMode && !isAdaptiveModel;
   const showCompactMenu = showEffortControl || showThinkingControl;
   const shouldShowContext = maxTokens > 0;
+  const supportsImages = activeBackend === 'opencode' ? ocSupportsImages : true;
+  const imageTooltip = supportsImages ? 'Attach image' : "This model doesn't support images";
   const cycleOcAgent = (): void => {
     setOcAgent(getNextOcAgent(ocAgent));
   };
@@ -224,22 +227,28 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
             {/* Image Button - stays visible in compact mode */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={handleImageClick}
-                  aria-label="Attach image"
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                    'bg-transparent text-muted-foreground/70',
-                    TRANSITION_CLASSES.button,
-                    'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                    'active:scale-95',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                  )}
-                >
-                  <Image className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <span className="inline-flex">
+                  <button
+                    onClick={handleImageClick}
+                    disabled={!supportsImages}
+                    aria-label="Attach image"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-[9px]',
+                      supportsImages
+                        ? 'bg-transparent text-muted-foreground/70'
+                        : 'bg-transparent text-muted-foreground/30 cursor-not-allowed',
+                      supportsImages && TRANSITION_CLASSES.button,
+                      supportsImages &&
+                        'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
+                      supportsImages && 'active:scale-95',
+                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                    )}
+                  >
+                    <Image className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Attach image</TooltipContent>
+              <TooltipContent>{imageTooltip}</TooltipContent>
             </Tooltip>
           </>
         ) : (
@@ -268,22 +277,28 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
             {/* Image Button */}
             <Tooltip>
               <TooltipTrigger asChild>
-                <button
-                  onClick={handleImageClick}
-                  aria-label="Attach image"
-                  className={cn(
-                    'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                    'bg-transparent text-muted-foreground/70',
-                    TRANSITION_CLASSES.button,
-                    'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                    'active:scale-95',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                  )}
-                >
-                  <Image className="h-4 w-4" aria-hidden="true" />
-                </button>
+                <span className="inline-flex">
+                  <button
+                    onClick={handleImageClick}
+                    disabled={!supportsImages}
+                    aria-label="Attach image"
+                    className={cn(
+                      'h-7 w-7 flex items-center justify-center rounded-[9px]',
+                      supportsImages
+                        ? 'bg-transparent text-muted-foreground/70'
+                        : 'bg-transparent text-muted-foreground/30 cursor-not-allowed',
+                      supportsImages && TRANSITION_CLASSES.button,
+                      supportsImages &&
+                        'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
+                      supportsImages && 'active:scale-95',
+                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
+                    )}
+                  >
+                    <Image className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </span>
               </TooltipTrigger>
-              <TooltipContent>Attach image</TooltipContent>
+              <TooltipContent>{imageTooltip}</TooltipContent>
             </Tooltip>
           </>
         )}

@@ -7,6 +7,7 @@ export interface OcProviderModel {
   readonly id: string;
   readonly name: string;
   readonly reasoning?: boolean;
+  readonly supportsImageInput?: boolean;
   readonly variants?: Record<string, Record<string, unknown>>;
   readonly limit?: {
     readonly context: number;
@@ -173,4 +174,24 @@ export const useOcSelectedModelContextLimit = (): number =>
     const provider = state.providers.find((p) => p.id === state.selectedProviderId);
     const model = provider?.models[state.selectedModelId];
     return model?.limit?.context ?? 0;
+  });
+
+/**
+ * Returns whether the currently selected OpenCode model supports image input.
+ * Defaults to true when no provider/model is selected (boot state, no model loaded yet).
+ *
+ * NOTE: This selector is OpenCode-specific. Callers in shared components MUST gate
+ * with `activeBackend === 'opencode'` — Claude always supports images.
+ */
+export const useOcSelectedModelSupportsImageInput = (): boolean =>
+  useOcProviderStore((state) => {
+    if (state.selectedProviderId === null || state.selectedModelId === null) {
+      return true;
+    }
+    const provider = state.providers.find((p) => p.id === state.selectedProviderId);
+    const model = provider?.models[state.selectedModelId];
+    if (model === undefined) {
+      return true;
+    }
+    return model.supportsImageInput ?? true;
   });

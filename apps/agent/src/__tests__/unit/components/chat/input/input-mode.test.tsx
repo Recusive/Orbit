@@ -514,3 +514,80 @@ describe('InputControls Mode Picker Edge Cases', () => {
     expect(cycleInputMode).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('InputControls image attachment gating', () => {
+  beforeEach(() => {
+    useOcProviderStore.getState().clear();
+    useOcProviderStore.setState({
+      providers: [
+        {
+          id: 'ollama',
+          name: 'Ollama',
+          env: [],
+          models: {
+            supported: {
+              id: 'supported',
+              name: 'Supported',
+              supportsImageInput: true,
+            },
+            unsupported: {
+              id: 'unsupported',
+              name: 'Unsupported',
+              supportsImageInput: false,
+            },
+          },
+        },
+      ],
+      connectedProviders: ['ollama'],
+      defaultModels: { ollama: 'supported' },
+      authMethods: {},
+      selectedProviderId: 'ollama',
+      selectedModelId: 'unsupported',
+      selectedAgent: 'build',
+      isLoading: false,
+    });
+  });
+
+  it('disables the image button for unsupported OpenCode models', async () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    const handleImageClick = vi.fn();
+    const user = userEvent.setup();
+
+    render(<InputControls {...createDefaultProps({ handleImageClick })} />, {
+      wrapper: TestWrapper,
+    });
+
+    const button = screen.getByRole('button', { name: 'Attach image' });
+    expect(button).toBeDisabled();
+
+    await user.click(button);
+    expect(handleImageClick).not.toHaveBeenCalled();
+
+    const trigger = button.parentElement;
+    expect(trigger).not.toBeNull();
+    if (trigger === null) {
+      throw new Error('Image tooltip trigger wrapper was not rendered');
+    }
+
+    await user.hover(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      "This model doesn't support images"
+    );
+  });
+
+  it('keeps the image button enabled on Claude despite stale OpenCode model state', async () => {
+    useBackendStore.setState({ activeBackend: 'claude' });
+    const handleImageClick = vi.fn();
+    const user = userEvent.setup();
+
+    render(<InputControls {...createDefaultProps({ handleImageClick })} />, {
+      wrapper: TestWrapper,
+    });
+
+    const button = screen.getByRole('button', { name: 'Attach image' });
+    expect(button).toBeEnabled();
+
+    await user.click(button);
+    expect(handleImageClick).toHaveBeenCalledTimes(1);
+  });
+});

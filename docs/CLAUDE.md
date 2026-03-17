@@ -116,6 +116,8 @@ Use this to find the right file. Read the file directly — no links needed.
 - `fix-csp-opencode-backend.md` — Fix CSP blocking OpenCode backend in production builds (add `http://127.0.0.1:*` to `connect-src`, contract test, CSP doc update)
 - `unify-opencode-question-widget.md` — Unify OpenCode question tool to use shared QuestionPrompt presenter (shared visuals, backend-specific wrappers, multi-select + custom support)
 - `fix-thinking-content-streaming-order.md` — Fix sequential thinking-before-content streaming (ordered frontier reveal, phase-aware content ceiling, multi-phase interleaving)
+- `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
+- `DISABLE-IMAGE-BUTTON-UNSUPPORTED-MODELS.md` — Disable image button when model doesn't support images (derive supportsImageInput from modalities/attachment, backend-gated UI, chip cleanup, send-time guard)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

@@ -2,9 +2,14 @@ import { createLogger } from '@orbit/common/lib';
 
 import { getClient } from './client';
 
+import type { ImageAttachment } from '@/components/chat/input/types';
 import type { OcProviderInfo } from '@/stores/opencode';
 import type { OcProviderAuthAuthorization, OcQuestionAnswer, OcSession } from '@/types/opencode';
-import type { ProviderListResponses, SessionMessagesResponses } from '@orbit.build/sdk/v2/client';
+import type {
+  FilePartInput,
+  ProviderListResponses,
+  SessionMessagesResponses,
+} from '@orbit.build/sdk/v2/client';
 
 import { useToolStore } from '@/stores/agent/tool-store';
 import {
@@ -21,6 +26,7 @@ export interface OcSendMessageOptions {
   readonly modelId?: string;
   readonly agent?: string;
   readonly variant?: string;
+  readonly images?: readonly ImageAttachment[];
 }
 
 function mapProviders(response: ProviderListResponses[200]): {
@@ -41,6 +47,11 @@ function mapProviders(response: ProviderListResponses[200]): {
               id: string;
               name: string;
               reasoning: boolean;
+              attachment: boolean;
+              modalities?: {
+                input: ('text' | 'audio' | 'image' | 'video' | 'pdf')[];
+                output: ('text' | 'audio' | 'image' | 'video' | 'pdf')[];
+              };
               variants?: Record<string, Record<string, unknown>>;
               limit?: { context: number; input?: number; output: number };
             }
@@ -51,6 +62,9 @@ function mapProviders(response: ProviderListResponses[200]): {
             id: model.id,
             name: model.name,
             ...(model.reasoning ? { reasoning: true } : {}),
+            supportsImageInput: model.modalities
+              ? model.modalities.input.includes('image')
+              : model.attachment,
             ...(model.variants ? { variants: model.variants } : {}),
             ...(model.limit ? { limit: model.limit } : {}),
           },
@@ -128,6 +142,7 @@ export const ocSessionService = {
       hasModel: Boolean(options?.providerId && options.modelId),
       agent: options?.agent,
       variant: options?.variant,
+      imageCount: (options?.images ?? []).length,
     });
 
     const model =
@@ -137,6 +152,12 @@ export const ocSessionService = {
             modelID: options.modelId,
           }
         : undefined;
+    const fileParts: FilePartInput[] = (options?.images ?? []).map((image) => ({
+      type: 'file',
+      mime: image.mimeType,
+      filename: image.name,
+      url: `data:${image.mimeType};base64,${image.data}`,
+    }));
 
     await getClient().session.promptAsync(
       {
@@ -148,12 +169,7 @@ export const ocSessionService = {
         ...(options?.agent ? { agent: options.agent } : {}),
         ...(model ? { model } : {}),
         ...(options?.variant ? { variant: options.variant } : {}),
-        parts: [
-          {
-            type: 'text',
-            text,
-          },
-        ],
+        parts: [{ type: 'text', text }, ...fileParts],
       },
       { throwOnError: true }
     );

@@ -24,7 +24,7 @@ import { useActiveBackend } from '@/stores/backend';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
-import { useOcProviderStore } from '@/stores/opencode';
+import { useOcProviderStore, useOcSelectedModelSupportsImageInput } from '@/stores/opencode';
 
 const logger = createLogger('ChatInput');
 const OPENCODE_AGENTS = ['build', 'plan', 'explore'] as const;
@@ -42,8 +42,12 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onEffortChange,
   } = options;
   const activeBackend = useActiveBackend();
+  const ocSupportsImages = useOcSelectedModelSupportsImageInput();
   const selectedOcAgent = useOcProviderStore((state) => state.selectedAgent);
+  const selectedOcProviderId = useOcProviderStore((state) => state.selectedProviderId);
+  const selectedOcModelId = useOcProviderStore((state) => state.selectedModelId);
   const setSelectedOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
+  const supportsImages = activeBackend === 'opencode' ? ocSupportsImages : true;
 
   // Core input state
   const [inputText, setInputText] = useState('');
@@ -61,6 +65,13 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const editorElementRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<LexicalEditor | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const previousActiveBackendRef = useRef(activeBackend);
+  const previousOcModelKeyRef = useRef<string | null>(
+    selectedOcProviderId !== null && selectedOcModelId !== null
+      ? `${selectedOcProviderId}/${selectedOcModelId}`
+      : null
+  );
+  const previousOcSupportsImagesRef = useRef(ocSupportsImages);
   // Guard against ESC key repeat triggering multiple stops
   // React state updates are async, so isAgentRunning can be true for multiple rapid keydown events
   const isStoppingRef = useRef(false);
@@ -117,6 +128,33 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       isStoppingRef.current = false;
     }
   }, [isAgentRunning]);
+
+  useEffect(() => {
+    const ocModelKey =
+      selectedOcProviderId !== null && selectedOcModelId !== null
+        ? `${selectedOcProviderId}/${selectedOcModelId}`
+        : null;
+    const backendWasOpencode = previousActiveBackendRef.current === 'opencode';
+    const backendIsOpencode = activeBackend === 'opencode';
+    const modelChangedWhileOpencodeActive =
+      backendWasOpencode && backendIsOpencode && previousOcModelKeyRef.current !== ocModelKey;
+    const supportDroppedWhileOpencodeActive =
+      backendWasOpencode &&
+      backendIsOpencode &&
+      previousOcSupportsImagesRef.current &&
+      !ocSupportsImages;
+
+    if ((modelChangedWhileOpencodeActive || supportDroppedWhileOpencodeActive) && !supportsImages) {
+      setAttachedContext((prev) => {
+        const next = prev.filter((item) => item.type !== 'image');
+        return next.length === prev.length ? prev : next;
+      });
+    }
+
+    previousActiveBackendRef.current = activeBackend;
+    previousOcModelKeyRef.current = ocModelKey;
+    previousOcSupportsImagesRef.current = ocSupportsImages;
+  }, [activeBackend, ocSupportsImages, selectedOcModelId, selectedOcProviderId, supportsImages]);
 
   const handleTextChange = useCallback(
     (text: string): void => {

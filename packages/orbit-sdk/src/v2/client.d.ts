@@ -217,6 +217,15 @@ export interface FilePart {
   source?: FilePartSource;
 }
 
+export interface FilePartInput {
+  id?: string;
+  type: 'file';
+  mime: string;
+  filename?: string;
+  url: string;
+  source?: FilePartSource;
+}
+
 export interface ToolStatePending {
   status: 'pending';
   input: Record<string, unknown>;
@@ -734,7 +743,7 @@ export interface OrbitClient {
         model?: { providerID: string; modelID: string };
         agent?: string;
         variant?: string;
-        parts: Array<{ type: 'text'; text: string }>;
+        parts: Array<{ type: 'text'; text: string } | FilePartInput>;
       },
       options?: { throwOnError?: boolean }
     ): Promise<ApiResponse<boolean>>;
