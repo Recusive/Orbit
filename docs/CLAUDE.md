@@ -119,6 +119,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
 - `DISABLE-IMAGE-BUTTON-UNSUPPORTED-MODELS.md` — Disable image button when model doesn't support images (derive supportsImageInput from modalities/attachment, backend-gated UI, chip cleanup, send-time guard)
 - `fix-base64-leak-image-dialog.md` — Fix base64 data leaking into DOM via image src attributes (SafeImage component converts data: URLs to opaque blob: URLs across all four rendering surfaces)
+- `FIX-IMAGE-BUTTON-TYPE-MISMATCH.md` — Fix image button enabled for all models (schema-data divergence: migrate to capabilities-based model schema, make supportsImageInput required)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 
