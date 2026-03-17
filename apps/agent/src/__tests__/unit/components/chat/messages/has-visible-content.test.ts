@@ -12,6 +12,16 @@ function makeAssistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage
   };
 }
 
+function makeUserMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+  return {
+    id: 'user-1',
+    role: 'user',
+    content: '',
+    displayedContent: '',
+    ...overrides,
+  };
+}
+
 describe('hasVisibleContent', () => {
   it('keeps placeholder message visible when interrupted with thinking', () => {
     const message = makeAssistantMessage({
@@ -54,5 +64,19 @@ describe('hasVisibleContent', () => {
     });
 
     expect(hasVisibleContent(message, [], true)).toBe(false);
+  });
+
+  it('keeps image-only user messages visible', () => {
+    const message = makeUserMessage({
+      attachedImages: [
+        {
+          name: 'diagram.png',
+          mimeType: 'image/png',
+          previewUrl: 'asset://diagram.png',
+        },
+      ],
+    });
+
+    expect(hasVisibleContent(message, [], true)).toBe(true);
   });
 });

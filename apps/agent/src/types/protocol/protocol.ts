@@ -141,8 +141,8 @@ export const StoredImageAttachmentSchema = z
   .object({
     name: z.string(),
     mimeType: z.string(),
-    data: z.string(), // Base64 encoded
-    previewUrl: z.string(), // Data URL for display
+    data: z.string().optional(),
+    previewUrl: z.string(),
   })
   .strict();
 
@@ -205,7 +205,7 @@ export const SendMessageSchema = z
     type: z.literal('message:send'),
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
-    content: z.string().min(1),
+    content: z.string(),
     /**
      * UUID of the previous message in the conversation chain.
      * Used for Claude Code-style rewind: after rewinding, the next message
@@ -1503,6 +1503,7 @@ const PersistedMessageSchema = z
     createdAt: z.number().optional(),
     timestamp: z.number().optional(),
     toolUses: z.array(PersistedToolUseSchema).optional(),
+    attachedImages: z.array(StoredImageAttachmentSchema).optional(),
     usage: PersistedTokenUsageSchema.optional(),
     /**
      * UUID of the previous message in the conversation chain.
@@ -1525,6 +1526,7 @@ const PersistedMessageSchema = z
     // Prefer createdAt, fall back to timestamp, default to 0
     createdAt: msg.createdAt ?? msg.timestamp ?? 0,
     toolUses: msg.toolUses ?? [],
+    ...(msg.attachedImages ? { attachedImages: msg.attachedImages } : {}),
     usage: msg.usage,
     parentUuid: msg.parentUuid,
   }));

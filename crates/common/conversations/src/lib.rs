@@ -17,6 +17,7 @@
 //! it understands and silently skips unknown types (forward-compatible).
 
 use std::collections::HashSet;
+use std::fmt::Write as _;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::{
@@ -25,9 +26,11 @@ use std::io::{
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use base64::{engine::general_purpose, Engine as _};
 use hashbrown::HashMap;
 use orbit_core::{Error, Result};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 
 // ============================================
 // Message Types
@@ -77,6 +80,12 @@ pub struct Message {
     /// Tool uses in this message
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUse>,
+    /// Cached image attachments for user messages.
+    ///
+    /// `preview_url` stores a local file path. The frontend converts it to an
+    /// `asset://` URL before rendering.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_images: Vec<ImageAttachmentData>,
     /// Token usage for this message (assistant messages only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TokenUsage>,
@@ -84,6 +93,18 @@ pub struct Message {
     /// Used by the frontend's `getActiveChain()` to walk the active branch after rewind.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_uuid: Option<String>,
+}
+
+/// Cached metadata for a user-attached image.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageAttachmentData {
+    /// Display name for the image tile.
+    pub name: String,
+    /// MIME type for the cached image.
+    pub mime_type: String,
+    /// Local file path to the cached image. The frontend normalizes this to `asset://`.
+    pub preview_url: String,
 }
 
 /// A tool use within a message
@@ -261,9 +282,58 @@ impl UserContent {
                     .iter()
                     .rev()
                     .find_map(|b| b.get("text").and_then(serde_json::Value::as_str))
-                    .unwrap_or("")
-                    .to_owned()
+                    .map_or_else(String::new, clean_user_text)
             },
+        }
+    }
+
+    fn extract_and_cache_images(
+        &self,
+        image_cache_root: &Path,
+        session_id: &str,
+    ) -> Vec<ImageAttachmentData> {
+        match self {
+            Self::Text(_) => Vec::new(),
+            Self::Blocks(blocks) => blocks
+                .iter()
+                .enumerate()
+                .filter_map(|(index, block)| {
+                    if block.get("type").and_then(serde_json::Value::as_str) != Some("image") {
+                        return None;
+                    }
+
+                    let source = block.get("source")?;
+                    let mime_type = source
+                        .get("media_type")
+                        .or_else(|| source.get("mediaType"))
+                        .and_then(serde_json::Value::as_str)?;
+                    let data = source.get("data").and_then(serde_json::Value::as_str)?;
+                    let image_name = resolve_image_name(block, mime_type, index);
+                    let file_path = match cache_image_data_in_root(
+                        image_cache_root,
+                        session_id,
+                        image_name.as_str(),
+                        mime_type,
+                        data,
+                    ) {
+                        Ok(path) => path,
+                        Err(error) => {
+                            tracing::warn!(
+                                "Failed to cache image attachment for session {}: {}",
+                                session_id,
+                                error
+                            );
+                            return None;
+                        },
+                    };
+
+                    Some(ImageAttachmentData {
+                        name: image_name,
+                        mime_type: mime_type.to_owned(),
+                        preview_url: file_path.to_string_lossy().into_owned(),
+                    })
+                })
+                .collect(),
         }
     }
 
@@ -447,6 +517,8 @@ impl From<&Conversation> for ConversationSummary {
 pub struct ConversationManager {
     /// Base path (e.g., `~/.claude/`)
     base_dir: PathBuf,
+    /// Local cache for user-attached images rendered by the frontend.
+    image_cache_root: PathBuf,
 }
 
 impl ConversationManager {
@@ -455,19 +527,32 @@ impl ConversationManager {
     pub fn new() -> Self {
         Self {
             base_dir: Self::default_base_dir(),
+            image_cache_root: Self::default_image_cache_root(),
         }
     }
 
     /// Create a conversation manager with a custom base directory (for testing)
     #[must_use]
     pub fn with_data_dir(data_dir: PathBuf) -> Self {
-        Self { base_dir: data_dir }
+        Self {
+            image_cache_root: data_dir.join(".orbit").join("image-cache"),
+            base_dir: data_dir,
+        }
     }
 
     /// Default base directory: `~/.claude/`
     #[must_use]
     pub fn default_base_dir() -> PathBuf {
         dirs::home_dir().map_or_else(|| PathBuf::from(".claude"), |h| h.join(".claude"))
+    }
+
+    /// Default image cache root: `~/.orbit/image-cache/`
+    #[must_use]
+    pub fn default_image_cache_root() -> PathBuf {
+        dirs::home_dir().map_or_else(
+            || PathBuf::from(".orbit").join("image-cache"),
+            |h| h.join(".orbit").join("image-cache"),
+        )
     }
 
     /// Get the projects directory
@@ -664,7 +749,7 @@ impl ConversationManager {
         })?;
 
         let reader = BufReader::new(file);
-        let parsed = parse_jsonl_lines(reader, &path);
+        let parsed = parse_jsonl_lines(reader, &path, &self.image_cache_root, session_id);
 
         // Merge consecutive assistant messages into single turns.
         let mut messages =
@@ -979,6 +1064,8 @@ impl ConversationManager {
             tracing::debug!("Deleted conversation {}", session_id);
         }
 
+        drop(remove_image_cache_dir(&self.image_cache_root, session_id));
+
         Ok(())
     }
 
@@ -1061,6 +1148,97 @@ fn dedup_insert(
     }
 }
 
+fn remove_image_cache_dir(image_cache_root: &Path, session_id: &str) -> Result<()> {
+    let session_dir = image_cache_root.join(session_id);
+    if !session_dir.exists() {
+        return Ok(());
+    }
+
+    fs::remove_dir_all(&session_dir).map_err(Error::Io)
+}
+
+fn cache_image_data_in_root(
+    image_cache_root: &Path,
+    session_id: &str,
+    filename: &str,
+    mime_type: &str,
+    base64_data: &str,
+) -> Result<PathBuf> {
+    let normalized_data = strip_data_url_prefix(base64_data);
+    let decoded = general_purpose::STANDARD
+        .decode(normalized_data)
+        .map_err(|error| Error::Config(format!("Failed to decode image attachment: {error}")))?;
+
+    let session_dir = image_cache_root.join(session_id);
+    fs::create_dir_all(&session_dir).map_err(Error::Io)?;
+
+    let extension = mime_to_extension(mime_type, filename);
+    let file_path = session_dir.join(format!(
+        "{}.{}",
+        short_sha256_hex(normalized_data),
+        extension
+    ));
+
+    if !file_path.exists() {
+        fs::write(&file_path, decoded).map_err(Error::Io)?;
+    }
+
+    Ok(file_path)
+}
+
+fn resolve_image_name(block: &serde_json::Value, mime_type: &str, index: usize) -> String {
+    block
+        .get("title")
+        .or_else(|| block.get("name"))
+        .and_then(serde_json::Value::as_str)
+        .map_or_else(
+            || {
+                format!(
+                    "image-{}.{}",
+                    index + 1,
+                    mime_to_extension(mime_type, "image")
+                )
+            },
+            str::to_owned,
+        )
+}
+
+fn mime_to_extension(mime_type: &str, filename: &str) -> String {
+    match mime_type {
+        "image/png" => String::from("png"),
+        "image/jpeg" => String::from("jpg"),
+        "image/gif" => String::from("gif"),
+        "image/webp" => String::from("webp"),
+        "image/svg+xml" => String::from("svg"),
+        "image/bmp" => String::from("bmp"),
+        "image/heic" => String::from("heic"),
+        "image/heif" => String::from("heif"),
+        _ => Path::new(filename)
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .filter(|ext| !ext.is_empty())
+            .map_or_else(|| String::from("bin"), str::to_owned),
+    }
+}
+
+fn strip_data_url_prefix(base64_data: &str) -> &str {
+    base64_data
+        .split_once(',')
+        .map_or(base64_data, |(_, payload)| payload)
+}
+
+fn short_sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    let digest = hasher.finalize();
+    digest.get(..6).map_or_else(String::new, |bytes| {
+        bytes.iter().fold(String::with_capacity(12), |mut hex, b| {
+            let _ok = write!(&mut hex, "{b:02x}");
+            hex
+        })
+    })
+}
+
 /// Build a `Message` from an assistant JSONL line.
 fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Message {
     let (text, thinking, thinking_phases, tool_uses) = extract_assistant_content(value);
@@ -1081,6 +1259,7 @@ fn build_assistant_message(uuid: &str, value: &serde_json::Value, ts: u64) -> Me
         turn_duration_ms: None,
         created_at: ts,
         tool_uses,
+        attached_images: Vec::new(),
         usage,
         parent_uuid: None,
     }
@@ -1191,10 +1370,15 @@ fn is_active(uuid: &str, active_uuids: Option<&HashSet<String>>) -> bool {
 ///
 /// Supports branched conversations (rewind): when `parentUuid` fields are present,
 /// only messages on the active branch are returned. Dead branches are filtered out.
-fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
+fn parse_jsonl_lines(
+    reader: BufReader<fs::File>,
+    path: &Path,
+    image_cache_root: &Path,
+    session_id: &str,
+) -> ParsedJsonl {
     let all_lines: Vec<String> = reader.lines().map_while(io::Result::ok).collect();
     let active_uuids = build_active_uuid_set(&all_lines);
-    let mut ctx = ParseContext::new();
+    let mut ctx = ParseContext::new(image_cache_root.to_path_buf(), session_id.to_owned());
 
     for (line_num, line) in all_lines.iter().enumerate() {
         let trimmed = line.trim();
@@ -1262,6 +1446,8 @@ fn parse_jsonl_lines(reader: BufReader<fs::File>, path: &Path) -> ParsedJsonl {
 
 /// Accumulator for `parse_jsonl_lines` — extracted to keep the main loop under 100 lines.
 struct ParseContext {
+    image_cache_root: PathBuf,
+    session_id: String,
     raw_messages: Vec<Message>,
     seen_uuids: HashMap<String, usize>,
     title: String,
@@ -1278,8 +1464,10 @@ struct ParseContext {
 }
 
 impl ParseContext {
-    fn new() -> Self {
+    fn new(image_cache_root: PathBuf, session_id: String) -> Self {
         Self {
+            image_cache_root,
+            session_id,
             raw_messages: Vec::new(),
             seen_uuids: HashMap::new(),
             title: String::from("Untitled"),
@@ -1318,6 +1506,9 @@ impl ParseContext {
         let ts = parse_iso_timestamp(timestamp);
         self.track_timestamp(ts);
         let text = payload.content.to_text();
+        let attached_images = payload
+            .content
+            .extract_and_cache_images(&self.image_cache_root, &self.session_id);
         // SDK writes these markers when the user interrupts (Stop button).
         // Mark the preceding assistant message as interrupted so the UI
         // can show the "Response interrupted" indicator after session reload.
@@ -1331,10 +1522,10 @@ impl ParseContext {
             self.pending_interrupt_boundary = true;
             return;
         }
-        if text.is_empty() {
+        if text.is_empty() && attached_images.is_empty() {
             return;
         }
-        if self.first_user_text.is_none() {
+        if self.first_user_text.is_none() && !text.is_empty() {
             self.first_user_text = Some(text.clone());
         }
         let msg = Message {
@@ -1348,6 +1539,7 @@ impl ParseContext {
             turn_duration_ms: None,
             created_at: ts,
             tool_uses: Vec::new(),
+            attached_images,
             usage: None,
             parent_uuid: self.last_msg_uuid.clone(),
         };
@@ -2289,6 +2481,7 @@ mod tests {
             turn_duration_ms: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
+            attached_images: Vec::new(),
             usage: None,
             parent_uuid: None,
         };
@@ -2345,6 +2538,7 @@ mod tests {
             turn_duration_ms: None,
             created_at: current_timestamp(),
             tool_uses: Vec::new(),
+            attached_images: Vec::new(),
             usage: None,
             parent_uuid: None,
         };
@@ -2685,6 +2879,7 @@ mod tests {
                 content_offset: Some(2),
                 ordinal: Some(1),
             }],
+            attached_images: Vec::new(),
             usage: None,
             parent_uuid: None,
         };
@@ -2712,6 +2907,7 @@ mod tests {
                 content_offset: Some(0),
                 ordinal: Some(1),
             }],
+            attached_images: Vec::new(),
             usage: None,
             parent_uuid: None,
         };
@@ -3337,6 +3533,62 @@ mod tests {
             .load_summaries_for_workspace(None)
             .expect("load summaries");
         assert_eq!(summaries.len(), 3);
+    }
+
+    #[test]
+    fn test_image_only_user_message_is_preserved_and_cached() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let encoded = general_purpose::STANDARD.encode(b"fake-image-bytes");
+        let path = ws_dir.join("image-only.jsonl");
+        let summary_line = r#"{"type":"summary","summary":"Images","leafUuid":""}"#;
+        let user_line = format!(
+            r#"{{"type":"user","uuid":"u1","message":{{"role":"user","content":[{{"type":"image","source":{{"type":"base64","media_type":"image/png","data":"{encoded}"}}}}]}},"cwd":"/test","sessionId":"image-only","timestamp":"2026-03-17T12:00:00.000Z"}}"#
+        );
+        fs::write(&path, format!("{summary_line}\n{user_line}\n")).expect("write");
+
+        let conv = manager
+            .load_from_workspace("image-only", None)
+            .expect("load")
+            .expect("not found");
+
+        assert_eq!(conv.messages.len(), 1);
+        let message = &conv.messages[0];
+        assert_eq!(message.role, MessageRole::User);
+        assert_eq!(message.content, "");
+        assert_eq!(message.attached_images.len(), 1);
+        assert_eq!(message.attached_images[0].mime_type, "image/png");
+        assert!(
+            Path::new(&message.attached_images[0].preview_url).exists(),
+            "cached image path should exist on disk"
+        );
+    }
+
+    #[test]
+    fn test_delete_removes_cached_images() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("session-1.jsonl");
+        fs::write(
+            &path,
+            r#"{"type":"summary","summary":"Test","leafUuid":""}"#,
+        )
+        .expect("write");
+
+        let cache_dir = manager.image_cache_root.join("session-1");
+        fs::create_dir_all(&cache_dir).expect("mkdir cache");
+        fs::write(cache_dir.join("cached.png"), b"image").expect("write cache");
+
+        manager.delete("session-1", None).expect("delete");
+
+        assert!(
+            !cache_dir.exists(),
+            "cached image directory should be removed with the conversation"
+        );
     }
 
     #[test]

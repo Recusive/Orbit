@@ -4,6 +4,7 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { FC } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
+import { SafeImage } from '@/components/shared';
 
 interface QueuedMessageBubbleProps {
   readonly message: QueuedMessage;
@@ -68,7 +69,7 @@ export const QueuedMessageBubble: FC<QueuedMessageBubbleProps> = ({ message, onC
               className="flex items-center gap-1.5 px-1.5 py-1 bg-lg-control rounded border border-dashed border-lg-separator"
               title={image.name}
             >
-              <img
+              <SafeImage
                 src={image.previewUrl}
                 alt={image.name}
                 className="h-4 w-4 object-cover rounded-md opacity-50"

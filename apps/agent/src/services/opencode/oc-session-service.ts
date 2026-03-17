@@ -152,12 +152,18 @@ export const ocSessionService = {
             modelID: options.modelId,
           }
         : undefined;
-    const fileParts: FilePartInput[] = (options?.images ?? []).map((image) => ({
-      type: 'file',
-      mime: image.mimeType,
-      filename: image.name,
-      url: `data:${image.mimeType};base64,${image.data}`,
-    }));
+    const fileParts: FilePartInput[] = (options?.images ?? []).flatMap((image) =>
+      image.data
+        ? [
+            {
+              type: 'file' as const,
+              mime: image.mimeType,
+              filename: image.name,
+              url: `data:${image.mimeType};base64,${image.data}`,
+            },
+          ]
+        : []
+    );
 
     await getClient().session.promptAsync(
       {

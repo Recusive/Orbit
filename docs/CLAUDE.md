@@ -118,6 +118,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `fix-thinking-content-streaming-order.md` — Fix sequential thinking-before-content streaming (ordered frontier reveal, phase-aware content ceiling, multi-phase interleaving)
 - `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
 - `DISABLE-IMAGE-BUTTON-UNSUPPORTED-MODELS.md` — Disable image button when model doesn't support images (derive supportsImageInput from modalities/attachment, backend-gated UI, chip cleanup, send-time guard)
+- `fix-base64-leak-image-dialog.md` — Fix base64 data leaking into DOM via image src attributes (SafeImage component converts data: URLs to opaque blob: URLs across all four rendering surfaces)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

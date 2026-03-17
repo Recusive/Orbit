@@ -101,6 +101,13 @@ export interface ChatStoreState {
   appendThinking: (id: string, messageId: string, thinking: string) => void;
   addMessage: (id: string, msg: ChatMessage) => void;
   updateMessage: (id: string, messageId: string, updater: (m: ChatMessage) => ChatMessage) => void;
+  patchImagePreviewUrl: (
+    id: string,
+    messageId: string,
+    matchPreviewUrl: string,
+    previewUrl: string
+  ) => void;
+  removeImageFromMessage: (id: string, messageId: string, matchPreviewUrl: string) => void;
   reconcileMessageId: (id: string, oldId: string, newId: string) => void;
   setAgentRunning: (id: string, running: boolean) => void;
   setStopPending: (id: string, pending: boolean) => void;
@@ -344,6 +351,41 @@ export const useChatStore = create<ChatStoreState>()(
           const existing = idx >= 0 ? session.messages[idx] : undefined;
           if (idx >= 0 && existing) {
             session.messages[idx] = updater(existing);
+          }
+        });
+      },
+
+      patchImagePreviewUrl: (
+        id: string,
+        messageId: string,
+        matchPreviewUrl: string,
+        previewUrl: string
+      ): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          const message = session?.messages.find((entry) => entry.id === messageId);
+          const image = message?.attachedImages?.find(
+            (entry) => entry.previewUrl === matchPreviewUrl
+          );
+          if (image) {
+            image.previewUrl = previewUrl;
+          }
+        });
+      },
+
+      removeImageFromMessage: (id: string, messageId: string, matchPreviewUrl: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          const message = session?.messages.find((entry) => entry.id === messageId);
+          if (!message?.attachedImages) {
+            return;
+          }
+
+          message.attachedImages = message.attachedImages.filter(
+            (entry) => entry.previewUrl !== matchPreviewUrl
+          );
+          if (message.attachedImages.length === 0) {
+            message.attachedImages = undefined;
           }
         });
       },

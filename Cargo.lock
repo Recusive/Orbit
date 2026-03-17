@@ -3583,12 +3583,14 @@ dependencies = [
 name = "orbit-conversations"
 version = "0.0.1"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "dirs",
  "hashbrown 0.15.5",
  "orbit-core",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "tracing",
  "uuid",

@@ -8,8 +8,8 @@
 )]
 
 use orbit_conversations::{
-    Conversation, ConversationManager, ConversationSummary, Message, MessageRole, ThinkingPhase,
-    TokenUsage, ToolUse,
+    Conversation, ConversationManager, ConversationSummary, ImageAttachmentData, Message,
+    MessageRole, ThinkingPhase, TokenUsage, ToolUse,
 };
 use orbit_core::Result;
 use tauri::State;
@@ -44,6 +44,9 @@ pub struct MessageDto {
     /// Tool uses
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_uses: Vec<ToolUseDto>,
+    /// Cached image attachments for user messages.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub attached_images: Vec<ImageAttachmentDataDto>,
     /// Token usage for this message (assistant messages only)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub usage: Option<TokenUsageDto>,
@@ -74,6 +77,18 @@ pub struct ToolUseDto {
     /// Stable ordering key shared with thinking phases
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ordinal: Option<u32>,
+}
+
+/// Serializable cached image attachment for frontend.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageAttachmentDataDto {
+    /// Display name for the image tile.
+    pub name: String,
+    /// MIME type for the cached image.
+    pub mime_type: String,
+    /// Local file path to the cached image. The frontend converts it to `asset://`.
+    pub preview_url: String,
 }
 
 /// Serializable thinking phase for frontend
@@ -169,6 +184,11 @@ impl From<Message> for MessageDto {
             turn_duration_ms: msg.turn_duration_ms,
             created_at: msg.created_at,
             tool_uses: msg.tool_uses.into_iter().map(ToolUseDto::from).collect(),
+            attached_images: msg
+                .attached_images
+                .into_iter()
+                .map(ImageAttachmentDataDto::from)
+                .collect(),
             usage: msg.usage.map(TokenUsageDto::from),
             parent_uuid: msg.parent_uuid,
         }
@@ -221,8 +241,33 @@ impl From<MessageDto> for Message {
             turn_duration_ms: dto.turn_duration_ms,
             created_at: dto.created_at,
             tool_uses: dto.tool_uses.into_iter().map(ToolUse::from).collect(),
+            attached_images: dto
+                .attached_images
+                .into_iter()
+                .map(ImageAttachmentData::from)
+                .collect(),
             usage: dto.usage.map(TokenUsage::from),
             parent_uuid: dto.parent_uuid,
+        }
+    }
+}
+
+impl From<ImageAttachmentData> for ImageAttachmentDataDto {
+    fn from(image: ImageAttachmentData) -> Self {
+        Self {
+            name: image.name,
+            mime_type: image.mime_type,
+            preview_url: image.preview_url,
+        }
+    }
+}
+
+impl From<ImageAttachmentDataDto> for ImageAttachmentData {
+    fn from(image: ImageAttachmentDataDto) -> Self {
+        Self {
+            name: image.name,
+            mime_type: image.mime_type,
+            preview_url: image.preview_url,
         }
     }
 }
@@ -512,6 +557,7 @@ mod tests {
                 content_offset: Some(4),
                 ordinal: Some(1),
             }],
+            attached_images: Vec::new(),
             usage: Some(TokenUsage {
                 input_tokens: 1,
                 output_tokens: 2,

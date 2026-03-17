@@ -4,6 +4,8 @@
 
 // Main component
 export { MessageItem } from './MessageItem';
+export { ImageAttachmentTiles } from './ImageAttachmentTiles';
+export { ImageLightbox } from './ImageLightbox';
 
 // Sub-components
 export { ToolWidgetRenderer } from './ToolWidgetRenderer';

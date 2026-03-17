@@ -13,6 +13,7 @@ import { Streamdown } from 'streamdown';
 
 import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
 
+import { ImageAttachmentTiles } from './ImageAttachmentTiles';
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
 import { FeedbackDialog } from './feedback-dialog';
 import { MessageActions } from './message-actions';
@@ -368,12 +369,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           <CompactIndicator messageId={message.id} />
         ) : (
           <div className="flex flex-col items-end gap-1 pb-3">
-            <UserMessageBubble
-              content={message.displayedContent}
-              animate={animate}
-              onOpenFile={onOpenFile}
-              attachedFiles={message.attachedFiles}
-            />
+            {message.displayedContent.trim().length > 0 ? (
+              <UserMessageBubble
+                content={message.displayedContent}
+                animate={animate}
+                onOpenFile={onOpenFile}
+                attachedFiles={message.attachedFiles}
+              />
+            ) : null}
+            {message.attachedImages !== undefined && message.attachedImages.length > 0 ? (
+              <ImageAttachmentTiles attachedImages={message.attachedImages} />
+            ) : null}
           </div>
         )
       ) : (

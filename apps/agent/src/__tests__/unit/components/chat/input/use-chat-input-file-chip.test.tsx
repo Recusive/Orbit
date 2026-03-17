@@ -265,4 +265,30 @@ describe('useChatInput pending file chips', () => {
       );
     });
   });
+
+  it('sends image-only messages without requiring text input', async () => {
+    const onSend = vi.fn();
+    const { result } = renderHook(() => useChatInput(createOptions({ onSend })));
+
+    await attachImage(result);
+
+    act(() => {
+      result.current.handleSend();
+    });
+
+    expect(onSend).toHaveBeenCalledWith(
+      '',
+      undefined,
+      [
+        {
+          name: 'test.png',
+          mimeType: 'image/png',
+          data: 'compressed-image-data',
+          previewUrl: 'data:image/png;base64,compressed-image-data',
+        },
+      ],
+      undefined,
+      undefined
+    );
+  });
 });

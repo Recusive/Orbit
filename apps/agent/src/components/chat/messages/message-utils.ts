@@ -374,7 +374,8 @@ export function hasVisibleContent(
   // Also filter out SDK internal messages (e.g., <local-command-stdout> from /compact).
   if (message.role === 'user') {
     const trimmed = message.content.trim();
-    if (trimmed.length === 0) return false;
+    const hasImages = (message.attachedImages?.length ?? 0) > 0;
+    if (trimmed.length === 0 && !hasImages) return false;
     if (trimmed.startsWith('<local-command-stdout>')) return false;
     return true;
   }

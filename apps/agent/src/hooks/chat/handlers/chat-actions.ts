@@ -13,6 +13,10 @@ import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
 import { serializeThinkingBlocks } from '@/lib/mappers';
 import { chatMessageService } from '@/services/chat/chat-message-service';
+import {
+  buildOptimisticAttachedImages,
+  cacheAttachedImagesForMessage,
+} from '@/services/chat/image-attachment-cache';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
@@ -74,7 +78,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     elements?: ReactElementContext[],
     skills?: string[]
   ): void => {
-    if (!text) return;
+    const sendableImages = (images ?? []).flatMap((image) =>
+      image.data
+        ? [
+            {
+              name: image.name,
+              mimeType: image.mimeType,
+              data: image.data,
+            },
+          ]
+        : []
+    );
+    if (!text && sendableImages.length === 0) return;
 
     const uiState = useUIStore.getState();
     const { workspacePath, activeWorktreePath, conversations } = uiState;
@@ -148,7 +163,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
-            title: generateFallbackTitle(text),
+            title: generateFallbackTitle(text || 'Image conversation'),
             workspace_path: workspacePath ?? undefined,
             worktree_path: activeWorktreePath ?? undefined,
           });
@@ -158,8 +173,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // If first message but conversation exists (created via "New conversation" button),
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
-          applySessionTitle(sessionId, generateFallbackTitle(text));
-          generateAITitle(sessionId, text);
+          applySessionTitle(sessionId, generateFallbackTitle(text || 'Image conversation'));
+          generateAITitle(sessionId, text || 'Image conversation');
         }
 
         // Always send current thinking mode and model BEFORE message:send
@@ -193,18 +208,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         const lastMessage = messages[messages.length - 1];
         const parentUuid = forkPoint ?? lastMessage?.id ?? null;
 
+        const optimisticImages = buildOptimisticAttachedImages(images);
         const userMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'user',
           content: text,
           displayedContent: text,
           attachedFiles: hasMergedContextFiles ? mergedContextFiles : undefined,
-          attachedImages: images,
+          attachedImages: optimisticImages,
           parentUuid,
         };
 
         // Write to ChatStore (not React setState)
         useChatStore.getState().addMessage(sessionId, userMessage);
+        cacheAttachedImagesForMessage(sessionId, userMessage.id, images);
         useChatStore.getState().setAgentRunning(sessionId, true);
 
         // Persist user message to backend
@@ -223,19 +240,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Build context object with files, images, and/or elements
         const hasFiles = hasMergedContextFiles;
-        const hasImages = images && images.length > 0;
+        const hasImages = sendableImages.length > 0;
         const hasElements = elements && elements.length > 0;
         const context =
           hasFiles || hasImages || hasElements
             ? {
                 files: hasFiles ? mergedContextFiles : undefined,
-                images: hasImages
-                  ? images.map((img) => ({
-                      name: img.name,
-                      mimeType: img.mimeType,
-                      data: img.data,
-                    }))
-                  : undefined,
+                images: hasImages ? sendableImages : undefined,
                 elements: hasElements ? elements : undefined,
               }
             : undefined;

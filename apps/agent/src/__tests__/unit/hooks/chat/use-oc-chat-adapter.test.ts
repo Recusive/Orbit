@@ -179,6 +179,33 @@ describe('useOcChatAdapter helpers', () => {
     });
   });
 
+  it('maps OpenCode image file parts into attached images without inline text', () => {
+    const adapted = adaptParts(
+      [
+        {
+          id: 'file-1',
+          sessionID: 'oc-session',
+          messageID: 'msg-1',
+          type: 'file',
+          filename: 'diagram.png',
+          mime: 'image/png',
+          url: 'data:image/png;base64,abc123',
+        },
+      ] as Parameters<typeof adaptParts>[0],
+      'msg-1',
+      'oc-session'
+    );
+
+    expect(adapted.content).toBe('');
+    expect(adapted.images).toEqual([
+      {
+        name: 'diagram.png',
+        mimeType: 'image/png',
+        previewUrl: 'data:image/png;base64,abc123',
+      },
+    ]);
+  });
+
   it('preserves permission patterns and always-allow support', () => {
     expect(
       adaptPermission({

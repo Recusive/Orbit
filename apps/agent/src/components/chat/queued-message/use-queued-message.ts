@@ -3,6 +3,10 @@ import { useEffect } from 'react';
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { ReactElementContext, WebviewMessage } from '@/types/protocol';
 
+import {
+  buildOptimisticAttachedImages,
+  cacheAttachedImagesForMessage,
+} from '@/services/chat/image-attachment-cache';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore, useQueuedMessage } from '@/stores/chat/queued-message-store';
 
@@ -56,6 +60,18 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
         model: toolState.model,
       });
 
+      const sendableImages = (images ?? []).flatMap((image) =>
+        image.data
+          ? [
+              {
+                name: image.name,
+                mimeType: image.mimeType,
+                data: image.data,
+              },
+            ]
+          : []
+      );
+
       // Add user message to chat
       const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -63,22 +79,21 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
         content: text,
         displayedContent: text,
         attachedFiles: contextFiles,
-        attachedImages: images,
+        attachedImages: buildOptimisticAttachedImages(images),
       };
       addMessage(userMessage);
+      cacheAttachedImagesForMessage(sessionId, userMessage.id, images);
       setIsAgentRunning(true);
 
       // Build context object
       const hasFiles = contextFiles && contextFiles.length > 0;
-      const hasImages = images && images.length > 0;
+      const hasImages = sendableImages.length > 0;
       const hasElements = elements && elements.length > 0;
       const context =
         hasFiles || hasImages || hasElements
           ? {
               files: hasFiles ? contextFiles : undefined,
-              images: hasImages
-                ? images.map((img) => ({ name: img.name, mimeType: img.mimeType, data: img.data }))
-                : undefined,
+              images: hasImages ? sendableImages : undefined,
               elements: hasElements ? elements : undefined,
             }
           : undefined;

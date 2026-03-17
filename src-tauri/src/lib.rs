@@ -31,7 +31,7 @@ use commands::canvas::setup as canvas_setup;
 use commands::canvas::transform as canvas_transform;
 use commands::canvas::PreviewServerState;
 use commands::common::{
-    credentials, dev_monitor, diagnostics, files, git, icons, lsp, providers,
+    credentials, dev_monitor, diagnostics, files, git, icons, image_cache, lsp, providers,
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
@@ -586,6 +586,7 @@ pub fn run() {
             settings::pick_directory,
             icons::list_app_icons,
             icons::set_app_icon,
+            image_cache::cache_image,
             // Diagnostics commands
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,

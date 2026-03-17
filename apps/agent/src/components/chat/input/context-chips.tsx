@@ -5,6 +5,7 @@ import type { FC, ReactNode } from 'react';
 
 import { FileIcon } from '@/components/files/file-icon';
 import { IconSkills } from '@/components/layout/primary-sidebar/components/IconSkills';
+import { SafeImage } from '@/components/shared';
 import { cn } from '@/lib/utils';
 
 interface ContextChipsProps {
@@ -73,7 +74,7 @@ const ContextChip: FC<ContextChipProps> = ({ item, onRemove }) => {
       {isSkill ? (
         <IconSkills className="h-3.5 w-3.5 shrink-0 opacity-60" />
       ) : isImage && item.previewUrl ? (
-        <img
+        <SafeImage
           src={item.previewUrl}
           alt={item.name}
           className="h-5 w-5 object-cover rounded-[5px] shrink-0"

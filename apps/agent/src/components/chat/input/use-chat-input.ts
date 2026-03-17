@@ -178,7 +178,20 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   // Send message handler
   const handleSend = useCallback((): void => {
     let text = inputText.trim();
-    if (!text) return;
+
+    const images = attachedContext
+      .filter(
+        (item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
+          item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
+      )
+      .map((item) => ({
+        name: item.name,
+        mimeType: item.mimeType,
+        data: item.imageData,
+        previewUrl: item.previewUrl ?? '',
+      }));
+
+    if (!text && images.length === 0) return;
 
     // Append @filename tokens for attached files/folders so they persist in JSONL content.
     // The file paths are still sent as attachments for the SDK, but the @tokens ensure
@@ -221,19 +234,6 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     const contextFiles = attachedContext
       .filter((item) => item.type === 'file' || item.type === 'folder')
       .map((item) => item.path);
-
-    // Extract images from attached context
-    const images = attachedContext
-      .filter(
-        (item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
-          item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
-      )
-      .map((item) => ({
-        name: item.name,
-        mimeType: item.mimeType,
-        data: item.imageData,
-        previewUrl: item.previewUrl ?? '',
-      }));
 
     // Extract skill names from attached context
     const skillNames = skillItems.map((s) => s.name);
@@ -483,7 +483,8 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     }
   }, [inputMode]);
 
-  const isInputEmpty = inputText.length === 0;
+  const hasAttachedImages = attachedContext.some((item) => item.type === 'image');
+  const isInputEmpty = inputText.length === 0 && !hasAttachedImages;
 
   // Ghost text: show the untyped suffix of the top matching slash command.
   // e.g., typed "/com" → top match "commit" → ghost = "mit"

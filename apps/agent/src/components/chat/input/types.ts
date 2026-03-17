@@ -18,8 +18,8 @@ export interface UsageData {
 export interface ImageAttachment {
   name: string;
   mimeType: string;
-  data: string; // Base64 encoded
-  previewUrl: string; // Data URL for display
+  data?: string | undefined;
+  previewUrl: string;
 }
 
 export interface ChatInputProps {

@@ -37,6 +37,7 @@ interface AdaptedOcParts {
   content: string;
   thinkingBlocks: ThinkingBlock[];
   tools: ToolExecution[];
+  images: ImageAttachment[];
   interruptReason?: string;
   isInterrupted: boolean;
   isThinkingActive: boolean;
@@ -226,6 +227,7 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
   let hasCompaction = false;
   const thinkingBlocks: ThinkingBlock[] = [];
   const tools: ToolExecution[] = [];
+  const images: ImageAttachment[] = [];
 
   for (const part of parts) {
     const offset = content.length;
@@ -294,8 +296,17 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
         break;
 
       case 'file': {
-        const file = part.filename ?? part.source?.path ?? part.url;
-        content = appendLine(content, `Referenced: ${file}`);
+        const mime = part.mime;
+        if (mime.startsWith('image/') && part.url) {
+          images.push({
+            name: part.filename ?? 'image',
+            mimeType: mime,
+            previewUrl: part.url,
+          });
+        } else {
+          const file = part.filename ?? part.source?.path ?? part.url;
+          content = appendLine(content, `Referenced: ${file}`);
+        }
         break;
       }
 
@@ -351,6 +362,7 @@ export function adaptParts(parts: OcPart[], messageId: string, sessionId: string
     content,
     thinkingBlocks,
     tools,
+    images,
     ...(interruptReason !== undefined ? { interruptReason } : {}),
     isInterrupted,
     isThinkingActive,
@@ -523,6 +535,7 @@ function adaptOcMessage(
       ...(thinking.length > 0 ? { thinking } : {}),
       ...(thinkingDurationMs > 0 ? { thinkingDurationMs } : {}),
       ...(adapted.thinkingBlocks.length > 0 ? { thinkingBlocks: adapted.thinkingBlocks } : {}),
+      ...(adapted.images.length > 0 ? { attachedImages: adapted.images } : {}),
       ...(adapted.isThinkingActive ? { isThinkingActive: true } : {}),
       ...(assistant?.parentID ? { parentUuid: assistant.parentID } : {}),
       ...(interruptReason !== undefined ? { interruptReason } : {}),
@@ -713,6 +726,9 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
         useOcProviderStore.getState().providers.find((provider) => provider.id === providerId)
           ?.models[modelId ?? '']?.supportsImageInput ?? true;
       const safeImages = modelSupportsImages ? images : undefined;
+      if (trimmed.length === 0 && (safeImages?.length ?? 0) === 0) {
+        return;
+      }
 
       void send(text, {
         agent,
