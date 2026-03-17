@@ -1,4 +1,4 @@
-import { createOrbitClient } from "@opencode-ai/sdk/v2/client"
+import { createOrbitClient } from "@orbit.build/sdk/v2/client"
 import type { ServerConnection } from "@/context/server"
 
 export function createSdkForServer({

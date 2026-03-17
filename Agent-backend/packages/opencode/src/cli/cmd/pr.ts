@@ -92,7 +92,7 @@ export const PrCommand = cmd({
               })
             }
 
-            // Check for opencode session link in PR body
+            // Check for orbit session link in PR body
             if (typeof prInfo.body === "string" && prInfo.body.length > 0) {
               const sessionMatch = /https:\/\/opncd\.ai\/s\/([a-zA-Z0-9_-]+)/.exec(prInfo.body)
               if (sessionMatch) {
@@ -122,20 +122,20 @@ export const PrCommand = cmd({
         UI.println("Starting orbit...")
         UI.println()
 
-        // Launch opencode TUI with session ID if available
+        // Launch orbit TUI with session ID if available
         const { spawn } = await import("child_process")
-        const opencodeArgs = sessionId ? ["-s", sessionId] : []
-        const opencodeProcess = spawn("orbit", opencodeArgs, {
+        const orbitArgs = sessionId ? ["-s", sessionId] : []
+        const orbitProcess = spawn("orbit", orbitArgs, {
           stdio: "inherit",
           cwd: process.cwd(),
         })
 
         await new Promise<void>((resolve, reject) => {
-          opencodeProcess.on("exit", (code) => {
+          orbitProcess.on("exit", (code) => {
             if (code === 0) resolve()
             else reject(new Error(`orbit exited with code ${String(code)}`))
           })
-          opencodeProcess.on("error", reject)
+          orbitProcess.on("error", reject)
         })
       },
     })

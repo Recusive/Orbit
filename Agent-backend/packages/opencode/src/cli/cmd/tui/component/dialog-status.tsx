@@ -1,7 +1,8 @@
+import { fileURLToPath } from "url"
+
 import { TextAttributes } from "@opentui/core"
 import { useSync } from "@tui/context/sync"
 import { useDialog } from "@tui/ui/dialog"
-import { fileURLToPath } from "bun"
 import { For, Match, Switch, Show, createMemo } from "solid-js"
 
 import { useTheme } from "../context/theme"
@@ -43,14 +44,18 @@ export function DialogStatus(): JSX.Element {
     return result.toSorted((a, b) => a.name.localeCompare(b.name))
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box paddingLeft={2} paddingRight={2} gap={1} paddingBottom={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text fg={theme.text} attributes={TextAttributes.BOLD}>
           Status
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -60,7 +65,6 @@ export function DialogStatus(): JSX.Element {
           <text fg={theme.text}>{Object.keys(sync.data.mcp).length} MCP Servers</text>
           <For each={Object.entries(sync.data.mcp)}>
             {([key, item]) => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box flexDirection="row" gap={1}>
                   <text
@@ -106,7 +110,6 @@ export function DialogStatus(): JSX.Element {
           <text fg={theme.text}>{sync.data.lsp.length} LSP Servers</text>
           <For each={sync.data.lsp}>
             {(item) => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box flexDirection="row" gap={1}>
                   <text
@@ -135,7 +138,6 @@ export function DialogStatus(): JSX.Element {
           <text fg={theme.text}>{enabledFormatters().length} Formatters</text>
           <For each={enabledFormatters()}>
             {(item) => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box flexDirection="row" gap={1}>
                   <text
@@ -161,7 +163,6 @@ export function DialogStatus(): JSX.Element {
           <text fg={theme.text}>{plugins().length} Plugins</text>
           <For each={plugins()}>
             {(item) => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box flexDirection="row" gap={1}>
                   <text

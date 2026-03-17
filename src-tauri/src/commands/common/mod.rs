@@ -6,6 +6,7 @@ pub mod diagnostics;
 pub mod files;
 pub mod git;
 pub mod icons;
+pub mod image_cache;
 pub mod lsp;
 pub mod path_utils;
 pub mod providers;

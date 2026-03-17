@@ -1,7 +1,6 @@
-import { text } from "node:stream/consumers"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import z from "zod"
 
 import { Global } from "../global"
@@ -17,32 +16,29 @@ import { proxied } from "@/util/proxied"
 export namespace BunProc {
   const log = Log.create({ service: "bun" })
 
-  export async function run(cmd: string[], options?: Process.Options): Promise<ReturnType<typeof Process.spawn>> {
+  export async function run(cmd: string[], options?: Process.RunOptions): Promise<Process.Result> {
+    const full = [which(), ...cmd]
     log.info("running", {
-      cmd: [which(), ...cmd],
+      cmd: full,
       ...options,
     })
-    const result = Process.spawn([which(), ...cmd], {
-      ...options,
-      stdout: "pipe",
-      stderr: "pipe",
+    const result = await Process.run(full, {
+      cwd: options?.cwd,
+      abort: options?.abort,
+      kill: options?.kill,
+      timeout: options?.timeout,
+      nothrow: options?.nothrow,
       env: {
         ...process.env,
         ...options?.env,
         BUN_BE_BUN: "1",
       },
     })
-    const code = await result.exited
-    const stdout = result.stdout ? await text(result.stdout) : undefined
-    const stderr = result.stderr ? await text(result.stderr) : undefined
     log.info("done", {
-      code,
-      stdout,
-      stderr,
+      code: result.code,
+      stdout: result.stdout.toString(),
+      stderr: result.stderr.toString(),
     })
-    if (code !== 0) {
-      throw new Error(`Command failed with exit code ${String(code)}`)
-    }
     return result
   }
 
@@ -89,7 +85,7 @@ export namespace BunProc {
       "--force",
       "--exact",
       // TODO: get rid of this case (see: https://github.com/oven-sh/bun/issues/19936)
-      ...(proxied() || process.env.CI !== undefined ? ["--no-cache"] : []),
+      ...(proxied() || process.env.CI ? ["--no-cache"] : []),
       "--cwd",
       Global.Path.cache,
       pkg + "@" + version,
@@ -122,7 +118,7 @@ export namespace BunProc {
       const installedPkg = await Filesystem.readJson<{ version?: string }>(path.join(mod, "package.json")).catch(
         () => null,
       )
-      if (installedPkg?.version !== undefined) {
+      if (installedPkg?.version) {
         resolvedVersion = installedPkg.version
       }
     }

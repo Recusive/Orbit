@@ -1,25 +1,24 @@
-import path from "path"
-
 import { describe, expect, test } from "bun:test"
-
-import { Agent } from "../../src/agent/agent"
-import { PermissionNext } from "../../src/permission/next"
-import { Instance } from "../../src/project/instance"
+import path from "path"
 import { ReadTool } from "../../src/tool/read"
+import { Instance } from "../../src/project/instance"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
+import { PermissionNext } from "../../src/permission/next"
+import { Agent } from "../../src/agent/agent"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const FIXTURES_DIR = path.join(import.meta.dir, "fixtures")
 
 const ctx = {
-  sessionID: "test",
-  messageID: "",
+  sessionID: SessionID.make("ses_test"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("tool.read external_directory permission", () => {
@@ -66,7 +65,7 @@ describe("tool.read external_directory permission", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -92,7 +91,7 @@ describe("tool.read external_directory permission", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -113,7 +112,7 @@ describe("tool.read external_directory permission", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -121,7 +120,7 @@ describe("tool.read external_directory permission", () => {
           },
         }
         // This will fail because file doesn't exist, but we can check if permission was asked
-        await read.execute({ filePath: "../outside.txt" }, testCtx).catch(() => { /* noop */ })
+        await read.execute({ filePath: "../outside.txt" }, testCtx).catch(() => {})
         const extDirReq = requests.find((r) => r.permission === "external_directory")
         expect(extDirReq).toBeDefined()
       },
@@ -139,7 +138,7 @@ describe("tool.read external_directory permission", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -174,17 +173,20 @@ describe("tool.read env file permissions", () => {
         directory: tmp.path,
         fn: async () => {
           const agent = await Agent.get(agentName)
+          if (!agent) {
+            throw new Error(`expected agent ${agentName}`)
+          }
           let askedForEnv = false
           const ctxWithPermissions = {
             ...ctx,
             ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
               for (const pattern of req.patterns) {
-                const rule = PermissionNext.evaluate(req.permission, pattern, agent!.permission)
+                const rule = PermissionNext.evaluate(req.permission, pattern, agent.permission)
                 if (rule.action === "ask" && req.permission === "read") {
                   askedForEnv = true
                 }
                 if (rule.action === "deny") {
-                  throw new PermissionNext.DeniedError(agent!.permission)
+                  throw new PermissionNext.DeniedError(agent.permission)
                 }
               }
             },
@@ -223,7 +225,7 @@ describe("tool.read truncation", () => {
   test("truncates by line count when limit is specified", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const lines = Array.from({ length: 100 }, (_, i) => `line${String(i)}`).join("\n")
+        const lines = Array.from({ length: 100 }, (_, i) => `line${i}`).join("\n")
         await Bun.write(path.join(dir, "many-lines.txt"), lines)
       },
     })
@@ -262,7 +264,7 @@ describe("tool.read truncation", () => {
   test("respects offset parameter", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const lines = Array.from({ length: 20 }, (_, i) => `line${String(i + 1)}`).join("\n")
+        const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`).join("\n")
         await Bun.write(path.join(dir, "offset.txt"), lines)
       },
     })
@@ -286,7 +288,7 @@ describe("tool.read truncation", () => {
   test("throws when offset is beyond end of file", async () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
-        const lines = Array.from({ length: 3 }, (_, i) => `line${String(i + 1)}`).join("\n")
+        const lines = Array.from({ length: 3 }, (_, i) => `line${i + 1}`).join("\n")
         await Bun.write(path.join(dir, "short.txt"), lines)
       },
     })
@@ -294,7 +296,7 @@ describe("tool.read truncation", () => {
       directory: tmp.path,
       fn: async () => {
         const read = await ReadTool.init()
-        expect(
+        await expect(
           read.execute({ filePath: path.join(tmp.path, "short.txt"), offset: 4, limit: 5 }, ctx),
         ).rejects.toThrow("Offset 4 is out of range for this file (3 lines)")
       },
@@ -339,7 +341,7 @@ describe("tool.read truncation", () => {
     await using tmp = await tmpdir({
       init: async (dir) => {
         await Promise.all(
-          Array.from({ length: 10 }, (_, i) => Bun.write(path.join(dir, "dir", `file-${String(i + 1)}.txt`), `line${String(i)}`)),
+          Array.from({ length: 10 }, (_, i) => Bun.write(path.join(dir, "dir", `file-${i + 1}.txt`), `line${i}`)),
         )
       },
     })

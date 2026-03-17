@@ -1,16 +1,10 @@
 import path from "path"
 
-import {
-  addDefaultParsers,
-  MacOSScrollAccel,
-
-  TextAttributes,
-  RGBA
-} from "@opentui/core"
-import { useKeyboard, useRenderer, useTerminalDimensions  } from "@opentui/solid"
+import { addDefaultParsers, CodeRenderable, MacOSScrollAccel, TextAttributes, RGBA } from "@opentui/core"
+import { useKeyboard, useRenderer, useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "@tui/component/border"
 import { useCommandDialog } from "@tui/component/dialog-command"
-import { Prompt  } from "@tui/component/prompt"
+import { Prompt } from "@tui/component/prompt"
 import { Spinner } from "@tui/component/spinner"
 import { useKeybind } from "@tui/context/keybind"
 import { useLocal } from "@tui/context/local"
@@ -76,11 +70,9 @@ import type { TodoWriteTool } from "@/tool/todo"
 import type { Tool } from "@/tool/tool"
 import type { WebFetchTool } from "@/tool/webfetch"
 import type { WriteTool } from "@/tool/write"
-import type { AssistantMessage, Part, ToolPart, UserMessage, TextPart, ReasoningPart } from "@opencode-ai/sdk/v2"
-import type {ScrollAcceleration,
-  ScrollBoxRenderable,
-  MouseEvent as OpentuiMouseEvent} from "@opentui/core";
-import type {PromptRef} from "@tui/component/prompt";
+import type { ScrollAcceleration, ScrollBoxRenderable, MouseEvent as OpentuiMouseEvent } from "@opentui/core"
+import type { AssistantMessage, Part, ReasoningPart, TextPart, ToolPart, UserMessage } from "@orbit.build/sdk/v2"
+import type { PromptRef } from "@tui/component/prompt"
 import type { DialogContext } from "@tui/ui/dialog"
 import type { JSX } from "solid-js"
 
@@ -91,6 +83,27 @@ import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Filesystem } from "@/util/filesystem"
 import { Locale } from "@/util/locale"
 
+// Monkey-patch CodeRenderable to prevent flash-of-invisible-text on re-highlighting.
+// MarkdownRenderable hardcodes drawUnstyledText=false on child CodeRenderables.
+// When a re-highlight triggers (syntaxStyle change, content update), the original
+// ensureVisibleTextBeforeHighlight() can set _shouldRenderTextBuffer=false, hiding
+// already-visible styled text until async tree-sitter completes — causing a flash.
+// This patch: if text is already visible, skip the method entirely to preserve the
+// current styled/concealed content. Initial renders (text not yet visible) run
+// the original logic unchanged.
+interface CodeRenderablePatch {
+  _shouldRenderTextBuffer: boolean
+  ensureVisibleTextBeforeHighlight(): void
+}
+
+const CodeProto = CodeRenderable.prototype as unknown as CodeRenderablePatch
+// eslint-disable-next-line @typescript-eslint/unbound-method -- preserving original prototype method for monkey patch
+const _origEnsureVisible = CodeProto.ensureVisibleTextBeforeHighlight
+CodeProto.ensureVisibleTextBeforeHighlight = function (this: CodeRenderablePatch): void {
+  if (this._shouldRenderTextBuffer) return
+  _origEnsureVisible.call(this)
+}
+
 addDefaultParsers(parsers.parsers)
 
 class CustomSpeedScroll implements ScrollAcceleration {
@@ -100,7 +113,9 @@ class CustomSpeedScroll implements ScrollAcceleration {
     return this.speed
   }
 
-  reset(): void { /* noop */ }
+  reset(): void {
+    /* noop */
+  }
 }
 
 const context = createContext<{
@@ -138,7 +153,9 @@ function use(): SessionContext {
 export function Session(): JSX.Element {
   const route = useRouteData("session")
   const routeCtx = useRoute()
-  const navigate = (r: Parameters<typeof routeCtx.navigate>[0]): void => { routeCtx.navigate(r) }
+  const navigate = (r: Parameters<typeof routeCtx.navigate>[0]): void => {
+    routeCtx.navigate(r)
+  }
   const sync = useSync()
   const tuiConfig = useTuiConfig()
   const kv = useKV()
@@ -186,13 +203,14 @@ export function Session(): JSX.Element {
   const [viewerTabs, setViewerTabs] = createSignal<string[]>([])
   const [activeTab, setActiveTab] = createSignal<string | null>(null)
   const openFileTab = (filePath: string): void => {
-    setViewerTabs((tabs) => tabs.includes(filePath) ? tabs : [...tabs, filePath])
+    setViewerTabs((tabs) => (tabs.includes(filePath) ? tabs : [...tabs, filePath]))
     setActiveTab(filePath)
   }
   const closeFileTab = (filePath: string): void => {
     setViewerTabs((tabs) => {
       const next = tabs.filter((t) => t !== filePath)
-      if (activeTab() === filePath) setActiveTab(next.length ? next[Math.min(tabs.indexOf(filePath), next.length - 1)] : null)
+      if (activeTab() === filePath)
+        setActiveTab(next.length ? next[Math.min(tabs.indexOf(filePath), next.length - 1)] : null)
       return next
     })
   }
@@ -241,7 +259,7 @@ export function Session(): JSX.Element {
           message: `Session not found: ${route.sessionID}`,
           variant: "error",
         })
-        navigate({ type: "home" });
+        navigate({ type: "home" })
       })
   })
 
@@ -413,11 +431,17 @@ export function Session(): JSX.Element {
       onSelect: (dialog) => {
         const copy = (url: string): Promise<void> =>
           Clipboard.copy(url)
-            .then(() => { toast.show({ message: "Share URL copied to clipboard!", variant: "success" }); })
-            .catch(() => { toast.show({ message: "Failed to copy URL to clipboard", variant: "error" }); })
+            .then(() => {
+              toast.show({ message: "Share URL copied to clipboard!", variant: "success" })
+            })
+            .catch(() => {
+              toast.show({ message: "Failed to copy URL to clipboard", variant: "error" })
+            })
         const url = session()?.share?.url
         if (url) {
-          void copy(url).then(() => { dialog.clear() })
+          void copy(url).then(() => {
+            dialog.clear()
+          })
           return
         }
         void sdk.client.session
@@ -428,8 +452,15 @@ export function Session(): JSX.Element {
             const shareUrl = res.data?.share?.url
             if (shareUrl) return copy(shareUrl)
           })
-          .catch(() => { toast.show({ message: "Failed to share session", variant: "error" }); })
-          .finally(() => { dialog.clear() })
+          .catch((error: unknown) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to share session",
+              variant: "error",
+            })
+          })
+          .finally(() => {
+            dialog.clear()
+          })
       },
     },
     {
@@ -441,7 +472,6 @@ export function Session(): JSX.Element {
         name: "rename",
       },
       onSelect: (dialog) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
         dialog.replace(() => <DialogSessionRename session={route.sessionID} />)
       },
     },
@@ -455,7 +485,6 @@ export function Session(): JSX.Element {
       },
       onSelect: (dialog) => {
         dialog.replace(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <DialogTimeline
               onMove={(messageID: string): void => {
@@ -465,7 +494,9 @@ export function Session(): JSX.Element {
                 if (child) scroll.scrollBy(child.y - scroll.y - 1)
               }}
               sessionID={route.sessionID}
-              setPrompt={(promptInfo) => { prompt.set(promptInfo); }}
+              setPrompt={(promptInfo) => {
+                prompt.set(promptInfo)
+              }}
             />
           )
         })
@@ -481,7 +512,6 @@ export function Session(): JSX.Element {
       },
       onSelect: (dialog) => {
         dialog.replace(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <DialogForkFromTimeline
               onMove={(messageID: string): void => {
@@ -537,9 +567,18 @@ export function Session(): JSX.Element {
           .unshare({
             sessionID: route.sessionID,
           })
-          .then(() => { toast.show({ message: "Session unshared successfully", variant: "success" }); })
-          .catch(() => { toast.show({ message: "Failed to unshare session", variant: "error" }); })
-          .finally(() => { dialog.clear() })
+          .then(() => {
+            toast.show({ message: "Session unshared successfully", variant: "success" })
+          })
+          .catch((error: unknown) => {
+            toast.show({
+              message: error instanceof Error ? error.message : "Failed to unshare session",
+              variant: "error",
+            })
+          })
+          .finally(() => {
+            dialog.clear()
+          })
       },
     },
     {
@@ -553,7 +592,10 @@ export function Session(): JSX.Element {
       onSelect: (dialog) => {
         const doUndo = async (): Promise<void> => {
           const status = sync.data.session_status[route.sessionID]
-          if (status.type !== "idle") await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => { /* noop */ })
+          if (status.type !== "idle")
+            await sdk.client.session.abort({ sessionID: route.sessionID }).catch(() => {
+              /* noop */
+            })
           const revert = session()?.revert?.messageID
           const message = messages().findLast((x) => (!revert || x.id < revert) && x.role === "user")
           if (!message) return
@@ -817,9 +859,7 @@ export function Session(): JSX.Element {
           const parts = sync.data.part[message.id]
           if (!Array.isArray(parts)) continue
 
-          const hasValidTextPart = parts.some(
-            (part) => part.type === "text" && !part.synthetic && !part.ignored,
-          )
+          const hasValidTextPart = parts.some((part) => part.type === "text" && !part.synthetic && !part.ignored)
 
           if (hasValidTextPart) {
             const child = scroll.getChildren().find((child) => {
@@ -837,7 +877,9 @@ export function Session(): JSX.Element {
       keybind: "messages_next",
       category: "Session",
       hidden: true,
-      onSelect: (dialog) => { scrollToMessage("next", dialog); },
+      onSelect: (dialog) => {
+        scrollToMessage("next", dialog)
+      },
     },
     {
       title: "Previous message",
@@ -845,7 +887,9 @@ export function Session(): JSX.Element {
       keybind: "messages_previous",
       category: "Session",
       hidden: true,
-      onSelect: (dialog) => { scrollToMessage("prev", dialog); },
+      onSelect: (dialog) => {
+        scrollToMessage("prev", dialog)
+      },
     },
     {
       title: "Copy last assistant message",
@@ -885,8 +929,12 @@ export function Session(): JSX.Element {
         }
 
         Clipboard.copy(text)
-          .then(() => { toast.show({ message: "Message copied to clipboard!", variant: "success" }); })
-          .catch(() => { toast.show({ message: "Failed to copy to clipboard", variant: "error" }); })
+          .then(() => {
+            toast.show({ message: "Message copied to clipboard!", variant: "success" })
+          })
+          .catch(() => {
+            toast.show({ message: "Failed to copy to clipboard", variant: "error" })
+          })
         dialog.clear()
       },
     },
@@ -911,9 +959,15 @@ export function Session(): JSX.Element {
           },
         )
         void Clipboard.copy(transcript)
-          .then(() => { toast.show({ message: "Session transcript copied to clipboard!", variant: "success" }) })
-          .catch(() => { toast.show({ message: "Failed to copy session transcript", variant: "error" }) })
-          .finally(() => { dialog.clear() })
+          .then(() => {
+            toast.show({ message: "Session transcript copied to clipboard!", variant: "success" })
+          })
+          .catch(() => {
+            toast.show({ message: "Failed to copy session transcript", variant: "error" })
+          })
+          .finally(() => {
+            dialog.clear()
+          })
       },
     },
     {
@@ -1082,7 +1136,6 @@ export function Session(): JSX.Element {
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <context.Provider
       value={{
@@ -1118,12 +1171,7 @@ export function Session(): JSX.Element {
         onMouseDragEnd={() => setDragging(null)}
         onMouseUp={() => setDragging(null)}
       >
-        <box
-          width={showFileTree() ? (fileTreeWidth()) + 1 : 0}
-          height="100%"
-          flexShrink={0}
-          flexDirection="row"
-        >
+        <box width={showFileTree() ? fileTreeWidth() + 1 : 0} height="100%" flexShrink={0} flexDirection="row">
           <Show when={showFileTree()}>
             <FileTree onFileOpen={openFileTab} width={fileTreeWidth()} />
             <box
@@ -1131,10 +1179,14 @@ export function Session(): JSX.Element {
               height="100%"
               backgroundColor={dragging() === "left" ? theme.borderActive : theme.borderSubtle}
               onMouseDown={() => setDragging("left")}
-               
-              onMouseOver={function () { if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderActive }}
-               
-              onMouseOut={function () { if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderSubtle }}
+              onMouseOver={function () {
+                if (dragging() === null)
+                  (this as unknown as Record<string, unknown>).backgroundColor = theme.borderActive
+              }}
+              onMouseOut={function () {
+                if (dragging() === null)
+                  (this as unknown as Record<string, unknown>).backgroundColor = theme.borderSubtle
+              }}
             />
           </Show>
         </box>
@@ -1163,109 +1215,109 @@ export function Session(): JSX.Element {
             >
               <For each={messages()}>
                 {(message, index) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                   return (
-                  <Switch>
-                    <Match when={message.id === revert()?.messageID}>
-                      {(function (): JSX.Element {
-                        const command = useCommandDialog()
-                        const [hover, setHover] = createSignal(false)
-                        const dlg = useDialog()
+                    <Switch>
+                      <Match when={message.id === revert()?.messageID}>
+                        {(function (): JSX.Element {
+                          const command = useCommandDialog()
+                          const [hover, setHover] = createSignal(false)
+                          const dlg = useDialog()
 
-                        const handleUnrevert = (): void => {
-                          void (async (): Promise<void> => {
-                            const confirmed = await DialogConfirm.show(
-                              dlg,
-                              "Confirm Redo",
-                              "Are you sure you want to restore the reverted messages?",
-                            )
-                            if (confirmed) {
-                              command.trigger("session.redo")
-                            }
-                          })()
-                        }
+                          const handleUnrevert = (): void => {
+                            void (async (): Promise<void> => {
+                              const confirmed = await DialogConfirm.show(
+                                dlg,
+                                "Confirm Redo",
+                                "Are you sure you want to restore the reverted messages?",
+                              )
+                              if (confirmed) {
+                                command.trigger("session.redo")
+                              }
+                            })()
+                          }
 
-                        const revertData = revert()
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
-                        return (
-                          <box
-                            onMouseOver={() => setHover(true)}
-                            onMouseOut={() => setHover(false)}
-                            onMouseUp={handleUnrevert}
-                            marginTop={1}
-                            flexShrink={0}
-                            border={["left"]}
-                            customBorderChars={SplitBorder.customBorderChars}
-                            borderColor={theme.backgroundPanel}
-                          >
+                          const revertData = revert()
+                          return (
                             <box
-                              paddingTop={1}
-                              paddingBottom={1}
-                              paddingLeft={2}
-                              backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+                              onMouseOver={() => setHover(true)}
+                              onMouseOut={() => setHover(false)}
+                              onMouseUp={handleUnrevert}
+                              marginTop={1}
+                              flexShrink={0}
+                              border={["left"]}
+                              customBorderChars={SplitBorder.customBorderChars}
+                              borderColor={theme.backgroundPanel}
                             >
-                              <text fg={theme.textMuted}>{revertData?.reverted.length ?? 0} message reverted</text>
-                              <text fg={theme.textMuted}>
-                                <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
-                                restore
-                              </text>
-                              <Show when={(revertData?.diffFiles.length ?? 0) > 0}>
-                                <box marginTop={1}>
-                                  <For each={revertData?.diffFiles ?? []}>
-                                    {(file) => {
-                                      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
-                                      return (
-                                      <text fg={theme.text}>
-                                        {file.filename}
-                                        <Show when={file.additions > 0}>
-                                          <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
-                                        </Show>
-                                        <Show when={file.deletions > 0}>
-                                          <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
-                                        </Show>
-                                      </text>
-                                    )}}
-                                  </For>
-                                </box>
-                              </Show>
+                              <box
+                                paddingTop={1}
+                                paddingBottom={1}
+                                paddingLeft={2}
+                                backgroundColor={hover() ? theme.backgroundElement : theme.backgroundPanel}
+                              >
+                                <text fg={theme.textMuted}>{revertData?.reverted.length ?? 0} message reverted</text>
+                                <text fg={theme.textMuted}>
+                                  <span style={{ fg: theme.text }}>{keybind.print("messages_redo")}</span> or /redo to
+                                  restore
+                                </text>
+                                <Show when={(revertData?.diffFiles.length ?? 0) > 0}>
+                                  <box marginTop={1}>
+                                    <For each={revertData?.diffFiles ?? []}>
+                                      {(file) => {
+                                        return (
+                                          <text fg={theme.text}>
+                                            {file.filename}
+                                            <Show when={file.additions > 0}>
+                                              <span style={{ fg: theme.diffAdded }}> +{file.additions}</span>
+                                            </Show>
+                                            <Show when={file.deletions > 0}>
+                                              <span style={{ fg: theme.diffRemoved }}> -{file.deletions}</span>
+                                            </Show>
+                                          </text>
+                                        )
+                                      }}
+                                    </For>
+                                  </box>
+                                </Show>
+                              </box>
                             </box>
-                          </box>
-                        )
-                      })()}
-                    </Match>
-                    <Match when={revert()?.messageID !== undefined && message.id >= (revert()?.messageID ?? "")}>
-                      <></>
-                    </Match>
-                    <Match when={message.role === "user"}>
-                      <UserMessage
-                        index={index()}
-                        onMouseUp={() => {
-                          if (renderer.getSelection()?.getSelectedText()) return
-                          dialog.replace(() => {
-                            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-                            return (
-                              <DialogMessage
-                                messageID={message.id}
-                                sessionID={route.sessionID}
-                                setPrompt={(promptInfo) => { prompt.set(promptInfo); }}
-                              />
-                            )
-                          })
-                        }}
-                        message={message as UserMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                        pending={pending()}
-                      />
-                    </Match>
-                    <Match when={message.role === "assistant"}>
-                      <AssistantMessage
-                        last={lastAssistant()?.id === message.id}
-                        message={message as AssistantMessage}
-                        parts={sync.data.part[message.id] ?? []}
-                      />
-                    </Match>
-                  </Switch>
-                )}}
+                          )
+                        })()}
+                      </Match>
+                      <Match when={revert()?.messageID !== undefined && message.id >= (revert()?.messageID ?? "")}>
+                        <></>
+                      </Match>
+                      <Match when={message.role === "user"}>
+                        <UserMessage
+                          index={index()}
+                          onMouseUp={() => {
+                            if (renderer.getSelection()?.getSelectedText()) return
+                            dialog.replace(() => {
+                              return (
+                                <DialogMessage
+                                  messageID={message.id}
+                                  sessionID={route.sessionID}
+                                  setPrompt={(promptInfo) => {
+                                    prompt.set(promptInfo)
+                                  }}
+                                />
+                              )
+                            })
+                          }}
+                          message={message as UserMessage}
+                          parts={sync.data.part[message.id] ?? []}
+                          pending={pending()}
+                        />
+                      </Match>
+                      <Match when={message.role === "assistant"}>
+                        <AssistantMessage
+                          last={lastAssistant()?.id === message.id}
+                          message={message as AssistantMessage}
+                          parts={sync.data.part[message.id] ?? []}
+                        />
+                      </Match>
+                    </Switch>
+                  )
+                }}
               </For>
             </scrollbox>
             <box flexShrink={0}>
@@ -1301,10 +1353,12 @@ export function Session(): JSX.Element {
             height="100%"
             backgroundColor={dragging() === "right" ? theme.borderActive : theme.borderSubtle}
             onMouseDown={() => setDragging("right")}
-             
-            onMouseOver={function () { if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderActive }}
-             
-            onMouseOut={function () { if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderSubtle }}
+            onMouseOver={function () {
+              if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderActive
+            }}
+            onMouseOut={function () {
+              if (dragging() === null) (this as unknown as Record<string, unknown>).backgroundColor = theme.borderSubtle
+            }}
           />
           <FileViewer
             filePath={activeTab()}
@@ -1370,7 +1424,6 @@ function UserMessage(props: {
 
   const compaction = createMemo(() => props.parts.find((x) => x.type === "compaction"))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <Show when={text()}>
@@ -1405,7 +1458,6 @@ function UserMessage(props: {
                       if (file.mime === "application/pdf") return theme.primary
                       return theme.secondary
                     })
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                     return (
                       <text fg={theme.text}>
                         <span style={{ bg: bg(), fg: theme.background }}> {MIME_BADGE[file.mime] ?? file.mime} </span>
@@ -1470,19 +1522,16 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
 
   const _keybind = useKeybind()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <For each={props.parts}>
-        {(part, index) => {
+        {(part) => {
           const component = createMemo(() => PART_MAPPING[part.type as keyof typeof PART_MAPPING])
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
           return (
             <Show when={component()}>
-              { }
+              {}
               {/* Dynamic component dispatch: part type is discriminated by PART_MAPPING lookup */}
               {(Dynamic as (props: Record<string, unknown>) => JSX.Element)({
-                last: index() === props.parts.length - 1,
                 component: component(),
                 part,
                 message: props.message,
@@ -1549,7 +1598,7 @@ const PART_MAPPING = {
   reasoning: ReasoningPart,
 }
 
-function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: AssistantMessage }): JSX.Element {
+function ReasoningPart(props: { part: ReasoningPart; message: AssistantMessage }): JSX.Element {
   const { theme, subtleSyntax } = useTheme()
   const ctx = use()
   const content = createMemo(() => {
@@ -1557,7 +1606,6 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
     // OpenRouter sends encrypted reasoning data that appears as [REDACTED]
     return props.part.text.replace("[REDACTED]", "").trim()
   })
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={content() && ctx.showThinking()}>
       <box
@@ -1571,7 +1619,7 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
       >
         <code
           filetype="markdown"
-          drawUnstyledText={false}
+          drawUnstyledText={true}
           streaming={true}
           syntaxStyle={subtleSyntax()}
           content={"_Thinking:_ " + content()}
@@ -1583,10 +1631,9 @@ function ReasoningPart(props: { last: boolean; part: ReasoningPart; message: Ass
   )
 }
 
-function TextPart(props: { last: boolean; part: TextPart; message: AssistantMessage }): JSX.Element {
+function TextPart(props: { part: TextPart; message: AssistantMessage }): JSX.Element {
   const ctx = use()
   const { theme, syntax } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
@@ -1618,7 +1665,7 @@ function TextPart(props: { last: boolean; part: TextPart; message: AssistantMess
 
 // Pending messages moved to individual tool pending functions
 
-function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMessage }): JSX.Element {
+function ToolPart(props: { part: ToolPart; message: AssistantMessage }): JSX.Element {
   const ctx = use()
   const sync = useSync()
 
@@ -1652,7 +1699,6 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
     },
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={!shouldHide()}>
       <Switch>
@@ -1731,7 +1777,7 @@ function GenericTool(props: ToolProps<any>): JSX.Element {
     return [...lines().slice(0, maxLines), "…"].join("\n")
   })
 
-  /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment -- opentui JSX types */
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment -- opentui JSX types */
   return (
     <Show
       when={props.output !== undefined && ctx.showGenericToolOutput()}
@@ -1811,15 +1857,15 @@ function InlineTool(props: {
     <box
       marginTop={margin()}
       paddingLeft={3}
-      onMouseOver={() => { if (props.onClick !== undefined) setHover(true) }}
+      onMouseOver={() => {
+        if (props.onClick !== undefined) setHover(true)
+      }}
       onMouseOut={() => setHover(false)}
       onMouseUp={() => {
         if (renderer.getSelection()?.getSelectedText()) return
         props.onClick?.()
       }}
-       
       renderBefore={function (): void {
-         
         const el = this as unknown as Record<string, unknown>
         const parent = el.parent as Record<string, (...args: unknown[]) => unknown> | null
         if (!parent) {
@@ -1872,7 +1918,7 @@ function BlockTool(props: {
   const renderer = useRenderer()
   const [hover, setHover] = createSignal(false)
   const error = createMemo(() => (props.part?.state.status === "error" ? props.part.state.error : undefined))
-   
+
   return (
     <box
       border={["left"]}
@@ -1884,14 +1930,16 @@ function BlockTool(props: {
       backgroundColor={hover() ? theme.backgroundMenu : theme.backgroundPanel}
       customBorderChars={SplitBorder.customBorderChars}
       borderColor={theme.background}
-      onMouseOver={() => { if (props.onClick !== undefined) setHover(true) }}
+      onMouseOver={() => {
+        if (props.onClick !== undefined) setHover(true)
+      }}
       onMouseOut={() => setHover(false)}
       onMouseUp={() => {
         if (renderer.getSelection()?.getSelectedText()) return
         props.onClick?.()
       }}
     >
-      { }
+      {}
       <Show
         when={props.spinner === true}
         fallback={
@@ -1948,7 +1996,6 @@ function Bash(props: ToolProps<typeof BashTool>): JSX.Element {
     return `# ${desc} in ${wd}`
   })
 
-   
   return (
     <Switch>
       <Match when={props.metadata.output !== undefined}>
@@ -1985,7 +2032,6 @@ function Write(props: ToolProps<typeof WriteTool>): JSX.Element {
     return props.input.content
   })
 
-   
   return (
     <Switch>
       <Match when={props.metadata.diagnostics !== undefined}>
@@ -2012,7 +2058,6 @@ function Write(props: ToolProps<typeof WriteTool>): JSX.Element {
 }
 
 function Glob(props: ToolProps<typeof GlobTool>): JSX.Element {
-   
   return (
     <InlineTool icon="✱" pending="Finding files..." complete={props.input.pattern} part={props.part}>
       Glob "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
@@ -2033,7 +2078,7 @@ function Read(props: ToolProps<typeof ReadTool>): JSX.Element {
     if (!value || !Array.isArray(value)) return []
     return value.filter((p): p is string => typeof p === "string")
   })
-   
+
   return (
     <>
       <InlineTool
@@ -2047,21 +2092,20 @@ function Read(props: ToolProps<typeof ReadTool>): JSX.Element {
       </InlineTool>
       <For each={loaded()}>
         {(filepath) => {
-           
           return (
-          <box paddingLeft={3}>
-            <text paddingLeft={3} fg={theme.textMuted}>
-              ↳ Loaded {normalizePath(filepath)}
-            </text>
-          </box>
-        )}}
+            <box paddingLeft={3}>
+              <text paddingLeft={3} fg={theme.textMuted}>
+                ↳ Loaded {normalizePath(filepath)}
+              </text>
+            </box>
+          )
+        }}
       </For>
     </>
   )
 }
 
 function Grep(props: ToolProps<typeof GrepTool>): JSX.Element {
-   
   return (
     <InlineTool icon="✱" pending="Searching content..." complete={props.input.pattern} part={props.part}>
       Grep "{props.input.pattern}" <Show when={props.input.path}>in {normalizePath(props.input.path)} </Show>
@@ -2079,7 +2123,7 @@ function List(props: ToolProps<typeof ListTool>): JSX.Element {
     }
     return ""
   })
-   
+
   return (
     <InlineTool icon="→" pending="Listing directory..." complete={props.input.path !== undefined} part={props.part}>
       List {dir()}
@@ -2089,7 +2133,7 @@ function List(props: ToolProps<typeof ListTool>): JSX.Element {
 
 function WebFetch(props: ToolProps<typeof WebFetchTool>): JSX.Element {
   const url = (props.input as Record<string, unknown>).url as string | undefined
-   
+
   return (
     <InlineTool icon="%" pending="Fetching from the web..." complete={url} part={props.part}>
       WebFetch {url}
@@ -2101,10 +2145,16 @@ function WebFetch(props: ToolProps<typeof WebFetchTool>): JSX.Element {
 function CodeSearch(props: ToolProps<any>): JSX.Element {
   const searchInput = props.input as Record<string, unknown>
   const searchMetadata = props.metadata as Record<string, unknown>
-   
+
   return (
-    <InlineTool icon="◇" pending="Searching code..." complete={searchInput.query as string | undefined} part={props.part}>
-      Exa Code Search "{(searchInput.query as string | undefined) ?? ""}" <Show when={searchMetadata.results !== undefined}>({String(searchMetadata.results)} results)</Show>
+    <InlineTool
+      icon="◇"
+      pending="Searching code..."
+      complete={searchInput.query as string | undefined}
+      part={props.part}
+    >
+      Exa Code Search "{(searchInput.query as string | undefined) ?? ""}"{" "}
+      <Show when={searchMetadata.results !== undefined}>({String(searchMetadata.results)} results)</Show>
     </InlineTool>
   )
 }
@@ -2113,10 +2163,16 @@ function CodeSearch(props: ToolProps<any>): JSX.Element {
 function WebSearch(props: ToolProps<any>): JSX.Element {
   const searchInput = props.input as Record<string, unknown>
   const searchMetadata = props.metadata as Record<string, unknown>
-   
+
   return (
-    <InlineTool icon="◈" pending="Searching web..." complete={searchInput.query as string | undefined} part={props.part}>
-      Exa Web Search "{(searchInput.query as string | undefined) ?? ""}" <Show when={searchMetadata.numResults !== undefined}>({String(searchMetadata.numResults)} results)</Show>
+    <InlineTool
+      icon="◈"
+      pending="Searching web..."
+      complete={searchInput.query as string | undefined}
+      part={props.part}
+    >
+      Exa Web Search "{(searchInput.query as string | undefined) ?? ""}"{" "}
+      <Show when={searchMetadata.numResults !== undefined}>({String(searchMetadata.numResults)} results)</Show>
     </InlineTool>
   )
 }
@@ -2143,7 +2199,9 @@ function Task(props: ToolProps<typeof TaskTool>): JSX.Element {
     )
   })
 
-  const current = createMemo(() => tools().findLast((x) => typeof (x.state as Record<string, unknown>).title === "string"))
+  const current = createMemo(() =>
+    tools().findLast((x) => typeof (x.state as Record<string, unknown>).title === "string"),
+  )
 
   const isRunning = createMemo(() => props.part.state.status === "running")
 
@@ -2175,7 +2233,6 @@ function Task(props: ToolProps<typeof TaskTool>): JSX.Element {
     return lines.join("\n")
   })
 
-   
   return (
     <InlineTool
       icon="│"
@@ -2209,7 +2266,6 @@ function Edit(props: ToolProps<typeof EditTool>): JSX.Element {
 
   const diffContent = createMemo(() => props.metadata.diff)
 
-   
   return (
     <Switch>
       <Match when={props.metadata.diff !== undefined}>
@@ -2260,7 +2316,6 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>): JSX.Element {
   })
 
   function PatchDiff(p: { diff: string; filePath: string }): JSX.Element {
-     
     return (
       <box paddingLeft={1}>
         <diff
@@ -2293,29 +2348,27 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>): JSX.Element {
     return "← Patched " + file.relativePath
   }
 
-   
   return (
     <Switch>
       <Match when={files().length > 0}>
         <For each={files()}>
           {(file) => {
-             
             return (
-            <BlockTool title={patchTitle(file)} part={props.part}>
-              <Show
-                when={file.type !== "delete"}
-                 
-                fallback={
-                  <text fg={theme.diffRemoved}>
-                    -{file.deletions} line{file.deletions !== 1 ? "s" : ""}
-                  </text>
-                }
-              >
-                <PatchDiff diff={file.diff} filePath={file.filePath} />
-                <Diagnostics diagnostics={props.metadata.diagnostics} filePath={file.movePath ?? file.filePath} />
-              </Show>
-            </BlockTool>
-          )}}
+              <BlockTool title={patchTitle(file)} part={props.part}>
+                <Show
+                  when={file.type !== "delete"}
+                  fallback={
+                    <text fg={theme.diffRemoved}>
+                      -{file.deletions} line{file.deletions !== 1 ? "s" : ""}
+                    </text>
+                  }
+                >
+                  <PatchDiff diff={file.diff} filePath={file.filePath} />
+                  <Diagnostics diagnostics={props.metadata.diagnostics} filePath={file.movePath ?? file.filePath} />
+                </Show>
+              </BlockTool>
+            )
+          }}
         </For>
       </Match>
       <Match when={true}>
@@ -2328,7 +2381,6 @@ function ApplyPatch(props: ToolProps<typeof ApplyPatchTool>): JSX.Element {
 }
 
 function TodoWrite(props: ToolProps<typeof TodoWriteTool>): JSX.Element {
-   
   return (
     <Switch>
       <Match when={(props.metadata.todos?.length ?? 0) > 0}>
@@ -2336,7 +2388,6 @@ function TodoWrite(props: ToolProps<typeof TodoWriteTool>): JSX.Element {
           <box>
             <For each={props.input.todos ?? []}>
               {(todo) => {
-                 
                 return <TodoItem status={todo.status} content={todo.content} />
               }}
             </For>
@@ -2361,7 +2412,6 @@ function Question(props: ToolProps<typeof QuestionTool>): JSX.Element {
     return answer?.join(", ") ?? "(no answer)"
   }
 
-   
   return (
     <Switch>
       <Match when={props.metadata.answers}>
@@ -2369,13 +2419,13 @@ function Question(props: ToolProps<typeof QuestionTool>): JSX.Element {
           <box gap={1}>
             <For each={props.input.questions ?? []}>
               {(q, i) => {
-                 
                 return (
-                <box flexDirection="column">
-                  <text fg={theme.textMuted}>{q.question}</text>
-                  <text fg={theme.text}>{format(props.metadata.answers?.[i()])}</text>
-                </box>
-              )}}
+                  <box flexDirection="column">
+                    <text fg={theme.textMuted}>{q.question}</text>
+                    <text fg={theme.text}>{format(props.metadata.answers?.[i()])}</text>
+                  </box>
+                )
+              }}
             </For>
           </box>
         </BlockTool>
@@ -2390,7 +2440,6 @@ function Question(props: ToolProps<typeof QuestionTool>): JSX.Element {
 }
 
 function Skill(props: ToolProps<typeof SkillTool>): JSX.Element {
-   
   return (
     <InlineTool icon="→" pending="Loading skill..." complete={props.input.name} part={props.part}>
       Skill "{props.input.name}"
@@ -2412,18 +2461,17 @@ function Diagnostics(props: { diagnostics?: Record<string, DiagnosticEntry[]>; f
     return arr.filter((x) => x.severity === 1).slice(0, 3)
   })
 
-   
   return (
     <Show when={errors().length > 0}>
       <box>
         <For each={errors()}>
           {(diagnostic) => {
-             
             return (
-            <text fg={theme.error}>
-              Error [{diagnostic.range.start.line + 1}:{diagnostic.range.start.character + 1}] {diagnostic.message}
-            </text>
-          )}}
+              <text fg={theme.error}>
+                Error [{diagnostic.range.start.line + 1}:{diagnostic.range.start.character + 1}] {diagnostic.message}
+              </text>
+            )
+          }}
         </For>
       </box>
     </Show>

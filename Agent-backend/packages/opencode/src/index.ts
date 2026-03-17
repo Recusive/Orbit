@@ -1,13 +1,13 @@
 import { EOL } from "os"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import yargs from "yargs"
 import { hideBin } from "yargs/helpers"
 
+import { ConsoleCommand } from "./cli/cmd/account"
 import { AcpCommand } from "./cli/cmd/acp"
 import { AgentCommand } from "./cli/cmd/agent"
-import { AuthCommand } from "./cli/cmd/auth"
 import { DbCommand } from "./cli/cmd/db"
 import { DebugCommand } from "./cli/cmd/debug"
 import { ExportCommand } from "./cli/cmd/export"
@@ -17,6 +17,7 @@ import { ImportCommand } from "./cli/cmd/import"
 import { McpCommand } from "./cli/cmd/mcp"
 import { ModelsCommand } from "./cli/cmd/models"
 import { PrCommand } from "./cli/cmd/pr"
+import { ProvidersCommand } from "./cli/cmd/providers"
 import { RunCommand } from "./cli/cmd/run"
 import { ServeCommand } from "./cli/cmd/serve"
 import { SessionCommand } from "./cli/cmd/session"
@@ -136,7 +137,8 @@ let cli = yargs(hideBin(process.argv))
   .command(RunCommand)
   .command(GenerateCommand)
   .command(DebugCommand)
-  .command(AuthCommand)
+  .command(ConsoleCommand)
+  .command(ProvidersCommand)
   .command(AgentCommand)
   .command(UpgradeCommand)
   .command(UninstallCommand)

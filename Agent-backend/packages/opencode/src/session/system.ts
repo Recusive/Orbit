@@ -7,7 +7,11 @@ import PROMPT_GEMINI from "./prompt/gemini.txt"
 import PROMPT_ANTHROPIC_WITHOUT_TODO from "./prompt/qwen.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
 
+import type { Agent } from "@/agent/agent"
 import type { Provider } from "@/provider/provider"
+
+import { PermissionNext } from "@/permission/next"
+import { Skill } from "@/skill"
 
 export namespace SystemPrompt {
   export function instructions(): string {
@@ -32,6 +36,7 @@ export namespace SystemPrompt {
         `Here is some useful information about the environment you are running in:`,
         `<env>`,
         `  Working directory: ${Instance.directory}`,
+        `  Workspace root folder: ${Instance.worktree}`,
         `  Is directory a git repo: ${project.vcs === "git" ? "yes" : "no"}`,
         `  Platform: ${process.platform}`,
         `  Today's date: ${new Date().toDateString()}`,
@@ -41,5 +46,16 @@ export namespace SystemPrompt {
         `</directories>`,
       ].join("\n"),
     ]
+  }
+
+  export async function skills(agent: Agent.Info): Promise<string | undefined> {
+    if (PermissionNext.disabled(["skill"], agent.permission).has("skill")) return
+
+    const list = await Skill.available(agent)
+    return [
+      "Skills provide specialized instructions and workflows for specific tasks.",
+      "Use the skill tool to load a skill when a task matches its description.",
+      Skill.fmt(list, { verbose: true }),
+    ].join("\n")
   }
 }

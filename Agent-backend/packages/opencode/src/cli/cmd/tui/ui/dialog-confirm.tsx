@@ -5,7 +5,7 @@ import { createStore } from "solid-js/store"
 
 import { useTheme } from "../context/theme"
 
-import { useDialog  } from "./dialog"
+import { useDialog } from "./dialog"
 
 import type { DialogContext } from "./dialog"
 import type { JSX } from "solid-js"
@@ -19,7 +19,6 @@ export interface DialogConfirmProps {
   onCancel?: () => void
 }
 
- 
 export function DialogConfirm(props: DialogConfirmProps): JSX.Element {
   const dialog = useDialog()
   const { theme } = useTheme()
@@ -38,14 +37,18 @@ export function DialogConfirm(props: DialogConfirmProps): JSX.Element {
       setStore("active", store.active === "confirm" ? "cancel" : "confirm")
     }
   })
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -55,7 +58,6 @@ export function DialogConfirm(props: DialogConfirmProps): JSX.Element {
       <box flexDirection="row" justifyContent="flex-end" paddingBottom={1}>
         <For each={["cancel", "confirm"]}>
           {(key) => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
             <box
               paddingLeft={1}
               paddingRight={1}
@@ -81,15 +83,20 @@ DialogConfirm.show = (dialog: DialogContext, title: string, message: string): Pr
   return new Promise<boolean>((resolve) => {
     dialog.replace(
       () => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
         <DialogConfirm
           title={title}
           message={message}
-          onConfirm={() => { resolve(true); }}
-          onCancel={() => { resolve(false); }}
+          onConfirm={() => {
+            resolve(true)
+          }}
+          onCancel={() => {
+            resolve(false)
+          }}
         />
       ),
-      () => { resolve(false); },
+      () => {
+        resolve(false)
+      },
     )
   })
 }

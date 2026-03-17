@@ -2,7 +2,7 @@ import { EOL } from "os"
 import path from "path"
 import { pathToFileURL } from "url"
 
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 
 import { Agent } from "../../agent/agent"
 import { Flag } from "../../flag/flag"
@@ -30,7 +30,7 @@ import type { Tool } from "../../tool/tool"
 import type { WebFetchTool } from "../../tool/webfetch"
 import type { WebSearchTool } from "../../tool/websearch"
 import type { WriteTool } from "../../tool/write"
-import type { OpencodeClient, ToolPart } from "@opencode-ai/sdk/v2"
+import type { OpencodeClient, ToolPart } from "@orbit.build/sdk/v2"
 import type { Argv } from "yargs"
 
 interface ToolProps<T extends Tool.Info> {
@@ -119,9 +119,8 @@ function read(info: ToolProps<typeof ReadTool>): void {
     if (key === "filePath") return false
     return typeof value === "string" || typeof value === "number" || typeof value === "boolean"
   })
-  const description = pairs.length > 0
-    ? `[${pairs.map(([key, value]) => `${key}=${String(value)}`).join(", ")}]`
-    : undefined
+  const description =
+    pairs.length > 0 ? `[${pairs.map(([key, value]) => `${key}=${String(value)}`).join(", ")}]` : undefined
   inline({
     icon: "→",
     title: `Read ${file}`,
@@ -419,22 +418,63 @@ export const RunCommand = cmd({
     async function execute(sdk: OpencodeClient): Promise<void> {
       function tool(part: ToolPart): void {
         try {
-          if (part.tool === "bash") { bash(props<typeof BashTool>(part)); return; }
-          if (part.tool === "glob") { glob(props<typeof GlobTool>(part)); return; }
-          if (part.tool === "grep") { grep(props<typeof GrepTool>(part)); return; }
-          if (part.tool === "list") { list(props<typeof ListTool>(part)); return; }
-          if (part.tool === "read") { read(props<typeof ReadTool>(part)); return; }
-          if (part.tool === "write") { write(props<typeof WriteTool>(part)); return; }
-          if (part.tool === "webfetch") { webfetch(props<typeof WebFetchTool>(part)); return; }
-          if (part.tool === "edit") { edit(props<typeof EditTool>(part)); return; }
-          if (part.tool === "codesearch") { codesearch(props<typeof CodeSearchTool>(part)); return; }
-          if (part.tool === "websearch") { websearch(props<typeof WebSearchTool>(part)); return; }
-          if (part.tool === "task") { task(props<typeof TaskTool>(part)); return; }
-          if (part.tool === "todowrite") { todo(props<typeof TodoWriteTool>(part)); return; }
-          if (part.tool === "skill") { skill(props<typeof SkillTool>(part)); return; }
-          fallback(part); return;
+          if (part.tool === "bash") {
+            bash(props<typeof BashTool>(part))
+            return
+          }
+          if (part.tool === "glob") {
+            glob(props<typeof GlobTool>(part))
+            return
+          }
+          if (part.tool === "grep") {
+            grep(props<typeof GrepTool>(part))
+            return
+          }
+          if (part.tool === "list") {
+            list(props<typeof ListTool>(part))
+            return
+          }
+          if (part.tool === "read") {
+            read(props<typeof ReadTool>(part))
+            return
+          }
+          if (part.tool === "write") {
+            write(props<typeof WriteTool>(part))
+            return
+          }
+          if (part.tool === "webfetch") {
+            webfetch(props<typeof WebFetchTool>(part))
+            return
+          }
+          if (part.tool === "edit") {
+            edit(props<typeof EditTool>(part))
+            return
+          }
+          if (part.tool === "codesearch") {
+            codesearch(props<typeof CodeSearchTool>(part))
+            return
+          }
+          if (part.tool === "websearch") {
+            websearch(props<typeof WebSearchTool>(part))
+            return
+          }
+          if (part.tool === "task") {
+            task(props<typeof TaskTool>(part))
+            return
+          }
+          if (part.tool === "todowrite") {
+            todo(props<typeof TodoWriteTool>(part))
+            return
+          }
+          if (part.tool === "skill") {
+            skill(props<typeof SkillTool>(part))
+            return
+          }
+          fallback(part)
+          return
         } catch {
-          fallback(part); return;
+          fallback(part)
+          return
         }
       }
 
@@ -670,7 +710,8 @@ export const RunCommand = cmd({
         return { Authorization: auth }
       })()
       const sdk = createOpencodeClient({ baseUrl: args.attach, directory, headers })
-      await execute(sdk); return;
+      await execute(sdk)
+      return
     }
 
     await bootstrap(process.cwd(), async () => {
@@ -678,7 +719,7 @@ export const RunCommand = cmd({
         const request = new Request(input, init)
         return Server.Default().fetch(request)
       }) as typeof globalThis.fetch
-      const sdk = createOpencodeClient({ baseUrl: "http://opencode.internal", fetch: fetchFn })
+      const sdk = createOpencodeClient({ baseUrl: "http://orbit.internal", fetch: fetchFn })
       await execute(sdk)
     })
   },

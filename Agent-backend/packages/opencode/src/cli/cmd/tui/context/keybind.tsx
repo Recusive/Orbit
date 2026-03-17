@@ -11,7 +11,7 @@ import type { ParsedKey, Renderable } from "@opentui/core"
 
 import { Keybind } from "@/util/keybind"
 
-export type KeybindKey = keyof NonNullable<TuiConfig.Info["keybinds"]>  
+export type KeybindKey = keyof NonNullable<TuiConfig.Info["keybinds"]>
 
 export const { use: useKeybind, provider: KeybindProvider } = createSimpleContext({
   name: "Keybind",

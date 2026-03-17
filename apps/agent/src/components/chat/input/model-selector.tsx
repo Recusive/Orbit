@@ -367,7 +367,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         ref={triggerRef}
         onClick={handleToggle}
         className={cn(
-          'h-7 px-2.5 flex items-center gap-1.5 rounded-[9px]',
+          'h-7 px-2.5 flex items-center gap-1.5 rounded-full',
           'bg-transparent text-muted-foreground',
           TRANSITION_CLASSES.button,
           'hover:bg-lg-control-hover hover:text-foreground',
@@ -377,7 +377,7 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
-        <span className="text-sm font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
+        <span className="text-md font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
         <ChevronDown
           className={cn(
             'h-3 w-3 text-lg-text-secondary transition-transform duration-150',

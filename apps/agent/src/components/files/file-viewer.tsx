@@ -5,7 +5,6 @@ import { FileViewerContent } from './file-viewer-content';
 
 import type { FC } from 'react';
 
-import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { ThinkingDots } from '@/components/ui/thinking-dots';
 import { useIsPreviewRendered } from '@/hooks/file/use-is-preview-rendered';
 import {
@@ -75,11 +74,7 @@ const EmptyState: FC = () => {
   return (
     <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
       <div className="flex flex-col items-center gap-3 rounded-2xl bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
-        <div className="flex items-center gap-3 opacity-50">
-          <OrbitLogo className="h-18 w-18" />
-          <div className="w-0.5 h-8 bg-current opacity-40" />
-          <FileCode className="h-12 w-12" />
-        </div>
+        <FileCode className="h-12 w-12 opacity-50" />
         <p className="text-sm">No file open</p>
         <p className="text-xs opacity-50 text-center max-w-[10rem]">
           Click a file in the chat to view it here

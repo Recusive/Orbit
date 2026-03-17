@@ -123,8 +123,8 @@ interface UIState {
   activeTab: HeaderTab;
   // Dialogs
   goToLineDialogOpen: boolean;
-  settingsDialogOpen: boolean;
-  settingsDialogSection: SettingsSection;
+  settingsOpen: boolean;
+  settingsSection: SettingsSection;
   // Editor mode specific
   editorChatPanelOpen: boolean;
   // Worktrees
@@ -183,8 +183,9 @@ interface UIActions {
   openSourceControl: () => void;
   // Dialog actions
   setGoToLineDialogOpen: (open: boolean) => void;
-  setSettingsDialogOpen: (open: boolean) => void;
+  setSettingsOpen: (open: boolean) => void;
   openSettings: (section?: SettingsSection) => void;
+  closeSecondarySurface: () => void;
   // Editor mode actions
   toggleEditorChatPanel: () => void;
   // Worktree actions
@@ -269,6 +270,17 @@ function getDemoPanelOverrides(): Partial<UIState> {
 
 /** Evaluated once at module load — empty object for non-demo usage */
 const DEMO_PANEL_OVERRIDES = getDemoPanelOverrides();
+
+function ensureSidebarExpanded(
+  state: Pick<UIState, 'leftSidebarWidth' | 'lastExpandedSidebarWidth'>
+): void {
+  if (state.leftSidebarWidth <= SIDEBAR.collapsed) {
+    state.leftSidebarWidth =
+      state.lastExpandedSidebarWidth > SIDEBAR.collapsed
+        ? state.lastExpandedSidebarWidth
+        : SIDEBAR.expanded;
+  }
+}
 
 // Helper to load worktrees from localStorage
 // Uses Zod validation to prevent runtime errors from malformed data
@@ -355,8 +367,8 @@ export const useUIStore = create<UIStore>()(
     activityTab: 'file' as ActivityTab,
     activeTab: 'agent' as HeaderTab,
     goToLineDialogOpen: false,
-    settingsDialogOpen: false,
-    settingsDialogSection: 'agent' as const,
+    settingsOpen: false,
+    settingsSection: 'agent' as const,
     // Editor mode
     editorChatPanelOpen: true,
     // Worktrees
@@ -725,16 +737,29 @@ export const useUIStore = create<UIStore>()(
       });
     },
 
-    setSettingsDialogOpen: (open: boolean): void => {
+    setSettingsOpen: (open: boolean): void => {
       set((state) => {
-        state.settingsDialogOpen = open;
+        state.settingsOpen = open;
+        if (open) {
+          state.vaultOpen = false;
+          ensureSidebarExpanded(state);
+        }
       });
     },
 
     openSettings: (section?: SettingsSection): void => {
       set((state) => {
-        state.settingsDialogSection = section ?? 'agent';
-        state.settingsDialogOpen = true;
+        state.settingsSection = section ?? state.settingsSection;
+        state.settingsOpen = true;
+        state.vaultOpen = false;
+        ensureSidebarExpanded(state);
+      });
+    },
+
+    closeSecondarySurface: (): void => {
+      set((state) => {
+        state.vaultOpen = false;
+        state.settingsOpen = false;
       });
     },
 
@@ -889,12 +914,19 @@ export const useUIStore = create<UIStore>()(
     setVaultOpen: (open: boolean): void => {
       set((state) => {
         state.vaultOpen = open;
+        if (open) {
+          state.settingsOpen = false;
+        }
       });
     },
 
     toggleVault: (): void => {
       set((state) => {
-        state.vaultOpen = !state.vaultOpen;
+        const nextOpen = !state.vaultOpen;
+        state.vaultOpen = nextOpen;
+        if (nextOpen) {
+          state.settingsOpen = false;
+        }
       });
     },
 
@@ -1068,4 +1100,12 @@ export const useEditorChatPanelOpen = (): boolean => {
 
 export const useVaultOpen = (): boolean => {
   return useUIStore((state) => state.vaultOpen);
+};
+
+export const useSettingsOpen = (): boolean => {
+  return useUIStore((state) => state.settingsOpen);
+};
+
+export const useSettingsSection = (): SettingsSection => {
+  return useUIStore((state) => state.settingsSection);
 };

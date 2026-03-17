@@ -1,15 +1,14 @@
-import path from "path"
-
-import { $ } from "bun"
 import { describe, expect, mock, test } from "bun:test"
-
-import { GlobalBus } from "../../src/bus/global"
 import { Project } from "../../src/project/project"
-import { Filesystem } from "../../src/util/filesystem"
 import { Log } from "../../src/util/log"
+import { $ } from "bun"
+import path from "path"
 import { tmpdir } from "../fixture/fixture"
+import { Filesystem } from "../../src/util/filesystem"
+import { GlobalBus } from "../../src/bus/global"
+import { ProjectID } from "../../src/project/schema"
 
-void Log.init({ print: false })
+Log.init({ print: false })
 
 const gitModule = await import("../../src/util/git")
 const originalGit = gitModule.git
@@ -17,7 +16,7 @@ const originalGit = gitModule.git
 type Mode = "none" | "rev-list-fail" | "top-fail" | "common-dir-fail"
 let mode: Mode = "none"
 
-void mock.module("../../src/util/git", () => ({
+mock.module("../../src/util/git", () => ({
   git: (args: string[], opts: { cwd: string; env?: Record<string, string> }) => {
     const cmd = ["git", ...args].join(" ")
     if (
@@ -53,7 +52,7 @@ void mock.module("../../src/util/git", () => ({
   },
 }))
 
-async function withMode(next: Mode, run: () => Promise<void>): Promise<void> {
+async function withMode(next: Mode, run: () => Promise<void>) {
   const prev = mode
   mode = next
   try {
@@ -63,7 +62,7 @@ async function withMode(next: Mode, run: () => Promise<void>): Promise<void> {
   }
 }
 
-async function loadProject(): Promise<typeof Project> {
+async function loadProject() {
   return (await import("../../src/project/project")).Project
 }
 
@@ -76,12 +75,12 @@ describe("Project.fromDirectory", () => {
     const { project } = await p.fromDirectory(tmp.path)
 
     expect(project).toBeDefined()
-    expect(project.id).toBe("global")
+    expect(project.id).toBe(ProjectID.global)
     expect(project.vcs).toBe("git")
     expect(project.worktree).toBe(tmp.path)
 
     const opencodeFile = path.join(tmp.path, ".git", "opencode")
-    const fileExists = Filesystem.exists(opencodeFile)
+    const fileExists = await Filesystem.exists(opencodeFile)
     expect(fileExists).toBe(false)
   })
 
@@ -92,12 +91,12 @@ describe("Project.fromDirectory", () => {
     const { project } = await p.fromDirectory(tmp.path)
 
     expect(project).toBeDefined()
-    expect(project.id).not.toBe("global")
+    expect(project.id).not.toBe(ProjectID.global)
     expect(project.vcs).toBe("git")
     expect(project.worktree).toBe(tmp.path)
 
     const opencodeFile = path.join(tmp.path, ".git", "opencode")
-    const fileExists = Filesystem.exists(opencodeFile)
+    const fileExists = await Filesystem.exists(opencodeFile)
     expect(fileExists).toBe(true)
   })
 
@@ -109,7 +108,7 @@ describe("Project.fromDirectory", () => {
     await withMode("rev-list-fail", async () => {
       const { project } = await p.fromDirectory(tmp.path)
       expect(project.vcs).toBe("git")
-      expect(project.id).toBe("global")
+      expect(project.id).toBe(ProjectID.global)
       expect(project.worktree).toBe(tmp.path)
     })
   })
@@ -169,7 +168,7 @@ describe("Project.fromDirectory with worktrees", () => {
       await $`git worktree remove ${worktreePath}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {})
     }
   })
 
@@ -194,11 +193,11 @@ describe("Project.fromDirectory with worktrees", () => {
       await $`git worktree remove ${worktree1}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {})
       await $`git worktree remove ${worktree2}`
         .cwd(tmp.path)
         .quiet()
-        .catch(() => { /* noop */ })
+        .catch(() => {})
     }
   })
 })
@@ -242,7 +241,7 @@ describe("Project.update", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const updated = Project.update({
+    const updated = await Project.update({
       projectID: project.id,
       name: "New Project Name",
     })
@@ -257,7 +256,7 @@ describe("Project.update", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const updated = Project.update({
+    const updated = await Project.update({
       projectID: project.id,
       icon: { url: "https://example.com/icon.png" },
     })
@@ -272,7 +271,7 @@ describe("Project.update", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const updated = Project.update({
+    const updated = await Project.update({
       projectID: project.id,
       icon: { color: "#ff0000" },
     })
@@ -287,7 +286,7 @@ describe("Project.update", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const updated = Project.update({
+    const updated = await Project.update({
       projectID: project.id,
       commands: { start: "npm run dev" },
     })
@@ -299,11 +298,11 @@ describe("Project.update", () => {
   })
 
   test("should throw error when project not found", async () => {
-    await using _tmp = await tmpdir({ git: true })
+    await using tmp = await tmpdir({ git: true })
 
-    expect(
+    await expect(
       Project.update({
-        projectID: "nonexistent-project-id",
+        projectID: ProjectID.make("nonexistent-project-id"),
         name: "Should Fail",
       }),
     ).rejects.toThrow("Project not found: nonexistent-project-id")
@@ -321,7 +320,7 @@ describe("Project.update", () => {
       eventPayload = data
     })
 
-    Project.update({
+    await Project.update({
       projectID: project.id,
       name: "Updated Name",
     })
@@ -335,7 +334,7 @@ describe("Project.update", () => {
     await using tmp = await tmpdir({ git: true })
     const { project } = await Project.fromDirectory(tmp.path)
 
-    const updated = Project.update({
+    const updated = await Project.update({
       projectID: project.id,
       name: "Multi Update",
       icon: { url: "https://example.com/favicon.ico", color: "#00ff00" },

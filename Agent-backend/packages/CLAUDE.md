@@ -21,18 +21,18 @@ Orbit:  ██ opencode  ██ sdk  ██ plugin  ██ util  ██ script  
 | Package     | Name                  | Purpose                                                                                                        |
 | ----------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
 | `opencode/` | `opencode`            | CLI, API server, agent orchestration, 30+ tools, 20+ LLM providers, MCP, sessions, permissions. **The heart.** |
-| `sdk/js/`   | `@opencode-ai/sdk`    | Auto-generated TypeScript API client from `sdk/openapi.json`. Already rebranded (`OrbitClient`).               |
-| `plugin/`   | `@opencode-ai/plugin` | Plugin SDK — `tool()` factory, 20+ hook points, auth hooks                                                     |
-| `util/`     | `@opencode-ai/util`   | Shared utilities (array, encoding, error, path, retry, slug)                                                   |
-| `script/`   | `@opencode-ai/script` | Build script utilities (semver)                                                                                |
+| `sdk/js/`   | `@orbit.build/sdk`    | Auto-generated TypeScript API client from `sdk/openapi.json`. Already rebranded (`OrbitClient`).               |
+| `plugin/`   | `@orbit.build/plugin` | Plugin SDK — `tool()` factory, 20+ hook points, auth hooks                                                     |
+| `util/`     | `@orbit.build/util`   | Shared utilities (array, encoding, error, path, retry, slug)                                                   |
+| `script/`   | `@orbit.build/script` | Build script utilities (semver)                                                                                |
 
 ### Reference (kept for patterns, not run)
 
 | Package    | Name                   | Purpose                                                                                                    |
 | ---------- | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `app/`     | `@opencode-ai/app`     | SolidJS web UI — context providers, SDK data fetching, SSE event handling, component patterns              |
-| `desktop/` | `@opencode-ai/desktop` | Tauri v2 desktop app — sidecar lifecycle, native platform abstraction, auto-updater, window chrome         |
-| `ui/`      | `@opencode-ai/ui`      | 175 SolidJS components — theme system, provider icons, audio assets. Keeps `app/` import paths resolvable. |
+| `app/`     | `@orbit.build/app`     | SolidJS web UI — context providers, SDK data fetching, SSE event handling, component patterns              |
+| `desktop/` | `@orbit.build/desktop` | Tauri v2 desktop app — sidecar lifecycle, native platform abstraction, auto-updater, window chrome         |
+| `ui/`      | `@orbit.build/ui`      | 175 SolidJS components — theme system, provider icons, audio assets. Keeps `app/` import paths resolvable. |
 
 ### Removed (upstream infrastructure)
 
@@ -77,7 +77,7 @@ cd packages/opencode && bun test --timeout 30000
 
 - All UI uses **SolidJS** (not React) — Orbit's React frontend does NOT import these directly
 - Database access uses **Drizzle ORM** — SQLite in `opencode`
-- The `ui` package has extensive conditional exports — import from subpaths like `@opencode-ai/ui/hooks`
+- The `ui` package has extensive conditional exports — import from subpaths like `@orbit.build/ui/hooks`
 
 ## Development Guide
 

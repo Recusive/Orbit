@@ -12,11 +12,10 @@ import { createDialogProviderOptions, DialogProvider } from "./dialog-provider"
 
 import type { Accessor, JSX } from "solid-js"
 
-
 export function useConnected(): Accessor<boolean> {
   const sync = useSync()
   return createMemo(() =>
-    sync.data.provider.some((x) => x.id !== "opencode" || Object.values(x.models).some((y) => y.cost.input !== 0)),
+    sync.data.provider.some((x) => x.id !== "orbit" || Object.values(x.models).some((y) => y.cost.input !== 0)),
   )
 }
 
@@ -38,8 +37,11 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
     const favorites = connected() ? local.model.favorite() : []
     const recents = local.model.recent()
 
-    function toOptions(items: typeof favorites, category: string): {
-      key: typeof items[number]
+    function toOptions(
+      items: typeof favorites,
+      category: string,
+    ): {
+      key: (typeof items)[number]
       value: { providerID: string; modelID: string }
       title: string
       description: string
@@ -60,8 +62,8 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
             title: model.name,
             description: provider.name,
             category,
-            disabled: provider.id === "opencode" && model.id.includes("-nano"),
-            footer: model.cost.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            disabled: provider.id === "orbit" && model.id.includes("-nano"),
+            footer: model.cost.input === 0 && provider.id === "orbit" ? "Free" : undefined,
             onSelect: () => {
               dialog.clear()
               local.model.set({ providerID: provider.id, modelID: model.id }, { recent: true })
@@ -82,7 +84,7 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
     const providerOptions = pipe(
       sync.data.provider,
       sortBy(
-        (provider) => provider.id !== "opencode",
+        (provider) => provider.id !== "orbit",
         (provider) => provider.name,
       ),
       flatMap((provider) =>
@@ -98,8 +100,8 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
               ? "(Favorite)"
               : undefined,
             category: connected() ? provider.name : undefined,
-            disabled: provider.id === "opencode" && model.includes("-nano"),
-            footer: info.cost.input === 0 && provider.id === "opencode" ? "Free" : undefined,
+            disabled: provider.id === "orbit" && model.includes("-nano"),
+            footer: info.cost.input === 0 && provider.id === "orbit" ? "Free" : undefined,
             onSelect() {
               dialog.clear()
               local.model.set({ providerID: provider.id, modelID: model }, { recent: true })
@@ -148,7 +150,6 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
 
   const title = createMemo(() => provider()?.name ?? "Select model")
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect<ReturnType<typeof options>[number]["value"]>
       options={options()}
@@ -157,7 +158,6 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
           keybind: keybind.all.model_provider_list[0],
           title: connected() ? "Connect provider" : "View all providers",
           onTrigger() {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogProvider />)
           },
         },

@@ -1,4 +1,4 @@
-import { createWriteStream, existsSync, statSync, realpathSync  } from "fs"
+import { createWriteStream, existsSync, statSync, realpathSync } from "fs"
 import { chmod, mkdir, readFile, writeFile } from "fs/promises"
 import { dirname, join, relative, resolve as pathResolve } from "path"
 import { Readable } from "stream"
@@ -89,7 +89,8 @@ export namespace Filesystem {
       await mkdir(dir, { recursive: true })
     }
 
-    const nodeStream = stream instanceof ReadableStream ? Readable.fromWeb(stream as unknown as NodeWebReadableStream) : stream
+    const nodeStream =
+      stream instanceof ReadableStream ? Readable.fromWeb(stream as unknown as NodeWebReadableStream) : stream
     const writeStr = createWriteStream(p)
     await pipeline(nodeStream, writeStr)
 

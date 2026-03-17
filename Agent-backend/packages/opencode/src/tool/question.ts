@@ -1,6 +1,7 @@
 import z from "zod"
 
 import { Question } from "../question"
+import { MessageID, SessionID } from "../session/schema"
 
 import DESCRIPTION from "./question.txt"
 import { Tool } from "./tool"
@@ -12,9 +13,9 @@ export const QuestionTool = Tool.define("question", {
   }),
   async execute(params, ctx) {
     const answers = await Question.ask({
-      sessionID: ctx.sessionID,
+      sessionID: SessionID.make(ctx.sessionID),
       questions: params.questions,
-      tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
+      tool: ctx.callID ? { messageID: MessageID.make(ctx.messageID), callID: ctx.callID } : undefined,
     })
 
     function format(answer: Question.Answer | undefined): string {

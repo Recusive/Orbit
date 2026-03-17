@@ -388,19 +388,19 @@ Git detects this as a rename (high similarity %). Future upstream merges will ap
 
 ```bash
 # Replace user-facing strings: "OpenCode" → "Orbit" in prompts, UI, CLI output
-# Leave internal plumbing alone (@opencode-ai/*, .opencode/ dirs, config keys)
+# Leave internal plumbing alone (.opencode/ dirs, config keys)
 git commit -m "brand: opencode → Orbit in user-facing strings"
 ```
 
 ### What to rename vs what to leave alone
 
-| Rename to "Orbit"       | Leave as "opencode"            |
-| ----------------------- | ------------------------------ |
-| System prompts          | `@opencode-ai/*` package names |
-| CLI output / help text  | `.opencode/` config directory  |
-| UI labels and titles    | Internal variable names        |
-| Window titles, branding | Import paths                   |
-| README / docs           | `opencode.json` config files   |
+| Rename to "Orbit"                        | Leave as "opencode"           |
+| ---------------------------------------- | ----------------------------- |
+| System prompts                           | `.opencode/` config directory |
+| CLI output / help text                   | Internal variable names       |
+| UI labels and titles                     | Import paths                  |
+| Window titles, branding                  | `opencode.json` config files  |
+| Orbit package imports (`@orbit.build/*`) |                               |
 
 Renaming internal plumbing creates ~300 extra conflict points for zero user-facing value.
 

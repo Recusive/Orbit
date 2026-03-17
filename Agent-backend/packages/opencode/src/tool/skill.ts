@@ -4,7 +4,6 @@ import { pathToFileURL } from "url"
 import z from "zod"
 
 import { Ripgrep } from "../file/ripgrep"
-import { PermissionNext } from "../permission/next"
 import { Skill } from "../skill"
 
 import { Tool } from "./tool"
@@ -12,19 +11,10 @@ import { Tool } from "./tool"
 import { iife } from "@/util/iife"
 
 export const SkillTool = Tool.define("skill", async (ctx) => {
-  const skills = await Skill.all()
-
-  // Filter skills by agent permissions if agent provided
-  const agent = ctx?.agent
-  const accessibleSkills = agent
-    ? skills.filter((skill) => {
-        const rule = PermissionNext.evaluate("skill", skill.name, agent.permission)
-        return rule.action !== "deny"
-      })
-    : skills
+  const list = await Skill.available(ctx?.agent)
 
   const description =
-    accessibleSkills.length === 0
+    list.length === 0
       ? "Load a specialized skill that provides domain-specific instructions and workflows. No skills are currently available."
       : [
           "Load a specialized skill that provides domain-specific instructions and workflows.",
@@ -38,18 +28,10 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
           "The following skills provide specialized sets of instructions for particular tasks",
           "Invoke this tool to load a skill when a task matches one of the available skills listed below:",
           "",
-          "<available_skills>",
-          ...accessibleSkills.flatMap((skill) => [
-            `  <skill>`,
-            `    <name>${skill.name}</name>`,
-            `    <description>${skill.description}</description>`,
-            `    <location>${pathToFileURL(skill.location).href}</location>`,
-            `  </skill>`,
-          ]),
-          "</available_skills>",
+          Skill.fmt(list, { verbose: false }),
         ].join("\n")
 
-  const examples = accessibleSkills
+  const examples = list
     .map((skill) => `'${skill.name}'`)
     .slice(0, 3)
     .join(", ")
@@ -63,12 +45,13 @@ export const SkillTool = Tool.define("skill", async (ctx) => {
     description,
     parameters,
     async execute(params: z.infer<typeof parameters>, ctx) {
-      const allSkills = await Skill.all()
-      const skill = allSkills.find((s) => s.name === params.name)
+      const skill = await Skill.get(params.name)
 
       if (skill === undefined) {
-        const available = allSkills.map((s) => s.name).join(", ")
-        throw new Error(`Skill "${params.name}" not found. Available skills: ${available.length > 0 ? available : "none"}`)
+        const available = await Skill.all().then((skills) => skills.map((item) => item.name).join(", "))
+        throw new Error(
+          `Skill "${params.name}" not found. Available skills: ${available.length > 0 ? available : "none"}`,
+        )
       }
 
       await ctx.ask({

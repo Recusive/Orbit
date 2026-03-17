@@ -1,10 +1,12 @@
 const {
   mockApplySessionTitle,
+  mockCacheAttachedImagesForMessage,
   mockConversationAddMessage,
   mockGenerateAITitle,
   mockGenerateFallbackTitle,
 } = vi.hoisted(() => ({
   mockApplySessionTitle: vi.fn<(sessionId: string, title: string) => void>(),
+  mockCacheAttachedImagesForMessage: vi.fn<(sessionId: string, messageId: string) => void>(),
   mockConversationAddMessage: vi.fn<
     [string, Record<string, unknown>, string | undefined, string | undefined],
     Promise<void>
@@ -29,6 +31,11 @@ vi.mock('@/services/session', () => ({
   generateFallbackTitle: mockGenerateFallbackTitle,
 }));
 
+vi.mock('@/services/chat/image-attachment-cache', () => ({
+  buildOptimisticAttachedImages: (images?: unknown[]) => images,
+  cacheAttachedImagesForMessage: mockCacheAttachedImagesForMessage,
+}));
+
 import { useVaultStore } from '@/features/vault/stores';
 import { createChatActions } from '@/hooks/chat/handlers/chat-actions';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
@@ -51,7 +58,7 @@ function resetStores(): void {
     rewindEpoch: 0,
     conversationLoadEpoch: 0,
     loadedSessions: {},
-    compactingMessageId: null,
+    activeCompactions: {},
     lruOrder: [],
   });
   useUIStore.setState({
@@ -146,5 +153,54 @@ describe('send-time title generation', () => {
 
     expect(mockApplySessionTitle).not.toHaveBeenCalled();
     expect(mockGenerateAITitle).not.toHaveBeenCalled();
+  });
+
+  it('uses the image conversation fallback when the first message has only images', () => {
+    const sessionId = 'existing-session';
+    seedConversation(sessionId, []);
+    useUIStore.setState({
+      ...useUIStore.getState(),
+      conversations: [
+        {
+          sessionId,
+          title: 'Untitled',
+          updatedAt: Date.now(),
+          messageCount: 0,
+        },
+      ],
+      activeConversationId: sessionId,
+      activeConversationTitle: 'Untitled',
+    });
+
+    const postMessage = vi.fn();
+    const actions = createChatActions({ postMessage });
+
+    actions.handleSend('', undefined, [
+      {
+        name: 'diagram.png',
+        mimeType: 'image/png',
+        data: 'abc',
+        previewUrl: 'data:image/png;base64,abc',
+      },
+    ]);
+
+    expect(mockApplySessionTitle).toHaveBeenCalledWith(sessionId, 'Fallback: Image conversation');
+    expect(mockGenerateAITitle).toHaveBeenCalledWith(sessionId, 'Image conversation');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'message:send',
+        content: '',
+        context: expect.objectContaining({
+          images: [
+            {
+              name: 'diagram.png',
+              mimeType: 'image/png',
+              data: 'abc',
+            },
+          ],
+        }),
+      })
+    );
+    expect(mockCacheAttachedImagesForMessage).toHaveBeenCalled();
   });
 });

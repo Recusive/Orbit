@@ -1,15 +1,15 @@
+import { pathToFileURL } from "url"
+
 import { useTerminalDimensions } from "@opentui/solid"
 import { SplitBorder } from "@tui/component/border"
 import { useCommandDialog } from "@tui/component/dialog-command"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
 import { useTheme, selectedForeground } from "@tui/context/theme"
-import { pathToFileURL } from "bun"
 import fuzzysort from "fuzzysort"
 import { firstBy } from "remeda"
 import { createMemo, createResource, createEffect, onMount, onCleanup, Index, Show, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
-
 
 import { useFrecency } from "./frecency"
 
@@ -110,7 +110,9 @@ export function Autocomplete(props: {
         }
       }, 50)
 
-      onCleanup(() => { clearInterval(interval); })
+      onCleanup(() => {
+        clearInterval(interval)
+      })
     }
   })
 
@@ -191,13 +193,7 @@ export function Autocomplete(props: {
         const existingIndex = draft.parts.findIndex((p) => p.type === "file" && "url" in p && p.url === part.url)
         if (existingIndex !== -1) {
           const existing = draft.parts[existingIndex] as PromptInfo["parts"][number] | undefined
-          if (
-            part.source?.text &&
-            existing &&
-            "source" in existing &&
-            existing.source &&
-            "text" in existing.source
-          ) {
+          if (part.source?.text && existing && "source" in existing && existing.source && "text" in existing.source) {
             existing.source.text.start = extmarkStart
             existing.source.text.end = extmarkEnd
             existing.source.text.value = virtualText
@@ -515,9 +511,9 @@ export function Autocomplete(props: {
             // Typed text before the trigger
             props.input().cursorOffset <= store.index ||
             // There is a space between the trigger and the cursor
-            (/\s/.exec(props.input().getTextRange(store.index, props.input().cursorOffset))) !== null ||
+            /\s/.exec(props.input().getTextRange(store.index, props.input().cursorOffset)) !== null ||
             // "/<command>" is not the sole content
-            (store.visible === "/" && (/^\S+\s+\S+\s*$/.exec(value)) !== null)
+            (store.visible === "/" && /^\S+\s+\S+\s*$/.exec(value) !== null)
           ) {
             hide()
           }
@@ -529,7 +525,7 @@ export function Autocomplete(props: {
         if (offset === 0) return
 
         // Check for "/" at position 0 - reopen slash commands
-        if (value.startsWith("/") && (/\s/.exec(value.slice(0, offset))) === null) {
+        if (value.startsWith("/") && /\s/.exec(value.slice(0, offset)) === null) {
           show("/")
           setStore("index", 0)
           return
@@ -542,7 +538,7 @@ export function Autocomplete(props: {
 
         const between = text.slice(idx)
         const before = idx === 0 ? undefined : value[idx - 1]
-        if ((before === undefined || /\s/.test(before)) && (/\s/.exec(between)) === null) {
+        if ((before === undefined || /\s/.test(before)) && /\s/.exec(between) === null) {
           show("@")
           setStore("index", idx)
         }
@@ -613,7 +609,6 @@ export function Autocomplete(props: {
 
   let scroll: ScrollBoxRenderable | undefined
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box
       visible={store.visible !== false}
@@ -641,7 +636,6 @@ export function Autocomplete(props: {
           }
         >
           {(option, index) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             return (
               <box
                 paddingLeft={1}
@@ -659,7 +653,9 @@ export function Autocomplete(props: {
                   setStore("input", "mouse")
                   moveTo(index)
                 }}
-                onMouseUp={() => { select(); }}
+                onMouseUp={() => {
+                  select()
+                }}
               >
                 <text fg={index === store.selected ? selectedForeground(theme) : theme.text} flexShrink={0}>
                   {option().display}

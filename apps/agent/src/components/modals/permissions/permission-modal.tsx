@@ -61,6 +61,10 @@ export const PermissionModal: FC<PermissionModalProps> = ({
     onApprove(request.requestId);
   }, [request.requestId, onApprove]);
 
+  const handleApproveAlways = useCallback(() => {
+    onApprove(request.requestId, true);
+  }, [request.requestId, onApprove]);
+
   const handleDeny = useCallback(() => {
     onDeny(request.requestId);
   }, [request.requestId, onDeny]);
@@ -86,9 +90,18 @@ export const PermissionModal: FC<PermissionModalProps> = ({
         </div>
 
         {/* Label + Loader */}
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className="text-base font-medium text-foreground shrink-0">{confirmLabel}</span>
-          <Loader2 className="h-3 w-3 animate-spin text-foreground/60 shrink-0" />
+        <div className="flex min-w-0 flex-1 items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base font-medium text-foreground shrink-0">{confirmLabel}</span>
+              <Loader2 className="h-3 w-3 animate-spin text-foreground/60 shrink-0" />
+            </div>
+            {request.patterns !== undefined && request.patterns.length > 0 ? (
+              <div className="mt-1 text-xs text-muted-foreground break-words">
+                {request.patterns.join(', ')}
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Action buttons */}
@@ -99,6 +112,14 @@ export const PermissionModal: FC<PermissionModalProps> = ({
           >
             Reject <span className="text-muted-foreground/50 ml-1">ESC</span>
           </button>
+          {request.supportsAlwaysAllow ? (
+            <button
+              onClick={handleApproveAlways}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-lg-control hover:bg-lg-control-hover text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              Always <span className="text-muted-foreground/50 ml-1">⌘⏎</span>
+            </button>
+          ) : null}
           <button
             onClick={handleApprove}
             className="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-foreground text-background hover:bg-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"

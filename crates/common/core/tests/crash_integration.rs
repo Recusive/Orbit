@@ -16,9 +16,9 @@
 )]
 
 use orbit_core::diagnostics::crash::CrashManager;
+use std::env::temp_dir;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
-use std::path::PathBuf;
 
 /// Generate a unique test app name using the test name and a random suffix.
 fn unique_test_app(base_name: &str) -> String {
@@ -30,52 +30,35 @@ fn unique_test_app(base_name: &str) -> String {
     format!("orbit_test_{base_name}_{}", ts % 1_000_000_u128)
 }
 
-/// Helper to get crash log path for a test app.
-fn crash_log_path_for(app_name: &str) -> Option<PathBuf> {
-    dirs::data_local_dir().map(|d| d.join(app_name).join("logs").join("crash.log"))
+/// Create a crash manager rooted in a writable temp directory.
+fn create_test_manager(base_name: &str) -> CrashManager {
+    let log_dir = temp_dir().join(unique_test_app(base_name)).join("logs");
+    CrashManager::with_log_dir(log_dir)
 }
 
-/// Clean up test crash logs for a specific app.
-fn cleanup_test_logs_for(app_name: &str) {
-    if let Some(path) = crash_log_path_for(app_name) {
-        drop(fs::remove_file(&path));
-        // Also remove rotated logs
-        if let Some(parent) = path.parent() {
-            for i in 1_i32..=5_i32 {
-                let rotated = parent.join(format!("crash.log.{i}"));
-                drop(fs::remove_file(&rotated));
-            }
-            // Try to remove the directories if empty
-            drop(fs::remove_dir(parent));
-            if let Some(grandparent) = parent.parent() {
-                drop(fs::remove_dir(grandparent));
-            }
-        }
+/// Clean up test crash logs for a specific manager.
+fn cleanup_test_logs_for(manager: &CrashManager) {
+    if let Some(log_dir) = manager.crash_log_path().parent() {
+        drop(fs::remove_dir_all(log_dir));
     }
 }
 
 #[test]
 fn test_crash_manager_full_lifecycle() {
-    let app_name = unique_test_app("lifecycle");
-    cleanup_test_logs_for(&app_name);
-
-    let manager = CrashManager::new(&app_name);
-    assert!(manager.is_some(), "Should create manager");
-
-    let manager = manager.as_ref();
+    let manager = create_test_manager("lifecycle");
+    cleanup_test_logs_for(&manager);
 
     // Initially no crashes
-    let has_pending = manager.is_none_or(CrashManager::has_pending_crashes);
+    let has_pending = manager.has_pending_crashes();
     assert!(!has_pending, "Should have no pending crashes initially");
 
     // Simulate a crash by writing directly to the log
-    if let Some(m) = manager {
-        let log_path = m.crash_log_path();
-        if let Some(parent) = log_path.parent() {
-            drop(fs::create_dir_all(parent));
-        }
+    let log_path = manager.crash_log_path();
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent).expect("Should create crash log directory");
+    }
 
-        let crash_content = "=== CRASH REPORT ===
+    let crash_content = "=== CRASH REPORT ===
 Timestamp: 2024-12-31T12:00:00+00:00
 Location: tests/crash_integration.rs:42:5
 Message: test integration panic
@@ -84,17 +67,14 @@ Backtrace:
 ==================
 ";
 
-        if let Ok(mut f) = File::create(&log_path) {
-            drop(f.write_all(crash_content.as_bytes()));
-        }
-    }
+    fs::write(&log_path, crash_content).expect("Should write crash log");
 
     // Now should have pending crashes
-    let has_pending = manager.is_some_and(CrashManager::has_pending_crashes);
+    let has_pending = manager.has_pending_crashes();
     assert!(has_pending, "Should have pending crashes after writing log");
 
     // Read the log
-    let contents = manager.and_then(CrashManager::read_crash_log);
+    let contents = manager.read_crash_log();
     assert!(contents.is_some(), "Should read crash log");
 
     let content_str = contents.as_deref().unwrap_or("");
@@ -112,17 +92,20 @@ Backtrace:
     assert_eq!(first.location, "tests/crash_integration.rs:42:5");
 
     // Consume (clear) the log
-    let manager2 = CrashManager::new(&app_name);
-    let consumed = manager2.as_ref().and_then(CrashManager::consume_crash_log);
+    let manager2 = CrashManager::with_log_dir(
+        log_path
+            .parent()
+            .expect("Crash log should have a parent directory")
+            .to_path_buf(),
+    );
+    let consumed = manager2.consume_crash_log();
     assert!(consumed.is_some(), "Should consume crash log");
 
     // After consuming, no more pending crashes
-    let has_pending = manager2
-        .as_ref()
-        .is_none_or(CrashManager::has_pending_crashes);
+    let has_pending = manager2.has_pending_crashes();
     assert!(!has_pending, "Should have no pending crashes after consume");
 
-    cleanup_test_logs_for(&app_name);
+    cleanup_test_logs_for(&manager);
 }
 
 #[test]
@@ -158,17 +141,12 @@ frame 2
 
 #[test]
 fn test_multiple_crashes_append() {
-    let app_name = unique_test_app("multiple");
-    cleanup_test_logs_for(&app_name);
+    let manager = create_test_manager("multiple");
+    cleanup_test_logs_for(&manager);
 
-    let manager = CrashManager::new(&app_name);
-    let Some(m) = manager.as_ref() else {
-        return;
-    };
-
-    let log_path = m.crash_log_path();
+    let log_path = manager.crash_log_path();
     if let Some(parent) = log_path.parent() {
-        drop(fs::create_dir_all(parent));
+        fs::create_dir_all(parent).expect("Should create crash log directory");
     }
 
     // Write first crash
@@ -199,7 +177,7 @@ Backtrace:
     }
 
     // Read and parse
-    let contents = m.read_crash_log();
+    let contents = manager.read_crash_log();
     let content_str = contents.as_deref().unwrap_or("");
     let reports = CrashManager::parse_crash_log(content_str);
 
@@ -210,55 +188,45 @@ Backtrace:
     assert_eq!(first.message, "first crash");
     assert_eq!(second.message, "second crash");
 
-    cleanup_test_logs_for(&app_name);
+    cleanup_test_logs_for(&manager);
 }
 
 #[test]
 fn test_empty_log_handling() {
-    let app_name = unique_test_app("empty");
-    cleanup_test_logs_for(&app_name);
+    let manager = create_test_manager("empty");
+    cleanup_test_logs_for(&manager);
 
-    let manager = CrashManager::new(&app_name);
-    let Some(m) = manager.as_ref() else {
-        return;
-    };
-
-    let log_path = m.crash_log_path();
+    let log_path = manager.crash_log_path();
     if let Some(parent) = log_path.parent() {
-        drop(fs::create_dir_all(parent));
+        fs::create_dir_all(parent).expect("Should create crash log directory");
     }
 
     // Create empty file
-    drop(File::create(&log_path));
+    drop(File::create(&log_path).expect("Should create empty crash log"));
 
     // Should not have pending crashes (empty file)
     assert!(
-        !m.has_pending_crashes(),
+        !manager.has_pending_crashes(),
         "Empty file should not count as pending crash"
     );
 
     // Read should return None for empty
-    let contents = m.read_crash_log();
+    let contents = manager.read_crash_log();
     assert!(contents.is_none(), "Empty file should return None");
 
-    cleanup_test_logs_for(&app_name);
+    cleanup_test_logs_for(&manager);
 }
 
 #[test]
 fn test_delete_all_logs() {
-    let app_name = unique_test_app("delete_all");
-    cleanup_test_logs_for(&app_name);
+    let manager = create_test_manager("delete_all");
+    cleanup_test_logs_for(&manager);
 
-    let manager = CrashManager::new(&app_name);
-    let Some(m) = manager.as_ref() else {
-        return;
-    };
-
-    let log_path = m.crash_log_path();
+    let log_path = manager.crash_log_path();
     let Some(parent) = log_path.parent() else {
         return;
     };
-    drop(fs::create_dir_all(parent));
+    fs::create_dir_all(parent).expect("Should create crash log directory");
 
     // Create main log and some rotated logs
     if let Ok(mut f) = File::create(&log_path) {
@@ -276,16 +244,16 @@ fn test_delete_all_logs() {
     }
 
     // Should have logs
-    let logs = m.all_crash_logs();
+    let logs = manager.all_crash_logs();
     assert!(!logs.is_empty(), "Should have crash logs");
 
     // Delete all
-    let deleted = m.delete_all_logs();
+    let deleted = manager.delete_all_logs();
     assert!(deleted > 0, "Should delete at least one log");
 
     // Should have no logs
-    let logs = m.all_crash_logs();
+    let logs = manager.all_crash_logs();
     assert!(logs.is_empty(), "Should have no crash logs after delete");
 
-    cleanup_test_logs_for(&app_name);
+    cleanup_test_logs_for(&manager);
 }

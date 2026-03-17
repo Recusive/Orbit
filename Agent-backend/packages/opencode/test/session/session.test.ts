@@ -1,16 +1,14 @@
-import path from "path"
-
 import { describe, expect, test } from "bun:test"
-
-import { Bus } from "../../src/bus"
-import { Identifier } from "../../src/id/id"
-import { Instance } from "../../src/project/instance"
+import path from "path"
 import { Session } from "../../src/session"
-import { MessageV2 } from "../../src/session/message-v2"
+import { Bus } from "../../src/bus"
 import { Log } from "../../src/util/log"
+import { Instance } from "../../src/project/instance"
+import { MessageV2 } from "../../src/session/message-v2"
+import { MessageID, PartID } from "../../src/session/schema"
 
 const projectRoot = path.join(__dirname, "../..")
-void Log.init({ print: false })
+Log.init({ print: false })
 
 describe("session.started event", () => {
   test("should emit session.started event when session is created", async () => {
@@ -22,7 +20,7 @@ describe("session.started event", () => {
 
         const unsub = Bus.subscribe(Session.Event.Created, (event) => {
           eventReceived = true
-          receivedInfo = event.properties.info
+          receivedInfo = event.properties.info as Session.Info
         })
 
         const session = await Session.create({})
@@ -83,7 +81,7 @@ describe("step-finish token propagation via Bus event", () => {
         fn: async () => {
           const session = await Session.create({})
 
-          const messageID = Identifier.ascending("message")
+          const messageID = MessageID.ascending()
           await Session.updateMessage({
             id: messageID,
             sessionID: session.id,
@@ -109,7 +107,7 @@ describe("step-finish token propagation via Bus event", () => {
           }
 
           const partInput = {
-            id: Identifier.ascending("part"),
+            id: PartID.ascending(),
             messageID,
             sessionID: session.id,
             type: "step-finish" as const,

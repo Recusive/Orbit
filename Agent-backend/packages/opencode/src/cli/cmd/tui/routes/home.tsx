@@ -1,4 +1,4 @@
-import { Prompt  } from "@tui/component/prompt"
+import { Prompt } from "@tui/component/prompt"
 import { useRouteData } from "@tui/context/route"
 import { useTheme } from "@tui/context/theme"
 import { createEffect, createMemo, Match, on, onMount, Show, Switch } from "solid-js"
@@ -14,7 +14,7 @@ import { usePromptRef } from "../context/prompt"
 import { useSync } from "../context/sync"
 import { Toast } from "../ui/toast"
 
-import type {PromptRef} from "@tui/component/prompt";
+import type { PromptRef } from "@tui/component/prompt"
 import type { JSX } from "solid-js"
 
 import { Installation } from "@/installation"
@@ -108,7 +108,6 @@ export function Home(): JSX.Element {
   )
   const directory = useDirectory()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <box flexGrow={1} alignItems="center" paddingLeft={2} paddingRight={2}>
@@ -126,6 +125,7 @@ export function Home(): JSX.Element {
             }}
             // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX types resolve to error/any
             hint={Hint}
+            workspaceID={route.workspaceID}
           />
         </box>
         <box height={4} minHeight={0} width="100%" maxWidth={75} alignItems="center" paddingTop={3} flexShrink={1}>

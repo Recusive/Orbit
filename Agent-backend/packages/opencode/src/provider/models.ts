@@ -80,6 +80,13 @@ export namespace ModelsDev {
 
   export type Provider = z.infer<typeof Provider>
 
+  function normalizeProviderCatalog(providers: Record<string, Provider>): Record<string, Provider> {
+    // OpenCode Zen is an external LLM provider service (like OpenRouter or Together AI).
+    // Do NOT rename it to "Orbit" — it's their hosted API, not ours.
+    // Keep the provider ID and name as-is from the models.dev snapshot.
+    return providers
+  }
+
   function url(): string {
     return Flag.OPENCODE_MODELS_URL ?? "https://models.dev"
   }
@@ -87,7 +94,6 @@ export namespace ModelsDev {
   export const Data = lazy(async () => {
     const result = await Filesystem.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).catch(() => undefined)
     if (result !== undefined) return result as Record<string, unknown>
-    // @ts-expect-error - snapshot module may not exist during development
     const snapshot = await import("./models-snapshot")
       .then((m: { snapshot?: Record<string, unknown> }) => m.snapshot)
       .catch(() => undefined)
@@ -99,7 +105,7 @@ export namespace ModelsDev {
 
   export async function get(): Promise<Record<string, Provider>> {
     const result = await Data()
-    return result as Record<string, Provider>
+    return normalizeProviderCatalog(result as Record<string, Provider>)
   }
 
   export async function refresh(): Promise<void> {

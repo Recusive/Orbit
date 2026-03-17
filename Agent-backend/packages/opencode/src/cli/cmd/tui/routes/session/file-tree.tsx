@@ -89,7 +89,6 @@ function FileNode(props: { node: TreeNode; depth: number; onFileOpen?: (path: st
     return theme.textMuted
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box flexShrink={0}>
       <text
@@ -102,11 +101,13 @@ function FileNode(props: { node: TreeNode; depth: number; onFileOpen?: (path: st
           }
         }}
       >
-        {"  ".repeat(props.depth)}{icon()}{props.node.name}{props.node.isDir ? "/" : ""}
+        {"  ".repeat(props.depth)}
+        {icon()}
+        {props.node.name}
+        {props.node.isDir ? "/" : ""}
       </text>
       <Show when={expanded() && props.node.isDir}>
         <For each={children()}>
-          {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
           {(child) => <FileNode node={child} depth={props.depth + 1} onFileOpen={props.onFileOpen} />}
         </For>
       </Show>
@@ -125,7 +126,6 @@ export function FileTree(props: { onFileOpen?: (path: string) => void; width?: n
     setNodes(readDir(directory(), 0))
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box
       backgroundColor={theme.backgroundPanel}
@@ -151,7 +151,6 @@ export function FileTree(props: { onFileOpen?: (path: string) => void; width?: n
         }}
       >
         <For each={nodes()}>
-          {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
           {(node) => <FileNode node={node} depth={0} onFileOpen={props.onFileOpen} />}
         </For>
       </scrollbox>

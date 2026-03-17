@@ -183,7 +183,10 @@ impl WebviewWindowExt for WebviewWindow {
 ///
 /// On non-macOS platforms, this is a no-op.
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn set_frost_opacity(alpha: f64) {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -201,7 +204,10 @@ pub fn set_frost_opacity(alpha: f64) {
 ///
 /// On non-macOS platforms, this is a no-op.
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn set_tint_opacity(opacity: f64) {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -219,7 +225,10 @@ pub fn set_tint_opacity(opacity: f64) {
 ///
 /// On non-macOS platforms, this is a no-op.
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn set_frost_material(material: i64) {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -238,7 +247,10 @@ pub fn set_frost_material(material: i64) {
 ///
 /// On non-macOS platforms, this is a no-op.
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn configure_frost_for_theme(is_dark: bool) {
     #[cfg(target_os = "macos")]
     unsafe {
@@ -260,13 +272,41 @@ pub fn configure_frost_for_theme(is_dark: bool) {
 ///
 /// On non-macOS platforms or macOS < 26 (no glass), this is a no-op.
 // Cannot be const: calls non-const store on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn set_glass_effective_theme(is_dark: bool) {
     #[cfg(target_os = "macos")]
     glass_defocus::set_effective_theme(is_dark);
 
     #[cfg(not(target_os = "macos"))]
     let _ = is_dark;
+}
+
+/// Set the alpha (opacity) of a specific `NSWindow`.
+///
+/// Uses `[NSWindow setAlphaValue:]` to make a window transparent (0.0) or
+/// opaque (1.0) without moving it offscreen. This avoids confusing the macOS
+/// window server, which can break Mission Control when windows are moved to
+/// extreme coordinates like (-10000, -10000).
+///
+/// On non-macOS platforms, this is a no-op.
+///
+/// **Must be called from the main thread.**
+// Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
+pub fn set_ns_window_alpha(ns_window: *mut std::ffi::c_void, alpha: f64) {
+    #[cfg(target_os = "macos")]
+    window_order::set_ns_window_alpha(ns_window, alpha);
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (ns_window, alpha);
+    }
 }
 
 /// Re-order all child windows of the main window to the front.
@@ -282,7 +322,10 @@ pub fn set_glass_effective_theme(is_dark: bool) {
 ///
 /// **Must be called from the main thread** (Tauri event handlers are fine).
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn order_child_windows_front() {
     #[cfg(target_os = "macos")]
     window_order::order_child_windows_front();
@@ -302,7 +345,10 @@ pub fn order_child_windows_front() {
 ///
 /// **Must be called from the main thread.**
 // Cannot be const: calls non-const FFI on macOS; Clippy only sees empty body on Linux.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 pub fn set_child_windows_corner_radius(radius: f64) {
     #[cfg(target_os = "macos")]
     window_order::set_child_windows_corner_radius(radius);

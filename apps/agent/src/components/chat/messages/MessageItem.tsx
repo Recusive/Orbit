@@ -13,6 +13,7 @@ import { Streamdown } from 'streamdown';
 
 import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
 
+import { ImageAttachmentTiles } from './ImageAttachmentTiles';
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
 import { FeedbackDialog } from './feedback-dialog';
 import { MessageActions } from './message-actions';
@@ -25,7 +26,9 @@ import { ErrorBoundary } from '@/components/shared';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING } from '@/lib/utils';
+import { useActiveBackend } from '@/stores/backend';
 import { useUIStore } from '@/stores/ui/ui-store';
+import { getCapabilities } from '@/types/backend';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
 const USER_MESSAGE_MAX_HEIGHT = 200;
@@ -118,8 +121,8 @@ const UserMessageBubble: FC<{
   }, []);
 
   // Render /slash-commands and @file tokens with special styling anywhere in the message.
-  // Slash commands → gray inline code. @file tokens → light blue clickable links that
-  // open the file in the code editor. Plain text between tokens is preserved as-is.
+  // Slash commands stay as plain blue text to match the chat input surface. @file tokens
+  // remain clickable links that open the file in the code editor.
   const renderedContent = useMemo(() => {
     // Match /slash-commands and @file tokens anywhere in the string
     const tokenPattern = /(\/[\w-]+|@[\w./-]+)/g;
@@ -164,9 +167,9 @@ const UserMessageBubble: FC<{
         );
       } else {
         parts.push(
-          <code key={key} className="rounded-[5px] bg-lg-control px-1.5 py-0.5 font-mono text-sm">
+          <span key={key} className="text-git-untracked">
             {token}
-          </code>
+          </span>
         );
       }
 
@@ -248,6 +251,14 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   onOpenUrl,
   onFeedback,
 }) {
+  const activeBackend = useActiveBackend();
+  const supportsRewind = getCapabilities(activeBackend).rewind;
+  const rewindDisabled =
+    !supportsRewind ||
+    isAgentRunning ||
+    (activeBackend === 'claude'
+      ? isLastAssistantMessage
+      : message.parentUuid === undefined || message.parentUuid === null);
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
   const [messageHovered, setMessageHovered] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -358,12 +369,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           <CompactIndicator messageId={message.id} />
         ) : (
           <div className="flex flex-col items-end gap-1 pb-3">
-            <UserMessageBubble
-              content={message.displayedContent}
-              animate={animate}
-              onOpenFile={onOpenFile}
-              attachedFiles={message.attachedFiles}
-            />
+            {message.displayedContent.trim().length > 0 ? (
+              <UserMessageBubble
+                content={message.displayedContent}
+                animate={animate}
+                onOpenFile={onOpenFile}
+                attachedFiles={message.attachedFiles}
+              />
+            ) : null}
+            {message.attachedImages !== undefined && message.attachedImages.length > 0 ? (
+              <ImageAttachmentTiles attachedImages={message.attachedImages} />
+            ) : null}
           </div>
         )
       ) : (
@@ -432,7 +448,8 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
             <>
               <MessageActions
                 isHovered={messageHovered}
-                rewindDisabled={isLastAssistantMessage || isAgentRunning}
+                showRewind={supportsRewind}
+                rewindDisabled={rewindDisabled}
                 turnDurationMs={message.turnDurationMs}
                 onCopy={() => {
                   void navigator.clipboard.writeText(message.content);

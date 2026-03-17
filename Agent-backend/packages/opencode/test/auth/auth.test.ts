@@ -57,3 +57,28 @@ test("set and remove are no-ops on keys without trailing slashes", async () => {
   const after = await Auth.all()
   expect(after.anthropic).toBeUndefined()
 })
+
+test("orbit auth aliases legacy opencode credentials", async () => {
+  await Auth.set("opencode", {
+    type: "api",
+    key: "legacy-key",
+  })
+
+  const legacy = await Auth.get("orbit")
+  expect(legacy).toBeDefined()
+  expect(legacy?.type).toBe("api")
+  if (legacy?.type === "api") expect(legacy.key).toBe("legacy-key")
+
+  await Auth.set("orbit", {
+    type: "api",
+    key: "canonical-key",
+  })
+
+  const data = await Auth.all()
+  expect(data.orbit).toBeDefined()
+  expect(data.opencode).toBeUndefined()
+  if (data.orbit?.type === "api") expect(data.orbit.key).toBe("canonical-key")
+
+  await Auth.remove("opencode")
+  expect(await Auth.get("orbit")).toBeUndefined()
+})

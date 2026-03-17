@@ -28,18 +28,22 @@ export function Logo(): JSX.Element {
 
       if (markerIndex === -1) {
         elements.push(
-          (<text fg={fg} attributes={attrs} selectable={false}>
-            {rest}
-          </text>) as JSX.Element,
+          (
+            <text fg={fg} attributes={attrs} selectable={false}>
+              {rest}
+            </text>
+          ) as JSX.Element,
         )
         break
       }
 
       if (markerIndex > 0) {
         elements.push(
-          (<text fg={fg} attributes={attrs} selectable={false}>
-            {rest.slice(0, markerIndex)}
-          </text>) as JSX.Element,
+          (
+            <text fg={fg} attributes={attrs} selectable={false}>
+              {rest.slice(0, markerIndex)}
+            </text>
+          ) as JSX.Element,
         )
       }
 
@@ -47,23 +51,29 @@ export function Logo(): JSX.Element {
       switch (marker) {
         case "_":
           elements.push(
-            (<text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-              {" "}
-            </text>) as JSX.Element,
+            (
+              <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
+                {" "}
+              </text>
+            ) as JSX.Element,
           )
           break
         case "^":
           elements.push(
-            (<text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
-              ▀
-            </text>) as JSX.Element,
+            (
+              <text fg={fg} bg={shadow} attributes={attrs} selectable={false}>
+                ▀
+              </text>
+            ) as JSX.Element,
           )
           break
         case "~":
           elements.push(
-            (<text fg={shadow} attributes={attrs} selectable={false}>
-              ▀
-            </text>) as JSX.Element,
+            (
+              <text fg={shadow} attributes={attrs} selectable={false}>
+                ▀
+              </text>
+            ) as JSX.Element,
           )
           break
       }
@@ -74,15 +84,13 @@ export function Logo(): JSX.Element {
     return elements
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box>
       <For each={logo.left}>
         {(line, index) => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <box flexDirection="row" gap={1}>
-              <box flexDirection="row">{renderLine(line, theme.textMuted, false)}</box>
+              <box flexDirection="row">{renderLine(line, theme.text, false)}</box>
               <box flexDirection="row">{renderLine(logo.right[index()], theme.text, true)}</box>
             </box>
           )

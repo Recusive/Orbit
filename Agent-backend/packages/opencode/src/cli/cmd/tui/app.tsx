@@ -23,7 +23,7 @@ import { DialogProvider, useDialog } from "@tui/ui/dialog"
 import { Clipboard } from "@tui/util/clipboard"
 import { Selection } from "@tui/util/selection"
 import open from "open"
-import { Switch, Match, createEffect, untrack, ErrorBoundary, createSignal, onMount, batch, on } from "solid-js"
+import { Switch, Match, createEffect, ErrorBoundary, createSignal, onMount, batch, on } from "solid-js"
 
 import { FrecencyProvider } from "./component/prompt/frecency"
 import { PromptHistoryProvider } from "./component/prompt/history"
@@ -34,11 +34,9 @@ import { KVProvider, useKV } from "./context/kv"
 import { PromptRefProvider, usePromptRef } from "./context/prompt"
 import { TuiConfigProvider } from "./context/tui-config"
 import { TuiEvent } from "./event"
-import { DialogAlert } from "./ui/dialog-alert"
 import { DialogHelp } from "./ui/dialog-help"
 import { ToastProvider, useToast } from "./ui/toast"
 import { win32DisableProcessedInput, win32FlushInputBuffer, win32InstallCtrlCGuard } from "./win32"
-
 
 import type { Args } from "./context/args"
 import type { EventSource } from "./context/sdk"
@@ -124,91 +122,91 @@ export function tui(input: {
   // promise to prevent immediate exit
   return new Promise<void>((resolve) => {
     void (async (): Promise<void> => {
-    const unguard = win32InstallCtrlCGuard()
-    win32DisableProcessedInput()
+      const unguard = win32InstallCtrlCGuard()
+      win32DisableProcessedInput()
 
-    const mode = await getTerminalBackgroundColor()
+      const mode = await getTerminalBackgroundColor()
 
-    // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
-    // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
-    win32DisableProcessedInput()
+      // Re-clear after getTerminalBackgroundColor() — setRawMode(false) restores
+      // the original console mode which re-enables ENABLE_PROCESSED_INPUT.
+      win32DisableProcessedInput()
 
-    const onExit = (): Promise<void> => {
-      unguard?.()
-      resolve()
-      return Promise.resolve()
-    }
+      const onExit = (): Promise<void> => {
+        unguard?.()
+        resolve()
+        return Promise.resolve()
+      }
 
-    void render(
-      () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
-        return (
-          <ErrorBoundary
-            fallback={(error, reset) =>
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment -- opentui JSX element
-              <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />}
-          >
-            <ArgsProvider {...input.args}>
-              <ExitProvider onExit={onExit}>
-                <KVProvider>
-                  <ToastProvider>
-                    <RouteProvider>
-                      <TuiConfigProvider config={input.config}>
-                        <SDKProvider
-                          url={input.url}
-                          directory={input.directory}
-                          fetch={input.fetch}
-                          headers={input.headers}
-                          events={input.events}
-                        >
-                          <SyncProvider>
-                            <ThemeProvider mode={mode}>
-                              <LocalProvider>
-                                <KeybindProvider>
-                                  <PromptStashProvider>
-                                    <DialogProvider>
-                                      <CommandProvider>
-                                        <FrecencyProvider>
-                                          <PromptHistoryProvider>
-                                            <PromptRefProvider>
-                                              <App />
-                                            </PromptRefProvider>
-                                          </PromptHistoryProvider>
-                                        </FrecencyProvider>
-                                      </CommandProvider>
-                                    </DialogProvider>
-                                  </PromptStashProvider>
-                                </KeybindProvider>
-                              </LocalProvider>
-                            </ThemeProvider>
-                          </SyncProvider>
-                        </SDKProvider>
-                      </TuiConfigProvider>
-                    </RouteProvider>
-                  </ToastProvider>
-                </KVProvider>
-              </ExitProvider>
-            </ArgsProvider>
-          </ErrorBoundary>
-        )
-      },
-      {
-        targetFps: 60,
-        gatherStats: false,
-        exitOnCtrlC: false,
-        useKittyKeyboard: {},
-        autoFocus: false,
-        openConsoleOnError: false,
-        consoleOptions: {
-          keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
-          onCopySelection: (text) => {
-            Clipboard.copy(text).catch((error: unknown) => {
-              console.error(`Failed to copy console selection to clipboard: ${String(error)}`)
-            })
+      void render(
+        () => {
+          return (
+            <ErrorBoundary
+              fallback={(error, reset) => (
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX element
+                <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />
+              )}
+            >
+              <ArgsProvider {...input.args}>
+                <ExitProvider onExit={onExit}>
+                  <KVProvider>
+                    <ToastProvider>
+                      <RouteProvider>
+                        <TuiConfigProvider config={input.config}>
+                          <SDKProvider
+                            url={input.url}
+                            directory={input.directory}
+                            fetch={input.fetch}
+                            headers={input.headers}
+                            events={input.events}
+                          >
+                            <SyncProvider>
+                              <ThemeProvider mode={mode}>
+                                <LocalProvider>
+                                  <KeybindProvider>
+                                    <PromptStashProvider>
+                                      <DialogProvider>
+                                        <CommandProvider>
+                                          <FrecencyProvider>
+                                            <PromptHistoryProvider>
+                                              <PromptRefProvider>
+                                                <App />
+                                              </PromptRefProvider>
+                                            </PromptHistoryProvider>
+                                          </FrecencyProvider>
+                                        </CommandProvider>
+                                      </DialogProvider>
+                                    </PromptStashProvider>
+                                  </KeybindProvider>
+                                </LocalProvider>
+                              </ThemeProvider>
+                            </SyncProvider>
+                          </SDKProvider>
+                        </TuiConfigProvider>
+                      </RouteProvider>
+                    </ToastProvider>
+                  </KVProvider>
+                </ExitProvider>
+              </ArgsProvider>
+            </ErrorBoundary>
+          )
+        },
+        {
+          targetFps: 60,
+          gatherStats: false,
+          exitOnCtrlC: false,
+          useKittyKeyboard: {},
+          autoFocus: false,
+          openConsoleOnError: false,
+          consoleOptions: {
+            keyBindings: [{ name: "y", ctrl: true, action: "copy-selection" }],
+            onCopySelection: (text) => {
+              Clipboard.copy(text).catch((error: unknown) => {
+                console.error(`Failed to copy console selection to clipboard: ${String(error)}`)
+              })
+            },
           },
         },
-      },
-    )
+      )
     })()
   })
 }
@@ -227,7 +225,9 @@ function App(): JSX.Element {
   const themeCtx = useTheme()
   const { theme } = themeCtx
   const mode = (): "dark" | "light" => themeCtx.mode()
-  const setMode = (m: "dark" | "light"): void => { themeCtx.setMode(m) }
+  const setMode = (m: "dark" | "light"): void => {
+    themeCtx.setMode(m)
+  }
   const sync = useSync()
   const exit = useExit()
   const promptRef = usePromptRef()
@@ -266,8 +266,12 @@ function App(): JSX.Element {
     if (!text || text.length === 0) return
 
     void Clipboard.copy(text)
-      .then(() => { toast.show({ message: "Copied to clipboard", variant: "info" }); })
-      .catch((err: unknown) => { toast.error(err); })
+      .then(() => {
+        toast.show({ message: "Copied to clipboard", variant: "info" })
+      })
+      .catch((err: unknown) => {
+        toast.error(err)
+      })
 
     renderer.clearSelection()
   }
@@ -303,12 +307,14 @@ function App(): JSX.Element {
       if (args.agent) local.agent.set(args.agent)
       if (args.model) {
         const { providerID, modelID } = Provider.parseModel(args.model)
-        if (!providerID || !modelID)
-          { toast.show({
+        if (!providerID || !modelID) {
+          toast.show({
             variant: "warning",
             message: `Invalid model format: ${args.model}`,
             duration: 3000,
-          }); return; }
+          })
+          return
+        }
         local.model.set({ providerID, modelID }, { recent: true })
       }
       // Handle --session without --fork immediately (fork is handled in createEffect below)
@@ -366,7 +372,6 @@ function App(): JSX.Element {
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogProviderList />)
       },
     ),
@@ -385,7 +390,6 @@ function App(): JSX.Element {
         aliases: ["resume", "continue"],
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogSessionList />)
       },
     },
@@ -400,7 +404,6 @@ function App(): JSX.Element {
               name: "workspaces",
             },
             onSelect: () => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
               dialog.replace(() => <DialogWorkspaceList />)
             },
           },
@@ -420,9 +423,12 @@ function App(): JSX.Element {
         const current = promptRef.current
         // Don't require focus - if there's any text, preserve it
         const currentPrompt = current?.current.input ? current.current : undefined
+        const workspaceID =
+          route.data.type === "session" ? sync.session.get(route.data.sessionID)?.workspaceID : undefined
         route.navigate({
           type: "home",
           initialPrompt: currentPrompt,
+          workspaceID,
         })
         dialog.clear()
       },
@@ -437,7 +443,6 @@ function App(): JSX.Element {
         name: "models",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogModel />)
       },
     },
@@ -490,7 +495,6 @@ function App(): JSX.Element {
         name: "agents",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogAgent />)
       },
     },
@@ -502,7 +506,6 @@ function App(): JSX.Element {
         name: "mcps",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogMcp />)
       },
     },
@@ -544,7 +547,6 @@ function App(): JSX.Element {
         name: "connect",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogProviderList />)
       },
       category: "Provider",
@@ -557,7 +559,6 @@ function App(): JSX.Element {
         name: "status",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogStatus />)
       },
       category: "System",
@@ -570,7 +571,6 @@ function App(): JSX.Element {
         name: "themes",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogThemeList />)
       },
       category: "System",
@@ -591,7 +591,6 @@ function App(): JSX.Element {
         name: "help",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogHelp />)
       },
       category: "System",
@@ -600,7 +599,9 @@ function App(): JSX.Element {
       title: "Open docs",
       value: "docs.open",
       onSelect: () => {
-        open("https://opencode.ai/docs").catch(() => { /* noop */ })
+        open("https://orbit.build/docs").catch(() => {
+          /* noop */
+        })
         dialog.clear()
       },
       category: "System",
@@ -612,7 +613,9 @@ function App(): JSX.Element {
         name: "exit",
         aliases: ["quit", "q"],
       },
-      onSelect: () => { void exit() },
+      onSelect: () => {
+        void exit()
+      },
       category: "System",
     },
     {
@@ -699,20 +702,6 @@ function App(): JSX.Element {
     },
   ])
 
-  createEffect(() => {
-    const currentModel = local.model.current()
-    if (!currentModel) return
-    if (currentModel.providerID === "openrouter" && !kv.get<boolean>("openrouter_warning", false)) {
-      untrack(() => {
-        void DialogAlert.show(
-          dialog,
-          "Warning",
-          "While openrouter is a convenient way to access LLMs your request will often be routed to subpar providers that do not work well in our testing.\n\nFor reliable access to models check out OpenCode Zen\nhttps://opencode.ai/zen",
-        ).then(() => { kv.set("openrouter_warning", true); })
-      })
-    }
-  })
-
   sdk.event.on(TuiEvent.CommandExecute.type, (evt) => {
     command.trigger(evt.properties.command)
   })
@@ -772,7 +761,6 @@ function App(): JSX.Element {
     })
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <box
       width={dimensions().width}
@@ -853,7 +841,6 @@ function ErrorComponent(props: {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <box flexDirection="column" gap={1} backgroundColor={colors.bg}>
       <box flexDirection="row" gap={1} alignItems="center">
@@ -872,7 +859,13 @@ function ErrorComponent(props: {
         <box onMouseUp={props.reset} backgroundColor={colors.primary} padding={1}>
           <text fg={colors.bg}>Reset TUI</text>
         </box>
-        <box onMouseUp={() => { void handleExit() }} backgroundColor={colors.primary} padding={1}>
+        <box
+          onMouseUp={() => {
+            void handleExit()
+          }}
+          backgroundColor={colors.primary}
+          padding={1}
+        >
           <text fg={colors.bg}>Exit</text>
         </box>
       </box>

@@ -1,5 +1,5 @@
 import { AgentSideConnection, ndJsonStream } from "@agentclientprotocol/sdk"
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 
 import { bootstrap } from "../bootstrap"
 import { withNetworkOptions, resolveNetworkOptions } from "../network"
@@ -50,8 +50,12 @@ export const AcpCommand = cmd({
           process.stdin.on("data", (chunk: Buffer) => {
             controller.enqueue(new Uint8Array(chunk))
           })
-          process.stdin.on("end", () => { controller.close(); })
-          process.stdin.on("error", (err) => { controller.error(err); })
+          process.stdin.on("end", () => {
+            controller.close()
+          })
+          process.stdin.on("error", (err) => {
+            controller.error(err)
+          })
         },
       })
 

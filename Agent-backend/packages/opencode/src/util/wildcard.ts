@@ -32,7 +32,10 @@ export namespace Wildcard {
     return result
   }
 
-  export function allStructured<T>(input: { head: string; tail: string[] }, patterns: Record<string, T>): T | undefined {
+  export function allStructured<T>(
+    input: { head: string; tail: string[] },
+    patterns: Record<string, T>,
+  ): T | undefined {
     const entries: [string, T][] = Object.entries(patterns)
     const sorted = sortBy(entries, [([key]) => key.length, "asc"], [([key]) => key, "asc"])
     let result: T | undefined = undefined

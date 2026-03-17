@@ -7,6 +7,7 @@ import type { PromptInfo } from "../component/prompt/history"
 export interface HomeRoute {
   type: "home"
   initialPrompt?: PromptInfo
+  workspaceID?: string
 }
 
 export interface SessionRoute {

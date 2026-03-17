@@ -11,6 +11,7 @@
     "isolatedModules": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    "allowJs": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,
 
@@ -43,6 +44,9 @@
       "@/*": ["./apps/agent/src/*"],
       "@canvas/*": ["./apps/Canvas-UI-Builder/src/*"],
       "@editor/*": ["./apps/editor/src/*"],
+      "@orbit.build/sdk": ["./packages/orbit-sdk/src/v2/index.d.ts"],
+      "@orbit.build/sdk/v2": ["./packages/orbit-sdk/src/v2/index.d.ts"],
+      "@orbit.build/sdk/v2/client": ["./packages/orbit-sdk/src/v2/client.d.ts"],
       "@orbit/common": ["./apps/common/src/index.ts"],
       "@orbit/common/*": ["./apps/common/src/*"]
     }

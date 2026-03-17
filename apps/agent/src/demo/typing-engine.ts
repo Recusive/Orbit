@@ -14,8 +14,19 @@ function createAbortError(): DOMException {
   return new DOMException('Aborted', 'AbortError');
 }
 
-function dispatchInputEvent(inputElement: HTMLElement): void {
-  inputElement.dispatchEvent(new InputEvent('input', { bubbles: true }));
+interface OrbitDemoWindow extends Window {
+  __orbit_editor_clear?: (() => void) | undefined;
+}
+
+function dispatchBeforeInputEvent(inputElement: HTMLElement, character: string): void {
+  inputElement.dispatchEvent(
+    new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      data: character === '\n' ? null : character,
+      inputType: character === '\n' ? 'insertParagraph' : 'insertText',
+    })
+  );
 }
 
 export function computeCharDelay(
@@ -39,8 +50,13 @@ export function computeCharDelay(
 }
 
 export function clearInput(inputElement: HTMLElement): void {
+  const orbitWindow = window as OrbitDemoWindow;
+  if (typeof orbitWindow.__orbit_editor_clear === 'function') {
+    orbitWindow.__orbit_editor_clear();
+    return;
+  }
+
   inputElement.textContent = '';
-  dispatchInputEvent(inputElement);
 }
 
 export async function typeText(
@@ -64,6 +80,7 @@ export async function typeText(
   const baseDelay = options.charDelay ?? DEFAULT_BASE_CHAR_DELAY_MS;
   const speedMultiplier = options.speedMultiplier ?? 1;
 
+  inputElement.focus();
   clearInput(inputElement);
 
   for (const character of text) {
@@ -71,8 +88,7 @@ export async function typeText(
       throw createAbortError();
     }
 
-    inputElement.textContent = `${inputElement.textContent}${character}`;
-    dispatchInputEvent(inputElement);
+    dispatchBeforeInputEvent(inputElement, character);
 
     const delay = computeCharDelay(character, baseDelay, speedMultiplier);
     await sleep(delay, options.signal);

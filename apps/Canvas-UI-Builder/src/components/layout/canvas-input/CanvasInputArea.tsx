@@ -4,12 +4,15 @@
  * Wraps the shared ChatInput component with canvas-specific state management.
  * Will be connected to the canvas agent when implemented.
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useState } from 'react';
 
 import type { EffortLevel, InputMode, Model, ThinkingMode } from '@/types/protocol';
 import type { FC } from 'react';
 
 import { ChatInput } from '@/components/chat/input';
+
+const logger = createLogger('CanvasInputArea');
 
 export const CanvasInputArea: FC = () => {
   // Input state (canvas-specific, will be connected to canvas agent later)
@@ -20,8 +23,7 @@ export const CanvasInputArea: FC = () => {
   // Handlers
   const handleSend = useCallback((text: string): void => {
     // TODO: Connect to canvas agent when implemented
-    // eslint-disable-next-line no-console
-    console.log('[Canvas] Send message:', text);
+    logger.info('Send message', { text });
     setIsAgentRunning(true);
     // Simulate agent response
     setTimeout(() => {
@@ -41,14 +43,12 @@ export const CanvasInputArea: FC = () => {
     setThinkingMode(mode);
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEffortChange = useCallback((_effort: EffortLevel): void => {
-    // Effort changes are handled by the backend - no local state needed
+  const handleEffortChange = useCallback((effort: EffortLevel): void => {
+    logger.debug('Effort change requested', { effort });
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleModelChange = useCallback((_model: Model): void => {
-    // Model changes are handled by the backend - no local state needed
+  const handleModelChange = useCallback((model: Model): void => {
+    logger.debug('Model change requested', { model });
   }, []);
 
   return (

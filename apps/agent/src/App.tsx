@@ -31,6 +31,7 @@ import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
+import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
 import {
@@ -54,6 +55,7 @@ import {
   useBottomPanelHeight,
   useTerminalCollapsed,
   useTerminalPosition,
+  useSettingsOpen,
   useUIStore,
   useVaultOpen,
 } from '@/stores/ui/ui-store';
@@ -96,6 +98,12 @@ const TerminalPanelBoth: FC<TerminalPanelProps> = (props) => (
   </Suspense>
 );
 
+const LazySettingsPage = lazy(() =>
+  import('@/components/modals/settings/SettingsPage').then((m) => ({
+    default: m.SettingsPage,
+  }))
+);
+
 // ============================================
 // Demo View Initialization
 // ============================================
@@ -131,7 +139,7 @@ function applyDemoView(view: string, scenario: string): (() => void) | undefined
     }
 
     case 'showcase': {
-      // Settings dialog open on accounts page showing Claude Code connected
+      // Settings page open on accounts page showing Claude Code connected
       uiStore.openSettings('account');
       break;
     }
@@ -364,12 +372,14 @@ const EditorMode: FC = () => {
 const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
   useAutoUpdate(); // Check for app updates on mount + periodic interval
+  useOpencodeLifecycle();
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
 
   const activeTab = useUIStore((state) => state.activeTab);
   const hasWorkspace = useHasWorkspace();
   const vaultOpen = useVaultOpen();
+  const settingsOpen = useSettingsOpen();
   const hasCompletedOnboarding = useOnboardingStore((state) => state.hasCompletedOnboarding);
 
   // Demo mode — must be available before sidebar width calculation
@@ -886,7 +896,7 @@ const App: FC = () => {
                           allows programmatic scrolling even without a scrollbar. */}
                       <div className="flex-1 min-h-0 overflow-clip relative z-0">
                         {/* Gradient fade below header — follows the chat area (skipped in editor mode and vault) */}
-                        {!isWelcome && activeTab !== 'editor' && !vaultOpen ? (
+                        {!isWelcome && activeTab !== 'editor' && !vaultOpen && !settingsOpen ? (
                           <div
                             className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
                             style={{
@@ -895,6 +905,13 @@ const App: FC = () => {
                             }}
                             aria-hidden="true"
                           />
+                        ) : null}
+                        {settingsOpen && !isWelcome ? (
+                          <div className="absolute inset-0 z-20 bg-chat-area">
+                            <Suspense fallback={null}>
+                              <LazySettingsPage />
+                            </Suspense>
+                          </div>
                         ) : null}
                         {isWelcome ? (
                           <WelcomePage

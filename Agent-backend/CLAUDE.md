@@ -102,7 +102,7 @@ Bun workspace monorepo orchestrated with Turbo. After stripping:
 
 - **`packages/opencode`** — CLI, API server, agent logic, tools, session management. **The heart.**
 - **`packages/sdk/js`** — Auto-generated TypeScript SDK from OpenAPI spec.
-- **`packages/plugin`** — Plugin SDK (`@opencode-ai/plugin`).
+- **`packages/plugin`** — Plugin SDK (`@orbit.build/plugin`).
 - **`packages/util`** — Shared utilities (array, encoding, error, path, retry, slug).
 - **`packages/script`** — Build script utilities (semver).
 

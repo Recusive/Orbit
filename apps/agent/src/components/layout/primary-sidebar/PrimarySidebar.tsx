@@ -22,20 +22,21 @@ import {
   Settings2,
   Terminal,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { ConversationList } from './components/ConversationList';
 import { PowersSection } from './components/PowersSection';
+import { SettingsNavList } from './components/SettingsNavList';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
 import { VaultNoteList } from './components/VaultNoteList';
+import { WorkspaceItem } from './components/WorkspaceItem';
 import { TriStateSwitch } from './components/tri-state-switch';
 import { useSidebarActions } from './hooks/use-sidebar-actions';
 
 import type { EditorSidebarTab, SidebarTab } from './types';
 import type { ProjectsDialogProps } from '@/components/modals/projects';
-import type { SettingsDialogProps } from '@/components/modals/settings';
 import type { SkillsDialogProps } from '@/components/modals/skills';
 import type { UnifiedDoc } from '@/features/vault/types';
 import type { FC } from 'react';
@@ -50,6 +51,7 @@ import {
 import { CloneRepositoryDialog } from '@/components/modals/git';
 import { SSHConnectionDialog } from '@/components/modals/ssh';
 import { SFSymbol } from '@/components/shared';
+import { WorktreeItem } from '@/components/sidebar';
 import { Kbd } from '@/components/ui/kbd';
 import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -57,19 +59,22 @@ import { VaultCreateDialog } from '@/features/vault/components/VaultCreateDialog
 import { VaultDeleteDialog } from '@/features/vault/components/VaultDeleteDialog';
 import { useVaultInitialization } from '@/features/vault/hooks';
 import { useVaultStore } from '@/features/vault/stores';
+import { useConversationList } from '@/hooks/sidebar/use-conversation-list';
 import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
-import { addRecentProject, conversationList, initializeWorkspace, openFileDialog } from '@/lib/api';
-import { toConversationSummaries } from '@/lib/mappers';
+import { addRecentProject, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { getConversationUiBridge } from '@/services/conversations';
+import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
+import { useOcActiveSessionId } from '@/stores/opencode';
 import {
   useUIStore,
+  useSettingsOpen,
   useVaultOpen,
   useWorkspaceName,
   useWorkspacePath,
-  useWorkspaceConversations,
   useActiveConversationId,
   useWorktrees,
   useActiveWorktreePath,
@@ -78,17 +83,6 @@ import {
 import { useUpdateStore } from '@/stores/ui/update-store';
 
 // Lazy load heavy components
-const LazySettingsDialog = lazy(() =>
-  import('@/components/modals/settings/SettingsDialog').then((m) => ({
-    default: m.SettingsDialog,
-  }))
-);
-const SettingsDialog: FC<SettingsDialogProps> = (props) => (
-  <Suspense fallback={null}>
-    <LazySettingsDialog {...props} />
-  </Suspense>
-);
-
 const LazyProjectsDialog = lazy(() =>
   import('@/components/modals/projects/ProjectsDialog').then((m) => ({
     default: m.ProjectsDialog,
@@ -115,6 +109,7 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
+  const activeBackend = useActiveBackend();
 
   // Track whether the scrollable area can scroll further down.
   // The bottom fade mask is only applied when there's more content below,
@@ -203,9 +198,7 @@ export const PrimarySidebar: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
-    settingsDialogOpen,
-    settingsDialogSection,
-    setSettingsDialogOpen,
+    setSettingsOpen,
     openSettings,
     toggleWorktreeExpanded,
     editingConversationId,
@@ -213,9 +206,7 @@ export const PrimarySidebar: FC = () => {
   } = useUIStore(
     useShallow((s) => ({
       toggleLeftSidebar: s.toggleLeftSidebar,
-      settingsDialogOpen: s.settingsDialogOpen,
-      settingsDialogSection: s.settingsDialogSection,
-      setSettingsDialogOpen: s.setSettingsDialogOpen,
+      setSettingsOpen: s.setSettingsOpen,
       openSettings: s.openSettings,
       toggleWorktreeExpanded: s.toggleWorktreeExpanded,
       editingConversationId: s.editingConversationId,
@@ -224,14 +215,18 @@ export const PrimarySidebar: FC = () => {
   );
   const workspaceName = useWorkspaceName();
   const workspacePath = useWorkspacePath();
-  const conversations = useWorkspaceConversations();
-  const activeConversationId = useActiveConversationId();
+  const conversations = useConversationList();
+  const claudeActiveConversationId = useActiveConversationId();
+  const ocActiveConversationId = useOcActiveSessionId();
+  const activeConversationId =
+    activeBackend === 'claude' ? claudeActiveConversationId : ocActiveConversationId;
   const worktrees = useWorktrees();
   const activeWorktreePath = useActiveWorktreePath();
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
 
   // Vault mode
   const vaultOpen = useVaultOpen();
+  const settingsOpen = useSettingsOpen();
   useVaultInitialization();
   const currentPath = useVaultStore((s) => s.currentPath);
   const createVaultFile = useVaultStore((s) => s.createVaultFile);
@@ -291,6 +286,34 @@ export const PrimarySidebar: FC = () => {
 
   // Welcome mode — no workspace open
   const isWelcome = !workspacePath;
+
+  // Worktree state for the pinned workspaces header
+  const mainWorktreePath = worktrees.find((wt) => wt.worktree.isMain)?.worktree.path ?? null;
+  const effectiveActiveWorktreePath = activeWorktreePath ?? mainWorktreePath;
+  const activeWorktreeExpanded =
+    worktrees.length > 0
+      ? (worktrees.find((wt) => wt.worktree.path === effectiveActiveWorktreePath)?.isExpanded ??
+        true)
+      : true;
+  const worktreeListRef = useRef<HTMLDivElement>(null);
+
+  // Whether the sessions/conversations UI is currently visible
+  const showingSessionsUi =
+    !isWelcome &&
+    !vaultOpen &&
+    !settingsOpen &&
+    ((!isEditorMode && activeTab === 'conversations') ||
+      (isEditorMode && editorTab === 'sessions'));
+
+  // Auto-scroll active worktree into view when it changes, tab becomes visible, or rows hydrate
+  useLayoutEffect(() => {
+    if (!showingSessionsUi || !effectiveActiveWorktreePath || !worktreeListRef.current) return;
+    const el = worktreeListRef.current.querySelector<HTMLElement>(
+      `[data-worktree-path="${CSS.escape(effectiveActiveWorktreePath)}"]`
+    );
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [showingSessionsUi, effectiveActiveWorktreePath, worktrees.length]);
+
   const setRootPath = useFileStore((s) => s.setRootPath);
   const { projects } = useRecentProjects();
   const [cloneDialogOpen, setCloneDialogOpen] = useState(false);
@@ -303,13 +326,15 @@ export const PrimarySidebar: FC = () => {
         await addRecentProject(path);
         useUIStore.getState().initializeWorkspace(path);
         setRootPath(path);
-        const convos = await conversationList(path);
-        useUIStore.getState().setConversations(toConversationSummaries(convos));
+        await getConversationUiBridge(activeBackend).hydrateWorkspace({
+          workspacePath: path,
+          worktreePath: null,
+        });
       } catch (err) {
         logger.error('Failed to open project', err);
       }
     },
-    [setRootPath]
+    [activeBackend, setRootPath]
   );
 
   const handleOpenProject = useCallback(async (): Promise<void> => {
@@ -369,7 +394,9 @@ export const PrimarySidebar: FC = () => {
             aria-label="Go back"
             className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
             onClick={() => {
-              if (vaultOpen) {
+              if (settingsOpen) {
+                setSettingsOpen(false);
+              } else if (vaultOpen) {
                 useUIStore.getState().setVaultOpen(false);
               }
             }}
@@ -425,7 +452,7 @@ export const PrimarySidebar: FC = () => {
       ) : null}
 
       {/* Tab heading + toggle (workspace mode only, hidden in vault mode) */}
-      {!isWelcome && !vaultOpen ? (
+      {!isWelcome && !vaultOpen && !settingsOpen ? (
         isEditorMode ? (
           /* Editor mode: Explorer / Source Control / Sessions toggle */
           <div className="flex items-center justify-between px-3 py-1 shrink-0">
@@ -482,7 +509,7 @@ export const PrimarySidebar: FC = () => {
             </Tooltip>
           </div>
         )
-      ) : vaultOpen ? (
+      ) : settingsOpen ? null : vaultOpen ? (
         /* Vault mode: "Notes" heading */
         <div className="flex items-center px-3 py-1 shrink-0">
           <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
@@ -527,9 +554,9 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         </div>
-      ) : (!isEditorMode && activeTab === 'conversations') ||
+      ) : settingsOpen ? null : (!isEditorMode && activeTab === 'conversations') ||
         (isEditorMode && editorTab === 'sessions') ? (
-        <div className="flex flex-col shrink-0 gap-1 py-1.5">
+        <div className="flex flex-col shrink-0 gap-1 py-1.5 animate-title-in">
           <SidebarItem
             icon={() => (
               <SFSymbol
@@ -569,6 +596,66 @@ export const PrimarySidebar: FC = () => {
         </div>
       ) : null}
 
+      {/* Workspaces header — pinned above scroll so it stays visible while conversations scroll */}
+      {showingSessionsUi ? (
+        <div className="shrink-0 py-1.5 animate-title-in">
+          <div className="flex items-center justify-between px-3 py-1">
+            <span className="text-sm font-medium text-muted-foreground/70 uppercase tracking-tight whitespace-nowrap">
+              Workspaces
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  aria-label="Create worktree"
+                  className="relative h-5 w-5 flex items-center justify-center rounded-md hover:bg-lg-sidebar-hover active:scale-90 transition-transform duration-75 text-muted-foreground hover:text-foreground shrink-0 before:absolute before:content-[''] before:inset-[-10px]"
+                  onClick={handleOpenCreateWorktree}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <span>Create worktree</span>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          {/* Worktree list — capped at ~5 rows to prevent starving the conversation scroll area */}
+          <div
+            ref={worktreeListRef}
+            className="flex flex-col gap-0.5 mt-1 max-h-[160px] overflow-y-auto overscroll-y-contain"
+          >
+            {worktrees.length > 0 ? (
+              worktrees.map((wt) => (
+                <div key={wt.worktree.path} data-worktree-path={wt.worktree.path}>
+                  <WorktreeItem
+                    worktreeState={wt}
+                    active={wt.worktree.path === effectiveActiveWorktreePath}
+                    onToggle={() => {
+                      toggleWorktreeExpanded(wt.worktree.path);
+                    }}
+                    onSelect={() => {
+                      useUIStore.getState().switchToWorktree(wt.worktree.path);
+                      useChatStore.getState().clearActiveSession();
+                    }}
+                    onRemove={() => {
+                      handleOpenDeleteWorktreeDialog(wt.worktree);
+                    }}
+                  />
+                </div>
+              ))
+            ) : workspaceName ? (
+              <WorkspaceItem
+                name={workspaceName}
+                active
+                expanded
+                onToggle={() => {
+                  // No-op for single workspace
+                }}
+              />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       {/* Tab Content — mask fades bottom edge when more content is below */}
       <div
         ref={scrollContainerRef}
@@ -585,7 +672,9 @@ export const PrimarySidebar: FC = () => {
           transition: 'mask-position 200ms ease-out, -webkit-mask-position 200ms ease-out',
         }}
       >
-        {vaultOpen ? (
+        {settingsOpen ? (
+          <SettingsNavList />
+        ) : vaultOpen ? (
           <VaultNoteList
             onRequestCreate={() => {
               setVaultCreateDialogOpen(true);
@@ -665,10 +754,8 @@ export const PrimarySidebar: FC = () => {
           ) : (
             <ConversationList
               conversations={conversations}
-              worktrees={worktrees}
-              workspaceName={workspaceName}
+              expanded={activeWorktreeExpanded}
               activeConversationId={activeConversationId}
-              activeWorktreePath={activeWorktreePath}
               editingConversationId={editingConversationId}
               onLoadConversation={handleLoadConversation}
               onStartEditConversation={setEditingConversationId}
@@ -680,22 +767,13 @@ export const PrimarySidebar: FC = () => {
               }}
               onDeleteConversation={handleOpenDeleteDialog}
               onDuplicateConversation={handleDuplicateConversation}
-              onToggleWorktree={toggleWorktreeExpanded}
-              onSelectWorktree={(path) => {
-                useUIStore.getState().switchToWorktree(path);
-                useChatStore.getState().clearActiveSession();
-              }}
-              onRemoveWorktree={handleOpenDeleteWorktreeDialog}
-              onOpenCreateWorktree={handleOpenCreateWorktree}
             />
           )
         ) : activeTab === 'conversations' ? (
           <ConversationList
             conversations={conversations}
-            worktrees={worktrees}
-            workspaceName={workspaceName}
+            expanded={activeWorktreeExpanded}
             activeConversationId={activeConversationId}
-            activeWorktreePath={activeWorktreePath}
             editingConversationId={editingConversationId}
             onLoadConversation={handleLoadConversation}
             onStartEditConversation={setEditingConversationId}
@@ -707,13 +785,6 @@ export const PrimarySidebar: FC = () => {
             }}
             onDeleteConversation={handleOpenDeleteDialog}
             onDuplicateConversation={handleDuplicateConversation}
-            onToggleWorktree={toggleWorktreeExpanded}
-            onSelectWorktree={(path) => {
-              useUIStore.getState().switchToWorktree(path);
-              useChatStore.getState().clearActiveSession();
-            }}
-            onRemoveWorktree={handleOpenDeleteWorktreeDialog}
-            onOpenCreateWorktree={handleOpenCreateWorktree}
           />
         ) : (
           <FileExplorer />
@@ -721,7 +792,18 @@ export const PrimarySidebar: FC = () => {
       </div>
 
       {/* Utilities — pinned to bottom */}
-      <div className="flex flex-col shrink-0 gap-1 py-1.5">
+      <div
+        key={
+          settingsOpen
+            ? 'settings'
+            : vaultOpen
+              ? 'vault'
+              : isEditorMode
+                ? `editor-${editorTab}`
+                : activeTab
+        }
+        className="flex flex-col shrink-0 gap-1 py-1.5 animate-title-in"
+      >
         {/* Update indicator — visible after user dismisses the update toast */}
         {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
           <SidebarItem
@@ -739,25 +821,9 @@ export const PrimarySidebar: FC = () => {
             }}
           />
         ) : null}
-        {/* Settings | Feedback — inline row */}
-        <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
+        {isWelcome ? null : settingsOpen ? (
           <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
-            onClick={() => {
-              openSettings('agent');
-            }}
-          >
-            <SFSymbol
-              name="gear"
-              size={18}
-              weight="medium"
-              fallback={<Settings2 className="h-4 w-4" />}
-            />
-            <span className="text-base whitespace-nowrap">Settings</span>
-          </button>
-          <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-          <button
-            className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}
@@ -770,15 +836,40 @@ export const PrimarySidebar: FC = () => {
             />
             <span className="text-base whitespace-nowrap">Feedback</span>
           </button>
-        </div>
+        ) : (
+          <div className="flex items-center h-8 mx-1.5 gap-1.5 overflow-hidden">
+            <button
+              className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+              onClick={() => {
+                openSettings('agent');
+              }}
+            >
+              <SFSymbol
+                name="gear"
+                size={18}
+                weight="medium"
+                fallback={<Settings2 className="h-4 w-4" />}
+              />
+              <span className="text-base whitespace-nowrap">Settings</span>
+            </button>
+            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+            <button
+              className="flex items-center justify-center gap-1.5 flex-1 min-w-0 h-full rounded-[9px] px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+              onClick={() => {
+                openSettings('feedback');
+              }}
+            >
+              <SFSymbol
+                name="exclamationmark.bubble"
+                size={18}
+                weight="medium"
+                fallback={<FlaskConical className="h-4 w-4" />}
+              />
+              <span className="text-base whitespace-nowrap">Feedback</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {/* Settings Dialog */}
-      <SettingsDialog
-        open={settingsDialogOpen}
-        onOpenChange={setSettingsDialogOpen}
-        defaultSection={settingsDialogSection}
-      />
 
       {/* Create Worktree Dialog */}
       <CreateWorktreeDialog

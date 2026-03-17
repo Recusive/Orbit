@@ -19,7 +19,6 @@ export function DialogAgent(): JSX.Element {
     }),
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types resolve to error type
   return (
     <DialogSelect
       title="Select agent"

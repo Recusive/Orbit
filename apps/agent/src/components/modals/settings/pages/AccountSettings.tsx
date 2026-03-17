@@ -309,9 +309,14 @@ export const AccountSettings: FC = () => {
       {/* ── OAuth Status Card ─────────────────────────────────────── */}
       <div className="rounded-[14px] border border-lg-separator bg-background min-h-[120px] overflow-hidden">
         {isChecking ? (
-          <div className="flex items-center justify-center gap-3 p-6">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Checking credentials…</span>
+          <div className="p-4 pb-3 animate-pulse">
+            <div className="flex items-start gap-3">
+              <div className="h-9 w-9 rounded-lg bg-muted-foreground/10 shrink-0" />
+              <div className="flex flex-col gap-2 pt-0.5">
+                <div className="h-3.5 w-28 rounded bg-muted-foreground/10" />
+                <div className="h-3 w-16 rounded bg-muted-foreground/10" />
+              </div>
+            </div>
           </div>
         ) : (
           <>

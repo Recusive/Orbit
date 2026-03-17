@@ -2,7 +2,6 @@ import { existsSync } from "fs"
 
 import { mergeDeep, unique } from "remeda"
 
-
 import { Config } from "./config"
 import { migrateTuiConfig } from "./migrate-tui-config"
 import { ConfigPaths } from "./paths"
@@ -93,7 +92,7 @@ export namespace TuiConfig {
     if (data === null || data === undefined || typeof data !== "object" || Array.isArray(data)) return {}
 
     // Flatten a nested "tui" key so users who wrote `{ "tui": { ... } }` inside tui.json
-    // (mirroring the old opencode.json shape) still get their settings applied.
+    // (mirroring the old orbit.json shape) still get their settings applied.
     const normalized = (() => {
       const copy = { ...(data as Record<string, unknown>) }
       if (!("tui" in copy)) return copy

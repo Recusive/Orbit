@@ -66,6 +66,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './apps/agent/src'),
       '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
+      '@orbit.build/sdk/v2/client': path.resolve(
+        __dirname,
+        './packages/orbit-sdk/src/v2/client.js'
+      ),
+      '@orbit.build/sdk/v2': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
+      '@orbit.build/sdk': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
       // Pierre's package.json exports don't include internal theme files.
       // Alias bypasses the exports check so we can extend pierre-dark/light
@@ -114,6 +120,10 @@ export default defineConfig({
             id.includes('node_modules/@lezer')
           ) {
             return 'vendor-codemirror';
+          }
+          // Lexical editor framework
+          if (id.includes('node_modules/lexical') || id.includes('node_modules/@lexical')) {
+            return 'vendor-lexical';
           }
           // xterm terminal emulator (~200KB)
           if (id.includes('node_modules/@xterm') || id.includes('node_modules/xterm')) {
@@ -190,6 +200,18 @@ export default defineConfig({
       '@codemirror/state',
       '@codemirror/view',
       '@lezer/highlight',
+      // Lexical chat input editor packages
+      // NOTE: @lexical/react has no root "." export — must list deep imports individually.
+      'lexical',
+      '@lexical/react/LexicalComposer',
+      '@lexical/react/LexicalComposerContext',
+      '@lexical/react/LexicalContentEditable',
+      '@lexical/react/LexicalErrorBoundary',
+      '@lexical/react/LexicalHistoryPlugin',
+      '@lexical/react/LexicalPlainTextPlugin',
+      '@lexical/plain-text',
+      '@lexical/history',
+      '@lexical/selection',
       // xterm packages must be pre-bundled to prevent runtime discovery that triggers
       // 504 "Outdated Optimize Dep" errors — especially in Tauri's WKWebView which
       // doesn't handle Vite's full-reload recovery as well as a regular browser.

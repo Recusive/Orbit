@@ -80,7 +80,7 @@ Tauri v2 desktop application wrapping the OpenCode web UI (`packages/app`). Bund
 
 ## Dependencies
 
-- **Internal:** `@opencode-ai/app` (web UI), `@opencode-ai/ui` (components)
+- **Internal:** `@orbit.build/app` (web UI), `@orbit.build/ui` (components)
 - **Tauri:** `@tauri-apps/api` + 12 Tauri plugins
 - **Frontend:** `solid-js`, `@solidjs/meta`
 

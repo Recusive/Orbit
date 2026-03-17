@@ -17,7 +17,7 @@ const fwd = (...parts: string[]): string => path.join(...parts).replaceAll("\\",
 /** Assert that Snapshot.track() returned a hash, narrowing away undefined. */
 function assertHash(hash: string | undefined): string {
   expect(hash).toBeTruthy()
-   
+
   return hash as string
 }
 

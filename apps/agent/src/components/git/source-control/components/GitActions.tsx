@@ -35,14 +35,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         onClick={() => void onCommit()}
         disabled={isCommitting || !canCommit}
         aria-label={isCommitting ? 'Committing changes...' : 'Commit staged changes'}
-        className="
-          flex-1 flex items-center justify-center gap-1.5
-          h-7 rounded-[9px] text-sm font-medium
-          bg-foreground text-background
-          hover:bg-foreground/90
-          active:scale-[0.98] transition-[background-color,transform] duration-150
-          disabled:opacity-30 disabled:cursor-not-allowed
-        "
+        className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-full text-[12px] font-medium bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-[background-color,transform] duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
       >
         {isCommitting ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
@@ -57,14 +50,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         onClick={() => void onPull()}
         disabled={isSyncing}
         aria-label={isPulling ? 'Pulling changes...' : 'Pull from remote'}
-        className="
-          h-7 px-2.5 flex items-center justify-center gap-1 rounded-[9px]
-          text-sm text-muted-foreground
-          border border-lg-separator
-          hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
-          active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
-          disabled:opacity-30 disabled:cursor-not-allowed
-        "
+        className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground bg-control-fill hover:bg-control-fill-hover hover:text-foreground active:scale-[0.98] transition-[background-color,color,transform] duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
         title="Pull"
       >
         {isPulling ? (
@@ -79,14 +65,7 @@ export const GitActions: React.FC<GitActionsProps> = ({
         onClick={() => void onPush()}
         disabled={isSyncing}
         aria-label={isPushing ? 'Pushing changes...' : 'Push to remote'}
-        className="
-          h-7 px-2.5 flex items-center justify-center gap-1 rounded-[9px]
-          text-sm text-muted-foreground
-          border border-lg-separator
-          hover:bg-lg-control-hover hover:text-foreground hover:border-lg-border
-          active:scale-[0.98] transition-[background-color,color,border-color,transform] duration-150
-          disabled:opacity-30 disabled:cursor-not-allowed
-        "
+        className="h-7 w-7 flex items-center justify-center rounded-full text-muted-foreground bg-control-fill hover:bg-control-fill-hover hover:text-foreground active:scale-[0.98] transition-[background-color,color,transform] duration-150 disabled:opacity-30 disabled:cursor-not-allowed"
         title="Push"
       >
         {isPushing ? (

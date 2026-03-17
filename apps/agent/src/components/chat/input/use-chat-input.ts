@@ -8,21 +8,26 @@ import {
   THINKING_MODE_INFO,
   THINKING_MODES,
 } from './constants';
-import { getFilteredCommandsCount, getCommandAtIndex } from './slash-command-popover';
-import { usePopoverNavigation, handlePopoverKeyDown } from './use-popover-navigation';
+import { clearEditor, replaceTriggerRange } from './lexical';
+import { getCommandAtIndex } from './slash-command-popover';
+import { usePopoverNavigation } from './use-popover-navigation';
 
 import type { SlashCommand, UseChatInputOptions, UseChatInputReturn } from './types';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
 import type { InputMode } from '@/types/protocol';
+import type { LexicalEditor } from 'lexical';
 
 import { cn } from '@/lib/utils';
 import { compressImage } from '@/lib/utils/image-utils';
 import { useSlashCommands, useCommandsStore } from '@/stores/agent';
+import { useActiveBackend } from '@/stores/backend';
 import { useElementContexts, useBrowserStore } from '@/stores/browser/browser-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
+import { useOcProviderStore, useOcSelectedModelSupportsImageInput } from '@/stores/opencode';
 
 const logger = createLogger('ChatInput');
+const OPENCODE_AGENTS = ['build', 'plan', 'explore'] as const;
 
 export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const {
@@ -36,10 +41,20 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     onThinkingModeChange,
     onEffortChange,
   } = options;
+  const activeBackend = useActiveBackend();
+  const ocSupportsImages = useOcSelectedModelSupportsImageInput();
+  const selectedOcAgent = useOcProviderStore((state) => state.selectedAgent);
+  const selectedOcProviderId = useOcProviderStore((state) => state.selectedProviderId);
+  const selectedOcModelId = useOcProviderStore((state) => state.selectedModelId);
+  const setSelectedOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
+  const supportsImages = activeBackend === 'opencode' ? ocSupportsImages : true;
 
   // Core input state
   const [inputText, setInputText] = useState('');
   const [attachedContext, setAttachedContext] = useState<ContextItem[]>([]);
+  // Leading command set explicitly on popover selection — NOT derived from text.
+  // Explicit state is stable: set on select, cleared when text changes.
+  const [leadingCommand, setLeadingCommand] = useState<string | null>(null);
 
   // Slash commands + skills from centralized store (prevents duplicate IPC calls)
   const slashCommands = useSlashCommands();
@@ -47,8 +62,16 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
   const fetchSkills = useCommandsStore((state) => state.fetchSkills);
 
   // Refs
-  const inputRef = useRef<HTMLDivElement>(null);
+  const editorElementRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<LexicalEditor | null>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const previousActiveBackendRef = useRef(activeBackend);
+  const previousOcModelKeyRef = useRef<string | null>(
+    selectedOcProviderId !== null && selectedOcModelId !== null
+      ? `${selectedOcProviderId}/${selectedOcModelId}`
+      : null
+  );
+  const previousOcSupportsImagesRef = useRef(ocSupportsImages);
   // Guard against ESC key repeat triggering multiple stops
   // React state updates are async, so isAgentRunning can be true for multiple rapid keydown events
   const isStoppingRef = useRef(false);
@@ -66,41 +89,6 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     void fetchCommands();
     void fetchSkills();
   }, [fetchCommands, fetchSkills]);
-
-  // Listen for focus event from feedback button
-  useEffect(() => {
-    const handleFocusEvent = (): void => {
-      inputRef.current?.focus();
-    };
-    window.addEventListener('focusChatInput', handleFocusEvent);
-    return () => {
-      window.removeEventListener('focusChatInput', handleFocusEvent);
-    };
-  }, []);
-
-  // Listen for prefill event from rewind — populates input with the removed message
-  useEffect(() => {
-    const handlePrefill = (e: Event): void => {
-      const text = (e as CustomEvent<{ text: string }>).detail.text;
-      if (!text || !inputRef.current) return;
-      inputRef.current.textContent = text;
-      setInputText(text);
-      // Move cursor to end
-      const range = document.createRange();
-      const sel = window.getSelection();
-      if (sel) {
-        range.selectNodeContents(inputRef.current);
-        range.collapse(false);
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-      inputRef.current.focus();
-    };
-    window.addEventListener('prefillChatInput', handlePrefill);
-    return () => {
-      window.removeEventListener('prefillChatInput', handlePrefill);
-    };
-  }, []);
 
   // Drain pending context chips from the store (survives ChatInput unmount).
   // Runs immediately on mount and whenever new chips are queued while mounted.
@@ -121,7 +109,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         });
         return nextItems.length > 0 ? [...prev, ...nextItems] : prev;
       });
-      inputRef.current?.focus();
+      editorRef.current?.focus();
     };
 
     drainAndAttach();
@@ -141,79 +129,69 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     }
   }, [isAgentRunning]);
 
-  // Input change handler - detects @ mentions and / commands
-  const handleInputChange = useCallback(
-    (e: React.SyntheticEvent<HTMLDivElement>): void => {
-      const text = e.currentTarget.textContent || '';
+  useEffect(() => {
+    const ocModelKey =
+      selectedOcProviderId !== null && selectedOcModelId !== null
+        ? `${selectedOcProviderId}/${selectedOcModelId}`
+        : null;
+    const backendWasOpencode = previousActiveBackendRef.current === 'opencode';
+    const backendIsOpencode = activeBackend === 'opencode';
+    const modelChangedWhileOpencodeActive =
+      backendWasOpencode && backendIsOpencode && previousOcModelKeyRef.current !== ocModelKey;
+    const supportDroppedWhileOpencodeActive =
+      backendWasOpencode &&
+      backendIsOpencode &&
+      previousOcSupportsImagesRef.current &&
+      !ocSupportsImages;
+
+    if ((modelChangedWhileOpencodeActive || supportDroppedWhileOpencodeActive) && !supportsImages) {
+      setAttachedContext((prev) => {
+        const next = prev.filter((item) => item.type !== 'image');
+        return next.length === prev.length ? prev : next;
+      });
+    }
+
+    previousActiveBackendRef.current = activeBackend;
+    previousOcModelKeyRef.current = ocModelKey;
+    previousOcSupportsImagesRef.current = ocSupportsImages;
+  }, [activeBackend, ocSupportsImages, selectedOcModelId, selectedOcProviderId, supportsImages]);
+
+  const handleTextChange = useCallback(
+    (text: string): void => {
       setInputText(text);
 
-      const selection = window.getSelection();
-      if (selection && selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const cursorPos = range.startOffset;
-        const beforeCursor = text.slice(0, cursorPos);
-
-        // Detect / slash command — triggers after any whitespace or at start of input.
-        // Find the last "/" before cursor that's either at position 0 or preceded by a space.
-        const lastSlashIndex = beforeCursor.lastIndexOf('/');
-        if (
-          lastSlashIndex !== -1 &&
-          (lastSlashIndex === 0 || beforeCursor[lastSlashIndex - 1] === ' ')
-        ) {
-          const afterSlash = beforeCursor.slice(lastSlashIndex + 1);
-          if (!afterSlash.includes(' ')) {
-            // Only keep the popover open if there are matching commands (or query is empty → show all).
-            // When nothing matches the user is likely typing a URL or path, not a slash command.
-            if (afterSlash === '' || getFilteredCommandsCount(afterSlash, slashCommands) > 0) {
-              popover.setSlashQuery(afterSlash);
-              popover.setSlashStartIndex(lastSlashIndex);
-              popover.setSlashOpen(true);
-              // Close mention if open
-              if (popover.mentionOpen) {
-                popover.setMentionOpen(false);
-                popover.setMentionQuery('');
-              }
-              return;
-            } else {
-              // No matches — dismiss the popover silently
-              popover.closeSlashPopover();
-            }
-          }
-        }
-
-        // Detect @ mention
-        const lastAtIndex = beforeCursor.lastIndexOf('@');
-        if (lastAtIndex !== -1) {
-          const afterAt = beforeCursor.slice(lastAtIndex + 1);
-          if (!afterAt.includes(' ')) {
-            popover.setMentionQuery(afterAt);
-            popover.setMentionOpen(true);
-            // Close slash if open
-            if (popover.slashOpen) {
-              popover.setSlashOpen(false);
-              popover.setSlashQuery('');
-            }
-            return;
-          }
-        }
+      if (leadingCommand === null) {
+        return;
       }
 
-      if (popover.mentionOpen) {
-        popover.setMentionOpen(false);
-        popover.setMentionQuery('');
-      }
-      if (popover.slashOpen) {
-        popover.setSlashOpen(false);
-        popover.setSlashQuery('');
+      const token = `/${leadingCommand}`;
+      const afterToken = text[token.length];
+      const stillValid =
+        text.startsWith(token) && (afterToken === undefined || /\s/.test(afterToken));
+      if (!stillValid) {
+        setLeadingCommand(null);
       }
     },
-    [popover, slashCommands]
+    [leadingCommand]
   );
 
   // Send message handler
   const handleSend = useCallback((): void => {
     let text = inputText.trim();
-    if (!text) return;
+
+    const images = attachedContext
+      .filter(
+        (item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
+          item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
+      )
+      .map((item) => ({
+        name: item.name,
+        mimeType: item.mimeType,
+        data: item.imageData,
+        previewUrl: item.previewUrl ?? '',
+      }));
+
+    if (!text && images.length === 0) return;
 
     // Append @filename tokens for attached files/folders so they persist in JSONL content.
     // The file paths are still sent as attachments for the SDK, but the @tokens ensure
@@ -247,27 +225,15 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
 
     // Clear input immediately
     setInputText('');
-    if (inputRef.current) {
-      inputRef.current.textContent = '';
+    setLeadingCommand(null);
+    if (editorRef.current) {
+      clearEditor(editorRef.current);
     }
 
     // Extract file paths from attached context
     const contextFiles = attachedContext
       .filter((item) => item.type === 'file' || item.type === 'folder')
       .map((item) => item.path);
-
-    // Extract images from attached context
-    const images = attachedContext
-      .filter(
-        (item): item is ContextItem & { type: 'image'; imageData: string; mimeType: string } =>
-          item.type === 'image' && item.imageData !== undefined && item.mimeType !== undefined
-      )
-      .map((item) => ({
-        name: item.name,
-        mimeType: item.mimeType,
-        data: item.imageData,
-        previewUrl: item.previewUrl ?? '',
-      }));
 
     // Extract skill names from attached context
     const skillNames = skillItems.map((s) => s.name);
@@ -281,7 +247,7 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     );
     setAttachedContext([]);
     clearElementContexts();
-  }, [inputText, onSend, attachedContext, clearElementContexts, elementContexts]);
+  }, [attachedContext, clearElementContexts, elementContexts, inputText, onSend]);
 
   // Image handlers
   const handleImageClick = useCallback((): void => {
@@ -344,41 +310,43 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
         return [...prev, newContext];
       });
 
-      // Remove the @query from input
-      if (inputRef.current) {
-        const text = inputRef.current.textContent || '';
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0);
-          const cursorPos = range.startOffset;
-          const beforeCursor = text.slice(0, cursorPos);
-          const lastAtIndex = beforeCursor.lastIndexOf('@');
-          if (lastAtIndex !== -1) {
-            const newText = text.slice(0, lastAtIndex) + text.slice(cursorPos);
-            inputRef.current.textContent = newText;
-            setInputText(newText);
-          }
-        }
+      const nextText =
+        inputText.slice(0, popover.mentionStartIndex) +
+        inputText.slice(popover.mentionStartIndex + 1 + popover.mentionQuery.length);
+      setInputText(nextText);
+
+      if (editorRef.current !== null) {
+        replaceTriggerRange(
+          editorRef.current,
+          {
+            end: popover.mentionStartIndex + 1 + popover.mentionQuery.length,
+            kind: 'mention',
+            query: popover.mentionQuery,
+            start: popover.mentionStartIndex,
+          },
+          ''
+        );
       }
 
       popover.closeMentionPopover();
-      inputRef.current?.focus();
+      editorRef.current?.focus();
     },
-    [popover]
+    [inputText, popover]
   );
 
   // Slash command selection handler — replaces only the /query token at slashStartIndex
   const handleSlashSelect = useCallback(
     (command: SlashCommand): void => {
-      if (!inputRef.current) return;
-
-      const currentText = inputRef.current.textContent;
       const start = popover.slashStartIndex;
-      // The token to replace: from "/" through the end of the query (no space after yet)
-      const tokenEnd = start + 1 + popover.slashQuery.length; // +1 for the "/" character
+      const end = start + 1 + popover.slashQuery.length;
+      const triggerRange = {
+        end,
+        kind: 'slash' as const,
+        query: popover.slashQuery,
+        start,
+      };
 
       if (command.kind === 'skill') {
-        // Skills become context chips — remove the /query token from text
         const skillContext: ContextItem = {
           id: crypto.randomUUID(),
           type: 'skill',
@@ -392,38 +360,30 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
           return [...prev, skillContext];
         });
 
-        // Remove the /query token, trimming any trailing space
-        const before = currentText.slice(0, start);
-        const after = currentText.slice(tokenEnd).replace(/^ /, '');
-        const newText = (before + after).trim();
-        inputRef.current.textContent = newText;
-        setInputText(newText);
+        const nextText = inputText.slice(0, start) + inputText.slice(end);
+        setInputText(nextText);
+        if (editorRef.current !== null) {
+          replaceTriggerRange(editorRef.current, triggerRange, '');
+        }
+        setLeadingCommand(null);
       } else {
-        // Regular commands: replace /query with /command-name + space
-        const before = currentText.slice(0, start);
-        const after = currentText.slice(tokenEnd);
         const replacement = `/${command.name} `;
-        const newText = before + replacement + after;
-        inputRef.current.textContent = newText;
-        setInputText(newText);
-
-        // Place cursor right after the inserted command + space
-        const cursorPos = start + replacement.length;
-        const textNode = inputRef.current.firstChild;
-        if (textNode) {
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.setStart(textNode, Math.min(cursorPos, textNode.textContent?.length ?? 0));
-          range.collapse(true);
-          sel?.removeAllRanges();
-          sel?.addRange(range);
+        const nextText = inputText.slice(0, start) + replacement + inputText.slice(end);
+        setInputText(nextText);
+        if (editorRef.current !== null) {
+          replaceTriggerRange(editorRef.current, triggerRange, replacement);
+        }
+        if (start === 0) {
+          setLeadingCommand(command.name);
+        } else {
+          setLeadingCommand(null);
         }
       }
 
       popover.closeSlashPopover();
-      inputRef.current.focus();
+      editorRef.current?.focus();
     },
-    [popover]
+    [inputText, popover]
   );
 
   // Context removal handler
@@ -463,75 +423,19 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     };
   }, [isAgentRunning, popover.slashOpen, popover.mentionOpen, handleStop]);
 
-  // Keyboard handler
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent): void => {
-      // ESC stop is handled by the global window listener (useEffect above)
-      // so it works regardless of which element has focus.
-
-      // Handle slash command popover
-      if (popover.slashOpen) {
-        const itemCount = getFilteredCommandsCount(popover.slashQuery, slashCommands);
-        const handled = handlePopoverKeyDown(e, {
-          itemCount,
-          selectedIndex: popover.slashSelectedIndex,
-          setSelectedIndex: popover.setSlashSelectedIndex,
-          onSelect: () => {
-            const selectedCommand = getCommandAtIndex(
-              popover.slashQuery,
-              popover.slashSelectedIndex,
-              slashCommands
-            );
-            if (selectedCommand) {
-              handleSlashSelect(selectedCommand);
-            }
-          },
-          onClose: popover.closeSlashPopover,
-        });
-        if (handled) return;
-      }
-
-      // MentionPopover handles its own keyboard navigation internally
-      // Skip sending message when mention popover is open (it handles Enter)
-      if (popover.mentionOpen) {
-        return;
-      }
-
-      // Shift+Tab cycles input mode when focus is inside the chat input.
-      // Scoped here to preserve native reverse-tab navigation elsewhere.
-      if (e.key === 'Tab' && e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        e.preventDefault();
-        const nextMode: InputMode =
-          inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
-        onModeChange(nextMode);
-        return;
-      }
-
-      // Enter sends message
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSend();
-      }
-    },
-    [popover, slashCommands, handleSlashSelect, handleSend, inputMode, onModeChange]
-  );
-
-  // Paste handler
-  const handlePaste = useCallback((e: React.ClipboardEvent): void => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData('text/plain');
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      range.deleteContents();
-      range.insertNode(document.createTextNode(pastedText));
-      range.collapse(false);
-      selection.removeAllRanges();
-      selection.addRange(range);
+  const handleShiftTab = useCallback((): void => {
+    if (activeBackend === 'claude') {
+      const nextMode: InputMode =
+        inputMode === 'default' ? 'plan' : inputMode === 'plan' ? 'accept' : 'default';
+      onModeChange(nextMode);
+      return;
     }
-    const newText = inputRef.current?.textContent ?? '';
-    setInputText(newText);
-  }, []);
+
+    const currentIndex = OPENCODE_AGENTS.indexOf(selectedOcAgent);
+    const nextIndex = (currentIndex + 1) % OPENCODE_AGENTS.length;
+    const nextAgent = OPENCODE_AGENTS[nextIndex] ?? 'build';
+    setSelectedOcAgent(nextAgent);
+  }, [activeBackend, inputMode, onModeChange, selectedOcAgent, setSelectedOcAgent]);
 
   // Mode cycling handlers
   const cycleInputMode = useCallback((): void => {
@@ -579,7 +483,8 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     }
   }, [inputMode]);
 
-  const isInputEmpty = inputText.length === 0;
+  const hasAttachedImages = attachedContext.some((item) => item.type === 'image');
+  const isInputEmpty = inputText.length === 0 && !hasAttachedImages;
 
   // Ghost text: show the untyped suffix of the top matching slash command.
   // e.g., typed "/com" → top match "commit" → ghost = "mit"
@@ -605,15 +510,16 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
     slashCommands,
     isInputEmpty,
     slashGhostText,
+    leadingCommand,
     // Refs
-    inputRef,
+    editorElementRef,
+    editorRef,
     imageInputRef,
     // Popover state
     popover,
     // Handlers
-    handleInputChange,
-    handleKeyDown,
-    handlePaste,
+    handleShiftTab,
+    handleTextChange,
     handleSend,
     handleImageClick,
     handleImageSelect,

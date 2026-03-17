@@ -1,9 +1,8 @@
 import os from "os"
 import path from "path"
 
-
 // Direct imports for bundled providers
-import { createAmazonBedrock  } from "@ai-sdk/amazon-bedrock"
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock"
 import { createAnthropic } from "@ai-sdk/anthropic"
 import { createAzure } from "@ai-sdk/azure"
 import { createCerebras } from "@ai-sdk/cerebras"
@@ -23,9 +22,9 @@ import { createVercel } from "@ai-sdk/vercel"
 import { createXai } from "@ai-sdk/xai"
 import { fromNodeProviderChain } from "@aws-sdk/credential-providers"
 import { createGitLab, VERSION as GITLAB_PROVIDER_VERSION } from "@gitlab/gitlab-ai-provider"
-import { NamedError } from "@opencode-ai/util/error"
-import { createOpenRouter  } from "@openrouter/ai-sdk-provider"
-import { NoSuchModelError  } from "ai"
+import { createOpenRouter } from "@openrouter/ai-sdk-provider"
+import { NamedError } from "@orbit.build/util/error"
+import { NoSuchModelError } from "ai"
 import fuzzysort from "fuzzysort"
 import { GoogleAuth } from "google-auth-library"
 import { mapValues, mergeDeep, omit, pickBy, sortBy } from "remeda"
@@ -48,9 +47,9 @@ import { ModelsDev } from "./models"
 import { createOpenaiCompatible as createGitHubCopilotOpenAICompatible } from "./sdk/copilot"
 import { ProviderTransform } from "./transform"
 
-import type {AmazonBedrockProviderSettings} from "@ai-sdk/amazon-bedrock";
-import type {LanguageModelV2} from "@openrouter/ai-sdk-provider";
-import type {Provider as SDK} from "ai";
+import type { AmazonBedrockProviderSettings } from "@ai-sdk/amazon-bedrock"
+import type { LanguageModelV2 } from "@openrouter/ai-sdk-provider"
+import type { Provider as SDK } from "ai"
 
 import { iife } from "@/util/iife"
 
@@ -68,8 +67,20 @@ interface ExtendedSDK extends SDK {
  */
 type SapSDK = ((modelId: string) => LanguageModelV2) & SDK
 
+const DEFAULT_CHUNK_TIMEOUT = 120_000
+
 export namespace Provider {
   const log = Log.create({ service: "provider" })
+  // "opencode" is the OpenCode Zen provider (external LLM service, like OpenRouter).
+  // It is NOT our app — do NOT remap it to "orbit".
+  // Both "opencode" and "orbit" provider IDs are supported via CUSTOM_LOADERS.
+  export function normalizeProviderID(providerID: string): string {
+    return providerID
+  }
+
+  export function isOrbitProviderID(providerID: string): boolean {
+    return providerID === "orbit" || providerID === "opencode" || providerID.startsWith("orbit-") || providerID.startsWith("opencode-")
+  }
 
   function isGpt5OrLater(modelID: string): boolean {
     const match = /^gpt-(\d+)/.exec(modelID)
@@ -83,15 +94,69 @@ export namespace Provider {
     return isGpt5OrLater(modelID) && !modelID.startsWith("gpt-5-mini")
   }
 
+  function wrapSSE(res: Response, ms: number, ctl: AbortController): Response {
+    if (typeof ms !== "number" || ms <= 0) return res
+    if (res.body === null) return res
+    if (res.headers.get("content-type")?.includes("text/event-stream") !== true) return res
+
+    const reader = res.body.getReader()
+    const body = new ReadableStream<Uint8Array>({
+      async pull(ctrl) {
+        const part = await new Promise<Awaited<ReturnType<typeof reader.read>>>((resolve, reject) => {
+          const id = setTimeout(() => {
+            const err = new Error("SSE read timed out")
+            ctl.abort(err)
+            void reader.cancel(err)
+            reject(err instanceof Error ? err : new Error(String(err)))
+          }, ms)
+
+          reader.read().then(
+            (part) => {
+              clearTimeout(id)
+              resolve(part)
+            },
+            (err: unknown) => {
+              clearTimeout(id)
+              reject(err instanceof Error ? err : new Error(String(err)))
+            },
+          )
+        })
+
+        if (part.done) {
+          ctrl.close()
+          return
+        }
+
+        ctrl.enqueue(part.value)
+      },
+      async cancel(reason) {
+        ctl.abort(reason)
+        await reader.cancel(reason)
+      },
+    })
+
+    return new Response(body, {
+      headers: new Headers(res.headers),
+      status: res.status,
+      statusText: res.statusText,
+    })
+  }
+
   function googleVertexVars(options: Record<string, unknown>): {
     GOOGLE_VERTEX_PROJECT: unknown
     GOOGLE_VERTEX_LOCATION: unknown
     GOOGLE_VERTEX_ENDPOINT: string
   } {
     const project =
-      (options.project as string | undefined) ?? Env.get("GOOGLE_CLOUD_PROJECT") ?? Env.get("GCP_PROJECT") ?? Env.get("GCLOUD_PROJECT")
+      (options.project as string | undefined) ??
+      Env.get("GOOGLE_CLOUD_PROJECT") ??
+      Env.get("GCP_PROJECT") ??
+      Env.get("GCLOUD_PROJECT")
     const location =
-      (options.location as string | undefined) ?? Env.get("GOOGLE_CLOUD_LOCATION") ?? Env.get("VERTEX_LOCATION") ?? "us-central1"
+      (options.location as string | undefined) ??
+      Env.get("GOOGLE_CLOUD_LOCATION") ??
+      Env.get("VERTEX_LOCATION") ??
+      "us-central1"
     const endpoint = location === "global" ? "aiplatform.googleapis.com" : `${location}-aiplatform.googleapis.com`
 
     return {
@@ -103,7 +168,8 @@ export namespace Provider {
 
   function loadBaseURL(model: Model, options: Record<string, unknown>): unknown {
     const raw = (options.baseURL as string | undefined) ?? model.api.url
-    if (typeof raw !== "string" || raw === "") return raw === "" ? undefined : raw
+    if (typeof raw !== "string") return raw
+    if (raw === "") return undefined
     const vars = model.providerID === "google-vertex" ? googleVertexVars(options) : undefined
     return raw.replace(/\$\{([^}]+)\}/g, (match, key: string) => {
       const val = Env.get(key) ?? (vars !== undefined ? vars[key as keyof typeof vars] : undefined)
@@ -138,12 +204,44 @@ export namespace Provider {
     "@ai-sdk/github-copilot": createGitHubCopilotOpenAICompatible as (options: Record<string, unknown>) => unknown,
   }
 
-  type CustomModelLoader = (sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>) => LanguageModelV2 | Promise<LanguageModelV2>
+  type CustomModelLoader = (
+    sdk: ExtendedSDK,
+    modelID: string,
+    options?: Record<string, unknown>,
+  ) => LanguageModelV2 | Promise<LanguageModelV2>
   type CustomLoader = (provider: Info) => Promise<{
     autoload: boolean
     getModel?: CustomModelLoader
     options?: Record<string, unknown>
   }>
+
+  async function loadOrbitProvider(input: Info): Promise<{
+    autoload: boolean
+    options?: Record<string, unknown>
+  }> {
+    const hasKey = await (async (): Promise<boolean> => {
+      const env = Env.all()
+      if (input.env.some((item) => env[item] !== undefined && env[item] !== "")) return true
+      if (await Auth.get(input.id)) return true
+      const config = await Config.get()
+      if (config.provider?.orbit?.options?.apiKey !== undefined) return true
+      if (config.provider?.opencode?.options?.apiKey !== undefined) return true
+      return false
+    })()
+
+    if (!hasKey) {
+      for (const [key, value] of Object.entries(input.models)) {
+        if (value.cost.input === 0) continue
+        const models = input.models
+        Reflect.deleteProperty(models, key)
+      }
+    }
+
+    return {
+      autoload: Object.keys(input.models).length > 0,
+      options: hasKey ? {} : { apiKey: "public" },
+    }
+  }
 
   const CUSTOM_LOADERS: Record<string, CustomLoader> = {
     anthropic() {
@@ -157,28 +255,11 @@ export namespace Provider {
         },
       })
     },
+    async orbit(input) {
+      return loadOrbitProvider(input)
+    },
     async opencode(input) {
-      const hasKey = await (async (): Promise<boolean> => {
-        const env = Env.all()
-        if (input.env.some((item) => env[item] !== undefined && env[item] !== "")) return true
-        if (await Auth.get(input.id)) return true
-        const config = await Config.get()
-        if (config.provider?.opencode.options?.apiKey !== undefined) return true
-        return false
-      })()
-
-      if (!hasKey) {
-        for (const [key, value] of Object.entries(input.models)) {
-          if (value.cost.input === 0) continue
-          const models = input.models
-          delete models[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        }
-      }
-
-      return {
-        autoload: Object.keys(input.models).length > 0,
-        options: hasKey ? {} : { apiKey: "public" },
-      }
+      return loadOrbitProvider(input)
     },
     openai() {
       return Promise.resolve({
@@ -196,10 +277,15 @@ export namespace Provider {
       return Promise.resolve({
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string): LanguageModelV2 {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID) as LanguageModelV2
+          if (sdk.responses === undefined && sdk.chat === undefined)
+            return sdk.languageModel(modelID) as LanguageModelV2
           return shouldUseCopilotResponsesApi(modelID)
-            ? (sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
-            : (sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
+            ? sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
+            : sdk.chat !== undefined
+              ? sdk.chat(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
         },
         options: {},
       })
@@ -208,10 +294,15 @@ export namespace Provider {
       return Promise.resolve({
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string): LanguageModelV2 {
-          if (sdk.responses === undefined && sdk.chat === undefined) return sdk.languageModel(modelID) as LanguageModelV2
+          if (sdk.responses === undefined && sdk.chat === undefined)
+            return sdk.languageModel(modelID) as LanguageModelV2
           return shouldUseCopilotResponsesApi(modelID)
-            ? (sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
-            : (sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2)
+            ? sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
+            : sdk.chat !== undefined
+              ? sdk.chat(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
         },
         options: {},
       })
@@ -221,9 +312,11 @@ export namespace Provider {
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>): LanguageModelV2 {
           if (options?.useCompletionUrls === true) {
-            return sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.chat !== undefined ? sdk.chat(modelID) : (sdk.languageModel(modelID) as LanguageModelV2)
           } else {
-            return sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
           }
         },
         options: {},
@@ -235,13 +328,16 @@ export namespace Provider {
         autoload: false,
         getModel(sdk: ExtendedSDK, modelID: string, options?: Record<string, unknown>): LanguageModelV2 {
           if (options?.useCompletionUrls === true) {
-            return sdk.chat !== undefined ? sdk.chat(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.chat !== undefined ? sdk.chat(modelID) : (sdk.languageModel(modelID) as LanguageModelV2)
           } else {
-            return sdk.responses !== undefined ? sdk.responses(modelID) : sdk.languageModel(modelID) as LanguageModelV2
+            return sdk.responses !== undefined
+              ? sdk.responses(modelID)
+              : (sdk.languageModel(modelID) as LanguageModelV2)
           }
         },
         options: {
-          baseURL: resourceName !== undefined ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
+          baseURL:
+            resourceName !== undefined ? `https://${resourceName}.cognitiveservices.azure.com/openai` : undefined,
         },
       })
     },
@@ -281,7 +377,13 @@ export namespace Provider {
         process.env.AWS_CONTAINER_CREDENTIALS_RELATIVE_URI ?? process.env.AWS_CONTAINER_CREDENTIALS_FULL_URI,
       )
 
-      if (profile === undefined && awsAccessKeyId === undefined && awsBearerToken === undefined && awsWebIdentityTokenFile === undefined && !containerCreds)
+      if (
+        profile === undefined &&
+        awsAccessKeyId === undefined &&
+        awsBearerToken === undefined &&
+        awsWebIdentityTokenFile === undefined &&
+        !containerCreds
+      )
         return { autoload: false }
 
       const providerOptions: AmazonBedrockProviderSettings = {
@@ -399,8 +501,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -410,8 +512,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "http-referer": "https://opencode.ai/",
-            "x-title": "opencode",
+            "http-referer": "https://orbit.build/",
+            "x-title": "orbit",
           },
         },
       })
@@ -424,7 +526,10 @@ export namespace Provider {
         Env.get("GCLOUD_PROJECT")
 
       const location =
-        (provider.options.location as string | undefined) ?? Env.get("GOOGLE_CLOUD_LOCATION") ?? Env.get("VERTEX_LOCATION") ?? "us-central1"
+        (provider.options.location as string | undefined) ??
+        Env.get("GOOGLE_CLOUD_LOCATION") ??
+        Env.get("VERTEX_LOCATION") ??
+        "us-central1"
 
       const autoload = project !== undefined && project !== ""
       if (!autoload) return Promise.resolve({ autoload: false })
@@ -495,8 +600,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -515,7 +620,7 @@ export namespace Provider {
       const providerConfig = config.provider?.gitlab
 
       const aiGatewayHeaders: Record<string, string> = {
-        "User-Agent": `opencode/${Installation.VERSION} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
+        "User-Agent": `orbit/${Installation.VERSION} gitlab-ai-provider/${GITLAB_PROVIDER_VERSION} (${os.platform()} ${os.release()}; ${os.arch()})`,
         "anthropic-beta": "context-1m-2025-08-07",
         ...((providerConfig?.options?.aiGatewayHeaders as Record<string, string> | undefined) ?? {}),
       }
@@ -636,7 +741,7 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "X-Cerebras-3rd-Party-Integration": "opencode",
+            "X-Cerebras-3rd-Party-Integration": "orbit",
           },
         },
       })
@@ -646,8 +751,8 @@ export namespace Provider {
         autoload: false,
         options: {
           headers: {
-            "HTTP-Referer": "https://opencode.ai/",
-            "X-Title": "opencode",
+            "HTTP-Referer": "https://orbit.build/",
+            "X-Title": "orbit",
           },
         },
       })
@@ -840,7 +945,9 @@ export namespace Provider {
 
     log.info("init")
 
-    const configProviders = Object.entries(config.provider ?? {})
+    const configProviders = Object.entries(config.provider ?? {}).map(
+      ([providerID, provider]) => [normalizeProviderID(providerID), provider] as const,
+    )
 
     // Add GitHub Copilot Enterprise provider that inherits from GitHub Copilot
     if ("github-copilot" in database) {
@@ -869,17 +976,66 @@ export namespace Provider {
     // extend database from config
     for (const [providerID, provider] of configProviders) {
       const existing = database[providerID]
+      const existingProviderModel = Object.values(existing?.models ?? {})[0]
       const parsed: Info = {
         id: providerID,
-        name: provider.name ?? existing.name,
-        env: provider.env ?? existing.env,
-        options: mergeDeep(existing.options, provider.options ?? {}),
+        name: provider.name ?? existing?.name ?? providerID,
+        env: provider.env ?? existing?.env ?? [],
+        options: mergeDeep(existing?.options ?? {}, provider.options ?? {}),
         source: "config",
-        models: existing.models,
+        models: { ...(existing?.models ?? {}) },
       }
 
       for (const [modelID, model] of Object.entries(provider.models ?? {})) {
-        const existingModel = parsed.models[model.id ?? modelID]
+        const existingModel = parsed.models[model.id ?? modelID] ?? {
+          id: model.id ?? modelID,
+          api: {
+            id: model.id ?? modelID,
+            npm: model.provider?.npm ?? provider.npm ?? existingProviderModel?.api.npm ?? "",
+            url: model.provider?.api ?? provider.api ?? existingProviderModel?.api.url ?? "",
+          },
+          status: undefined,
+          name: modelID,
+          providerID,
+          capabilities: {
+            temperature: true,
+            reasoning: false,
+            attachment: false,
+            toolcall: true,
+            input: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              pdf: false,
+            },
+            output: {
+              text: true,
+              audio: false,
+              image: false,
+              video: false,
+              pdf: false,
+            },
+            interleaved: false,
+          },
+          cost: {
+            input: 0,
+            output: 0,
+            cache: {
+              read: 0,
+              write: 0,
+            },
+          },
+          options: {},
+          limit: {
+            context: 0,
+            output: 0,
+          },
+          headers: {},
+          family: "",
+          release_date: "",
+          variants: {},
+        }
         const name = iife((): string => {
           if (model.name !== undefined) return model.name
           if (model.id !== undefined && model.id !== modelID) return modelID
@@ -889,10 +1045,7 @@ export namespace Provider {
           id: modelID,
           api: {
             id: model.id ?? existingModel.api.id,
-            npm:
-              model.provider?.npm ??
-              provider.npm ??
-              existingModel.api.npm,
+            npm: model.provider?.npm ?? provider.npm ?? existingModel.api.npm,
             url: model.provider?.api ?? provider.api ?? existingModel.api.url,
           },
           status: model.status ?? existingModel.status,
@@ -927,12 +1080,12 @@ export namespace Provider {
               write: model.cost?.cache_write ?? existingModel.cost.cache.write,
             },
           },
-          options: mergeDeep(existingModel.options, model.options ?? {}),
+          options: mergeDeep(existingModel.options ?? {}, model.options ?? {}),
           limit: {
             context: model.limit?.context ?? existingModel.limit.context,
             output: model.limit?.output ?? existingModel.limit.output,
           },
-          headers: mergeDeep(existingModel.headers, model.headers ?? {}),
+          headers: mergeDeep(existingModel.headers ?? {}, model.headers ?? {}),
           family: model.family ?? existingModel.family ?? "",
           release_date: model.release_date ?? existingModel.release_date,
           variants: {},
@@ -1009,9 +1162,10 @@ export namespace Provider {
               () => Auth.get(enterpriseProviderID) as Promise<Auth.Info>,
               database[enterpriseProviderID],
             )
-            const patch: Partial<Info> = enterpriseProviderID in providers
-              ? { options: enterpriseOptions }
-              : { source: "custom", options: enterpriseOptions }
+            const patch: Partial<Info> =
+              enterpriseProviderID in providers
+                ? { options: enterpriseOptions }
+                : { source: "custom", options: enterpriseOptions }
             mergeProvider(enterpriseProviderID, patch)
           }
         }
@@ -1046,7 +1200,7 @@ export namespace Provider {
     for (const [providerID, provider] of Object.entries(providers)) {
       if (!isProviderAllowed(providerID)) {
         const providerRecord = providers
-        delete providerRecord[providerID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(providerRecord, providerID)
         continue
       }
 
@@ -1055,14 +1209,14 @@ export namespace Provider {
       for (const [modelID, model] of Object.entries(provider.models)) {
         const modelRecord = provider.models
         if (modelID === "gpt-5-chat-latest" || (providerID === "openrouter" && modelID === "openai/gpt-5-chat"))
-          delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        if (model.status === "deprecated") delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+          Reflect.deleteProperty(modelRecord, modelID)
+        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) Reflect.deleteProperty(modelRecord, modelID)
+        if (model.status === "deprecated") Reflect.deleteProperty(modelRecord, modelID)
         if (
-          (configProvider?.blacklist?.includes(modelID) === true) ||
+          configProvider?.blacklist?.includes(modelID) === true ||
           (configProvider?.whitelist !== undefined && !configProvider.whitelist.includes(modelID))
         )
-          delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+          Reflect.deleteProperty(modelRecord, modelID)
 
         model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
 
@@ -1079,7 +1233,7 @@ export namespace Provider {
 
       if (Object.keys(provider.models).length === 0) {
         const providerRecord = providers
-        delete providerRecord[providerID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(providerRecord, providerID)
         continue
       }
 
@@ -1098,6 +1252,15 @@ export namespace Provider {
     return state().then((state) => state.providers)
   }
 
+  /**
+   * Invalidates the cached provider state so the next `list()` call
+   * re-reads auth.json and rebuilds the provider map from scratch.
+   * Called after any auth mutation (API key save, OAuth callback, auth removal).
+   */
+  export function reset(): void {
+    state.reset()
+  }
+
   async function getSDK(model: Model): Promise<SDK> {
     try {
       using _ = log.time("getSDK", {
@@ -1109,7 +1272,7 @@ export namespace Provider {
 
       if (model.providerID === "google-vertex" && !model.api.npm.includes("@ai-sdk/openai-compatible")) {
         const optRecord = options
-        delete optRecord.fetch  
+        delete optRecord.fetch
       }
 
       if (model.api.npm.includes("@ai-sdk/openai-compatible") && options.includeUsage !== false) {
@@ -1129,21 +1292,26 @@ export namespace Provider {
       const existing = s.sdk.get(key)
       if (existing !== undefined) return existing
 
-      const customFetch = options.fetch as ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>) | undefined
+      const customFetch = options.fetch as
+        | ((input: RequestInfo | URL, init?: RequestInit) => Promise<Response>)
+        | undefined
+      const chunkTimeout = typeof options.chunkTimeout === "number" ? options.chunkTimeout : DEFAULT_CHUNK_TIMEOUT
+      delete options.chunkTimeout
 
       options.fetch = async (input: RequestInfo | URL, init?: BunFetchRequestInit): Promise<Response> => {
         // Preserve custom fetch if it exists, wrap it with timeout logic
         const fetchFn = customFetch ?? fetch
         const opts: BunFetchRequestInit = init ?? {}
+        const chunkAbortCtl = chunkTimeout > 0 ? new AbortController() : undefined
 
-        if (options.timeout !== undefined && options.timeout !== null) {
-          const signals: AbortSignal[] = []
-          if (opts.signal !== undefined && opts.signal !== null) signals.push(opts.signal)
-          if (options.timeout !== false) signals.push(AbortSignal.timeout(options.timeout as number))
-
-          const combined = signals.length > 1 ? AbortSignal.any(signals) : signals[0]
-
-          opts.signal = combined
+        const signals: AbortSignal[] = []
+        if (opts.signal !== undefined && opts.signal !== null) signals.push(opts.signal)
+        if (chunkAbortCtl !== undefined) signals.push(chunkAbortCtl.signal)
+        if (options.timeout !== undefined && options.timeout !== null && options.timeout !== false) {
+          signals.push(AbortSignal.timeout(options.timeout as number))
+        }
+        if (signals.length > 0) {
+          opts.signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals)
         }
 
         // Strip openai itemId metadata following what codex does
@@ -1157,18 +1325,20 @@ export namespace Provider {
           if (!keepIds && Array.isArray(body.input)) {
             for (const item of body.input as Record<string, unknown>[]) {
               if ("id" in item) {
-                delete (item).id  
+                delete item.id
               }
             }
             opts.body = JSON.stringify(body)
           }
         }
 
-        return fetchFn(input, {
+        const res = await fetchFn(input, {
           ...opts,
           // Bun-specific: disable fetch timeout (see: https://github.com/oven-sh/bun/issues/16682)
           timeout: false as unknown as number,
         } as RequestInit)
+        if (chunkAbortCtl === undefined) return res
+        return wrapSSE(res, chunkTimeout, chunkAbortCtl)
       }
 
       if (model.api.npm in BUNDLED_PROVIDERS) {
@@ -1190,7 +1360,7 @@ export namespace Provider {
         installedPath = model.api.npm
       }
 
-      const mod = await import(installedPath) as Record<string, unknown>
+      const mod = (await import(installedPath)) as Record<string, unknown>
 
       const createKey = Object.keys(mod).find((k) => k.startsWith("create"))
       if (createKey === undefined) {
@@ -1209,11 +1379,12 @@ export namespace Provider {
   }
 
   export async function getProvider(providerID: string): Promise<Info | undefined> {
-    return state().then((s) => s.providers[providerID])
+    return state().then((s) => s.providers[normalizeProviderID(providerID)])
   }
 
   export async function getModel(providerID: string, modelID: string): Promise<Model> {
     const s = await state()
+    providerID = normalizeProviderID(providerID)
     if (!(providerID in s.providers)) {
       const availableProviders = Object.keys(s.providers)
       const matches = fuzzysort.go(providerID, availableProviders, { limit: 3, threshold: -10000 })
@@ -1241,9 +1412,15 @@ export namespace Provider {
     const sdk = await getSDK(model)
 
     try {
-      const language = (model.providerID in s.modelLoaders
-        ? await s.modelLoaders[model.providerID](sdk as ExtendedSDK, model.api.id, provider.options as Record<string, unknown>)
-        : sdk.languageModel(model.api.id)) as LanguageModelV2
+      const language = (
+        model.providerID in s.modelLoaders
+          ? await s.modelLoaders[model.providerID](
+              sdk as ExtendedSDK,
+              model.api.id,
+              provider.options as Record<string, unknown>,
+            )
+          : sdk.languageModel(model.api.id)
+      ) as LanguageModelV2
       s.models.set(key, language)
       return language
     } catch (e: unknown) {
@@ -1259,8 +1436,12 @@ export namespace Provider {
     }
   }
 
-  export async function closest(providerID: string, query: string[]): Promise<{ providerID: string; modelID: string } | undefined> {
+  export async function closest(
+    providerID: string,
+    query: string[],
+  ): Promise<{ providerID: string; modelID: string } | undefined> {
     const s = await state()
+    providerID = normalizeProviderID(providerID)
     if (!(providerID in s.providers)) return undefined
     const provider = s.providers[providerID]
     for (const item of query) {
@@ -1276,6 +1457,7 @@ export namespace Provider {
   }
 
   export async function getSmallModel(providerID: string): Promise<Model | undefined> {
+    providerID = normalizeProviderID(providerID)
     const cfg = await Config.get()
 
     if (cfg.small_model !== undefined) {
@@ -1295,7 +1477,7 @@ export namespace Provider {
         "gemini-2.5-flash",
         "gpt-5-nano",
       ]
-      if (providerID.startsWith("opencode")) {
+      if (isOrbitProviderID(providerID)) {
         priority = ["gpt-5-nano"]
       }
       if (providerID.startsWith("github-copilot")) {
@@ -1357,13 +1539,16 @@ export namespace Provider {
       .then((x) => (Array.isArray(x.recent) ? x.recent : []))
       .catch(() => [])) as { providerID: string; modelID: string }[]
     for (const entry of recent) {
-      if (!(entry.providerID in providers)) continue
-      const provider = providers[entry.providerID]
+      const normalizedProviderID = normalizeProviderID(entry.providerID)
+      if (!(normalizedProviderID in providers)) continue
+      const provider = providers[normalizedProviderID]
       if (!(entry.modelID in provider.models)) continue
-      return { providerID: entry.providerID, modelID: entry.modelID }
+      return { providerID: normalizedProviderID, modelID: entry.modelID }
     }
 
-    const provider = Object.values(providers).find((p) => cfg.provider === undefined || Object.keys(cfg.provider).includes(p.id))
+    const provider = Object.values(providers).find(
+      (p) => cfg.provider === undefined || Object.keys(cfg.provider).includes(p.id),
+    )
     if (provider === undefined) throw new Error("no providers found")
     const sorted = sort(Object.values(provider.models))
     if (sorted.length === 0) throw new Error("no models found")
@@ -1377,7 +1562,7 @@ export namespace Provider {
   export function parseModel(model: string): { providerID: string; modelID: string } {
     const [providerID, ...rest] = model.split("/")
     return {
-      providerID: providerID,
+      providerID: normalizeProviderID(providerID),
       modelID: rest.join("/"),
     }
   }

@@ -112,8 +112,8 @@ Composer region — the bottom dock area handling permissions, questions, and to
 
 - **Internal contexts:** `@/context/sdk`, `sync`, `global-sync`, `global-sdk`, `layout`, `settings`, `platform`, `language`, `local`, `file`, `comments`, `prompt`, `permission`, `notification`, `terminal`, `command`
 - **Internal components:** `@/components/session`, `@/components/prompt-input`, `@/components/dialog-*`, `@/components/status-popover`
-- **UI library:** `@opencode-ai/ui` — ResizeHandle, ScrollView, SessionTurn, InlineInput, Dialog, ContextMenu, HoverCard, DropdownMenu, Button, Icon, Spinner, FileIcon, Markdown, Logo, Toast, Select, DragDrop
-- **SDK:** `@opencode-ai/sdk/v2` for Session, Message, Part, UserMessage, AssistantMessage, PermissionRequest, QuestionRequest, Todo, FileDiff types
+- **UI library:** `@orbit.build/ui` — ResizeHandle, ScrollView, SessionTurn, InlineInput, Dialog, ContextMenu, HoverCard, DropdownMenu, Button, Icon, Spinner, FileIcon, Markdown, Logo, Toast, Select, DragDrop
+- **SDK:** `@orbit.build/sdk/v2` for Session, Message, Part, UserMessage, AssistantMessage, PermissionRequest, QuestionRequest, Todo, FileDiff types
 - **External:** `@thisbeyond/solid-dnd` (drag-and-drop), `@solid-primitives/media` (media queries), `@solid-primitives/resize-observer`, `luxon` (dates)
 
 ## Development Guide

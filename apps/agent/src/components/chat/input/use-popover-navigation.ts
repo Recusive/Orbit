@@ -11,6 +11,7 @@ export function usePopoverNavigation(): PopoverNavigationState {
   const [mentionOpen, setMentionOpen] = useState(false);
   const [mentionQuery, setMentionQuery] = useState('');
   const [mentionSelectedIndex, setMentionSelectedIndex] = useState(0);
+  const [mentionStartIndex, setMentionStartIndex] = useState(0);
 
   // Slash command popover state
   const [slashOpen, setSlashOpen] = useState(false);
@@ -40,6 +41,7 @@ export function usePopoverNavigation(): PopoverNavigationState {
     setMentionOpen(false);
     setMentionQuery('');
     setMentionSelectedIndex(0);
+    setMentionStartIndex(0);
   }, []);
 
   // Close slash popover and reset state
@@ -58,6 +60,8 @@ export function usePopoverNavigation(): PopoverNavigationState {
     setMentionQuery,
     mentionSelectedIndex,
     setMentionSelectedIndex,
+    mentionStartIndex,
+    setMentionStartIndex,
     // Slash
     slashOpen,
     setSlashOpen,
@@ -91,10 +95,13 @@ export interface PopoverKeyboardConfig {
   readonly onClose: () => void;
 }
 
-export function handlePopoverKeyDown(
-  e: React.KeyboardEvent,
-  config: PopoverKeyboardConfig
-): boolean {
+interface PopoverKeyEvent {
+  readonly key: string;
+  readonly shiftKey: boolean;
+  preventDefault: () => void;
+}
+
+export function handlePopoverKeyDown(e: PopoverKeyEvent, config: PopoverKeyboardConfig): boolean {
   const { itemCount, setSelectedIndex, onSelect, onClose } = config;
 
   if (e.key === 'Escape') {

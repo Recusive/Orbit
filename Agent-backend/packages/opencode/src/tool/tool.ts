@@ -6,9 +6,8 @@ import type { Agent } from "../agent/agent"
 import type { PermissionNext } from "../permission/next"
 import type { MessageV2 } from "../session/message-v2"
 
-
 export namespace Tool {
-  type Metadata = Record<string, unknown>;
+  type Metadata = Record<string, unknown>
 
   export interface InitContext {
     agent?: Agent.Info

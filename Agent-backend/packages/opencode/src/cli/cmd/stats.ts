@@ -9,8 +9,6 @@ import { cmd } from "./cmd"
 import type { Project } from "../../project/project"
 import type { Argv } from "yargs"
 
-
-
 interface SessionStats {
   totalSessions: number
   totalMessages: number
@@ -215,8 +213,7 @@ export function aggregateSessionStats(days?: number, projectFilter?: string): Se
           sessionTokens.cache.write += message.info.tokens.cache.write
 
           sessionModelUsage[modelKey].tokens.input += message.info.tokens.input
-          sessionModelUsage[modelKey].tokens.output +=
-            message.info.tokens.output + message.info.tokens.reasoning
+          sessionModelUsage[modelKey].tokens.output += message.info.tokens.output + message.info.tokens.reasoning
           sessionModelUsage[modelKey].tokens.cache.read += message.info.tokens.cache.read
           sessionModelUsage[modelKey].tokens.cache.write += message.info.tokens.cache.write
         }

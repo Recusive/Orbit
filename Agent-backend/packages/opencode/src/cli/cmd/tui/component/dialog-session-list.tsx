@@ -67,7 +67,6 @@ export function DialogSessionList(): JSX.Element {
     dialog.setSize("large")
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title="Sessions"
@@ -104,7 +103,6 @@ export function DialogSessionList(): JSX.Element {
           keybind: keybind.all.session_rename[0],
           title: "rename",
           onTrigger: (option) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogSessionRename session={option.value} />)
           },
         },

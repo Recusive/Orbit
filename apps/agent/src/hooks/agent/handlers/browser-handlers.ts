@@ -24,6 +24,7 @@ import {
   browserStop,
 } from '@/lib/api';
 import { deactivateGrab, injectAndActivateGrab } from '@/lib/browser/react-grab-injector';
+import { syncBrowserVisibilityAfterCreate } from '@/lib/browser-overlay-coordination';
 import { useBrowserLifecycleStore } from '@/stores/browser/browser-lifecycle-store';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 
@@ -77,6 +78,7 @@ export async function handleBrowserCreate(
     browserStore.setViewId(info.label);
     browserStore.setError(null);
     browserStore.setCreating(false);
+    syncBrowserVisibilityAfterCreate();
 
     // Delayed resize to force WKWebView repaint
     // Manual resize works because it happens AFTER webview initialization

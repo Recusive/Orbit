@@ -1,5 +1,5 @@
 import fs from "fs/promises"
-import { platform, release, tmpdir  } from "os"
+import { platform, release, tmpdir } from "os"
 import path from "path"
 
 import clipboardy from "clipboardy"
@@ -33,7 +33,7 @@ export namespace Clipboard {
     const os = platform()
 
     if (os === "darwin") {
-      const tmpfile = path.join(tmpdir(), "opencode-clipboard.png")
+      const tmpfile = path.join(tmpdir(), "orbit-clipboard.png")
       try {
         await Process.run(
           [
@@ -56,7 +56,9 @@ export namespace Clipboard {
       } catch {
         // osascript failed — no image in clipboard
       } finally {
-        await fs.rm(tmpfile, { force: true }).catch(() => { /* ignore */ })
+        await fs.rm(tmpfile, { force: true }).catch(() => {
+          /* ignore */
+        })
       }
     }
 
@@ -87,7 +89,9 @@ export namespace Clipboard {
       }
     }
 
-    const text = await clipboardy.read().catch(() => { /* ignore */ })
+    const text = await clipboardy.read().catch(() => {
+      /* ignore */
+    })
     if (text) {
       return { data: text, mime: "text/plain" }
     }
@@ -112,7 +116,9 @@ export namespace Clipboard {
           if (!proc.stdin) return
           proc.stdin.write(text)
           proc.stdin.end()
-          await proc.exited.catch(() => { /* ignore */ })
+          await proc.exited.catch(() => {
+            /* ignore */
+          })
         }
       }
       if (which("xclip")) {
@@ -126,7 +132,9 @@ export namespace Clipboard {
           if (!proc.stdin) return
           proc.stdin.write(text)
           proc.stdin.end()
-          await proc.exited.catch(() => { /* ignore */ })
+          await proc.exited.catch(() => {
+            /* ignore */
+          })
         }
       }
       if (which("xsel")) {
@@ -140,7 +148,9 @@ export namespace Clipboard {
           if (!proc.stdin) return
           proc.stdin.write(text)
           proc.stdin.end()
-          await proc.exited.catch(() => { /* ignore */ })
+          await proc.exited.catch(() => {
+            /* ignore */
+          })
         }
       }
     }
@@ -167,13 +177,17 @@ export namespace Clipboard {
         if (!proc.stdin) return
         proc.stdin.write(text)
         proc.stdin.end()
-        await proc.exited.catch(() => { /* ignore */ })
+        await proc.exited.catch(() => {
+          /* ignore */
+        })
       }
     }
 
     console.log("clipboard: no native support")
     return async (text: string) => {
-      await clipboardy.write(text).catch(() => { /* ignore */ })
+      await clipboardy.write(text).catch(() => {
+        /* ignore */
+      })
     }
   })
 

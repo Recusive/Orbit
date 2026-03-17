@@ -1,5 +1,6 @@
 import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { ContextItem, FileEntry } from '@/types/agent/context';
+import type { OcQuestionAnswer, OcQuestionRequest } from '@/types/opencode';
 import type {
   EffortLevel,
   InputMode,
@@ -7,6 +8,7 @@ import type {
   ReactElementContext,
   ThinkingMode,
 } from '@/types/protocol';
+import type { LexicalEditor } from 'lexical';
 
 export interface UsageData {
   readonly inputTokens: number;
@@ -16,8 +18,8 @@ export interface UsageData {
 export interface ImageAttachment {
   name: string;
   mimeType: string;
-  data: string; // Base64 encoded
-  previewUrl: string; // Data URL for display
+  data?: string | undefined;
+  previewUrl: string;
 }
 
 export interface ChatInputProps {
@@ -35,6 +37,9 @@ export interface ChatInputProps {
     answers?: Record<string, string>
   ) => void;
   readonly onPermissionDeny?: (requestId: string) => void;
+  readonly questions?: readonly OcQuestionRequest[];
+  readonly onQuestionReply?: (requestId: string, answers: OcQuestionAnswer[]) => Promise<void>;
+  readonly onQuestionReject?: (requestId: string) => Promise<void>;
   readonly onSend: (
     text: string,
     contextFiles?: string[],
@@ -67,6 +72,8 @@ export interface PopoverNavigationState {
   setMentionQuery: (query: string) => void;
   mentionSelectedIndex: number;
   setMentionSelectedIndex: React.Dispatch<React.SetStateAction<number>>;
+  mentionStartIndex: number;
+  setMentionStartIndex: (index: number) => void;
   // Slash popover
   slashOpen: boolean;
   setSlashOpen: (open: boolean) => void;
@@ -108,15 +115,17 @@ export interface UseChatInputReturn {
   isInputEmpty: boolean;
   /** Untyped suffix of the top matching slash command (e.g., "mit" when typing "/com" → "commit") */
   slashGhostText: string;
+  /** Name of a known leading slash command (e.g., "compact") for visual highlighting, or null */
+  leadingCommand: string | null;
   // Refs
-  inputRef: React.RefObject<HTMLDivElement | null>;
+  editorElementRef: React.RefObject<HTMLDivElement | null>;
+  editorRef: React.RefObject<LexicalEditor | null>;
   imageInputRef: React.RefObject<HTMLInputElement | null>;
   // Popover state
   popover: PopoverNavigationState;
   // Handlers
-  handleInputChange: (e: React.SyntheticEvent<HTMLDivElement>) => void;
-  handleKeyDown: (e: React.KeyboardEvent) => void;
-  handlePaste: (e: React.ClipboardEvent) => void;
+  handleShiftTab: () => void;
+  handleTextChange: (text: string) => void;
   handleSend: () => void;
   handleImageClick: () => void;
   handleImageSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;

@@ -1503,17 +1503,26 @@ pub async fn browser_show(app: AppHandle, state: State<'_, Arc<BrowserWindowStat
         let _ = window.set_size(LogicalSize::new(bounds.width, bounds.height));
     }
 
-    // No show() or orderFront needed here.
-    //
-    // Since browser_hide() never calls window.hide() (to preserve the
-    // parent-child NSWindow relationship), the window is always "visible"
-    // to macOS — just offscreen at (-10000, -10000) when hidden. Restoring
-    // bounds above is sufficient to make it visible to the user again.
-    //
-    // The parent-child relationship keeps the browser above the main window.
-    // If z-ordering ever drifts, the focus handler in lib.rs calls
-    // orderFront:nil on the main thread (NSWindow APIs require main thread;
-    // this command runs on a Tokio thread, so we must not call them here).
+    // On macOS, restore alpha to 1.0 (browser_hide sets it to 0.0).
+    // On other platforms, restoring bounds above is sufficient.
+    #[cfg(target_os = "macos")]
+    {
+        let app_clone = app.clone();
+        if let Err(e) = app.run_on_main_thread(move || {
+            if let Some(win) = app_clone.get_webview_window(BROWSER_WINDOW_LABEL) {
+                match win.ns_window() {
+                    Ok(ns_window) => {
+                        orbit_plugin_decorum::set_ns_window_alpha(ns_window, 1.0);
+                    },
+                    Err(e) => {
+                        log::warn!("browser_show: failed to get NSWindow handle: {e}");
+                    },
+                }
+            }
+        }) {
+            log::warn!("browser_show: failed to dispatch to main thread: {e}");
+        }
+    }
 
     Ok(())
 }
@@ -1546,7 +1555,7 @@ pub async fn browser_focus(
     Ok(())
 }
 
-/// Hide the browser window by moving it offscreen.
+/// Hide the browser window by making it fully transparent.
 ///
 /// **Important:** We do NOT call `window.hide()` (which maps to `NSWindow.orderOut:` on
 /// macOS). `orderOut:` removes the window from the parent's child window list, breaking
@@ -1555,27 +1564,49 @@ pub async fn browser_focus(
 /// as an **independent** window instead of a child — causing it to go behind the parent
 /// when the user clicks the main app.
 ///
-/// Instead, we move the window offscreen and shrink it to 1x1. This makes it invisible
-/// to the user while preserving the parent-child relationship, so the browser correctly
-/// stays above the parent window when restored.
+/// On macOS, we use `setAlphaValue(0.0)` to make the window invisible while keeping it
+/// at its current position and size. This preserves the parent-child relationship and
+/// avoids confusing the macOS window server (Mission Control breaks when windows are
+/// moved to extreme coordinates like -10000,-10000).
+///
+/// On other platforms, we fall back to moving the window offscreen.
 #[tauri::command]
 pub async fn browser_hide(app: AppHandle, state: State<'_, Arc<BrowserWindowState>>) -> Result<()> {
     if !*state.exists.lock() {
         return Err("No browser exists".to_owned());
     }
 
-    let window = app
-        .get_webview_window(BROWSER_WINDOW_LABEL)
-        .ok_or("Browser window not found")?;
-
     // Mark as hidden so browser_set_bounds skips position updates
-    // (prevents ResizeObserver from moving the window back on-screen).
+    // (prevents ResizeObserver from moving the window while hidden).
     *state.hidden.lock() = true;
 
-    // Move offscreen and shrink — but do NOT call window.hide().
-    // See doc comment above for why hide() must be avoided.
-    let _ = window.set_position(LogicalPosition::new(-10_000.0_f64, -10_000.0_f64));
-    let _ = window.set_size(LogicalSize::new(1.0_f64, 1.0_f64));
+    #[cfg(target_os = "macos")]
+    {
+        let app_clone = app.clone();
+        if let Err(e) = app.run_on_main_thread(move || {
+            if let Some(window) = app_clone.get_webview_window(BROWSER_WINDOW_LABEL) {
+                match window.ns_window() {
+                    Ok(ns_window) => {
+                        orbit_plugin_decorum::set_ns_window_alpha(ns_window, 0.0);
+                    },
+                    Err(e) => {
+                        log::warn!("browser_hide: failed to get NSWindow handle: {e}");
+                    },
+                }
+            }
+        }) {
+            log::warn!("browser_hide: failed to dispatch to main thread: {e}");
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let window = app
+            .get_webview_window(BROWSER_WINDOW_LABEL)
+            .ok_or("Browser window not found")?;
+        let _ = window.set_position(LogicalPosition::new(-10_000.0_f64, -10_000.0_f64));
+        let _ = window.set_size(LogicalSize::new(1.0_f64, 1.0_f64));
+    }
 
     Ok(())
 }

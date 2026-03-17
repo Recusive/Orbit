@@ -8,7 +8,6 @@ import { EditTool } from "./edit"
 import DESCRIPTION from "./multiedit.txt"
 import { Tool } from "./tool"
 
-
 export const MultiEditTool = Tool.define("multiedit", {
   description: DESCRIPTION,
   parameters: z.object({

@@ -1,30 +1,29 @@
-import * as fs from "fs/promises"
-import path from "path"
-
 import { describe, expect, test } from "bun:test"
-
-import { Instance } from "../../src/project/instance"
+import path from "path"
+import * as fs from "fs/promises"
 import { ApplyPatchTool } from "../../src/tool/apply_patch"
+import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const baseCtx = {
-  sessionID: "test",
-  messageID: "",
+  sessionID: SessionID.make("ses_test"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
+  metadata: () => {},
 }
 
-interface AskInput {
+type AskInput = {
   permission: string
   patterns: string[]
   always: string[]
   metadata: {
     diff: string
     filepath: string
-    files: {
+    files: Array<{
       filePath: string
       relativePath: string
       type: "add" | "update" | "delete" | "move"
@@ -34,7 +33,7 @@ interface AskInput {
       additions: number
       deletions: number
       movePath?: string
-    }[]
+    }>
   }
 }
 
@@ -42,12 +41,12 @@ type ToolCtx = typeof baseCtx & {
   ask: (input: AskInput) => Promise<void>
 }
 
-async function execute(params: { patchText: string }, ctx: ToolCtx): Promise<{ title: string; output: string; metadata: any }> {
+const execute = async (params: { patchText: string }, ctx: ToolCtx) => {
   const tool = await ApplyPatchTool.init()
   return tool.execute(params, ctx)
 }
 
-const makeCtx = (): { ctx: ToolCtx; calls: AskInput[] } => {
+const makeCtx = () => {
   const calls: AskInput[] = []
   const ctx: ToolCtx = {
     ...baseCtx,

@@ -10,7 +10,9 @@ import { memo, useEffect, useMemo } from 'react';
 import { InputControls } from './InputControls';
 import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
+import { LexicalChatEditor } from './lexical';
 import { MentionPopover } from './mention-popover';
+import { OcQuestionModal } from './oc-question-modal';
 import { SlashCommandPopover } from './slash-command-popover';
 import { useChatInput } from './use-chat-input';
 
@@ -19,7 +21,7 @@ import type { FC } from 'react';
 
 import { ElementContextChip } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
-import { CHAT_WIDTH, CHAT_WIDTH_VAR, INPUT_SIZES } from '@/lib/utils';
+import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import { useModel } from '@/stores/agent/tool-store';
 
 /** Check if a permission request is for the AskUserQuestion tool */
@@ -35,8 +37,11 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   usage,
   maxTokens,
   permissions = [],
+  questions,
   onPermissionApprove,
   onPermissionDeny,
+  onQuestionReply,
+  onQuestionReject,
   onSend,
   onStop,
   onModeChange,
@@ -49,19 +54,21 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   const {
     // State
+    inputText,
     attachedContext,
     slashCommands,
     isInputEmpty,
     slashGhostText,
+    leadingCommand,
     // Refs
-    inputRef,
+    editorElementRef,
+    editorRef,
     imageInputRef,
     // Popover state
     popover,
     // Handlers
-    handleInputChange,
-    handleKeyDown,
-    handlePaste,
+    handleShiftTab,
+    handleTextChange,
     handleSend,
     handleImageClick,
     handleImageSelect,
@@ -93,7 +100,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   });
 
   // Split permissions into AskUserQuestion vs regular tool permissions.
-  // AskUserQuestion gets its own interactive card; other tools use the compact modal.
+  // Question-style tools get their own overlay; other tools use the compact modal.
   const { askUserQuestions, regularPermissions } = useMemo(() => {
     const ask: (typeof permissions)[number][] = [];
     const regular: (typeof permissions)[number][] = [];
@@ -109,13 +116,30 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
+  const activeOcQuestion =
+    questions !== undefined && questions.length > 0 ? questions[0] : undefined;
+  const isQuestionOverlayActive = activeAskQuestion !== undefined || activeOcQuestion !== undefined;
+
+  // Build known command names for multi-command highlighting.
+  // Includes popover-selected command (explicit state, flicker-free) + all known commands from store.
+  const knownCommandNames = useMemo((): ReadonlySet<string> => {
+    const names = new Set<string>();
+    if (leadingCommand !== null) names.add(leadingCommand);
+    for (const cmd of slashCommands) {
+      if (cmd.kind !== 'skill') names.add(cmd.name);
+    }
+    return names;
+  }, [leadingCommand, slashCommands]);
 
   // Global keyboard shortcuts for regular permission modals.
   // Uses capture phase so Enter fires here BEFORE React's onKeyDown on
   // the input (which would otherwise send a message).
-  // AskUserQuestion handles its own keyboard shortcuts internally.
+  // Question overlays handle their own keyboard shortcuts internally.
   useEffect(() => {
     if (regularPermissions.length === 0 || !onPermissionApprove || !onPermissionDeny) {
+      return;
+    }
+    if (isQuestionOverlayActive) {
       return;
     }
 
@@ -128,6 +152,18 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
         e.preventDefault();
         e.stopPropagation();
         onPermissionApprove(firstPermission.requestId);
+      }
+      // Cmd/Ctrl+Enter always allows when supported
+      else if (
+        e.key === 'Enter' &&
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        firstPermission.supportsAlwaysAllow
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        onPermissionApprove(firstPermission.requestId, true);
       }
       // ESC denies the first permission (matches the button label)
       else if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -147,15 +183,15 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [regularPermissions, onPermissionApprove, onPermissionDeny]);
+  }, [isQuestionOverlayActive, onPermissionApprove, onPermissionDeny, regularPermissions]);
 
   return (
     <div className="flex justify-center px-4 pb-1 shrink-0 relative">
       <div
-        className={getInputBoxClasses()}
+        className={`${getInputBoxClasses()} relative`}
         style={{ maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)` }}
       >
-        {/* AskUserQuestion Modal — full overlay replacing the entire input box content */}
+        {/* Question overlays — full replacement for the input box content */}
         {activeAskQuestion !== undefined &&
         onPermissionApprove !== undefined &&
         onPermissionDeny !== undefined ? (
@@ -163,6 +199,14 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
             request={activeAskQuestion}
             onApprove={onPermissionApprove}
             onDeny={onPermissionDeny}
+          />
+        ) : activeOcQuestion !== undefined &&
+          onQuestionReply !== undefined &&
+          onQuestionReject !== undefined ? (
+          <OcQuestionModal
+            question={activeOcQuestion}
+            onReply={onQuestionReply}
+            onReject={onQuestionReject}
           />
         ) : (
           <>
@@ -202,40 +246,20 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               </ContextChips>
             ) : null}
 
-            {/* Input Area — relative wrapper for ghost text overlay */}
-            <div className="relative">
-              <div
-                ref={inputRef}
-                data-demo-input
-                className="p-2 text-base outline-none overflow-y-auto overflow-x-hidden wrap-break-word"
-                style={{
-                  minHeight: INPUT_SIZES.textareaMinHeight,
-                  maxHeight: INPUT_SIZES.textareaMaxHeight,
-                }}
-                contentEditable
-                suppressContentEditableWarning
-                data-placeholder="Plan, @ for context, / for commands"
-                data-empty={isInputEmpty}
-                onInput={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-              />
-
-              {/* Ghost autocomplete text — mirrors input position, typed portion is invisible */}
-              {slashGhostText.length > 0 ? (
-                <div
-                  aria-hidden
-                  className="absolute top-0 left-0 p-2 text-base pointer-events-none whitespace-pre-wrap wrap-break-word"
-                  style={{
-                    minHeight: INPUT_SIZES.textareaMinHeight,
-                    maxHeight: INPUT_SIZES.textareaMaxHeight,
-                  }}
-                >
-                  <span className="invisible">{inputRef.current?.textContent ?? ''}</span>
-                  <span className="text-muted-foreground/40">{slashGhostText}</span>
-                </div>
-              ) : null}
-            </div>
+            <LexicalChatEditor
+              editorElementRef={editorElementRef}
+              editorRef={editorRef}
+              inputText={inputText}
+              isInputEmpty={isInputEmpty}
+              knownCommandNames={knownCommandNames}
+              onSelectSlashCommand={handleSlashSelect}
+              onSend={handleSend}
+              onShiftTab={handleShiftTab}
+              onTextChange={handleTextChange}
+              popover={popover}
+              slashCommands={slashCommands}
+              slashGhostText={slashGhostText}
+            />
 
             {/* Mention Popover */}
             <MentionPopover
@@ -244,16 +268,15 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
               query={popover.mentionQuery}
               onQueryChange={popover.setMentionQuery}
               onSelect={handleMentionSelect}
-              anchorRef={inputRef}
+              anchorRef={editorElementRef}
             />
 
-            {/* Slash Command Popover */}
+            {/* Slash Command Popover — absolutely positioned inside the input box */}
             <SlashCommandPopover
               open={popover.slashOpen}
               onOpenChange={popover.setSlashOpen}
               query={popover.slashQuery}
               onSelect={handleSlashSelect}
-              anchorRef={inputRef}
               selectedIndex={popover.slashSelectedIndex}
               commands={slashCommands}
             />

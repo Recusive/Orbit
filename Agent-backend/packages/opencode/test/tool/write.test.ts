@@ -1,21 +1,20 @@
-import fs from "fs/promises"
-import path from "path"
-
 import { describe, test, expect } from "bun:test"
-
-import { Instance } from "../../src/project/instance"
+import path from "path"
+import fs from "fs/promises"
 import { WriteTool } from "../../src/tool/write"
+import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const ctx = {
-  sessionID: "test-write-session",
-  messageID: "",
+  sessionID: SessionID.make("ses_test-write-session"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("tool.write", () => {
@@ -310,7 +309,7 @@ describe("tool.write", () => {
           FileTime.read(ctx.sessionID, readonlyPath)
 
           const write = await WriteTool.init()
-          expect(
+          await expect(
             write.execute(
               {
                 filePath: readonlyPath,

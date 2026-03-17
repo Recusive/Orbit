@@ -1,6 +1,6 @@
 // @refresh reload
 
-import { iife } from "@opencode-ai/util/iife"
+import { iife } from "@orbit.build/util/iife"
 import { render } from "solid-js/web"
 import { AppBaseProviders, AppInterface } from "@/app"
 import { type Platform, PlatformProvider } from "@/context/platform"

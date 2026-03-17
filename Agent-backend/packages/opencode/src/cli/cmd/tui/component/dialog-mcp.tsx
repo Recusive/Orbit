@@ -2,29 +2,25 @@ import { TextAttributes } from "@opentui/core"
 import { useLocal } from "@tui/context/local"
 import { useSDK } from "@tui/context/sdk"
 import { useSync } from "@tui/context/sync"
-import { DialogSelect   } from "@tui/ui/dialog-select"
+import { DialogSelect } from "@tui/ui/dialog-select"
 import { map, pipe, entries, sortBy } from "remeda"
 import { createMemo, createSignal } from "solid-js"
 
 import { useTheme } from "../context/theme"
 
-import type {DialogSelectRef, DialogSelectOption} from "@tui/ui/dialog-select";
+import type { DialogSelectRef, DialogSelectOption } from "@tui/ui/dialog-select"
 import type { JSX } from "solid-js"
 
 import { Keybind } from "@/util/keybind"
 
-
 function Status(props: { enabled: boolean; loading: boolean }): JSX.Element {
   const { theme } = useTheme()
   if (props.loading) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     return <span style={{ fg: theme.textMuted }}>⋯ Loading</span>
   }
   if (props.enabled) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     return <span style={{ fg: theme.success, attributes: TextAttributes.BOLD }}>✓ Enabled</span>
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <span style={{ fg: theme.textMuted }}>○ Disabled</span>
 }
 
@@ -82,7 +78,6 @@ export function DialogMcp(): JSX.Element {
     },
   ])
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       ref={setRef}

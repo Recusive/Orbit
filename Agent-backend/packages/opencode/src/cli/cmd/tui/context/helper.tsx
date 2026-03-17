@@ -19,7 +19,6 @@ export function createSimpleContext<T, Props extends Record<string, unknown>>(in
     provider: (props: ParentProps<Props>): SafeJSX => {
       const init = input.init(props)
       const initRecord = init as Record<string, unknown>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
       return (
         <Show when={initRecord.ready === undefined || initRecord.ready === true}>
           <ctx.Provider value={init}>{props.children}</ctx.Provider>

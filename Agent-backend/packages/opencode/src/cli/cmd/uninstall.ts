@@ -167,7 +167,10 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
     if (!exists) continue
 
     spinner.start(`Removing ${dir.label}...`)
-    const rmResult = await fs.rm(dir.path, { recursive: true, force: true }).then(() => null, (e: unknown) => e)
+    const rmResult = await fs.rm(dir.path, { recursive: true, force: true }).then(
+      () => null,
+      (e: unknown) => e,
+    )
     if (rmResult !== null) {
       spinner.stop(`Failed to remove ${dir.label}`, 1)
       errors.push(`${dir.label}: ${rmResult instanceof Error ? rmResult.message : "unknown error"}`)
@@ -178,7 +181,10 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
 
   if (targets.shellConfig !== null) {
     spinner.start("Cleaning shell config...")
-    const cleanResult = await cleanShellConfig(targets.shellConfig).then(() => null, (e: unknown) => e)
+    const cleanResult = await cleanShellConfig(targets.shellConfig).then(
+      () => null,
+      (e: unknown) => e,
+    )
     if (cleanResult !== null) {
       spinner.stop("Failed to clean shell config", 1)
       errors.push(`Shell config: ${cleanResult instanceof Error ? cleanResult.message : "unknown error"}`)
@@ -201,10 +207,9 @@ async function executeUninstall(method: Installation.Method, targets: RemovalTar
     if (method in cmds) {
       const cmdArgs = cmds[method]
       spinner.start(`Running ${cmdArgs.join(" ")}...`)
-      const result = await Process.run(
-        method === "choco" ? ["choco", "uninstall", "opencode", "-y", "-r"] : cmdArgs,
-        { nothrow: true },
-      )
+      const result = await Process.run(method === "choco" ? ["choco", "uninstall", "opencode", "-y", "-r"] : cmdArgs, {
+        nothrow: true,
+      })
       if (result.code !== 0) {
         spinner.stop(`Package manager uninstall failed: exit code ${String(result.code)}`, 1)
         const text = `${result.stdout.toString("utf8")}\n${result.stderr.toString("utf8")}`

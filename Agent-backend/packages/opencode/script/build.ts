@@ -4,7 +4,7 @@ import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import solidPlugin from "@opentui/solid/bun-plugin"
 import { $ } from "bun"
 
@@ -111,6 +111,10 @@ const allTargets: {
   },
   {
     os: "win32",
+    arch: "arm64",
+  },
+  {
+    os: "win32",
     arch: "x64",
   },
   {
@@ -175,7 +179,6 @@ for (const item of targets) {
     conditions: ["browser"],
     tsconfig: "./tsconfig.json",
     plugins: [solidPlugin],
-    sourcemap: "external",
     compile: {
       autoloadBunfig: false,
       autoloadDotenv: false,

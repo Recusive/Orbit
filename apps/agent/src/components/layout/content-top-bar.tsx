@@ -19,17 +19,19 @@ import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useVaultContextManager } from '@/features/vault/hooks';
 import { useVaultEditorStore } from '@/features/vault/stores';
-import { useTauri } from '@/hooks/agent/use-tauri';
+import { useConversationList } from '@/hooks/sidebar/use-conversation-list';
+import { useConversationMeta } from '@/hooks/sidebar/use-conversation-meta';
 import { cn } from '@/lib/utils';
 import { CONTENT_CARD, HEIGHTS } from '@/lib/utils/constants';
+import { getConversationUiBridge } from '@/services/conversations';
 import { useBranchDiffStats } from '@/stores/git/git-store';
 import {
   useUIStore,
   useWorkspaceName,
   useHasWorkspace,
-  useActiveConversationTitle,
-  useIsTitleLoading,
   useReviewPanelOpen,
+  useSettingsOpen,
+  useSettingsSection,
   useVaultOpen,
 } from '@/stores/ui/ui-store';
 
@@ -228,8 +230,12 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
 }) => {
   const workspaceName = useWorkspaceName();
   const hasWorkspace = useHasWorkspace();
-  const conversationTitle = useActiveConversationTitle();
+  const conversations = useConversationList();
+  const conversationMeta = useConversationMeta();
+  const conversationTitle = conversationMeta.title;
   const reviewPanelOpen = useReviewPanelOpen();
+  const settingsOpen = useSettingsOpen();
+  const settingsSection = useSettingsSection();
   const vaultOpen = useVaultOpen();
 
   const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
@@ -243,11 +249,7 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     toggleRightSidebar,
     toggleBottomPanel,
     setTerminalPosition,
-    setVaultOpen,
-    conversations,
-    activeConversationId,
-    workspacePath,
-    activeWorktreePath,
+    closeSecondarySurface,
     rightSidebarOpen,
     bottomPanelOpen,
     terminalCollapsed,
@@ -258,17 +260,14 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       toggleRightSidebar: s.toggleRightSidebar,
       toggleBottomPanel: s.toggleBottomPanel,
       setTerminalPosition: s.setTerminalPosition,
-      setVaultOpen: s.setVaultOpen,
-      conversations: s.conversations,
-      activeConversationId: s.activeConversationId,
-      workspacePath: s.workspacePath,
-      activeWorktreePath: s.activeWorktreePath,
+      closeSecondarySurface: s.closeSecondarySurface,
       rightSidebarOpen: s.rightSidebarOpen,
       bottomPanelOpen: s.bottomPanelOpen,
       terminalCollapsed: s.terminalCollapsed,
     }))
   );
-  const isTitleLoading = useIsTitleLoading(activeConversationId);
+  const activeConversationId = conversationMeta.activeSessionId;
+  const isTitleLoading = conversationMeta.isTitleLoading;
 
   const checkOverflow = useCallback((): void => {
     const el = leftSectionRef.current;
@@ -299,29 +298,18 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
     };
   }, [sidebarOpen, workspaceName, conversationTitle, isTitleLoading, checkOverflow]);
 
-  const { postMessage } = useTauri();
-
   const handleNewSession = useCallback((): void => {
-    setVaultOpen(false);
+    closeSecondarySurface();
     const activeConv = conversations.find((c) => c.sessionId === activeConversationId);
     if (activeConv?.title === 'Untitled' && activeConv.messageCount === 0) {
       return;
     }
-    postMessage({
-      type: 'conversation:create',
-      uuid: crypto.randomUUID(),
-      title: 'Untitled',
-      workspace_path: workspacePath ?? undefined,
-      worktree_path: activeWorktreePath ?? undefined,
-    });
-  }, [
-    conversations,
-    activeConversationId,
-    workspacePath,
-    activeWorktreePath,
-    postMessage,
-    setVaultOpen,
-  ]);
+    void getConversationUiBridge()
+      .create({ title: 'Untitled' })
+      .catch(() => {
+        // Sidebar actions own the user-facing error surface for shared shell creation failures.
+      });
+  }, [activeConversationId, closeSecondarySurface, conversations]);
 
   // Listen for newSession keyboard shortcut event
   useEffect(() => {
@@ -412,6 +400,11 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                     aria-label="Go back"
                     tabIndex={sidebarOpen ? -1 : 0}
                     className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+                    onClick={() => {
+                      if (settingsOpen || vaultOpen) {
+                        closeSecondarySurface();
+                      }
+                    }}
                   >
                     <SFSymbol
                       name="arrow.left"
@@ -456,32 +449,57 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
           </div>
         ) : null}
 
-        {/* Project name — fades via parent mask when header is narrow */}
-        {workspaceName ? (
-          <span
-            data-tauri-drag-region={false}
-            className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
-          >
-            {workspaceName}
-          </span>
-        ) : null}
-
-        {/* Separator + Chat name */}
-        {conversationTitle || isTitleLoading ? (
-          <>
-            <div className="w-px h-3.5 bg-lg-separator shrink-0" />
-            {isTitleLoading ? (
-              <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
-            ) : (
+        {/* Header text — "Settings | Page" when settings is open, otherwise project + chat name.
+            Keyed on settingsOpen so the blur-reveal re-triggers when toggling settings. */}
+        <div
+          key={settingsOpen ? 'settings-header' : 'chat-header'}
+          className="flex items-center gap-1.5 min-w-0 animate-title-in"
+        >
+          {settingsOpen ? (
+            <>
               <span
                 data-tauri-drag-region={false}
-                className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap animate-title-in"
+                className="text-base text-lg-text-secondary whitespace-nowrap"
               >
-                {conversationTitle}
+                Settings
               </span>
-            )}
-          </>
-        ) : null}
+              <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+              <span
+                data-tauri-drag-region={false}
+                className="text-base text-foreground whitespace-nowrap capitalize"
+              >
+                {settingsSection}
+              </span>
+            </>
+          ) : (
+            <>
+              {workspaceName ? (
+                <span
+                  data-tauri-drag-region={false}
+                  className="text-base text-lg-text-secondary cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                >
+                  {workspaceName}
+                </span>
+              ) : null}
+
+              {conversationTitle || isTitleLoading ? (
+                <>
+                  <div className="w-px h-3.5 bg-lg-separator shrink-0" />
+                  {isTitleLoading ? (
+                    <span className="inline-block h-3.5 w-28 rounded bg-foreground/10 animate-pulse" />
+                  ) : (
+                    <span
+                      data-tauri-drag-region={false}
+                      className="text-base text-foreground cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                    >
+                      {conversationTitle}
+                    </span>
+                  )}
+                </>
+              ) : null}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Center spacer — keeps left and right sections pushed apart */}

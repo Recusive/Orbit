@@ -5,6 +5,7 @@ import {
   AppWindowMac,
   Bell,
   Bot,
+  Cable,
   FlaskConical,
   GitBranch,
   Globe,
@@ -28,6 +29,18 @@ interface SettingsSidebarProps {
 
 const NAV_ITEMS: NavItemConfig[] = [
   {
+    id: 'backend',
+    label: 'Engine',
+    icon: (
+      <SFSymbol
+        name="rectangle.connected.to.line.below"
+        size={18}
+        weight="medium"
+        fallback={<Cable className="h-4 w-4" />}
+      />
+    ),
+  },
+  {
     id: 'general',
     label: 'General',
     icon: <IconSettingsKnob className="h-4 w-4" />,
@@ -41,6 +54,11 @@ const NAV_ITEMS: NavItemConfig[] = [
     id: 'agent',
     label: 'Agent',
     icon: <Icon iconNode={hexagons7} className="h-4 w-4" />,
+  },
+  {
+    id: 'providers',
+    label: 'Providers',
+    icon: <User className="h-4 w-4" />,
   },
   {
     id: 'subagents',

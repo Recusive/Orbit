@@ -1,10 +1,10 @@
-import { spawn } from "child_process"
+import { spawn as launch } from "child_process"
 import fs from "fs/promises"
 import { text } from "node:stream/consumers"
 import os from "os"
 import path from "path"
 
-import { Module } from "@opencode-ai/util/module"
+import { Module } from "@orbit.build/util/module"
 
 import { BunProc } from "../bun"
 import { Flag } from "../flag/flag"
@@ -16,8 +16,7 @@ import { Log } from "../util/log"
 import { Process } from "../util/process"
 import { which } from "../util/which"
 
-
-import type { ChildProcessWithoutNullStreams } from "child_process"
+import type { ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "child_process"
 
 interface GitHubRelease {
   tag_name?: string
@@ -28,6 +27,19 @@ interface GitHubRelease {
 interface GitHubAsset {
   name?: string
   browser_download_url?: string
+}
+
+function spawn(cmd: string, args: string[], opts?: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams
+function spawn(cmd: string, opts?: SpawnOptionsWithoutStdio): ChildProcessWithoutNullStreams
+function spawn(
+  cmd: string,
+  args?: string[] | SpawnOptionsWithoutStdio,
+  opts?: SpawnOptionsWithoutStdio,
+): ChildProcessWithoutNullStreams {
+  if (Array.isArray(args)) {
+    return launch(cmd, [...args], { ...(opts ?? {}), windowsHide: true })
+  }
+  return launch(cmd, { ...(args ?? {}), windowsHide: true })
 }
 
 export namespace LSPServer {
@@ -154,7 +166,7 @@ export namespace LSPServer {
           "bin",
           "vue-language-server.js",
         )
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "@vue/language-server"], {
             cwd: Global.Path.bin,
@@ -196,7 +208,7 @@ export namespace LSPServer {
       if (!eslint) return
       log.info("spawning eslint server")
       const serverPath = path.join(Global.Path.bin, "vscode-eslint", "server", "out", "eslintServer.js")
-      if (!(Filesystem.exists(serverPath))) {
+      if (!Filesystem.exists(serverPath)) {
         if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
         log.info("downloading and building VS Code ESLint server")
         const response = await fetch("https://github.com/microsoft/vscode-eslint/archive/refs/heads/main.zip")
@@ -534,7 +546,7 @@ export namespace LSPServer {
       const args = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "pyright", "dist", "pyright-langserver.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "pyright"], {
             cwd: Global.Path.bin,
@@ -594,7 +606,7 @@ export namespace LSPServer {
           process.platform === "win32" ? "language_server.bat" : "language_server.sh",
         )
 
-        if (!(Filesystem.exists(binary))) {
+        if (!Filesystem.exists(binary)) {
           const elixir = which("elixir")
           if (!elixir) {
             log.error("elixir is required to run elixir-ls")
@@ -735,7 +747,7 @@ export namespace LSPServer {
 
         bin = path.join(Global.Path.bin, "zls" + (platform === "win32" ? ".exe" : ""))
 
-        if (!(Filesystem.exists(bin))) {
+        if (!Filesystem.exists(bin)) {
           log.error("Failed to extract zls binary")
           return
         }
@@ -966,7 +978,7 @@ export namespace LSPServer {
       const release: {
         tag_name?: string
         assets?: { name?: string; browser_download_url?: string }[]
-      } = await releaseResponse.json() as {
+      } = (await releaseResponse.json()) as {
         tag_name?: string
         assets?: { name?: string; browser_download_url?: string }[]
       }
@@ -1042,7 +1054,7 @@ export namespace LSPServer {
       await fs.rm(archive, { force: true })
 
       const bin = path.join(Global.Path.bin, "clangd_" + tag, "bin", "clangd" + ext)
-      if (!(Filesystem.exists(bin))) {
+      if (!Filesystem.exists(bin)) {
         log.error("Failed to extract clangd binary")
         return
       }
@@ -1079,7 +1091,7 @@ export namespace LSPServer {
       const args: string[] = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "svelte-language-server", "bin", "server.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "svelte-language-server"], {
             cwd: Global.Path.bin,
@@ -1126,7 +1138,7 @@ export namespace LSPServer {
       const args: string[] = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "@astrojs", "language-server", "bin", "nodeServer.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "@astrojs/language-server"], {
             cwd: Global.Path.bin,
@@ -1250,7 +1262,7 @@ export namespace LSPServer {
           return "config_linux"
         })(),
       )
-      const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "opencode-jdtls-data"))
+      const dataDir = await fs.mkdtemp(path.join(os.tmpdir(), "orbit-jdtls-data"))
       return {
         process: spawn(
           java,
@@ -1366,7 +1378,7 @@ export namespace LSPServer {
         }
         log.info("Installed Kotlin Language Server", { path: launcherScript })
       }
-      if (!(Filesystem.exists(launcherScript))) {
+      if (!Filesystem.exists(launcherScript)) {
         log.error(`Failed to locate the Kotlin LS launcher script in the installed directory: ${distPath}.`)
         return
       }
@@ -1542,7 +1554,7 @@ export namespace LSPServer {
         // Binary is located in bin/ subdirectory within the extracted archive
         bin = path.join(installDir, "bin", "lua-language-server" + (platform === "win32" ? ".exe" : ""))
 
-        if (!(Filesystem.exists(bin))) {
+        if (!Filesystem.exists(bin)) {
           log.error("Failed to extract lua-language-server binary")
           return
         }
@@ -1580,7 +1592,7 @@ export namespace LSPServer {
       const args: string[] = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "intelephense", "lib", "intelephense.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "intelephense"], {
             cwd: Global.Path.bin,
@@ -1677,7 +1689,7 @@ export namespace LSPServer {
       const args: string[] = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "bash-language-server", "out", "cli.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "bash-language-server"], {
             cwd: Global.Path.bin,
@@ -1766,7 +1778,7 @@ export namespace LSPServer {
 
         bin = path.join(Global.Path.bin, "terraform-ls" + (platform === "win32" ? ".exe" : ""))
 
-        if (!(Filesystem.exists(bin))) {
+        if (!Filesystem.exists(bin)) {
           log.error("Failed to extract terraform-ls binary")
           return
         }
@@ -1864,7 +1876,7 @@ export namespace LSPServer {
 
         bin = path.join(Global.Path.bin, "texlab" + (platform === "win32" ? ".exe" : ""))
 
-        if (!(Filesystem.exists(bin))) {
+        if (!Filesystem.exists(bin)) {
           log.error("Failed to extract texlab binary")
           return
         }
@@ -1895,7 +1907,7 @@ export namespace LSPServer {
       const args: string[] = []
       if (!binary) {
         const js = path.join(Global.Path.bin, "node_modules", "dockerfile-language-server-nodejs", "lib", "server.js")
-        if (!(Filesystem.exists(js))) {
+        if (!Filesystem.exists(js)) {
           if (Flag.OPENCODE_DISABLE_LSP_DOWNLOAD) return
           await Process.spawn([BunProc.which(), "install", "dockerfile-language-server-nodejs"], {
             cwd: Global.Path.bin,
@@ -2071,7 +2083,7 @@ export namespace LSPServer {
 
         bin = path.join(Global.Path.bin, "tinymist" + (platform === "win32" ? ".exe" : ""))
 
-        if (!(Filesystem.exists(bin))) {
+        if (!Filesystem.exists(bin)) {
           log.error("Failed to extract tinymist binary")
           return
         }

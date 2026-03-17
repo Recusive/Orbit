@@ -23,6 +23,7 @@ export interface ConversationMessageDto {
   turnDurationMs?: number;
   createdAt: number;
   toolUses?: ToolUseDto[];
+  attachedImages?: StoredImageAttachmentDto[];
   usage?: TokenUsageDto;
   /**
    * UUID of the previous message in the conversation chain.
@@ -31,6 +32,12 @@ export interface ConversationMessageDto {
    * - undefined for legacy messages without this field
    */
   parentUuid?: string | null;
+}
+
+export interface StoredImageAttachmentDto {
+  name: string;
+  mimeType: string;
+  previewUrl: string;
 }
 
 export interface ToolUseDto {

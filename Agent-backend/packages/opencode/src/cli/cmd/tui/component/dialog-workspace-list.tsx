@@ -1,4 +1,4 @@
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 import { useRoute } from "@tui/context/route"
 import { useSync } from "@tui/context/sync"
 import { useDialog } from "@tui/ui/dialog"
@@ -11,9 +11,8 @@ import { useToast } from "../ui/toast"
 
 import { DialogSessionList } from "./workspace/dialog-session-list"
 
-import type { Session } from "@opencode-ai/sdk/v2"
+import type { Session } from "@orbit.build/sdk/v2"
 import type { JSX } from "solid-js"
-
 
 async function openWorkspace(input: {
   dialog: ReturnType<typeof useDialog>
@@ -52,7 +51,7 @@ async function openWorkspace(input: {
   }
   let created: Session | undefined
   while (!created) {
-    const result = await client.session.create({}).catch(() => undefined)
+    const result = await client.session.create({ workspaceID: input.workspaceID }).catch(() => undefined)
     if (!result) {
       input.toast.show({
         message: "Failed to open workspace",
@@ -135,7 +134,6 @@ function DialogWorkspaceCreate(props: { onSelect: (workspaceID: string) => Promi
     setCreating(undefined)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title={creating() ? "Creating Workspace" : "New Workspace"}
@@ -173,7 +171,6 @@ export function DialogWorkspaceList(): JSX.Element {
   async function selectWorkspace(workspaceID: string): Promise<void> {
     if (workspaceID === "__local__") {
       if (localCount() > 0) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
         dialog.replace(() => <DialogSessionList localOnly={true} />)
         return
       }
@@ -185,7 +182,6 @@ export function DialogWorkspaceList(): JSX.Element {
     }
     const count = counts()[workspaceID]
     if (typeof count === "number" && count > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
       dialog.replace(() => <DialogSessionList workspaceID={workspaceID} />)
       return
     }
@@ -202,7 +198,6 @@ export function DialogWorkspaceList(): JSX.Element {
     })
     const listed = await client.session.list({ roots: true, limit: 1 }).catch(() => undefined)
     if (typeof listed?.data?.length === "number" && listed.data.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
       dialog.replace(() => <DialogSessionList workspaceID={workspaceID} />)
       return
     }
@@ -285,7 +280,6 @@ export function DialogWorkspaceList(): JSX.Element {
     void sync.workspace.sync()
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title="Workspaces"
@@ -298,7 +292,6 @@ export function DialogWorkspaceList(): JSX.Element {
       onSelect={(option) => {
         setToDelete(undefined)
         if (option.value === "__create__") {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           dialog.replace(() => <DialogWorkspaceCreate onSelect={(workspaceID) => open(workspaceID, true)} />)
           return
         }

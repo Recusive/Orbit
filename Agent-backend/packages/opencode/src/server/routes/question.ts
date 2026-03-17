@@ -1,10 +1,12 @@
 import { Hono } from "hono"
-import { describeRoute, validator, resolver  } from "hono-openapi"
+import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 
 import { Question } from "../../question"
 import { lazy } from "../../util/lazy"
 import { errors } from "../error"
+
+import { QuestionID } from "@/question/schema"
 
 export const QuestionRoutes = lazy(() =>
   new Hono()
@@ -59,7 +61,7 @@ export const QuestionRoutes = lazy(() =>
         const params = c.req.valid("param")
         const json = c.req.valid("json")
         Question.reply({
-          requestID: params.requestID,
+          requestID: QuestionID.make(params.requestID),
           answers: json.answers,
         })
         return c.json(true)
@@ -91,7 +93,7 @@ export const QuestionRoutes = lazy(() =>
       ),
       (c) => {
         const params = c.req.valid("param")
-        Question.reject(params.requestID)
+        Question.reject(QuestionID.make(params.requestID))
         return c.json(true)
       },
     ),

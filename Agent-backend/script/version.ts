@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import { $ } from "bun"
 
 import { buildNotes, getLatestRelease } from "./changelog"
@@ -23,11 +23,11 @@ if (!Script.preview) {
   output.push(`tag=${release.tagName}`)
 } else if (Script.channel === "beta") {
   await $`gh release create v${Script.version} -d --title "v${Script.version}" --repo ${process.env.GH_REPO}`
-  const release = (await $`gh release view v${Script.version} --json tagName,databaseId --repo ${process.env.GH_REPO}`
-    .json()) as {
-    databaseId: string
-    tagName: string
-  }
+  const release =
+    (await $`gh release view v${Script.version} --json tagName,databaseId --repo ${process.env.GH_REPO}`.json()) as {
+      databaseId: string
+      tagName: string
+    }
   output.push(`release=${release.databaseId}`)
   output.push(`tag=${release.tagName}`)
 }

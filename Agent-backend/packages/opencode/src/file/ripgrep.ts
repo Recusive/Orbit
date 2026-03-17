@@ -3,7 +3,7 @@ import fs from "fs/promises"
 import { text } from "node:stream/consumers"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { ZipReader, BlobReader, BlobWriter } from "@zip.js/zip.js"
 import z from "zod"
 
@@ -104,6 +104,7 @@ export namespace Ripgrep {
       platform: "aarch64-unknown-linux-gnu",
       extension: "tar.gz",
     },
+    "arm64-win32": { platform: "aarch64-pc-windows-msvc", extension: "zip" },
     "x64-darwin": { platform: "x86_64-apple-darwin", extension: "tar.gz" },
     "x64-linux": { platform: "x86_64-unknown-linux-musl", extension: "tar.gz" },
     "x64-win32": { platform: "x86_64-pc-windows-msvc", extension: "zip" },

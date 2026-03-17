@@ -1,9 +1,25 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 
 import type { UseChatInputOptions } from '@/components/chat/input/types';
+import type { LexicalEditor } from 'lexical';
+
+const { mockCompressImage } = vi.hoisted(() => ({
+  mockCompressImage: vi.fn(() =>
+    Promise.resolve({
+      mimeType: 'image/png',
+      data: 'compressed-image-data',
+    })
+  ),
+}));
+
+vi.mock('@/lib/utils/image-utils', () => ({
+  compressImage: mockCompressImage,
+}));
 
 import { useChatInput } from '@/components/chat/input/use-chat-input';
+import { useBackendStore } from '@/stores/backend/backend-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
+import { useOcProviderStore } from '@/stores/opencode';
 
 vi.mock('@/stores/agent', () => {
   const fetchCommands = vi.fn(() => Promise.resolve());
@@ -61,8 +77,54 @@ function createOptions(overrides: Partial<UseChatInputOptions> = {}): UseChatInp
 describe('useChatInput pending file chips', () => {
   beforeEach(() => {
     usePendingContextStore.setState({ pending: [] });
+    useBackendStore.setState({ activeBackend: 'claude' });
+    useOcProviderStore.getState().clear();
+    useOcProviderStore.setState({
+      providers: [
+        {
+          id: 'ollama',
+          name: 'Ollama',
+          env: [],
+          models: {
+            vision: {
+              id: 'vision',
+              name: 'Vision',
+              supportsImageInput: true,
+            },
+            text: {
+              id: 'text',
+              name: 'Text',
+              supportsImageInput: false,
+            },
+          },
+        },
+      ],
+      selectedProviderId: 'ollama',
+      selectedModelId: 'vision',
+      selectedAgent: 'build',
+    });
+    mockCompressImage.mockClear();
     vi.clearAllMocks();
   });
+
+  async function attachImage(result: { current: ReturnType<typeof useChatInput> }): Promise<void> {
+    const file = new File(['binary'], 'test.png', { type: 'image/png' });
+
+    act(() => {
+      result.current.handleImageSelect({
+        target: {
+          files: [file],
+          value: 'test.png',
+        },
+      } as never);
+    });
+
+    await waitFor(() => {
+      expect(result.current.attachedContext).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: 'image', name: 'test.png' })])
+      );
+    });
+  }
 
   it('drains pending store chips into attached context', async () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
@@ -109,15 +171,11 @@ describe('useChatInput pending file chips', () => {
 
   it('focuses input after adding chips', async () => {
     const { result } = renderHook(() => useChatInput(createOptions()));
-    const input = document.createElement('div');
     const focusSpy = vi.fn();
-    Object.defineProperty(input, 'focus', {
-      value: focusSpy,
-      writable: true,
-    });
+    const editor = { focus: focusSpy } as unknown as LexicalEditor;
 
     act(() => {
-      (result.current.inputRef as { current: HTMLDivElement | null }).current = input;
+      result.current.editorRef.current = editor;
       usePendingContextStore
         .getState()
         .enqueueFileChip({ path: '/repo/a.ts', name: 'a.ts', isDirectory: false });
@@ -148,6 +206,89 @@ describe('useChatInput pending file chips', () => {
         expect.objectContaining({ type: 'file', path: '/repo/a.ts' }),
         expect.objectContaining({ type: 'folder', path: '/repo/src' }),
       ])
+    );
+  });
+
+  it('cycles OpenCode agent mode on Shift+Tab', () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    const onModeChange = vi.fn();
+    const { result } = renderHook(() => useChatInput(createOptions({ onModeChange })));
+
+    act(() => {
+      result.current.handleShiftTab();
+    });
+
+    expect(onModeChange).not.toHaveBeenCalled();
+    expect(useOcProviderStore.getState().selectedAgent).toBe('plan');
+  });
+
+  it('wraps OpenCode agent mode from explore back to build on Shift+Tab', () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    useOcProviderStore.setState({ selectedAgent: 'explore' });
+    const { result } = renderHook(() => useChatInput(createOptions()));
+
+    act(() => {
+      result.current.handleShiftTab();
+    });
+
+    expect(useOcProviderStore.getState().selectedAgent).toBe('build');
+  });
+
+  it('clears attached images when the active OpenCode model switches to unsupported', async () => {
+    useBackendStore.setState({ activeBackend: 'opencode' });
+    const { result } = renderHook(() => useChatInput(createOptions()));
+
+    await attachImage(result);
+
+    act(() => {
+      useOcProviderStore.setState({ selectedModelId: 'text' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.attachedContext).toEqual([]);
+    });
+  });
+
+  it('does not clear Claude image chips when switching into an unsupported OpenCode backend', async () => {
+    const { result } = renderHook(() => useChatInput(createOptions()));
+
+    await attachImage(result);
+
+    act(() => {
+      useOcProviderStore.setState({ selectedModelId: 'text' });
+      useBackendStore.setState({ activeBackend: 'opencode' });
+    });
+
+    await waitFor(() => {
+      expect(result.current.attachedContext).toEqual(
+        expect.arrayContaining([expect.objectContaining({ type: 'image', name: 'test.png' })])
+      );
+    });
+  });
+
+  it('sends image-only messages without requiring text input', async () => {
+    const onSend = vi.fn();
+    const { result } = renderHook(() => useChatInput(createOptions({ onSend })));
+
+    await attachImage(result);
+
+    act(() => {
+      result.current.handleSend();
+    });
+
+    expect(onSend).toHaveBeenCalledWith(
+      '',
+      undefined,
+      [
+        {
+          name: 'test.png',
+          mimeType: 'image/png',
+          data: 'compressed-image-data',
+          previewUrl: 'data:image/png;base64,compressed-image-data',
+        },
+      ],
+      undefined,
+      undefined
     );
   });
 });

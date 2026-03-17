@@ -5,7 +5,7 @@
  * Only one tab is visible at a time. Each file is rendered as an
  * expandable DiffFileCard showing the inline diff on click.
  */
-import { Check, Minus, Plus } from 'lucide-react';
+import { Check, CircleDashed, Minus, Plus } from 'lucide-react';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 
@@ -122,62 +122,70 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   return (
     <div>
       {/* Tab bar */}
-      <div className="flex items-center gap-0.5 px-1.5 h-[34px]">
-        {/* Staged tab */}
-        <button
-          onClick={() => {
-            setActiveTab('staged');
-          }}
-          className={cn(
-            'flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs tracking-wide',
-            '',
-            activeTab === 'staged'
-              ? 'bg-lg-control text-foreground font-medium'
-              : 'text-foreground hover:text-foreground hover:bg-lg-control-hover'
-          )}
-        >
-          Staged
-          {stagedFiles.length > 0 ? (
-            <span
-              className={cn(
-                'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'staged'
-                  ? 'bg-foreground/10 text-foreground/80'
-                  : 'text-lg-text-secondary'
-              )}
-            >
-              {stagedFiles.length}
-            </span>
-          ) : null}
-        </button>
+      <div className="flex items-center gap-2 px-1.5 h-[34px]">
+        {/* Pill toggle */}
+        <div className="relative grid grid-cols-2 rounded-full bg-foreground/[0.05] p-1">
+          {/* Sliding indicator */}
+          <div
+            className="absolute inset-y-1 left-1 w-[calc((100%-8px)/2)] rounded-full bg-foreground shadow-sm transition-transform duration-200 ease-out"
+            style={{
+              transform: `translateX(${activeTab === 'staged' ? '0%' : '100%'})`,
+            }}
+          />
+          {/* Staged tab */}
+          <button
+            onClick={() => {
+              setActiveTab('staged');
+            }}
+            className={cn(
+              'relative z-10 flex items-center justify-center gap-1.5 rounded-full transition-colors duration-150 h-6 px-3 text-xs font-medium',
+              activeTab === 'staged'
+                ? 'text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Staged
+            {stagedFiles.length > 0 ? (
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center min-w-[14px] h-3.5 px-1 rounded-full text-[9px] font-semibold tabular-nums',
+                  activeTab === 'staged'
+                    ? 'bg-background/20 text-background'
+                    : 'bg-foreground/8 text-muted-foreground'
+                )}
+              >
+                {stagedFiles.length}
+              </span>
+            ) : null}
+          </button>
 
-        {/* Changes tab */}
-        <button
-          onClick={() => {
-            setActiveTab('changes');
-          }}
-          className={cn(
-            'flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs tracking-wide',
-            '',
-            activeTab === 'changes'
-              ? 'bg-lg-control text-foreground font-medium'
-              : 'text-foreground hover:text-foreground hover:bg-lg-control-hover'
-          )}
-        >
-          Changes
-          {unstagedFiles.length > 0 ? (
-            <span
-              className={cn(
-                'inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded text-[9px] font-semibold tabular-nums',
-                activeTab === 'changes'
-                  ? 'bg-foreground/10 text-foreground/80'
-                  : 'text-lg-text-secondary'
-              )}
-            >
-              {unstagedFiles.length}
-            </span>
-          ) : null}
-        </button>
+          {/* Changes tab */}
+          <button
+            onClick={() => {
+              setActiveTab('changes');
+            }}
+            className={cn(
+              'relative z-10 flex items-center justify-center gap-1.5 rounded-full transition-colors duration-150 h-6 px-3 text-xs font-medium',
+              activeTab === 'changes'
+                ? 'text-background'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            Changes
+            {unstagedFiles.length > 0 ? (
+              <span
+                className={cn(
+                  'inline-flex items-center justify-center min-w-[14px] h-3.5 px-1 rounded-full text-[9px] font-semibold tabular-nums',
+                  activeTab === 'changes'
+                    ? 'bg-background/20 text-background'
+                    : 'bg-foreground/8 text-muted-foreground'
+                )}
+              >
+                {unstagedFiles.length}
+              </span>
+            ) : null}
+          </button>
+        </div>
 
         <div className="flex-1" />
 
@@ -186,7 +194,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
           <button
             onClick={() => void activeBulkAction()}
             disabled={isStaging}
-            className="flex items-center gap-1 px-2 h-6 rounded-[9px] text-xs text-foreground hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-transform duration-75"
+            className="flex items-center gap-1 px-2.5 h-6 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-lg-control-hover active:scale-95 transition-[background-color,color,transform] duration-150"
             aria-label={isStaged ? 'Unstage all files' : 'Stage all files'}
           >
             {isStaged ? <Minus className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
@@ -221,8 +229,34 @@ export const ChangesList: React.FC<ChangesListProps> = ({
             <div className="px-3 py-4 text-xs text-lg-text-secondary">Loading changes...</div>
           )
         ) : (
-          <div className="px-3 py-4 text-center text-xs text-lg-text-secondary">
-            {isStaged ? 'No staged changes' : 'No unstaged changes'}
+          <div className="flex flex-col items-center gap-2 px-3 py-10 text-center">
+            {isStaged ? (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-foreground/[0.07] dark:bg-foreground/[0.04]">
+                  <CircleDashed
+                    className="h-4 w-4 text-muted-foreground/50 dark:text-muted-foreground/30"
+                    aria-hidden="true"
+                  />
+                </div>
+                <div>
+                  <p className="text-[12px] font-medium text-muted-foreground/70 dark:text-muted-foreground/50">
+                    No staged changes
+                  </p>
+                  <p className="text-[11px] text-muted-foreground/50 dark:text-muted-foreground/30 mt-0.5">
+                    Use + to stage files for commit
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-success/15 dark:bg-success/10">
+                  <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                </div>
+                <p className="text-[12px] font-medium text-muted-foreground/70 dark:text-muted-foreground/50">
+                  All changes staged
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

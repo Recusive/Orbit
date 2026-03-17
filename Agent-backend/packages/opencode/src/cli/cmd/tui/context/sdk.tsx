@@ -1,10 +1,10 @@
-import { createOpencodeClient  } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 import { createGlobalEmitter } from "@solid-primitives/event-bus"
 import { batch, onCleanup, onMount } from "solid-js"
 
 import { createSimpleContext } from "./helper"
 
-import type {Event} from "@opencode-ai/sdk/v2";
+import type { Event } from "@orbit.build/sdk/v2"
 
 export interface EventSource {
   on: (handler: (event: Event) => void) => () => void
@@ -88,7 +88,9 @@ export const { use: useSDK, provider: SDKProvider } = createSimpleContext({
           if (timer) clearTimeout(timer)
           if (queue.length > 0) flush()
         }
-      })().catch(() => { /* noop */ })
+      })().catch(() => {
+        /* noop */
+      })
     }
 
     onMount(() => {

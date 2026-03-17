@@ -91,7 +91,7 @@ function resetStores(): void {
     rewindEpoch: 0,
     conversationLoadEpoch: 0,
     loadedSessions: {},
-    compactingMessageId: null,
+    activeCompactions: {},
     lruOrder: [],
   });
   useUIStore.setState({

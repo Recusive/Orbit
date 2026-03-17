@@ -1,11 +1,11 @@
 import os from "os"
 import path from "path"
 
-import { NamedError } from "@opencode-ai/util/error"
-import {  parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
+import { NamedError } from "@orbit.build/util/error"
+import { parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
 import z from "zod"
 
-import type {ParseError as JsoncParseError} from "jsonc-parser";
+import type { ParseError as JsoncParseError } from "jsonc-parser"
 
 import { Flag } from "@/flag/flag"
 import { Global } from "@/global"
@@ -145,7 +145,11 @@ export namespace ConfigPaths {
   }
 
   /** Substitute and parse JSONC text, throwing JsonError on syntax errors. */
-  export async function parseText(text: string, input: ParseSource, missing: "error" | "empty" = "error"): Promise<unknown> {
+  export async function parseText(
+    text: string,
+    input: ParseSource,
+    missing: "error" | "empty" = "error",
+  ): Promise<unknown> {
     const configSource = source(input)
     text = await substitute(text, input, missing)
 

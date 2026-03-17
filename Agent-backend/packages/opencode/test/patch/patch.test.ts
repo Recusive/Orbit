@@ -6,7 +6,6 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 
 import { Patch } from "../../src/patch"
 
-
 describe("Patch namespace", () => {
   let tempDir: string
 

@@ -6,7 +6,6 @@ import type { JSX } from "solid-js"
 export function DialogSubagent(props: { sessionID: string }): JSX.Element {
   const route = useRoute()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <DialogSelect
       title="Subagent Actions"

@@ -165,7 +165,14 @@ export namespace JsonMigration {
 
     function insert(
       values: Record<string, unknown>[],
-      table: typeof ProjectTable | typeof SessionTable | typeof MessageTable | typeof PartTable | typeof TodoTable | typeof PermissionTable | typeof SessionShareTable,
+      table:
+        | typeof ProjectTable
+        | typeof SessionTable
+        | typeof MessageTable
+        | typeof PartTable
+        | typeof TodoTable
+        | typeof PermissionTable
+        | typeof SessionShareTable,
       label: string,
     ): number {
       if (values.length === 0) return 0
@@ -405,7 +412,8 @@ export namespace JsonMigration {
             typeof todo.content !== "string" ||
             typeof todo.status !== "string" ||
             typeof todo.priority !== "string"
-          ) continue
+          )
+            continue
           values.push({
             session_id: sessionID,
             content: todo.content,

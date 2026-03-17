@@ -5,7 +5,7 @@ import { Instance } from "../../src/project/instance"
 import { tmpdir } from "../fixture/fixture"
 
 import type { AgentSideConnection } from "@agentclientprotocol/sdk"
-import type { Event, EventMessagePartUpdated, ToolStatePending, ToolStateRunning } from "@opencode-ai/sdk/v2"
+import type { Event, EventMessagePartUpdated, ToolStatePending, ToolStateRunning } from "@orbit.build/sdk/v2"
 
 type SessionUpdateParams = Parameters<AgentSideConnection["sessionUpdate"]>[0]
 type RequestPermissionParams = Parameters<AgentSideConnection["requestPermission"]>[0]
@@ -112,7 +112,13 @@ function createEventStream(): {
       const value = await new Promise<GlobalEventEnvelope | undefined>((resolve) => {
         waiters.push(resolve)
         if (!signal) return
-        signal.addEventListener("abort", () => { resolve(undefined) }, { once: true })
+        signal.addEventListener(
+          "abort",
+          () => {
+            resolve(undefined)
+          },
+          { once: true },
+        )
       })
       if (!value) return
       yield value

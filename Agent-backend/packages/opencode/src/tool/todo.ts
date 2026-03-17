@@ -1,5 +1,6 @@
 import z from "zod"
 
+import { SessionID } from "../session/schema"
 import { Todo } from "../session/todo"
 
 import DESCRIPTION_WRITE from "./todowrite.txt"
@@ -19,7 +20,7 @@ export const TodoWriteTool = Tool.define("todowrite", {
     })
 
     Todo.update({
-      sessionID: ctx.sessionID,
+      sessionID: SessionID.make(ctx.sessionID),
       todos: params.todos,
     })
     return {
@@ -43,7 +44,7 @@ export const TodoReadTool = Tool.define("todoread", {
       metadata: {},
     })
 
-    const todos = Todo.get(ctx.sessionID)
+    const todos = Todo.get(SessionID.make(ctx.sessionID))
     return {
       title: `${String(todos.filter((x) => x.status !== "completed").length)} todos`,
       metadata: {

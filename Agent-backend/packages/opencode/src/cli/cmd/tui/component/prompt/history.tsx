@@ -5,7 +5,7 @@ import { createStore, produce, unwrap } from "solid-js/store"
 
 import { createSimpleContext } from "../../context/helper"
 
-import type { AgentPart, FilePart, TextPart } from "@opencode-ai/sdk/v2"
+import type { AgentPart, FilePart, TextPart } from "@orbit.build/sdk/v2"
 
 import { Global } from "@/global"
 import { Filesystem } from "@/util/filesystem"
@@ -60,7 +60,9 @@ const _historyContext = createSimpleContext({
       // Rewrite file with only valid entries to self-heal corruption
       if (lines.length > 0) {
         const content = lines.map((line) => JSON.stringify(line)).join("\n") + "\n"
-        writeFile(historyPath, content).catch(() => { /* noop */ })
+        writeFile(historyPath, content).catch(() => {
+          /* noop */
+        })
       }
     })()
 
@@ -100,11 +102,15 @@ const _historyContext = createSimpleContext({
 
         if (willTrim) {
           const content = store.history.map((line) => JSON.stringify(line)).join("\n") + "\n"
-          writeFile(historyPath, content).catch(() => { /* noop */ })
+          writeFile(historyPath, content).catch(() => {
+            /* noop */
+          })
           return
         }
 
-        appendFile(historyPath, JSON.stringify(entry) + "\n").catch(() => { /* noop */ })
+        appendFile(historyPath, JSON.stringify(entry) + "\n").catch(() => {
+          /* noop */
+        })
       },
     }
   },

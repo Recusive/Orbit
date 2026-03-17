@@ -1,10 +1,10 @@
 import { TextAttributes } from "@opentui/core"
 import { useKeyboard } from "@opentui/solid"
-import { onMount  } from "solid-js"
+import { onMount } from "solid-js"
 
 import { useTheme } from "../context/theme"
 
-import { useDialog  } from "./dialog"
+import { useDialog } from "./dialog"
 
 import type { DialogContext } from "./dialog"
 import type { TextareaRenderable } from "@opentui/core"
@@ -19,7 +19,6 @@ export interface DialogPromptProps {
   onCancel?: () => void
 }
 
- 
 export function DialogPrompt(props: DialogPromptProps): JSX.Element {
   const dialog = useDialog()
   const { theme } = useTheme()
@@ -40,14 +39,18 @@ export function DialogPrompt(props: DialogPromptProps): JSX.Element {
     textarea.gotoLineEnd()
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -76,14 +79,28 @@ export function DialogPrompt(props: DialogPromptProps): JSX.Element {
   )
 }
 
-DialogPrompt.show = (dialog: DialogContext, title: string, options?: Omit<DialogPromptProps, "title">): Promise<string | null> => {
+DialogPrompt.show = (
+  dialog: DialogContext,
+  title: string,
+  options?: Omit<DialogPromptProps, "title">,
+): Promise<string | null> => {
   return new Promise<string | null>((resolve) => {
     dialog.replace(
       () => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
-        <DialogPrompt title={title} {...options} onConfirm={(value) => { resolve(value); }} onCancel={() => { resolve(null); }} />
+        <DialogPrompt
+          title={title}
+          {...options}
+          onConfirm={(value) => {
+            resolve(value)
+          }}
+          onCancel={() => {
+            resolve(null)
+          }}
+        />
       ),
-      () => { resolve(null); },
+      () => {
+        resolve(null)
+      },
     )
   })
 }

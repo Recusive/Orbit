@@ -1,8 +1,10 @@
 # Content Security Policy (CSP) Configuration
 
-> **Last Updated:** January 2026
+> **Last Updated:** March 2026
 
 This document explains Orbit's CSP configuration in `src-tauri/tauri.conf.json`.
+Production builds enforce this policy inside the packaged WebView. `bunx tauri dev`
+is useful for iteration, but it is not the authoritative CSP validation path.
 
 ## Current CSP Settings
 
@@ -11,134 +13,62 @@ This document explains Orbit's CSP configuration in `src-tauri/tauri.conf.json`.
   "security": {
     "csp": {
       "default-src": "'self'",
-      "script-src": "'self' 'unsafe-eval' https://streamdown.ai",
-      "style-src": "'self' 'unsafe-inline' https://streamdown.ai",
-      "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai",
-      "img-src": "'self' data: blob:",
+      "script-src": "'self' 'unsafe-eval' https://streamdown.ai http://localhost:5176 http://localhost:5199",
+      "style-src": "'self' 'unsafe-inline' https://streamdown.ai http://localhost:*",
+      "connect-src": "'self' https://api.anthropic.com ipc://localhost https://streamdown.ai http://localhost:* http://127.0.0.1:* ws://localhost:* https://github.com https://*.githubusercontent.com",
+      "img-src": "'self' data: blob: asset: http://asset.localhost",
       "font-src": "'self' data: https://streamdown.ai",
-      "frame-src": "'none'",
+      "worker-src": "'self' blob:",
+      "frame-src": "'self' http://localhost:*",
       "object-src": "'none'"
     }
   }
 }
 ```
 
-## Streamdown 2.1.0 Update
+## Loopback Origin Contract
 
-**As of streamdown 2.1.0** (January 2026), the library moved to a **plugin architecture**:
+Orbit currently needs both `localhost` and `127.0.0.1` in CSP.
 
-- Mermaid support requires `@streamdown/mermaid` plugin
-- Mermaid is **bundled locally** - no CDN loading needed
-- The `cdnUrl` prop was removed
-- Dynamic `new Function()` imports are no longer used for Mermaid
+- The OpenCode frontend client uses `http://127.0.0.1:{port}` as its base URL.
+- The Rust backend binds OpenCode to `127.0.0.1` and performs health/dispose calls against
+  `http://127.0.0.1:{port}`.
+- CSP treats `http://localhost:*` and `http://127.0.0.1:*` as different origins. Allowing one
+  does not allow the other.
+- `http://localhost:*` remains necessary for local development and other localhost-based tooling.
+- `http://127.0.0.1:*` is required for the current OpenCode HTTP + SSE transport in production.
 
-### CSP Simplification Opportunity
+If OpenCode later moves to WebSockets on `127.0.0.1`, add `ws://127.0.0.1:*` to `connect-src`
+as well. The current policy only allows `ws://localhost:*`.
 
-With streamdown 2.1.0 + `@streamdown/mermaid`:
+## Directive Notes
 
-- `https://streamdown.ai` in CSP may no longer be necessary
-- `'unsafe-eval'` may no longer be required
+| Directive     | Value / Examples                                                                           | Purpose                                                        |
+| ------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `script-src`  | `'unsafe-eval'`, `https://streamdown.ai`, `http://localhost:5176`, `http://localhost:5199` | Streamdown runtime support plus local dev servers              |
+| `style-src`   | `'unsafe-inline'`, `https://streamdown.ai`, `http://localhost:*`                           | Tailwind/runtime styles and local dev stylesheets              |
+| `connect-src` | `ipc://localhost`, `https://api.anthropic.com`, `http://localhost:*`, `http://127.0.0.1:*` | Tauri IPC, Anthropic API, local HTTP/SSE backends, dev tooling |
+| `img-src`     | `data:`, `blob:`, `asset:`, `http://asset.localhost`                                       | Inline images, screenshots, Tauri asset protocol               |
+| `font-src`    | `data:`, `https://streamdown.ai`                                                           | Streamdown-provided fonts                                      |
+| `worker-src`  | `blob:`                                                                                    | Browser workers created from bundled code                      |
+| `frame-src`   | `'self'`, `http://localhost:*`                                                             | Local preview/dev frames                                       |
+| `object-src`  | `'none'`                                                                                   | Disables legacy plugin/embed content                           |
 
-**Note:** Keeping current CSP for backwards compatibility and future features. Can be simplified after thorough testing.
+## Why `'unsafe-eval'` Still Exists
 
-## Historical Context: Why `'unsafe-eval'` Was Added
+Orbit still keeps `'unsafe-eval'` in `script-src` because Streamdown 2.x historically relied on
+runtime evaluation for CDN-loaded markdown features. Even though the newer plugin architecture may
+allow future simplification, this fix does not change that part of the policy.
 
-### Root Cause (streamdown 2.0.x)
+## Regression Guard
 
-The `streamdown` library (v2.0.0-2.0.1) used `new Function()` for dynamic CDN imports:
-
-```typescript
-// From: node_modules/streamdown/lib/mermaid/utils.ts (line 19-22)
-// Using Function constructor to create an indirect import that bundlers won't analyze
-const dynamicImport = new Function('url', 'return import(url)') as (
-  url: string
-) => Promise<typeof import('mermaid')>;
-```
-
-### Version History
-
-| Version           | Bundle Strategy               | CSP Requirement                    |
-| ----------------- | ----------------------------- | ---------------------------------- |
-| streamdown 1.x    | Everything bundled statically | No `unsafe-eval` needed            |
-| streamdown 2.0.x  | 98% smaller bundle via CDN    | **Requires `unsafe-eval`**         |
-| streamdown 2.1.0+ | Plugin architecture           | May not need `unsafe-eval` anymore |
-
-Streamdown 2.0 reduced bundle size by loading Mermaid/KaTeX assets from `https://streamdown.ai/cdn` at runtime. To bypass bundler static analysis (Vite/Webpack), they used `new Function()` which is functionally equivalent to `eval()`.
-
-### References
-
-- **Streamdown repo:** <https://github.com/vercel/streamdown>
-- **Changelog:** See `packages/streamdown/CHANGELOG.md` in the repo
-- **Key commit:** `75faa2e` - "Reduce bundle size by 98%, create Streamdown CDN"
-
-## Security Risk Assessment
-
-### Threat Model: Web App vs Desktop App
-
-| Attack Vector                 | Web App Risk | Orbit (Desktop) Risk                       |
-| ----------------------------- | ------------ | ------------------------------------------ |
-| XSS injection                 | **HIGH**     | **VERY LOW** - No untrusted HTML rendered  |
-| Third-party script compromise | **HIGH**     | **LOW** - Only Vercel CDN (trusted)        |
-| User input to eval            | **MEDIUM**   | **NONE** - Chat is markdown, not executed  |
-| Local attacker                | N/A          | CSP irrelevant if local access compromised |
-
-### What Uses `eval()` in Orbit
-
-Only streamdown's CDN loader:
-
-- Loads Mermaid/KaTeX assets from `https://streamdown.ai/cdn`
-- **No user input ever reaches these code paths**
-
-### Attack Surface Analysis
-
-```text
-Untrusted Input Sources in Orbit:
-├── Claude API responses    → Rendered as markdown, NOT eval'd
-├── Local files             → Displayed in CodeMirror, NOT eval'd
-├── Terminal output         → Text rendering only, NOT eval'd
-└── User chat input         → Sent to API, NOT eval'd locally
-
-Code paths using eval (with unsafe-eval):
-└── Streamdown CDN loader
-    └── Hardcoded URLs only (https://streamdown.ai/cdn)
-    └── No user input flows here
-```
-
-**Conclusion:** No path exists from untrusted input to `eval()` execution.
-
-## Alternatives Considered
-
-| Option                          | Pros                                       | Cons                                          |
-| ------------------------------- | ------------------------------------------ | --------------------------------------------- |
-| **Keep `unsafe-eval`** (chosen) | Works with streamdown 2.x, smaller bundles | Slightly reduced CSP strictness               |
-| Downgrade to streamdown 1.x     | No CSP changes needed                      | 98% larger bundle, no security updates        |
-| Replace streamdown              | Full CSP compliance                        | Significant refactor, lose streaming features |
-| Self-host CDN assets            | No external CDN dependency                 | Complex setup, may still need eval            |
-
-## Other CSP Directives Explained
-
-| Directive     | Value                       | Purpose                                       |
-| ------------- | --------------------------- | --------------------------------------------- |
-| `script-src`  | `https://streamdown.ai`     | Streamdown CDN for Mermaid/KaTeX assets       |
-| `style-src`   | `https://streamdown.ai`     | Streamdown CSS assets                         |
-| `style-src`   | `'unsafe-inline'`           | Required for Tailwind/CSS-in-JS               |
-| `connect-src` | `ipc://localhost`           | Tauri's internal WebView to Rust IPC protocol |
-| `connect-src` | `https://api.anthropic.com` | Claude API calls                              |
-| `connect-src` | `https://streamdown.ai`     | Streamdown CDN fetch requests                 |
-| `font-src`    | `https://streamdown.ai`     | Streamdown font assets                        |
-| `img-src`     | `data: blob:`               | Inline images, screenshots, file previews     |
-| `frame-src`   | `'none'`                    | No iframes allowed (security hardening)       |
-| `object-src`  | `'none'`                    | No plugins/embeds (security hardening)        |
-
-## Recommendations
-
-1. **Pin streamdown version** - Use exact version (`"streamdown": "2.0.1"`) instead of caret (`^2.0.1`)
-2. **Audit updates** - Review streamdown changelogs before upgrading
-3. **Monitor for CSP-safe alternatives** - If streamdown adds a no-eval mode, consider switching
+`src-tauri/tests/csp_config.rs` parses `tauri.conf.json` and asserts that `connect-src` contains
+`http://127.0.0.1:*`. This catches production-only regressions where OpenCode's loopback host and
+the packaged WebView CSP drift out of sync.
 
 ## Changelog
 
-- **January 2026:** Upgraded streamdown to 2.1.0 with `@streamdown/mermaid` plugin - Mermaid now bundled locally, CSP can potentially be simplified
-- **January 2026:** Added `https://streamdown.ai` to CSP directives (script-src, style-src, connect-src, font-src) for Mermaid/KaTeX CDN assets
-- **January 2026:** Added `'unsafe-eval'` after upgrading streamdown 1.6.11 to 2.0.1
+- **March 2026:** Added `http://127.0.0.1:*` to `connect-src` for the OpenCode production transport
+- **January 2026:** Added `https://streamdown.ai` to CSP directives for Streamdown assets
+- **January 2026:** Added `'unsafe-eval'` after upgrading Streamdown 1.6.11 to 2.0.1
 - **January 2026:** Added `ipc://localhost` to `connect-src` for Tauri IPC

@@ -35,21 +35,32 @@ export function Footer(): JSX.Element {
       if (connected()) return
       if (!store.welcome) {
         setStore("welcome", true)
-        timeouts.push(setTimeout(() => { tick(); }, 5000))
+        timeouts.push(
+          setTimeout(() => {
+            tick()
+          }, 5000),
+        )
         return
       }
 
       setStore("welcome", false)
-      timeouts.push(setTimeout(() => { tick(); }, 10_000))
+      timeouts.push(
+        setTimeout(() => {
+          tick()
+        }, 10_000),
+      )
     }
-    timeouts.push(setTimeout(() => { tick(); }, 10_000))
+    timeouts.push(
+      setTimeout(() => {
+        tick()
+      }, 10_000),
+    )
 
     onCleanup(() => {
       timeouts.forEach(clearTimeout)
     })
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box flexDirection="row" justifyContent="space-between" gap={1} flexShrink={0}>
       <text fg={theme.textMuted}>{directory()}</text>

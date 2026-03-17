@@ -13,6 +13,10 @@ import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
 import { serializeThinkingBlocks } from '@/lib/mappers';
 import { chatMessageService } from '@/services/chat/chat-message-service';
+import {
+  buildOptimisticAttachedImages,
+  cacheAttachedImagesForMessage,
+} from '@/services/chat/image-attachment-cache';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
@@ -27,6 +31,11 @@ import { useUIStore } from '@/stores/ui/ui-store';
  */
 interface ChatActionsDeps {
   postMessage: (message: WebviewMessage) => void;
+}
+
+interface ChatOpenHandlers {
+  handleOpenFile: (path: string) => void;
+  handleOpenUrl: (url: string) => void;
 }
 
 interface ChatActionsReturn {
@@ -55,6 +64,7 @@ interface ChatActionsReturn {
 
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   const { postMessage } = deps;
+  const { handleOpenFile, handleOpenUrl } = createChatOpenHandlers(deps);
 
   /**
    * [warning] TESTED: Send-time title generation in this action creator is covered by
@@ -68,7 +78,18 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     elements?: ReactElementContext[],
     skills?: string[]
   ): void => {
-    if (!text) return;
+    const sendableImages = (images ?? []).flatMap((image) =>
+      image.data
+        ? [
+            {
+              name: image.name,
+              mimeType: image.mimeType,
+              data: image.data,
+            },
+          ]
+        : []
+    );
+    if (!text && sendableImages.length === 0) return;
 
     const uiState = useUIStore.getState();
     const { workspacePath, activeWorktreePath, conversations } = uiState;
@@ -142,7 +163,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           postMessage({
             type: 'conversation:create',
             uuid: crypto.randomUUID(),
-            title: generateFallbackTitle(text),
+            title: generateFallbackTitle(text || 'Image conversation'),
             workspace_path: workspacePath ?? undefined,
             worktree_path: activeWorktreePath ?? undefined,
           });
@@ -152,8 +173,8 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // If first message but conversation exists (created via "New conversation" button),
         // update the title from "Untitled" to the message text
         if (messages.length === 0 && conversationExists) {
-          applySessionTitle(sessionId, generateFallbackTitle(text));
-          generateAITitle(sessionId, text);
+          applySessionTitle(sessionId, generateFallbackTitle(text || 'Image conversation'));
+          generateAITitle(sessionId, text || 'Image conversation');
         }
 
         // Always send current thinking mode and model BEFORE message:send
@@ -187,18 +208,20 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         const lastMessage = messages[messages.length - 1];
         const parentUuid = forkPoint ?? lastMessage?.id ?? null;
 
+        const optimisticImages = buildOptimisticAttachedImages(images);
         const userMessage: ChatMessage = {
           id: crypto.randomUUID(),
           role: 'user',
           content: text,
           displayedContent: text,
           attachedFiles: hasMergedContextFiles ? mergedContextFiles : undefined,
-          attachedImages: images,
+          attachedImages: optimisticImages,
           parentUuid,
         };
 
         // Write to ChatStore (not React setState)
         useChatStore.getState().addMessage(sessionId, userMessage);
+        cacheAttachedImagesForMessage(sessionId, userMessage.id, images);
         useChatStore.getState().setAgentRunning(sessionId, true);
 
         // Persist user message to backend
@@ -217,19 +240,13 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Build context object with files, images, and/or elements
         const hasFiles = hasMergedContextFiles;
-        const hasImages = images && images.length > 0;
+        const hasImages = sendableImages.length > 0;
         const hasElements = elements && elements.length > 0;
         const context =
           hasFiles || hasImages || hasElements
             ? {
                 files: hasFiles ? mergedContextFiles : undefined,
-                images: hasImages
-                  ? images.map((img) => ({
-                      name: img.name,
-                      mimeType: img.mimeType,
-                      data: img.data,
-                    }))
-                  : undefined,
+                images: hasImages ? sendableImages : undefined,
                 elements: hasElements ? elements : undefined,
               }
             : undefined;
@@ -551,30 +568,6 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     }
   };
 
-  const handleOpenFile = (path: string): void => {
-    const fileViewerStore = useFileViewerStore.getState();
-    fileViewerStore.openFile(path);
-
-    const uiState = useUIStore.getState();
-    if (!uiState.reviewPanelOpen) {
-      uiState.toggleReviewPanel();
-    }
-
-    postMessage({
-      type: 'file:read',
-      uuid: crypto.randomUUID(),
-      path,
-    });
-  };
-
-  const handleOpenUrl = (url: string): void => {
-    postMessage({
-      type: 'url:open',
-      uuid: crypto.randomUUID(),
-      url,
-    });
-  };
-
   const handleModeChange = (mode: 'default' | 'plan' | 'accept'): void => {
     useToolStore.getState().setInputMode(mode);
     const sessionId = useChatStore.getState().activeSessionId ?? '';
@@ -639,5 +632,38 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
     handleThinkingModeChange,
     handleEffortLevelChange,
     handleModelChange,
+  };
+}
+
+export function createChatOpenHandlers(deps: ChatActionsDeps): ChatOpenHandlers {
+  const { postMessage } = deps;
+
+  const handleOpenFile = (path: string): void => {
+    const fileViewerStore = useFileViewerStore.getState();
+    fileViewerStore.openFile(path);
+
+    const uiState = useUIStore.getState();
+    if (!uiState.reviewPanelOpen) {
+      uiState.toggleReviewPanel();
+    }
+
+    postMessage({
+      type: 'file:read',
+      uuid: crypto.randomUUID(),
+      path,
+    });
+  };
+
+  const handleOpenUrl = (url: string): void => {
+    postMessage({
+      type: 'url:open',
+      uuid: crypto.randomUUID(),
+      url,
+    });
+  };
+
+  return {
+    handleOpenFile,
+    handleOpenUrl,
   };
 }

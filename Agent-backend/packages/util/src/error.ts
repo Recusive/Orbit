@@ -1,7 +1,10 @@
 import z from "zod"
 
 interface NamedErrorClass<Name extends string, Data extends z.core.$ZodType> {
-  new (data: z.input<Data>, options?: ErrorOptions): NamedError & {
+  new (
+    data: z.input<Data>,
+    options?: ErrorOptions,
+  ): NamedError & {
     readonly data: z.input<Data>
     readonly name: Name
   }

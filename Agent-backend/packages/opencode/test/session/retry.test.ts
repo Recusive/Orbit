@@ -1,13 +1,14 @@
 import { setTimeout as sleep } from "node:timers/promises"
 
+import type { NamedError } from "@orbit.build/util/error"
 import { APICallError } from "ai"
 import { describe, expect, test } from "bun:test"
 
+import { ProviderID } from "../../src/provider/schema"
 import { MessageV2 } from "../../src/session/message-v2"
 import { SessionRetry } from "../../src/session/retry"
 
-import type { NamedError } from "@opencode-ai/util/error"
-
+const providerID = ProviderID.make("test")
 
 function apiError(headers?: Record<string, string>): MessageV2.APIError {
   return new MessageV2.APIError({
@@ -74,7 +75,7 @@ describe("session.retry.delay", () => {
     const controller = new AbortController()
 
     const warnings: string[] = []
-    const originalWarn = process.emitWarning.bind(process)
+    const originalWarn = process.emitWarning
     process.emitWarning = (warning: string | Error) => {
       warnings.push(typeof warning === "string" ? warning : warning.message)
     }
@@ -84,7 +85,7 @@ describe("session.retry.delay", () => {
 
     try {
       await promise
-    } catch { /* expected abort error */ }
+    } catch {}
 
     process.emitWarning = originalWarn
     expect(warnings.some((w) => w.includes("TimeoutOverflowWarning"))).toBe(false)
@@ -110,7 +111,7 @@ describe("session.retry.retryable", () => {
   test("does not throw on numeric error codes", () => {
     const error = wrap(JSON.stringify({ type: "error", error: { code: 123 } }))
     const result = SessionRetry.retryable(error)
-    expect(result).toBeUndefined()
+    expect(result).toBe(`{"type":"error","error":{"code":123}}`)
   })
 
   test("returns undefined for non-json message", () => {
@@ -129,41 +130,21 @@ describe("session.retry.retryable", () => {
 })
 
 describe("session.message-v2.fromError", () => {
-  test.concurrent(
-    "converts ECONNRESET socket errors to retryable APIError",
-    async () => {
-      using server = Bun.serve({
-        port: 0,
-        idleTimeout: 8,
-        fetch(_req) {
-          return new Response(
-            new ReadableStream({
-              async pull(controller) {
-                controller.enqueue("Hello,")
-                await sleep(10000)
-                controller.enqueue(" World!")
-                controller.close()
-              },
-            }),
-            { headers: { "Content-Type": "text/plain" } },
-          )
-        },
-      })
+  test("converts ECONNRESET socket errors to retryable APIError", () => {
+    const error = {
+      code: "ECONNRESET",
+      syscall: "read",
+      message: "The socket connection was closed unexpectedly",
+    }
 
-      const error = await fetch(new URL("/", server.url.origin))
-        .then((res) => res.text())
-        .catch((e: unknown) => e)
+    const result = MessageV2.fromError(error, { providerID })
 
-      const result = MessageV2.fromError(error, { providerID: "test" })
-
-      expect(MessageV2.APIError.isInstance(result)).toBe(true)
-      expect((result as MessageV2.APIError).data.isRetryable).toBe(true)
-      expect((result as MessageV2.APIError).data.message).toBe("Connection reset by server")
-      expect((result as MessageV2.APIError).data.metadata?.code).toBe("ECONNRESET")
-      expect((result as MessageV2.APIError).data.metadata?.message).toInclude("socket connection")
-    },
-    15_000,
-  )
+    expect(MessageV2.APIError.isInstance(result)).toBe(true)
+    expect((result as MessageV2.APIError).data.isRetryable).toBe(true)
+    expect((result as MessageV2.APIError).data.message).toBe("Connection reset by server")
+    expect((result as MessageV2.APIError).data.metadata?.code).toBe("ECONNRESET")
+    expect((result as MessageV2.APIError).data.metadata?.message).toInclude("socket connection")
+  })
 
   test("ECONNRESET socket error is retryable", () => {
     const error = new MessageV2.APIError({
@@ -187,7 +168,7 @@ describe("session.message-v2.fromError", () => {
       responseBody: '{"error":"boom"}',
       isRetryable: false,
     })
-    const result = MessageV2.fromError(error, { providerID: "openai" }) as MessageV2.APIError
+    const result = MessageV2.fromError(error, { providerID: ProviderID.make("openai") }) as MessageV2.APIError
     expect(result.data.isRetryable).toBe(true)
   })
 })

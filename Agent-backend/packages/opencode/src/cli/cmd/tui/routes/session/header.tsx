@@ -9,14 +9,13 @@ import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 
 import { useKeybind } from "../../context/keybind"
 
-import type { AssistantMessage, Session } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage, Session } from "@orbit.build/sdk/v2"
 import type { Accessor, JSX } from "solid-js"
 
 import { Flag } from "@/flag/flag"
 
 function Title(props: { session: Accessor<Session> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <text fg={theme.text}>
       <span style={{ bold: true }}>#</span> <span style={{ bold: true }}>{props.session().title}</span>
@@ -26,7 +25,6 @@ function Title(props: { session: Accessor<Session> }): JSX.Element {
 
 function ContextInfo(props: { context: Accessor<string | undefined>; cost: Accessor<string> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.context()}>
       <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
@@ -38,7 +36,6 @@ function ContextInfo(props: { context: Accessor<string | undefined>; cost: Acces
 
 function WorkspaceInfo(props: { workspace: Accessor<string | undefined> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.workspace()}>
       <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
@@ -70,7 +67,9 @@ export function Header(): JSX.Element {
   })
 
   const context = createMemo(() => {
-    const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as AssistantMessage | undefined
+    const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as
+      | AssistantMessage
+      | undefined
     if (!last) return
     const total =
       last.tokens.input + last.tokens.output + last.tokens.reasoning + last.tokens.cache.read + last.tokens.cache.write
@@ -97,7 +96,6 @@ export function Header(): JSX.Element {
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box flexShrink={0}>
       <box
@@ -134,7 +132,9 @@ export function Header(): JSX.Element {
                 <box
                   onMouseOver={() => setHover("parent")}
                   onMouseOut={() => setHover(null)}
-                  onMouseUp={() => { command.trigger("session.parent"); }}
+                  onMouseUp={() => {
+                    command.trigger("session.parent")
+                  }}
                   backgroundColor={hover() === "parent" ? theme.backgroundElement : theme.backgroundPanel}
                 >
                   <text fg={theme.text}>
@@ -144,7 +144,9 @@ export function Header(): JSX.Element {
                 <box
                   onMouseOver={() => setHover("prev")}
                   onMouseOut={() => setHover(null)}
-                  onMouseUp={() => { command.trigger("session.child.previous"); }}
+                  onMouseUp={() => {
+                    command.trigger("session.child.previous")
+                  }}
                   backgroundColor={hover() === "prev" ? theme.backgroundElement : theme.backgroundPanel}
                 >
                   <text fg={theme.text}>
@@ -154,7 +156,9 @@ export function Header(): JSX.Element {
                 <box
                   onMouseOver={() => setHover("next")}
                   onMouseOut={() => setHover(null)}
-                  onMouseUp={() => { command.trigger("session.child.next"); }}
+                  onMouseUp={() => {
+                    command.trigger("session.child.next")
+                  }}
                   backgroundColor={hover() === "next" ? theme.backgroundElement : theme.backgroundPanel}
                 >
                   <text fg={theme.text}>

@@ -1,10 +1,5 @@
 //! Project document discovery and reading commands for Vault.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned payloads from JSON"
-)]
-
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;

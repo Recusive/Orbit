@@ -1,7 +1,7 @@
-import { spawn as launch  } from "child_process"
+import { spawn as launch } from "child_process"
 import { buffer } from "node:stream/consumers"
 
-import type {ChildProcess} from "child_process";
+import type { ChildProcess } from "child_process"
 
 export namespace Process {
   export type Stdio = "inherit" | "pipe" | "ignore"
@@ -62,6 +62,7 @@ export namespace Process {
       cwd: opts.cwd,
       env: opts.env === null ? {} : opts.env ? { ...process.env, ...opts.env } : undefined,
       stdio: [opts.stdin ?? "ignore", opts.stdout ?? "ignore", opts.stderr ?? "ignore"],
+      windowsHide: process.platform === "win32",
     })
 
     let closed = false

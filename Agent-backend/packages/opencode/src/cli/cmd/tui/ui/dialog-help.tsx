@@ -7,7 +7,6 @@ import { useDialog } from "./dialog"
 
 import type { JSX } from "solid-js"
 
- 
 export function DialogHelp(): JSX.Element {
   const dialog = useDialog()
   const { theme } = useTheme()
@@ -19,14 +18,18 @@ export function DialogHelp(): JSX.Element {
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           Help
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc/enter
         </text>
       </box>
@@ -36,7 +39,14 @@ export function DialogHelp(): JSX.Element {
         </text>
       </box>
       <box flexDirection="row" justifyContent="flex-end" paddingBottom={1}>
-        <box paddingLeft={3} paddingRight={3} backgroundColor={theme.primary} onMouseUp={() => { dialog.clear(); }}>
+        <box
+          paddingLeft={3}
+          paddingRight={3}
+          backgroundColor={theme.primary}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           <text fg={theme.selectedListItemText}>ok</text>
         </box>
       </box>

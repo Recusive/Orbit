@@ -5,14 +5,8 @@ import os from "os"
 import path from "path"
 import { pathToFileURL } from "url"
 
-import { NamedError } from "@opencode-ai/util/error"
-import {
-  
-  applyEdits,
-  modify,
-  parse as parseJsonc,
-  printParseErrorCode
-} from "jsonc-parser"
+import { NamedError } from "@orbit.build/util/error"
+import { applyEdits, modify, parse as parseJsonc, printParseErrorCode } from "jsonc-parser"
 import { mergeDeep, pipe, unique } from "remeda"
 import z from "zod"
 
@@ -30,24 +24,29 @@ import { Log } from "../util/log"
 import { ConfigMarkdown } from "./markdown"
 import { ConfigPaths } from "./paths"
 
-import type {ParseError as JsoncParseError} from "jsonc-parser";
+import type { ParseError as JsoncParseError } from "jsonc-parser"
 
-
-
+import { Account } from "@/account"
 import { BunProc } from "@/bun"
 import { PackageRegistry } from "@/bun/registry"
 import { Bus } from "@/bus"
 import { GlobalBus } from "@/bus/global"
-import { Control } from "@/control"
+import { Env } from "@/env"
 import { Installation } from "@/installation"
 import { Filesystem } from "@/util/filesystem"
 import { iife } from "@/util/iife"
+import { Lock } from "@/util/lock"
+import { Process } from "@/util/process"
 import { proxied } from "@/util/proxied"
 
 export namespace Config {
   const ModelId = z.string().meta({ $ref: "https://models.dev/model-schema.json#/$defs/Model" })
 
   const log = Log.create({ service: "config" })
+  const LEGACY_PLUGIN_PACKAGE_SCOPE = "@opencode-ai"
+  // Public npm package written into generated user project manifests.
+  const PUBLIC_PLUGIN_PACKAGE = "@orbit.build/plugin"
+  const LEGACY_PLUGIN_PACKAGES = [`${LEGACY_PLUGIN_PACKAGE_SCOPE}/plugin`]
 
   /** Safely extract the message from a ConfigFrontmatterError or return undefined. */
   function extractFrontmatterMessage(err: unknown): string | undefined {
@@ -94,12 +93,12 @@ export namespace Config {
   export const state = Instance.state(async () => {
     const auth = await Auth.all()
 
-    // Config loading order (low -> high precedence): https://opencode.ai/docs/config#precedence-order
+    // Config loading order (low -> high precedence): https://orbit.build/docs/config#precedence-order
     // 1) Remote .well-known/opencode (org defaults)
-    // 2) Global config (~/.config/opencode/opencode.json{,c})
+    // 2) Global config (~/.config/orbit/orbit.json{,c})
     // 3) Custom config (OPENCODE_CONFIG)
-    // 4) Project config (opencode.json{,c})
-    // 5) .opencode directories (.opencode/agents/, .opencode/commands/, .opencode/plugins/, .opencode/opencode.json{,c})
+    // 4) Project config (orbit.json{,c})
+    // 5) .orbit directories (.orbit/agents/, .orbit/commands/, .orbit/plugins/, .orbit/orbit.json{,c})
     // 6) Inline config (OPENCODE_CONFIG_CONTENT)
     // Managed config directory is enterprise-only and always overrides everything above.
     let result: Info = {}
@@ -126,9 +125,6 @@ export namespace Config {
         log.debug("loaded remote config from well-known", { url })
       }
     }
-
-    await Control.token()
-    // Reserved for future use with control plane token
 
     // Global user config overrides remote config.
     result = mergeConfigConcatArrays(result, await global())
@@ -194,6 +190,34 @@ export namespace Config {
         }),
       )
       log.debug("loaded custom config from OPENCODE_CONFIG_CONTENT")
+    }
+
+    const active = Account.active()
+    if (active?.active_org_id) {
+      try {
+        const [config, token] = await Promise.all([
+          Account.config(active.id, active.active_org_id),
+          Account.token(active.id),
+        ])
+        if (token) {
+          process.env.OPENCODE_CONSOLE_TOKEN = token
+          Env.set("OPENCODE_CONSOLE_TOKEN", token)
+        }
+
+        if (config) {
+          result = mergeConfigConcatArrays(
+            result,
+            await load(JSON.stringify(config), {
+              dir: path.dirname(`${active.url}/api/config`),
+              source: `${active.url}/api/config`,
+            }),
+          )
+        }
+      } catch (err) {
+        log.debug("failed to fetch remote account config", {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
     }
 
     // Load managed config files last (highest priority) - enterprise admin-controlled
@@ -267,12 +291,19 @@ export namespace Config {
     const pkg = path.join(dir, "package.json")
     const targetVersion = Installation.isLocal() ? "*" : Installation.VERSION
 
-    const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => ({
-      dependencies: {},
-    }))
+    const json = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(
+      (): { dependencies?: Record<string, string> } => ({
+        dependencies: {},
+      }),
+    )
+
+    for (const legacy of LEGACY_PLUGIN_PACKAGES) {
+      delete json.dependencies?.[legacy]
+    }
+
     json.dependencies = {
       ...json.dependencies,
-      "@opencode-ai/plugin": targetVersion,
+      [PUBLIC_PLUGIN_PACKAGE]: targetVersion,
     }
     await Filesystem.writeJson(pkg, json)
 
@@ -283,6 +314,7 @@ export namespace Config {
 
     // Install any additional dependencies defined in the package.json
     // This allows local plugins and custom tools to use external packages
+    using _ = await Lock.write("bun-install")
     await BunProc.run(
       [
         "install",
@@ -291,8 +323,50 @@ export namespace Config {
       ],
       { cwd: dir },
     ).catch((err: unknown) => {
+      if (err instanceof Process.RunFailedError) {
+        const detail = {
+          dir,
+          cmd: err.cmd,
+          code: err.code,
+          stdout: err.stdout.toString(),
+          stderr: err.stderr.toString(),
+        }
+        if (Flag.OPENCODE_STRICT_CONFIG_DEPS) {
+          log.error("failed to install dependencies", detail)
+          throw err
+        }
+        log.warn("failed to install dependencies", detail)
+        return
+      }
+
+      if (Flag.OPENCODE_STRICT_CONFIG_DEPS) {
+        log.error("failed to install dependencies", { dir, error: err })
+        throw err
+      }
       log.warn("failed to install dependencies", { dir, error: err })
     })
+
+    const pluginPkgPath = path.join(dir, "node_modules", ...PUBLIC_PLUGIN_PACKAGE.split("/"), "package.json")
+    const installedOk = await (async () => {
+      if (!Filesystem.exists(pluginPkgPath)) return false
+      if (targetVersion === "*") return true
+
+      const installed = await Filesystem.readJson<{ version?: string }>(pluginPkgPath).catch(() => null)
+      if (!installed?.version) return false
+      if (targetVersion === "latest") return true
+      return installed.version === targetVersion
+    })()
+
+    if (!installedOk) {
+      const { [PUBLIC_PLUGIN_PACKAGE]: _drop, ...dependencies } = json.dependencies
+      json.dependencies = dependencies
+      await Filesystem.writeJson(pkg, json)
+      log.warn("plugin install verification failed, will retry on next run", {
+        dir,
+        expected: pluginPkgPath,
+        targetVersion,
+      })
+    }
   }
 
   async function isWritable(dir: string): Promise<boolean> {
@@ -321,16 +395,28 @@ export namespace Config {
     if (!pkgExists) return true
 
     const parsed = await Filesystem.readJson<{ dependencies?: Record<string, string> }>(pkg).catch(() => null)
-    const dependencies = parsed?.dependencies ?? {}
-    const depVersion = dependencies["@opencode-ai/plugin"]
+    const dependencies: Record<string, string> = parsed?.dependencies ?? {}
+    for (const legacy of LEGACY_PLUGIN_PACKAGES) {
+      if (dependencies[legacy]) return true
+    }
+
+    const depVersion = dependencies[PUBLIC_PLUGIN_PACKAGE]
     if (!depVersion) return true
 
+    const pluginPkgPath = path.join(dir, "node_modules", ...PUBLIC_PLUGIN_PACKAGE.split("/"), "package.json")
+    if (!Filesystem.exists(pluginPkgPath)) return true
+
     const targetVersion = Installation.isLocal() ? "latest" : Installation.VERSION
+    if (targetVersion !== "latest" && targetVersion !== "*") {
+      const installed = await Filesystem.readJson<{ version?: string }>(pluginPkgPath).catch(() => null)
+      if (installed?.version !== targetVersion) return true
+    }
+
     if (targetVersion === "latest") {
-      const isOutdated = await PackageRegistry.isOutdated("@opencode-ai/plugin", depVersion, dir)
+      const isOutdated = await PackageRegistry.isOutdated(PUBLIC_PLUGIN_PACKAGE, depVersion, dir)
       if (!isOutdated) return false
       log.info("Cached version is outdated, proceeding with install", {
-        pkg: "@opencode-ai/plugin",
+        pkg: PUBLIC_PLUGIN_PACKAGE,
         cachedVersion: depVersion,
       })
       return true
@@ -364,7 +450,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse command ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load command", { command: item, err })
         return undefined
       })
@@ -401,7 +491,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse agent ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load agent", { agent: item, err })
         return undefined
       })
@@ -437,7 +531,11 @@ export namespace Config {
       const md = await ConfigMarkdown.parse(item).catch(async (err: unknown) => {
         const errMessage = extractFrontmatterMessage(err) ?? `Failed to parse mode ${item}`
         const { Session } = await import("@/session")
-        void Bus.publish(Session.Event.Error, { error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<typeof NamedError.Unknown.Schema> })
+        void Bus.publish(Session.Event.Error, {
+          error: new NamedError.Unknown({ message: errMessage }).toObject() as z.infer<
+            typeof NamedError.Unknown.Schema
+          >,
+        })
         log.error("failed to load mode", { mode: item, err })
         return undefined
       })
@@ -481,7 +579,7 @@ export namespace Config {
    *
    * @example
    * getPluginName("file:///path/to/plugin/foo.js") // "foo"
-   * getPluginName("oh-my-opencode@2.4.3") // "oh-my-opencode"
+   * getPluginName("oh-my-orbit@2.4.3") // "oh-my-orbit"
    * getPluginName("@scope/pkg@1.0.0") // "@scope/pkg"
    */
   export function getPluginName(plugin: string): string {
@@ -499,20 +597,20 @@ export namespace Config {
    * Deduplicates plugins by name, with later entries (higher priority) winning.
    * Priority order (highest to lowest):
    * 1. Local plugin/ directory
-   * 2. Local opencode.json
+   * 2. Local orbit.json
    * 3. Global plugin/ directory
-   * 4. Global opencode.json
+   * 4. Global orbit.json
    *
    * Since plugins are added in low-to-high priority order,
    * we reverse, deduplicate (keeping first occurrence), then restore order.
    */
   export function deduplicatePlugins(plugins: string[]): string[] {
     // seenNames: canonical plugin names for duplicate detection
-    // e.g., "oh-my-opencode", "@scope/pkg"
+    // e.g., "oh-my-orbit", "@scope/pkg"
     const seenNames = new Set<string>()
 
     // uniqueSpecifiers: full plugin specifiers to return
-    // e.g., "oh-my-opencode@2.4.3", "file:///path/to/plugin.js"
+    // e.g., "oh-my-orbit@2.4.3", "file:///path/to/plugin.js"
     const uniqueSpecifiers: string[] = []
 
     for (const specifier of plugins.toReversed()) {
@@ -985,6 +1083,14 @@ export namespace Config {
             .describe(
               "Timeout in milliseconds for requests to this provider. Default is 300000 (5 minutes). Set to false to disable timeout.",
             ),
+          chunkTimeout: z
+            .number()
+            .int()
+            .positive()
+            .optional()
+            .describe(
+              "Timeout in milliseconds between streamed SSE chunks for this provider. If no chunk arrives within this window, the request is aborted.",
+            ),
         })
         .catchall(z.any())
         .optional(),
@@ -1003,7 +1109,7 @@ export namespace Config {
       command: z
         .record(z.string(), Command)
         .optional()
-        .describe("Command configuration, see https://opencode.ai/docs/commands"),
+        .describe("Command configuration, see https://orbit.build/docs/commands"),
       skills: Skills.optional().describe("Additional skill folder paths"),
       watcher: z
         .object({
@@ -1070,7 +1176,7 @@ export namespace Config {
         })
         .catchall(Agent)
         .optional()
-        .describe("Agent configuration, see https://opencode.ai/docs/agents"),
+        .describe("Agent configuration, see https://orbit.build/docs/agents"),
       provider: z
         .record(z.string(), Provider)
         .optional()
@@ -1216,7 +1322,9 @@ export namespace Config {
             await fs.unlink(legacy)
           }
         })
-        .catch(() => { /* legacy config migration is best-effort */ })
+        .catch(() => {
+          /* legacy config migration is best-effort */
+        })
     }
 
     return result
@@ -1257,7 +1365,9 @@ export namespace Config {
       if (parsed.data.$schema === undefined && isFile) {
         parsed.data.$schema = "https://opencode.ai/config.json"
         const updated = original.replace(/^\s*\{/, '{\n  "$schema": "https://opencode.ai/config.json",')
-        await Filesystem.write(options.path, updated).catch(() => { /* best-effort schema injection */ })
+        await Filesystem.write(options.path, updated).catch(() => {
+          /* best-effort schema injection */
+        })
       }
       const result = parsed.data
       if (result.plugin && isFile) {
@@ -1312,9 +1422,7 @@ export namespace Config {
   }
 
   function globalConfigFile(): string {
-    const candidates = ["orbit.jsonc", "orbit.json", "config.json"].map((file) =>
-      path.join(Global.Path.config, file),
-    )
+    const candidates = ["orbit.jsonc", "orbit.json", "config.json"].map((file) => path.join(Global.Path.config, file))
     for (const file of candidates) {
       if (existsSync(file)) return file
     }

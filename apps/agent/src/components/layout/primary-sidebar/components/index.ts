@@ -3,6 +3,7 @@
  */
 export { ConversationItem } from './ConversationItem';
 export { ConversationList } from './ConversationList';
+export { SettingsNavList } from './SettingsNavList';
 export { SidebarItem } from './SidebarItem';
 export { SidebarToggleIcon } from './SidebarToggleIcon';
 export { TabButton } from './TabButton';

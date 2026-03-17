@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Shared SolidJS component library (`@opencode-ai/ui`) with 175 components, theme system, hooks, context providers, i18n, and assets. Built on Tailwind CSS + Kobalte (SolidJS equivalent of Radix UI). Provides the design system for both the web app (`packages/app`) and desktop apps.
+Shared SolidJS component library (`@orbit.build/ui`) with 175 components, theme system, hooks, context providers, i18n, and assets. Built on Tailwind CSS + Kobalte (SolidJS equivalent of Radix UI). Provides the design system for both the web app (`packages/app`) and desktop apps.
 
 ## Usage Status
 
@@ -33,18 +33,18 @@ Shared SolidJS component library (`@opencode-ai/ui`) with 175 components, theme 
 ## Export Map (Extensive)
 
 ```
-@opencode-ai/ui/*           → src/components/*.tsx (175 components)
-@opencode-ai/ui/hooks       → src/hooks/index.ts
-@opencode-ai/ui/context      → src/context/index.ts
-@opencode-ai/ui/context/*    → src/context/*.tsx
-@opencode-ai/ui/theme        → src/theme/index.ts
-@opencode-ai/ui/theme/*      → src/theme/*.ts
-@opencode-ai/ui/styles       → src/styles/index.css
-@opencode-ai/ui/i18n/*       → src/i18n/*.ts
-@opencode-ai/ui/pierre       → src/pierre/index.ts
-@opencode-ai/ui/fonts/*      → src/assets/fonts/*
-@opencode-ai/ui/audio/*      → src/assets/audio/*
-@opencode-ai/ui/icons/*      → icon type definitions
+@orbit.build/ui/*           → src/components/*.tsx (175 components)
+@orbit.build/ui/hooks       → src/hooks/index.ts
+@orbit.build/ui/context      → src/context/index.ts
+@orbit.build/ui/context/*    → src/context/*.tsx
+@orbit.build/ui/theme        → src/theme/index.ts
+@orbit.build/ui/theme/*      → src/theme/*.ts
+@orbit.build/ui/styles       → src/styles/index.css
+@orbit.build/ui/i18n/*       → src/i18n/*.ts
+@orbit.build/ui/pierre       → src/pierre/index.ts
+@orbit.build/ui/fonts/*      → src/assets/fonts/*
+@orbit.build/ui/audio/*      → src/assets/audio/*
+@orbit.build/ui/icons/*      → icon type definitions
 ```
 
 ## Notes

@@ -36,12 +36,15 @@ import {
   onBrowserLoading,
   onBrowserNavigated,
   onBrowserToolRequest,
+  onOpencodeCrashed,
+  onOpencodeReady,
   onTerminalExit,
   onTerminalForeground,
   onTerminalOutput,
   getWorkspacePath,
   buildFileIndex,
 } from '@/lib/api';
+import { useBackendStore } from '@/stores/backend';
 import { WebviewMessageSchema } from '@/types/protocol';
 
 // ============================================================================
@@ -653,6 +656,41 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
           .catch((err: unknown) => {
             logger.error(
               'Browser tool request listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      listenerPromises.push(
+        onOpencodeReady((event) => {
+          useBackendStore.getState().setOpencodePort(event.port);
+          useBackendStore.getState().setOpencodeHealthy(true);
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'OpenCode ready listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      listenerPromises.push(
+        onOpencodeCrashed((event) => {
+          useBackendStore.getState().setOpencodeHealthy(false);
+          useBackendStore.getState().setOpencodePort(null);
+          toast.error('OpenCode backend stopped unexpectedly', {
+            description: event.reason ?? event.error ?? 'The OpenCode server crashed.',
+          });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'OpenCode crash listener registration failed',
               err instanceof Error ? err : new Error(String(err))
             );
           })

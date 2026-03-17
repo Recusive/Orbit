@@ -41,6 +41,10 @@ import type {
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
+import {
+  buildOptimisticAttachedImages,
+  cacheAttachedImagesForMessage,
+} from '@/services/chat/image-attachment-cache';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
@@ -281,6 +285,17 @@ export function useChatMessages(): UseChatMessagesReturn {
 
     const { text, contextFiles, images, elements } = pendingMessage;
     useChatStore.getState().setPendingMessage(null);
+    const sendableImages = (images ?? []).flatMap((image) =>
+      image.data
+        ? [
+            {
+              name: image.name,
+              mimeType: image.mimeType,
+              data: image.data,
+            },
+          ]
+        : []
+    );
 
     // Send thinking mode, model, and effort BEFORE the message
     const toolState = useToolStore.getState();
@@ -308,8 +323,8 @@ export function useChatMessages(): UseChatMessagesReturn {
     }
 
     // Update title immediately, then kick off async title generation.
-    applySessionTitle(lastCreatedSessionId, generateFallbackTitle(text));
-    generateAITitle(lastCreatedSessionId, text);
+    applySessionTitle(lastCreatedSessionId, generateFallbackTitle(text || 'Image conversation'));
+    generateAITitle(lastCreatedSessionId, text || 'Image conversation');
 
     // Build user message
     const chatStore = useChatStore.getState();
@@ -318,17 +333,19 @@ export function useChatMessages(): UseChatMessagesReturn {
     const lastMsg = msgs[msgs.length - 1];
     const parentUuid = lastMsg?.id ?? null;
 
+    const optimisticImages = buildOptimisticAttachedImages(images);
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
       content: text,
       displayedContent: text,
       attachedFiles: contextFiles,
-      attachedImages: images,
+      attachedImages: optimisticImages,
       parentUuid,
     };
 
     chatStore.addMessage(lastCreatedSessionId, userMessage);
+    cacheAttachedImagesForMessage(lastCreatedSessionId, userMessage.id, images);
     chatStore.setAgentRunning(lastCreatedSessionId, true);
 
     // Broadcast for cross-instance sync (Agent ↔ Editor)
@@ -354,19 +371,13 @@ export function useChatMessages(): UseChatMessagesReturn {
 
     // Build context
     const hasFiles = contextFiles && contextFiles.length > 0;
-    const hasImages = images && images.length > 0;
+    const hasImages = sendableImages.length > 0;
     const hasElements = elements && elements.length > 0;
     const context =
       hasFiles || hasImages || hasElements
         ? {
             files: hasFiles ? contextFiles : undefined,
-            images: hasImages
-              ? images.map((img) => ({
-                  name: img.name,
-                  mimeType: img.mimeType,
-                  data: img.data,
-                }))
-              : undefined,
+            images: hasImages ? sendableImages : undefined,
             elements: hasElements ? elements : undefined,
           }
         : undefined;

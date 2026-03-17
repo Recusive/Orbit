@@ -5,6 +5,7 @@ import { test, expect } from "bun:test"
 import { Env } from "../../src/env"
 import { Instance } from "../../src/project/instance"
 import { Provider } from "../../src/provider/provider"
+import { ModelID, ProviderID } from "../../src/provider/schema"
 import { tmpdir } from "../fixture/fixture"
 
 test("provider loaded from env variable", async () => {
@@ -57,6 +58,40 @@ test("provider loaded from config with apiKey option", async () => {
     fn: async () => {
       const providers = await Provider.list()
       expect(providers.anthropic).toBeDefined()
+    },
+  })
+})
+
+test("legacy opencode provider config is normalized to orbit", async () => {
+  await using tmp = await tmpdir({
+    init: async (dir) => {
+      await Bun.write(
+        path.join(dir, "orbit.json"),
+        JSON.stringify({
+          $schema: "https://opencode.ai/config.json",
+          enabled_providers: ["orbit"],
+          provider: {
+            opencode: {
+              options: {
+                apiKey: "config-api-key",
+              },
+            },
+          },
+        }),
+      )
+    },
+  })
+
+  await Instance.provide({
+    directory: tmp.path,
+    fn: async () => {
+      const providers = await Provider.list()
+      expect(providers.orbit).toBeDefined()
+      expect(providers.orbit.options.apiKey).toBe("config-api-key")
+      expect(Provider.parseModel("opencode/big-pickle")).toEqual({
+        providerID: "orbit",
+        modelID: "big-pickle",
+      })
     },
   })
 })
@@ -261,6 +296,7 @@ test("env variable takes precedence, config merges options", async () => {
             anthropic: {
               options: {
                 timeout: 60000,
+                chunkTimeout: 15000,
               },
             },
           },
@@ -278,6 +314,7 @@ test("env variable takes precedence, config merges options", async () => {
       expect(providers.anthropic).toBeDefined()
       // Config options should be merged
       expect(providers.anthropic.options.timeout).toBe(60000)
+      expect(providers.anthropic.options.chunkTimeout).toBe(15000)
     },
   })
 })
@@ -299,10 +336,10 @@ test("getModel returns model for valid provider/model", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const model = await Provider.getModel("anthropic", "claude-sonnet-4-20250514")
+      const model = await Provider.getModel(ProviderID.anthropic, ModelID.make("claude-sonnet-4-20250514"))
       expect(model).toBeDefined()
-      expect(model.providerID).toBe("anthropic")
-      expect(model.id).toBe("claude-sonnet-4-20250514")
+      expect(String(model.providerID)).toBe("anthropic")
+      expect(String(model.id)).toBe("claude-sonnet-4-20250514")
       const language = await Provider.getLanguage(model)
       expect(language).toBeDefined()
     },
@@ -325,8 +362,8 @@ test("getModel throws ModelNotFoundError for invalid model", async () => {
     init: async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
-    fn: () => {
-      expect(Provider.getModel("anthropic", "nonexistent-model")).rejects.toThrow()
+    fn: async () => {
+      expect(Provider.getModel(ProviderID.anthropic, ModelID.make("nonexistent-model"))).rejects.toThrow()
     },
   })
 })
@@ -344,22 +381,22 @@ test("getModel throws ModelNotFoundError for invalid provider", async () => {
   })
   await Instance.provide({
     directory: tmp.path,
-    fn: () => {
-      expect(Provider.getModel("nonexistent-provider", "some-model")).rejects.toThrow()
+    fn: async () => {
+      expect(Provider.getModel(ProviderID.make("nonexistent-provider"), ModelID.make("some-model"))).rejects.toThrow()
     },
   })
 })
 
 test("parseModel correctly parses provider/model string", () => {
   const result = Provider.parseModel("anthropic/claude-sonnet-4")
-  expect(result.providerID).toBe("anthropic")
-  expect(result.modelID).toBe("claude-sonnet-4")
+  expect(String(result.providerID)).toBe("anthropic")
+  expect(String(result.modelID)).toBe("claude-sonnet-4")
 })
 
 test("parseModel handles model IDs with slashes", () => {
   const result = Provider.parseModel("openrouter/anthropic/claude-3-opus")
-  expect(result.providerID).toBe("openrouter")
-  expect(result.modelID).toBe("anthropic/claude-3-opus")
+  expect(String(result.providerID)).toBe("openrouter")
+  expect(String(result.modelID)).toBe("anthropic/claude-3-opus")
 })
 
 test("defaultModel returns first available model when no config set", async () => {
@@ -405,8 +442,8 @@ test("defaultModel respects config model setting", async () => {
     },
     fn: async () => {
       const model = await Provider.defaultModel()
-      expect(model.providerID).toBe("anthropic")
-      expect(model.modelID).toBe("claude-sonnet-4-20250514")
+      expect(String(model.providerID)).toBe("anthropic")
+      expect(String(model.modelID)).toBe("claude-sonnet-4-20250514")
     },
   })
 })
@@ -571,10 +608,10 @@ test("closest finds model by partial match", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const result = await Provider.closest("anthropic", ["sonnet-4"])
+      const result = await Provider.closest(ProviderID.anthropic, ["sonnet-4"])
       expect(result).toBeDefined()
-      expect(result?.providerID).toBe("anthropic")
-      expect(result?.modelID).toContain("sonnet-4")
+      expect(String(result?.providerID)).toBe("anthropic")
+      expect(String(result?.modelID)).toContain("sonnet-4")
     },
   })
 })
@@ -593,7 +630,7 @@ test("closest returns undefined for nonexistent provider", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      const result = await Provider.closest("nonexistent", ["model"])
+      const result = await Provider.closest(ProviderID.make("nonexistent"), ["model"])
       expect(result).toBeUndefined()
     },
   })
@@ -629,9 +666,9 @@ test("getModel uses realIdByKey for aliased models", async () => {
       const providers = await Provider.list()
       expect(providers.anthropic.models["my-sonnet"]).toBeDefined()
 
-      const model = await Provider.getModel("anthropic", "my-sonnet")
+      const model = await Provider.getModel(ProviderID.anthropic, ModelID.make("my-sonnet"))
       expect(model).toBeDefined()
-      expect(model.id).toBe("my-sonnet")
+      expect(String(model.id)).toBe("my-sonnet")
       expect(model.name).toBe("My Sonnet Alias")
     },
   })
@@ -932,7 +969,7 @@ test("getSmallModel returns appropriate small model", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const model = await Provider.getSmallModel("anthropic")
+      const model = await Provider.getSmallModel(ProviderID.anthropic)
       expect(model).toBeDefined()
       expect(model?.id).toContain("haiku")
     },
@@ -957,10 +994,10 @@ test("getSmallModel respects config small_model override", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const model = await Provider.getSmallModel("anthropic")
+      const model = await Provider.getSmallModel(ProviderID.anthropic)
       expect(model).toBeDefined()
-      expect(model?.providerID).toBe("anthropic")
-      expect(model?.id).toBe("claude-sonnet-4-20250514")
+      expect(String(model?.providerID)).toBe("anthropic")
+      expect(String(model?.id)).toBe("claude-sonnet-4-20250514")
     },
   })
 })
@@ -1465,8 +1502,8 @@ test("getModel returns consistent results", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const model1 = await Provider.getModel("anthropic", "claude-sonnet-4-20250514")
-      const model2 = await Provider.getModel("anthropic", "claude-sonnet-4-20250514")
+      const model1 = await Provider.getModel(ProviderID.anthropic, ModelID.make("claude-sonnet-4-20250514"))
+      const model2 = await Provider.getModel(ProviderID.anthropic, ModelID.make("claude-sonnet-4-20250514"))
       expect(model1.providerID).toEqual(model2.providerID)
       expect(model1.id).toEqual(model2.id)
       expect(model1).toEqual(model2)
@@ -1527,7 +1564,7 @@ test("ModelNotFoundError includes suggestions for typos", async () => {
     },
     fn: async () => {
       try {
-        await Provider.getModel("anthropic", "claude-sonet-4") // typo: sonet instead of sonnet
+        await Provider.getModel(ProviderID.anthropic, ModelID.make("claude-sonet-4")) // typo: sonet instead of sonnet
         expect(true).toBe(false) // Should not reach here
       } catch (e: any) {
         expect(e.data.suggestions).toBeDefined()
@@ -1555,7 +1592,7 @@ test("ModelNotFoundError for provider includes suggestions", async () => {
     },
     fn: async () => {
       try {
-        await Provider.getModel("antropic", "claude-sonnet-4") // typo: antropic
+        await Provider.getModel(ProviderID.make("antropic"), ModelID.make("claude-sonnet-4")) // typo: antropic
         expect(true).toBe(false) // Should not reach here
       } catch (e: any) {
         expect(e.data.suggestions).toBeDefined()
@@ -1579,7 +1616,7 @@ test("getProvider returns undefined for nonexistent provider", async () => {
   await Instance.provide({
     directory: tmp.path,
     fn: async () => {
-      const provider = await Provider.getProvider("nonexistent")
+      const provider = await Provider.getProvider(ProviderID.make("nonexistent"))
       expect(provider).toBeUndefined()
     },
   })
@@ -1602,9 +1639,9 @@ test("getProvider returns provider info", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const provider = await Provider.getProvider("anthropic")
+      const provider = await Provider.getProvider(ProviderID.anthropic)
       expect(provider).toBeDefined()
-      expect(provider!.id).toBe("anthropic")
+      expect(String(provider!.id)).toBe("anthropic")
     },
   })
 })
@@ -1626,7 +1663,7 @@ test("closest returns undefined when no partial match found", async () => {
       Env.set("ANTHROPIC_API_KEY", "test-api-key")
     },
     fn: async () => {
-      const result = await Provider.closest("anthropic", ["nonexistent-xyz-model"])
+      const result = await Provider.closest(ProviderID.anthropic, ["nonexistent-xyz-model"])
       expect(result).toBeUndefined()
     },
   })
@@ -1650,7 +1687,7 @@ test("closest checks multiple query terms in order", async () => {
     },
     fn: async () => {
       // First term won't match, second will
-      const result = await Provider.closest("anthropic", ["nonexistent", "haiku"])
+      const result = await Provider.closest(ProviderID.anthropic, ["nonexistent", "haiku"])
       expect(result).toBeDefined()
       expect(result?.modelID).toContain("haiku")
     },

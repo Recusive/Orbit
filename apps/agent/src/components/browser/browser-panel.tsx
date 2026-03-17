@@ -6,7 +6,6 @@ import { BrowserToolbar } from './browser-toolbar';
 
 import type { FC } from 'react';
 
-import { OrbitLogo } from '@/components/icons/orbit-logo';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import {
   selectFormattedIdleTime,
@@ -473,11 +472,7 @@ export const BrowserPanel: FC = () => {
         {!isActive && !isCreating && !error && lifecycleState === 'idle' ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground">
             <div className="flex flex-col items-center gap-3 rounded-2xl bg-lg-control dark:bg-background px-8 py-6 w-fit min-w-[14rem]">
-              <div className="flex items-center gap-3 opacity-50">
-                <OrbitLogo className="h-18 w-18" />
-                <div className="w-0.5 h-8 bg-current opacity-40" />
-                <Globe className="h-12 w-12" />
-              </div>
+              <Globe className="h-12 w-12 opacity-50" />
               <button
                 onClick={handleLaunchBrowser}
                 className="px-6 py-2 text-sm font-medium bg-foreground text-background rounded-full hover:bg-foreground/90 transition-colors"

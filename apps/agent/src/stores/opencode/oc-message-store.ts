@@ -1,0 +1,306 @@
+import { createLogger } from '@orbit/common/lib';
+import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
+
+import type { OcMessage, OcPart } from '@/types/opencode';
+import type { SessionMessagesResponses } from '@orbit.build/sdk/v2/client';
+
+const logger = createLogger('OcMessageStore');
+
+interface OcDeltaBuffer {
+  readonly field: string;
+  readonly delta: string;
+}
+
+interface OcSessionMessages {
+  messagesById: Record<string, OcMessage>;
+  messageOrder: string[];
+  partsByMessage: Record<string, OcPart[]>;
+  partsById: Record<string, OcPart>;
+  deltaBufferByPart: Record<string, OcDeltaBuffer[]>;
+}
+
+export interface OcDeltaItem {
+  readonly sessionID: string;
+  readonly messageID: string;
+  readonly partID: string;
+  readonly field: string;
+  readonly delta: string;
+}
+
+interface OcMessageState {
+  sessions: Record<string, OcSessionMessages>;
+  setSessionMessages: (sessionId: string, entries: SessionMessagesResponses[200]) => void;
+  upsertMessage: (message: OcMessage) => void;
+  removeMessage: (sessionId: string, messageId: string) => void;
+  upsertPart: (part: OcPart) => void;
+  removePart: (sessionId: string, partId: string) => void;
+  appendDelta: (
+    sessionId: string,
+    messageId: string,
+    partId: string,
+    field: string,
+    delta: string
+  ) => void;
+  appendDeltaBatch: (items: OcDeltaItem[]) => void;
+  flushDeltaBuffer: (sessionId: string, messageId: string, partId: string) => void;
+  clearSession: (sessionId: string) => void;
+  clearAll: () => void;
+}
+
+function compareMessages(
+  left: Pick<OcMessage, 'id' | 'time'>,
+  right: Pick<OcMessage, 'id' | 'time'>
+): number {
+  return left.time.created - right.time.created || left.id.localeCompare(right.id);
+}
+
+function getOrCreateSession(
+  sessions: Record<string, OcSessionMessages>,
+  sessionId: string
+): OcSessionMessages {
+  const existing = sessions[sessionId];
+  if (existing) {
+    return existing;
+  }
+
+  const created: OcSessionMessages = {
+    messagesById: {},
+    messageOrder: [],
+    partsByMessage: {},
+    partsById: {},
+    deltaBufferByPart: {},
+  };
+  sessions[sessionId] = created;
+  return created;
+}
+
+function orderMessageIds(messagesById: Record<string, OcMessage>): string[] {
+  return Object.values(messagesById)
+    .sort(compareMessages)
+    .map((message) => message.id);
+}
+
+function upsertSortedPart(parts: OcPart[], part: OcPart): OcPart[] {
+  const existingIndex = parts.findIndex((candidate) => candidate.id === part.id);
+  if (existingIndex !== -1) {
+    const next = parts.slice();
+    next[existingIndex] = part;
+    return next;
+  }
+
+  const next = parts.slice();
+  let index = 0;
+  while (index < next.length && (next[index]?.id ?? '').localeCompare(part.id) < 0) {
+    index += 1;
+  }
+  next.splice(index, 0, part);
+  return next;
+}
+
+export const useOcMessageStore = create<OcMessageState>()(
+  immer((set) => ({
+    sessions: {},
+    setSessionMessages: (sessionId, entries) => {
+      logger.debug('Session messages set', { sessionId, messageCount: entries.length });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, sessionId);
+        session.messagesById = {};
+        session.messageOrder = [];
+        session.partsByMessage = {};
+        session.partsById = {};
+        session.deltaBufferByPart = {};
+
+        for (const entry of entries) {
+          session.messagesById[entry.info.id] = entry.info;
+          session.partsByMessage[entry.info.id] = entry.parts
+            .slice()
+            .sort((left, right) => left.id.localeCompare(right.id));
+
+          for (const part of entry.parts) {
+            session.partsById[part.id] = part;
+          }
+        }
+
+        session.messageOrder = orderMessageIds(session.messagesById);
+      });
+    },
+    upsertMessage: (message) => {
+      logger.debug('Message upserted', {
+        sessionId: message.sessionID,
+        messageId: message.id,
+        role: message.role,
+      });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, message.sessionID);
+        session.messagesById[message.id] = message;
+        session.messageOrder = orderMessageIds(session.messagesById);
+      });
+    },
+    removeMessage: (sessionId, messageId) => {
+      logger.debug('Message removed', { sessionId, messageId });
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) {
+          return;
+        }
+
+        Reflect.deleteProperty(session.messagesById, messageId);
+        session.messageOrder = session.messageOrder.filter((id) => id !== messageId);
+        const parts = session.partsByMessage[messageId] ?? [];
+        Reflect.deleteProperty(session.partsByMessage, messageId);
+
+        for (const part of parts) {
+          Reflect.deleteProperty(session.partsById, part.id);
+          Reflect.deleteProperty(session.deltaBufferByPart, part.id);
+        }
+      });
+    },
+    upsertPart: (part) => {
+      logger.debug('Part upserted', {
+        sessionId: part.sessionID,
+        messageId: part.messageID,
+        partId: part.id,
+        partType: part.type,
+      });
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, part.sessionID);
+        session.partsById[part.id] = part;
+        session.partsByMessage[part.messageID] = upsertSortedPart(
+          session.partsByMessage[part.messageID] ?? [],
+          part
+        );
+      });
+    },
+    removePart: (sessionId, partId) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        const part = session?.partsById[partId];
+        if (!session || !part) {
+          return;
+        }
+
+        Reflect.deleteProperty(session.partsById, partId);
+        Reflect.deleteProperty(session.deltaBufferByPart, partId);
+        session.partsByMessage[part.messageID] =
+          session.partsByMessage[part.messageID]?.filter((candidate) => candidate.id !== partId) ??
+          [];
+      });
+    },
+    appendDelta: (sessionId, messageId, partId, field, delta) => {
+      set((state) => {
+        const session = getOrCreateSession(state.sessions, sessionId);
+        const part = session.partsById[partId];
+
+        if (!part) {
+          session.deltaBufferByPart[partId] = [
+            ...(session.deltaBufferByPart[partId] ?? []),
+            { field, delta },
+          ];
+          return;
+        }
+
+        const currentField =
+          ((part as unknown as Record<string, unknown>)[field] as string | undefined) ?? '';
+        const updatedPart = {
+          ...part,
+          [field]: currentField + delta,
+        } as OcPart;
+
+        session.partsById[partId] = updatedPart;
+        session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
+          (candidate) => (candidate.id === partId ? updatedPart : candidate)
+        );
+      });
+    },
+    appendDeltaBatch: (items) => {
+      set((state) => {
+        // Group by sessionID + partID + field and concatenate deltas
+        const grouped = new Map<
+          string,
+          {
+            sessionID: string;
+            messageID: string;
+            partID: string;
+            field: string;
+            accumulated: string;
+          }
+        >();
+        for (const item of items) {
+          const key = `${item.sessionID}\0${item.partID}\0${item.field}`;
+          const existing = grouped.get(key);
+          if (existing) {
+            existing.accumulated += item.delta;
+          } else {
+            grouped.set(key, { ...item, accumulated: item.delta });
+          }
+        }
+
+        for (const entry of grouped.values()) {
+          const session = getOrCreateSession(state.sessions, entry.sessionID);
+          const part = session.partsById[entry.partID];
+          if (!part) {
+            session.deltaBufferByPart[entry.partID] = [
+              ...(session.deltaBufferByPart[entry.partID] ?? []),
+              { field: entry.field, delta: entry.accumulated },
+            ];
+            continue;
+          }
+          const currentField =
+            ((part as unknown as Record<string, unknown>)[entry.field] as string | undefined) ?? '';
+          const updatedPart = {
+            ...part,
+            [entry.field]: currentField + entry.accumulated,
+          } as OcPart;
+          session.partsById[entry.partID] = updatedPart;
+          session.partsByMessage[entry.messageID] = (
+            session.partsByMessage[entry.messageID] ?? []
+          ).map((candidate) => (candidate.id === entry.partID ? updatedPart : candidate));
+        }
+      });
+    },
+    flushDeltaBuffer: (sessionId, messageId, partId) => {
+      set((state) => {
+        const session = state.sessions[sessionId];
+        if (!session) {
+          return;
+        }
+
+        const buffered = session.deltaBufferByPart[partId];
+        if (!buffered || buffered.length === 0) {
+          return;
+        }
+
+        Reflect.deleteProperty(session.deltaBufferByPart, partId);
+        for (const entry of buffered) {
+          const part = session.partsById[partId];
+          if (!part) {
+            continue;
+          }
+
+          const currentField =
+            ((part as unknown as Record<string, unknown>)[entry.field] as string | undefined) ?? '';
+          const updatedPart = {
+            ...part,
+            [entry.field]: currentField + entry.delta,
+          } as OcPart;
+          session.partsById[partId] = updatedPart;
+          session.partsByMessage[messageId] = (session.partsByMessage[messageId] ?? []).map(
+            (candidate) => (candidate.id === partId ? updatedPart : candidate)
+          );
+        }
+      });
+    },
+    clearSession: (sessionId) => {
+      logger.debug('Session cleared', { sessionId });
+      set((state) => {
+        Reflect.deleteProperty(state.sessions, sessionId);
+      });
+    },
+    clearAll: () => {
+      set((state) => {
+        state.sessions = {};
+      });
+    },
+  }))
+);

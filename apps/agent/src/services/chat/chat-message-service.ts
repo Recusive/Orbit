@@ -31,6 +31,7 @@ import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
+import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
@@ -148,6 +149,13 @@ function mapPersistedMessage(m: {
   turnDurationMs?: number | undefined;
   parentUuid?: string | null | undefined;
   toolUses?: { name: string; success: boolean }[] | undefined;
+  attachedImages?:
+    | {
+        name: string;
+        mimeType: string;
+        previewUrl: string;
+      }[]
+    | undefined;
 }): ChatMessage {
   const thinkingPhases = m.thinkingPhases ?? [];
   const thinkingBlocks: ThinkingBlock[] | undefined =
@@ -174,6 +182,15 @@ function mapPersistedMessage(m: {
     ...(m.thinking ? { thinking: m.thinking } : {}),
     ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
     ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
+    ...(m.attachedImages && m.attachedImages.length > 0
+      ? {
+          attachedImages: m.attachedImages.map((image) => ({
+            name: image.name,
+            mimeType: image.mimeType,
+            previewUrl: toCachedImagePreviewUrl(image.previewUrl),
+          })),
+        }
+      : {}),
   };
 
   if (m.isInterrupted === true) {
@@ -918,7 +935,10 @@ class ChatMessageService {
   ): void {
     const { session_id } = message;
     logger.info(`Context compaction completed (bridge event) for session ${session_id}`);
-    useChatStore.getState().markCompacted();
+    const entry = useChatStore.getState().activeCompactions[session_id];
+    if (entry?.backend === 'claude') {
+      useChatStore.getState().settleCompaction(session_id);
+    }
 
     // The SDK rewrites the JSONL asynchronously after compact_boundary fires.
     // Retry with backoff to handle slow machines where the SDK hasn't finished writing.

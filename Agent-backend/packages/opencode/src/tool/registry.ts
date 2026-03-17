@@ -6,6 +6,7 @@ import z from "zod"
 import { Config } from "../config/config"
 import { Plugin } from "../plugin"
 import { Instance } from "../project/instance"
+import { Provider } from "../provider/provider"
 import { Glob } from "../util/glob"
 
 import { ApplyPatchTool } from "./apply_patch"
@@ -30,16 +31,11 @@ import { WriteTool } from "./write"
 
 import type { Tool } from "./tool"
 import type { Agent } from "../agent/agent"
-import type {ToolContext as PluginToolContext, ToolDefinition} from "@opencode-ai/plugin";
-
-
-
+import type { ProviderID, ModelID } from "../provider/schema"
+import type { ToolContext as PluginToolContext, ToolDefinition } from "@orbit.build/plugin"
 
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log"
-
-
-
 
 export namespace ToolRegistry {
   const log = Log.create({ service: "tool.registry" })
@@ -143,8 +139,8 @@ export namespace ToolRegistry {
 
   export async function tools(
     model: {
-      providerID: string
-      modelID: string
+      providerID: ProviderID
+      modelID: ModelID
     },
     agent?: Agent.Info,
   ): Promise<(Awaited<ReturnType<Tool.Info["init"]>> & { id: string })[]> {
@@ -154,7 +150,7 @@ export namespace ToolRegistry {
         .filter((t) => {
           // Enable websearch/codesearch for zen users OR via enable flag
           if (t.id === "codesearch" || t.id === "websearch") {
-            return model.providerID === "opencode" || Flag.OPENCODE_ENABLE_EXA
+            return Provider.isOrbitProviderID(model.providerID) || Flag.OPENCODE_ENABLE_EXA
           }
 
           // use apply tool in same format as codex

@@ -9,7 +9,6 @@ import { UI } from "../ui"
 
 import { cmd } from "./cmd"
 
-
 function getNetworkIPs(): string[] {
   const nets = networkInterfaces()
   const results: string[] = []

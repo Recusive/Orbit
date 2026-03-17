@@ -7,6 +7,7 @@ import { Config } from "../../config/config"
 import { ProviderAuth } from "../../provider/auth"
 import { ModelsDev } from "../../provider/models"
 import { Provider } from "../../provider/provider"
+import { ProviderID } from "../../provider/schema"
 import { lazy } from "../../util/lazy"
 import { errors } from "../error"
 
@@ -25,7 +26,7 @@ export const ProviderRoutes = lazy(() =>
               "application/json": {
                 schema: resolver(
                   z.object({
-                    all: ModelsDev.Provider.array(),
+                    all: Provider.Info.array(),
                     default: z.record(z.string(), z.string()),
                     connected: z.array(z.string()),
                   }),
@@ -102,7 +103,7 @@ export const ProviderRoutes = lazy(() =>
       validator(
         "param",
         z.object({
-          providerID: z.string().meta({ description: "Provider ID" }),
+          providerID: ProviderID.zod.meta({ description: "Provider ID" }),
         }),
       ),
       validator(
@@ -142,7 +143,7 @@ export const ProviderRoutes = lazy(() =>
       validator(
         "param",
         z.object({
-          providerID: z.string().meta({ description: "Provider ID" }),
+          providerID: ProviderID.zod.meta({ description: "Provider ID" }),
         }),
       ),
       validator(

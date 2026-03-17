@@ -21,6 +21,16 @@ export {
 } from './commands-store';
 export type { CommandsState, SlashCommand } from './commands-store';
 
+// Subagents store
+export {
+  useSubagentsStore,
+  useSubagents,
+  useSubagentsLoading,
+  useSubagentsHasFetched,
+  useSubagentsError,
+} from './subagents-store';
+export type { SubagentsState } from './subagents-store';
+
 // Tool store
 export {
   useToolStore,

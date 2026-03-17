@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED: Use superpowers:subagent-driven-development (if subagents available) or superpowers:executing-plans to implement this plan. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Rebrand all user-facing "opencode"/"OpenCode" strings to "Orbit"/"orbit" while keeping internal code (env vars, flags, package imports) unchanged for upstream mergeability.
+**Goal:** Rebrand all user-facing "opencode"/"OpenCode" strings to "Orbit"/"orbit" while keeping internal code (env vars, flags) unchanged for upstream mergeability.
 
-**Architecture:** Surgical string replacements across ~40 files. No structural changes. Internal constants (`Flag.OPENCODE_*`, `@opencode-ai/*` imports, env vars) remain untouched. Only what the user sees changes. This is a fork — no backward compatibility needed for existing opencode installations. All contracts (auth username, GitHub triggers, branch prefixes, reader/writer paths) must move together.
+**Architecture:** Surgical string replacements across ~40 files. No structural changes. Internal constants (`Flag.OPENCODE_*`, env vars) remain untouched. Only what the user sees changes. This is a fork — no backward compatibility needed for existing opencode installations. All contracts (auth username, GitHub triggers, branch prefixes, reader/writer paths) must move together.
 
 **Tech Stack:** TypeScript, SolidJS TUI components, text prompt files, JSON theme files
 
@@ -32,7 +32,6 @@
 **Keep as-is (upstream compatibility):**
 
 - All `Flag.OPENCODE_*` constants and env vars (including `OPENCODE_SERVER_PASSWORD` warning text)
-- All `@opencode-ai/*` package imports
 - All `opencode.ai` URLs (real infrastructure)
 - "OpenCode Zen" and "OpenCode Go" — shared upstream infra
 - Provider ID `"opencode"` — tied to Zen/Go
@@ -657,8 +656,8 @@ if (binDir.includes(".orbit"))
 // Line 269
 if (content.includes("# orbit") || content.includes(".orbit/bin"))
   if (trimmed === "# orbit")
-    // Line 287
     if (trimmed.includes(".orbit/bin") || trimmed.includes("fish_add_path"))
+      // Line 287
       // Line 294
       // Line 300
       (trimmed.startsWith("export PATH=") && trimmed.includes(".orbit/bin"))(

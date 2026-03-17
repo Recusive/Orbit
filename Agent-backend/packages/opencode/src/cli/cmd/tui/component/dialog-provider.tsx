@@ -15,12 +15,11 @@ import { useToast } from "../ui/toast"
 
 import { DialogModel } from "./dialog-model"
 
-import type { ProviderAuthAuthorization } from "@opencode-ai/sdk/v2"
+import type { ProviderAuthAuthorization } from "@orbit.build/sdk/v2"
 import type { Accessor, JSX } from "solid-js"
 
-
-
 const PROVIDER_PRIORITY: Record<string, number> = {
+  orbit: 0,
   opencode: 0,
   "opencode-go": 1,
   openai: 2,
@@ -29,13 +28,15 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   google: 5,
 }
 
-export function createDialogProviderOptions(): Accessor<{
-  title: string
-  value: string
-  description: string | undefined
-  category: string
-  onSelect: () => Promise<void>
-}[]> {
+export function createDialogProviderOptions(): Accessor<
+  {
+    title: string
+    value: string
+    description: string | undefined
+    category: string
+    onSelect: () => Promise<void>
+  }[]
+> {
   const sync = useSync()
   const dialog = useDialog()
   const sdk = useSDK()
@@ -47,8 +48,7 @@ export function createDialogProviderOptions(): Accessor<{
         title: provider.name,
         value: provider.id,
         description: {
-          opencode: "(Recommended)",
-          anthropic: "(Claude Max or API key)",
+          anthropic: "(API key)",
           openai: "(ChatGPT Plus/Pro or API key)",
           "opencode-go": "Low cost subscription for everyone",
         }[provider.id],
@@ -65,7 +65,6 @@ export function createDialogProviderOptions(): Accessor<{
             index = await new Promise<number | null>((resolve) => {
               dialog.replace(
                 () => {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                   return (
                     <DialogSelect
                       title="Select auth method"
@@ -73,11 +72,15 @@ export function createDialogProviderOptions(): Accessor<{
                         title: x.label,
                         value: idx,
                       }))}
-                      onSelect={(option) => { resolve(option.value); }}
+                      onSelect={(option) => {
+                        resolve(option.value)
+                      }}
                     />
                   )
                 },
-                () => { resolve(null); },
+                () => {
+                  resolve(null)
+                },
               )
             })
           }
@@ -92,9 +95,13 @@ export function createDialogProviderOptions(): Accessor<{
               const codeAuth = result.data
               const codeIndex = index
               dialog.replace(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
-                  <CodeMethod providerID={provider.id} title={method.label} index={codeIndex} authorization={codeAuth} />
+                  <CodeMethod
+                    providerID={provider.id}
+                    title={method.label}
+                    index={codeIndex}
+                    authorization={codeAuth}
+                  />
                 )
               })
             }
@@ -102,16 +109,20 @@ export function createDialogProviderOptions(): Accessor<{
               const autoAuth = result.data
               const autoIndex = index
               dialog.replace(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
-                  <AutoMethod providerID={provider.id} title={method.label} index={autoIndex} authorization={autoAuth} />
+                  <AutoMethod
+                    providerID={provider.id}
+                    title={method.label}
+                    index={autoIndex}
+                    authorization={autoAuth}
+                  />
                 )
               })
             }
           }
           if (method.type === "api") {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />); return;
+            dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />)
+            return
           }
         },
       })),
@@ -122,7 +133,6 @@ export function createDialogProviderOptions(): Accessor<{
 
 export function DialogProvider(): JSX.Element {
   const options = createDialogProviderOptions()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <DialogSelect title="Connect a provider" options={options()} />
 }
 
@@ -141,9 +151,11 @@ function AutoMethod(props: AutoMethodProps): JSX.Element {
 
   useKeyboard((evt) => {
     if (evt.name === "c" && !evt.ctrl && !evt.meta) {
-      const code = (/[A-Z0-9]{4}-[A-Z0-9]{4,5}/.exec(props.authorization.instructions))?.[0] ?? props.authorization.url
+      const code = /[A-Z0-9]{4}-[A-Z0-9]{4,5}/.exec(props.authorization.instructions)?.[0] ?? props.authorization.url
       Clipboard.copy(code)
-        .then(() => { toast.show({ message: "Copied to clipboard", variant: "info" }); })
+        .then(() => {
+          toast.show({ message: "Copied to clipboard", variant: "info" })
+        })
         .catch(toast.error)
     }
   })
@@ -159,18 +171,21 @@ function AutoMethod(props: AutoMethodProps): JSX.Element {
     }
     await sdk.client.instance.dispose()
     await sync.bootstrap()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     dialog.replace(() => <DialogModel providerID={props.providerID} />)
   })()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box paddingLeft={2} paddingRight={2} gap={1} paddingBottom={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           {props.title}
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -199,7 +214,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
   const dialog = useDialog()
   const [error, setError] = createSignal(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogPrompt
       title={props.title}
@@ -214,7 +228,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
           if (!error) {
             await sdk.client.instance.dispose()
             await sync.bootstrap()
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogModel providerID={props.providerID} />)
             return
           }
@@ -222,7 +235,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
         })()
       }}
       description={() => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
         return (
           <box gap={1}>
             <text fg={theme.textMuted}>{props.authorization.instructions}</text>
@@ -247,38 +259,45 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
   const sync = useSync()
   const { theme } = useTheme()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogPrompt
       title={props.title}
       placeholder="API key"
       description={
-        (({
-          opencode: (() => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Zen gives you access to all the best coding models at the cheapest prices with a single API
-                key.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
-              </text>
-            </box>
-          )) as () => JSX.Element,
-          "opencode-go": (() => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
-            <box gap={1}>
-              <text fg={theme.textMuted}>
-                OpenCode Go is a $10 per month subscription that provides reliable access to popular open coding models
-                with generous usage limits.
-              </text>
-              <text fg={theme.text}>
-                Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go
-              </text>
-            </box>
-          )) as () => JSX.Element,
-        } as Record<string, (() => JSX.Element) | undefined>)[props.providerID] ?? undefined)
+        (
+          {
+            orbit: (() => (
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Zen gives you access to the best coding models with a single API key.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                </text>
+              </box>
+            )) as () => JSX.Element,
+            opencode: (() => (
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Zen gives you access to the best coding models with a single API key.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> to get a key
+                </text>
+              </box>
+            )) as () => JSX.Element,
+            "opencode-go": (() => (
+              <box gap={1}>
+                <text fg={theme.textMuted}>
+                  OpenCode Go provides reliable access to popular coding models with generous usage limits.
+                </text>
+                <text fg={theme.text}>
+                  Go to <span style={{ fg: theme.primary }}>https://opencode.ai/zen</span> and enable OpenCode Go
+                </text>
+              </box>
+            )) as () => JSX.Element,
+          } as Record<string, (() => JSX.Element) | undefined>
+        )[props.providerID] ?? undefined
       }
       onConfirm={(value) => {
         if (!value) return
@@ -292,7 +311,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
           })
           await sdk.client.instance.dispose()
           await sync.bootstrap()
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           dialog.replace(() => <DialogModel providerID={props.providerID} />)
         })()
       }}

@@ -11,7 +11,12 @@ export {
   useIsAgentRunning,
   useIsStopPending,
 } from './chat-store';
-export type { ChatSessionData, ChatStoreState, PendingMessage } from './chat-store';
+export type {
+  ActiveCompaction,
+  ChatSessionData,
+  ChatStoreState,
+  PendingMessage,
+} from './chat-store';
 
 // Queued message store
 export { useQueuedMessageStore, useQueuedMessage } from './queued-message-store';

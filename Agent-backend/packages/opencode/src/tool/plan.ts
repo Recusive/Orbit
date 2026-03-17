@@ -2,34 +2,37 @@ import path from "path"
 
 import z from "zod"
 
-
-import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
 import { Provider } from "../provider/provider"
+import { ModelID, ProviderID } from "../provider/schema"
 import { Question } from "../question"
 import { Session } from "../session"
 import { MessageV2 } from "../session/message-v2"
+import { MessageID, PartID, SessionID } from "../session/schema"
 
 import EXIT_DESCRIPTION from "./plan-exit.txt"
 import { Tool } from "./tool"
 
-async function getLastModel(
-  sessionID: string,
-): Promise<{ modelID: string; providerID: string }> {
+async function getLastModel(sessionID: SessionID): Promise<{ modelID: ModelID; providerID: ProviderID }> {
   for (const item of MessageV2.stream(sessionID)) {
     if (item.info.role === "user") return item.info.model
   }
-  return Provider.defaultModel()
+  const model = await Provider.defaultModel()
+  return {
+    providerID: ProviderID.make(model.providerID),
+    modelID: ModelID.make(model.modelID),
+  }
 }
 
 export const PlanExitTool = Tool.define("plan_exit", {
   description: EXIT_DESCRIPTION,
   parameters: z.object({}),
   async execute(_params, ctx) {
-    const session = Session.get(ctx.sessionID)
+    const sessionID = SessionID.make(ctx.sessionID)
+    const session = Session.get(sessionID)
     const plan = path.relative(Instance.worktree, Session.plan(session))
     const answers = await Question.ask({
-      sessionID: ctx.sessionID,
+      sessionID,
       questions: [
         {
           question: `Plan at ${plan} is complete. Would you like to switch to the build agent and start implementing?`,
@@ -41,17 +44,17 @@ export const PlanExitTool = Tool.define("plan_exit", {
           ],
         },
       ],
-      tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
+      tool: ctx.callID ? { messageID: MessageID.make(ctx.messageID), callID: ctx.callID } : undefined,
     })
 
     const answer = answers[0]?.[0]
     if (answer === "No") throw new Question.RejectedError()
 
-    const model = await getLastModel(ctx.sessionID)
+    const model = await getLastModel(sessionID)
 
     const userMsg: MessageV2.User = {
-      id: Identifier.ascending("message"),
-      sessionID: ctx.sessionID,
+      id: MessageID.ascending(),
+      sessionID,
       role: "user",
       time: {
         created: Date.now(),
@@ -61,9 +64,9 @@ export const PlanExitTool = Tool.define("plan_exit", {
     }
     Session.updateMessage(userMsg)
     Session.updatePart({
-      id: Identifier.ascending("part"),
+      id: PartID.ascending(),
       messageID: userMsg.id,
-      sessionID: ctx.sessionID,
+      sessionID,
       type: "text",
       text: `The plan at ${plan} has been approved, you can now edit files. Execute the plan`,
       synthetic: true,
@@ -82,11 +85,12 @@ export const PlanEnterTool = Tool.define("plan_enter", {
   description: ENTER_DESCRIPTION,
   parameters: z.object({}),
   async execute(_params, ctx) {
-    const session = Session.get(ctx.sessionID)
+    const sessionID = SessionID.make(ctx.sessionID)
+    const session = Session.get(sessionID)
     const plan = path.relative(Instance.worktree, Session.plan(session))
 
     const answers = await Question.ask({
-      sessionID: ctx.sessionID,
+      sessionID,
       questions: [
         {
           question: `Would you like to switch to the plan agent and create a plan saved to ${plan}?`,
@@ -98,18 +102,18 @@ export const PlanEnterTool = Tool.define("plan_enter", {
           ],
         },
       ],
-      tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
+      tool: ctx.callID ? { messageID: MessageID.make(ctx.messageID), callID: ctx.callID } : undefined,
     })
 
     const answer = answers[0]?.[0]
 
     if (answer === "No") throw new Question.RejectedError()
 
-    const model = await getLastModel(ctx.sessionID)
+    const model = await getLastModel(sessionID)
 
     const userMsg: MessageV2.User = {
-      id: Identifier.ascending("message"),
-      sessionID: ctx.sessionID,
+      id: MessageID.ascending(),
+      sessionID,
       role: "user",
       time: {
         created: Date.now(),
@@ -119,9 +123,9 @@ export const PlanEnterTool = Tool.define("plan_enter", {
     }
     Session.updateMessage(userMsg)
     await Session.updatePart({
-      id: Identifier.ascending("part"),
+      id: PartID.ascending(),
       messageID: userMsg.id,
-      sessionID: ctx.sessionID,
+      sessionID,
       type: "text",
       text: "User has requested to enter plan mode. Switch to plan mode and begin planning.",
       synthetic: true,

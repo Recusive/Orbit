@@ -131,8 +131,12 @@ describe("Truncate", () => {
     let recentFile: string
 
     afterAll(async () => {
-      await fs.unlink(oldFile).catch(() => { /* noop */ })
-      await fs.unlink(recentFile).catch(() => { /* noop */ })
+      await fs.unlink(oldFile).catch(() => {
+        /* noop */
+      })
+      await fs.unlink(recentFile).catch(() => {
+        /* noop */
+      })
     })
 
     test("deletes files older than 7 days and preserves recent files", async () => {

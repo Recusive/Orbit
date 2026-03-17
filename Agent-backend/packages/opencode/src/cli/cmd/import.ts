@@ -2,6 +2,7 @@ import { EOL } from "os"
 
 import { Instance } from "../../project/instance"
 import { Session } from "../../session"
+import { MessageV2 } from "../../session/message-v2"
 import { SessionTable, MessageTable, PartTable } from "../../session/session.sql"
 import { ShareNext } from "../../share/share-next"
 import { Database } from "../../storage/db"
@@ -10,7 +11,7 @@ import { bootstrap } from "../bootstrap"
 
 import { cmd } from "./cmd"
 
-import type { Session as SDKSession, Message, Part } from "@opencode-ai/sdk/v2"
+import type { Session as SDKSession, Message, Part } from "@orbit.build/sdk/v2"
 import type { Argv } from "yargs"
 
 /** Discriminated union returned by the ShareNext API (GET /api/share/:id/data) */
@@ -23,8 +24,16 @@ export type ShareData =
 
 /** Extract share ID from a share URL like https://opncd.ai/share/abc123 */
 export function parseShareUrl(url: string): string | null {
-  const match = /^https?:\/\/[^/]+\/share\/([a-zA-Z0-9_-]+)$/.exec(url)
+  const match = url.match(/^https?:\/\/[^/]+\/share\/([a-zA-Z0-9_-]+)$/)
   return match ? match[1] : null
+}
+
+export function shouldAttachShareAuthHeaders(shareUrl: string, accountBaseUrl: string): boolean {
+  try {
+    return new URL(shareUrl).origin === new URL(accountBaseUrl).origin
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -37,7 +46,7 @@ export function parseShareUrl(url: string): string | null {
  */
 export function transformShareData(shareData: ShareData[]): {
   info: SDKSession
-  messages: { info: Message; parts: Part[] }[]
+  messages: Array<{ info: Message; parts: Part[] }>
 } | null {
   const sessionItem = shareData.find((d) => d.type === "session")
   if (!sessionItem) return null
@@ -52,10 +61,7 @@ export function transformShareData(shareData: ShareData[]): {
       if (!partMap.has(item.data.messageID)) {
         partMap.set(item.data.messageID, [])
       }
-      const parts = partMap.get(item.data.messageID)
-      if (parts !== undefined) {
-        parts.push(item.data)
-      }
+      partMap.get(item.data.messageID)!.push(item.data)
     }
   }
 
@@ -84,11 +90,11 @@ export const ImportCommand = cmd({
     await bootstrap(process.cwd(), async () => {
       let exportData:
         | {
-            info: Session.Info
-            messages: {
+            info: SDKSession
+            messages: Array<{
               info: Message
               parts: Part[]
-            }[]
+            }>
           }
         | undefined
 
@@ -103,8 +109,21 @@ export const ImportCommand = cmd({
           return
         }
 
-        const baseUrl = await ShareNext.url()
-        const response = await fetch(`${baseUrl}/api/share/${slug}/data`)
+        const parsed = new URL(args.file)
+        const baseUrl = parsed.origin
+        const req = await ShareNext.request()
+        const headers = shouldAttachShareAuthHeaders(args.file, req.baseUrl) ? req.headers : {}
+
+        const dataPath = req.api.data(slug)
+        let response = await fetch(`${baseUrl}${dataPath}`, {
+          headers,
+        })
+
+        if (!response.ok && dataPath !== `/api/share/${slug}/data`) {
+          response = await fetch(`${baseUrl}/api/share/${slug}/data`, {
+            headers,
+          })
+        }
 
         if (!response.ok) {
           process.stdout.write(`Failed to fetch share data: ${response.statusText}`)
@@ -112,7 +131,7 @@ export const ImportCommand = cmd({
           return
         }
 
-        const shareData = (await response.json()) as ShareData[]
+        const shareData: ShareData[] = await response.json()
         const transformed = transformShareData(shareData)
 
         if (!transformed) {
@@ -131,41 +150,55 @@ export const ImportCommand = cmd({
         }
       }
 
-      const row = { ...Session.toRow(exportData.info), project_id: Instance.project.id }
+      if (!exportData) {
+        process.stdout.write("Failed to read session data")
+        process.stdout.write(EOL)
+        return
+      }
+
+      const info = Session.Info.parse({
+        ...exportData.info,
+        projectID: Instance.project.id,
+      })
+      const row = Session.toRow(info)
       Database.use((db) =>
-        { db
+        db
           .insert(SessionTable)
           .values(row)
           .onConflictDoUpdate({ target: SessionTable.id, set: { project_id: row.project_id } })
-          .run(); },
+          .run(),
       )
 
       for (const msg of exportData.messages) {
+        const msgInfo = MessageV2.Info.parse(msg.info)
+        const { id, sessionID: _sessionID, ...msgData } = msgInfo
         Database.use((db) =>
-          { db
+          db
             .insert(MessageTable)
             .values({
-              id: msg.info.id,
-              session_id: exportData.info.id,
-              time_created: msg.info.time.created,
-              data: msg.info,
+              id,
+              session_id: row.id,
+              time_created: msgInfo.time?.created ?? Date.now(),
+              data: msgData,
             })
             .onConflictDoNothing()
-            .run(); },
+            .run(),
         )
 
         for (const part of msg.parts) {
+          const partInfo = MessageV2.Part.parse(part)
+          const { id: partId, sessionID: _sessionID, messageID, ...partData } = partInfo
           Database.use((db) =>
-            { db
+            db
               .insert(PartTable)
               .values({
-                id: part.id,
-                message_id: msg.info.id,
-                session_id: exportData.info.id,
-                data: part,
+                id: partId,
+                message_id: messageID,
+                session_id: row.id,
+                data: partData,
               })
               .onConflictDoNothing()
-              .run(); },
+              .run(),
           )
         }
       }

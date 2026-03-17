@@ -1,6 +1,6 @@
 import path from "path"
 
-import { generateObject, streamObject  } from "ai"
+import { generateObject, streamObject } from "ai"
 import { mergeDeep, pipe, sortBy, values } from "remeda"
 import z from "zod"
 
@@ -20,12 +20,11 @@ import PROMPT_SUMMARY from "./prompt/summary.txt"
 import PROMPT_TITLE from "./prompt/title.txt"
 
 import type { SharedV2ProviderOptions } from "@ai-sdk/provider"
-import type {ModelMessage} from "ai";
+import type { ModelMessage } from "ai"
 
 import { Global } from "@/global"
 import { PermissionNext } from "@/permission/next"
 import { Plugin } from "@/plugin"
-
 
 export namespace Agent {
   export const Info = z

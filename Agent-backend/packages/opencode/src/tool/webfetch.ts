@@ -6,7 +6,6 @@ import { abortAfterAny } from "../util/abort"
 import { Tool } from "./tool"
 import DESCRIPTION from "./webfetch.txt"
 
-
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
 const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
 const MAX_TIMEOUT = 120 * 1000 // 2 minutes
@@ -67,7 +66,7 @@ export const WebFetchTool = Tool.define("webfetch", {
     // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
     const response =
       initial.status === 403 && initial.headers.get("cf-mitigated") === "challenge"
-        ? await fetch(params.url, { signal, headers: { ...headers, "User-Agent": "opencode" } })
+        ? await fetch(params.url, { signal, headers: { ...headers, "User-Agent": "orbit" } })
         : initial
 
     clearTimeout()

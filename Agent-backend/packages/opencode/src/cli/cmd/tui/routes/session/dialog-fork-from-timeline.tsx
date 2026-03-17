@@ -27,9 +27,7 @@ export function DialogForkFromTimeline(props: { sessionID: string; onMove: (mess
     const result: DialogSelectOption<string>[] = []
     for (const message of messages) {
       if (message.role !== "user") continue
-      const part = (sync.data.part[message.id] ?? []).find(
-        (x) => x.type === "text" && !x.synthetic && !x.ignored,
-      )
+      const part = (sync.data.part[message.id] ?? []).find((x) => x.type === "text" && !x.synthetic && !x.ignored)
       if (part?.type !== "text") continue
       result.push({
         title: part.text.replace(/\n/g, " "),
@@ -69,6 +67,13 @@ export function DialogForkFromTimeline(props: { sessionID: string; onMove: (mess
     return result
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
-  return <DialogSelect onMove={(option) => { props.onMove(option.value); }} title="Fork from message" options={options()} />
+  return (
+    <DialogSelect
+      onMove={(option) => {
+        props.onMove(option.value)
+      }}
+      title="Fork from message"
+      options={options()}
+    />
+  )
 }

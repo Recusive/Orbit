@@ -238,6 +238,38 @@ describe('tool-store', () => {
     });
   });
 
+  describe('updateToolInput', () => {
+    it('should replace the active tool input when it changes', () => {
+      const { startTool, updateToolInput } = useToolStore.getState();
+
+      startTool('tool-1', 'msg-1', 'todowrite', {});
+      updateToolInput('tool-1', {
+        todos: [{ id: '1', content: 'Ship it', status: 'pending' }],
+      });
+
+      expect(useToolStore.getState().activeTools['tool-1']?.toolInput).toEqual({
+        todos: [{ id: '1', content: 'Ship it', status: 'pending' }],
+      });
+    });
+
+    it('should ignore unchanged payloads', () => {
+      const { startTool, updateToolInput } = useToolStore.getState();
+
+      const toolInput = {
+        todos: [{ id: '1', content: 'Ship it', status: 'pending' }],
+      };
+
+      startTool('tool-1', 'msg-1', 'todowrite', toolInput);
+      const original = useToolStore.getState().activeTools['tool-1'];
+
+      updateToolInput('tool-1', {
+        todos: [{ id: '1', content: 'Ship it', status: 'pending' }],
+      });
+
+      expect(useToolStore.getState().activeTools['tool-1']).toBe(original);
+    });
+  });
+
   // ============================================================================
   // Permission Management
   // ============================================================================

@@ -664,7 +664,7 @@ export const McpDebugCommand = cmd({
               params: {
                 protocolVersion: "2024-11-05",
                 capabilities: {},
-                clientInfo: { name: "opencode-debug", version: Installation.VERSION },
+                clientInfo: { name: "orbit-debug", version: Installation.VERSION },
               },
               id: 1,
             }),
@@ -707,7 +707,7 @@ export const McpDebugCommand = cmd({
 
             try {
               const client = new Client({
-                name: "opencode-debug",
+                name: "orbit-debug",
                 version: Installation.VERSION,
               })
               await client.connect(transport)

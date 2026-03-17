@@ -80,14 +80,18 @@ export function DialogExportOptions(props: DialogExportOptionsProps): JSX.Elemen
     textarea.gotoLineEnd()
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
         <text attributes={TextAttributes.BOLD} fg={theme.text}>
           Export Options
         </text>
-        <text fg={theme.textMuted} onMouseUp={() => { dialog.clear(); }}>
+        <text
+          fg={theme.textMuted}
+          onMouseUp={() => {
+            dialog.clear()
+          }}
+        >
           esc
         </text>
       </box>
@@ -121,7 +125,9 @@ export function DialogExportOptions(props: DialogExportOptionsProps): JSX.Elemen
           gap={2}
           paddingLeft={1}
           backgroundColor={store.active === "thinking" ? theme.backgroundElement : undefined}
-          onMouseUp={() => { setStore("active", "thinking"); }}
+          onMouseUp={() => {
+            setStore("active", "thinking")
+          }}
         >
           <text fg={store.active === "thinking" ? theme.primary : theme.textMuted}>
             {store.thinking ? "[x]" : "[ ]"}
@@ -133,7 +139,9 @@ export function DialogExportOptions(props: DialogExportOptionsProps): JSX.Elemen
           gap={2}
           paddingLeft={1}
           backgroundColor={store.active === "toolDetails" ? theme.backgroundElement : undefined}
-          onMouseUp={() => { setStore("active", "toolDetails"); }}
+          onMouseUp={() => {
+            setStore("active", "toolDetails")
+          }}
         >
           <text fg={store.active === "toolDetails" ? theme.primary : theme.textMuted}>
             {store.toolDetails ? "[x]" : "[ ]"}
@@ -145,7 +153,9 @@ export function DialogExportOptions(props: DialogExportOptionsProps): JSX.Elemen
           gap={2}
           paddingLeft={1}
           backgroundColor={store.active === "assistantMetadata" ? theme.backgroundElement : undefined}
-          onMouseUp={() => { setStore("active", "assistantMetadata"); }}
+          onMouseUp={() => {
+            setStore("active", "assistantMetadata")
+          }}
         >
           <text fg={store.active === "assistantMetadata" ? theme.primary : theme.textMuted}>
             {store.assistantMetadata ? "[x]" : "[ ]"}
@@ -157,7 +167,9 @@ export function DialogExportOptions(props: DialogExportOptionsProps): JSX.Elemen
           gap={2}
           paddingLeft={1}
           backgroundColor={store.active === "openWithoutSaving" ? theme.backgroundElement : undefined}
-          onMouseUp={() => { setStore("active", "openWithoutSaving"); }}
+          onMouseUp={() => {
+            setStore("active", "openWithoutSaving")
+          }}
         >
           <text fg={store.active === "openWithoutSaving" ? theme.primary : theme.textMuted}>
             {store.openWithoutSaving ? "[x]" : "[ ]"}
@@ -204,18 +216,23 @@ DialogExportOptions.show = (
   } | null>((resolve) => {
     dialog.replace(
       () => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
         <DialogExportOptions
           defaultFilename={defaultFilename}
           defaultThinking={defaultThinking}
           defaultToolDetails={defaultToolDetails}
           defaultAssistantMetadata={defaultAssistantMetadata}
           defaultOpenWithoutSaving={defaultOpenWithoutSaving}
-          onConfirm={(options) => { resolve(options); }}
-          onCancel={() => { resolve(null); }}
+          onConfirm={(options) => {
+            resolve(options)
+          }}
+          onCancel={() => {
+            resolve(null)
+          }}
         />
       ),
-      () => { resolve(null); },
+      () => {
+        resolve(null)
+      },
     )
   })
 }

@@ -17,14 +17,16 @@ Use this to find the right file. Read the file directly — no links needed.
 | `quality/`              | Linting, audits, health metrics     | Code standards, audit results    |
 | `reference/`            | SDK docs, prompts, external guides  | API references, prompt templates |
 | `specs/`                | Behavior specs, acceptance criteria | What "done" looks like           |
+| `skills/`               | Agent skill creation and publishing | Creating/publishing skills       |
 | `orbitweb/`             | Marketing site context              | Orbitweb-specific (read-only)    |
 
-## decisions/ (4 files)
+## decisions/ (5 files)
 
 - `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
 - `CHAT-PANEL-MINIMUM-WIDTH.md` — Constant 400px chat floor via dynamic activity cap, sidebar auto-collapse, header overflow fade
 - `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` — Why sidebar uses single margin-left slide instead of two-property transition (eliminates desync jank)
 - `INSTANT-HOVER-SIDEBAR-LISTS.md` — Instant hover for all list items: removed backdrop-blur, bg transitions, and transition-all (Frequency Principle)
+- `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md` — Container-level blur reveal for sidebar view switches: skeleton hold timer, key-based remount, GPU compositing lesson
 
 ## architecture/ (12 files)
 
@@ -51,9 +53,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `COLOR-SYSTEM-REFACTOR.md` — File-by-file color refactor plan (patterns A-J, semantic tokens, verification)
 - `DEAD-CSS-REMOVAL-PLAN.md` — Dead CSS removal plan
 
-## development/ (6 files)
+## development/ (7 files)
 
 - `DEVELOPMENT.md` — Development workflow and setup
+- `NPM-PUBLISH-GUIDE.md` — Publishing @orbit.build/sdk and @orbit.build/plugin to npm (account, 2FA, versioning, troubleshooting)
 - `RELEASE-GUIDE.md` — How to tag, build, and ship a new version (step-by-step)
 - `TROUBLESHOOTING.md` — Common issues and solutions
 - `CI-CD-GUIDE.md` — GitHub Actions CI/CD pipeline
@@ -64,10 +67,9 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (13 entries)
+## plans/tracked/todo/ (9 entries)
 
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
-- `OPENCODE-MIGRATION-PLAN.md` — Replace agent-bridge with Agent-backend (opencode fork, HTTP + SSE, multi-provider)
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
@@ -79,9 +81,17 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `kanban-ticket-board.md` — Kanban ticket board
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
+- `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (8 entries)
+## plans/tracked/done/ (31 entries)
 
+- `lexical-chat-input-migration.md` — Migrate chat input from raw contentEditable + overlay to Lexical editor (fixes WebKit cursor bug, unifies text/decoration/cursor)
+- `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
+- `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI
+- `SETTINGS-DIALOG-TO-PAGE.md` — Convert settings from dialog to inline page (vault pattern)
+- `UNIFIED-OPENCODE-CHAT-UI.md` — Unify OpenCode chat UI into shared chat infrastructure
+- `OPENCODE-MIGRATION-PLAN.md` — Replace agent-bridge with Agent-backend (opencode fork, HTTP + SSE, multi-provider)
+- `TUI-FULL-BLEED-LAYOUT.md` — TUI full bleed layout
 - `THINKING-DURATION-PERSISTENCE-PLAN.md` — Thinking duration persistence
 - `fix-user-bubble-shift-after-send.md` — Fix user bubble sub-pixel shift after send animation
 - `instant-title-generation.md` — Instant title generation
@@ -90,6 +100,27 @@ Use this to find the right file. Read the file directly — no links needed.
 - `thinking-block-interleave-and-session-switch-fix.md` — Thinking block interleave and session switch fix
 - `title-divergence-fix.md` — Title divergence fix
 - `title-skeleton-loading.md` — Title skeleton loading state
+- `browser-overlay-dialog-fix.md` — Browser overlay dialog fix (overlay coordination + alpha transparency hide)
+- `fix-opencode-todobar-realtime.md` — Fix OpenCode TodoBar not showing in real-time (updateToolInput action)
+- `fix-todobar-flicker-consecutive-calls.md` — Fix TodoBar flicker on consecutive TodoWrite calls (payload-aware selection)
+- `opencode-session-restore-speed.md` — OpenCode session restore speed (pre-warm, skip validate, skeleton on mount)
+- `fix-provider-api-key-flow.md` — Fix provider API key → model selection end-to-end flow
+- `fix-provider-cache-invalidation.md` — Fix provider not showing connected after API key save (backend cache invalidation)
+- `rename-opencode-ai-to-orbit.md` — Rename @opencode-ai/_ packages to @orbit.build/_ (npm scope, imports, config migration)
+- `slash-command-code-badges.md` — Slash command inline code badges (iterated through 5 audit rounds, superseded by overlay approach)
+- `slash-command-chips.md` — Slash command context chips (abandoned — user wanted inline, not chips above input)
+- `slash-command-syntax-highlighting.md` — Slash command syntax highlighting via text overlay (shipped)
+- `wire-compact-opencode-backend.md` — Wire OpenCode /compact command into frontend (store infra, interception, SSE settlement)
+- `fix-compact-rendering-and-tokens.md` — Fix /compact rendering (CompactIndicator instead of raw markdown) and token count (last-assistant snapshot)
+- `fix-opencode-streaming-performance.md` — Fix OpenCode streaming performance (RAF delta batching, time-gated reveal, ThinkingBlock reuse)
+- `fix-csp-opencode-backend.md` — Fix CSP blocking OpenCode backend in production builds (add `http://127.0.0.1:*` to `connect-src`, contract test, CSP doc update)
+- `unify-opencode-question-widget.md` — Unify OpenCode question tool to use shared QuestionPrompt presenter (shared visuals, backend-specific wrappers, multi-select + custom support)
+- `fix-thinking-content-streaming-order.md` — Fix sequential thinking-before-content streaming (ordered frontier reveal, phase-aware content ceiling, multi-phase interleaving)
+- `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
+- `DISABLE-IMAGE-BUTTON-UNSUPPORTED-MODELS.md` — Disable image button when model doesn't support images (derive supportsImageInput from modalities/attachment, backend-gated UI, chip cleanup, send-time guard)
+- `fix-base64-leak-image-dialog.md` — Fix base64 data leaking into DOM via image src attributes (SafeImage component converts data: URLs to opaque blob: URLs across all four rendering surfaces)
+- `FIX-IMAGE-BUTTON-TYPE-MISMATCH.md` — Fix image button enabled for all models (schema-data divergence: migrate to capabilities-based model schema, make supportsImageInput required)
+- `STRICT-TYPING-LINT-CLEANUP.md` — Strict typing and lint suppression cleanup (6-phase: config consolidation, Rust allow→expect, LSP audit, TS fixes, Agent-backend targeted, test standardization)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 
@@ -126,6 +157,11 @@ Use this to find the right file. Read the file directly — no links needed.
 - `PENCIL-CANVAS-ARCHITECTURE.md` — Pencil design editor architecture (dual-canvas rendering, scene graph, AI streaming generation via MCP)
 - `System-Prompt.xml` — System prompt template
 - `canvas-rebuild-prompt.md` — Canvas rebuild prompt context
+
+## skills/ (2 files)
+
+- `skill-guide.md` — Definitive guide to building agent skills (compiled from Anthropic's official guide, AgentSkills spec, and skills-ref library)
+- `SKILLS-PUBLISHING-GUIDE.md` — How to create skills, publish to Recusive/Skills repo, CLI commands, skills.sh leaderboard mechanics, well-known endpoint hosting
 
 ## orbitweb/ (1 file)
 

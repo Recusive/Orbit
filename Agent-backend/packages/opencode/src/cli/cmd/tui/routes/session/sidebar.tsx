@@ -7,7 +7,7 @@ import { useDirectory } from "../../context/directory"
 import { useKV } from "../../context/kv"
 import { useTheme } from "../../context/theme"
 
-import type { AssistantMessage } from "@opencode-ai/sdk/v2"
+import type { AssistantMessage } from "@orbit.build/sdk/v2"
 import type { JSX } from "solid-js"
 
 import { Installation } from "@/installation"
@@ -53,14 +53,19 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
   })
 
   const context = createMemo(() => {
-    const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as AssistantMessage | undefined
+    const last = messages().findLast((x) => x.role === "assistant" && x.tokens.output > 0) as
+      | AssistantMessage
+      | undefined
     if (!last) return
     const total =
       last.tokens.input + last.tokens.output + last.tokens.reasoning + last.tokens.cache.read + last.tokens.cache.write
     const model = sync.data.provider.find((x) => x.id === last.providerID)?.models[last.modelID]
     return {
       tokens: total.toLocaleString(),
-      percentage: model?.limit.context !== undefined && model.limit.context !== 0 ? Math.round((total / model.limit.context) * 100) : null,
+      percentage:
+        model?.limit.context !== undefined && model.limit.context !== 0
+          ? Math.round((total / model.limit.context) * 100)
+          : null,
     }
   })
 
@@ -68,11 +73,10 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
   const kv = useKV()
 
   const hasProviders = createMemo(() =>
-    sync.data.provider.some((x) => x.id !== "opencode" || Object.values(x.models).some((y) => y.cost.input !== 0)),
+    sync.data.provider.some((x) => x.id !== "orbit" || Object.values(x.models).some((y) => y.cost.input !== 0)),
   )
   const gettingStartedDismissed = createMemo(() => kv.get<boolean>("dismissed_getting_started", false))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={session()}>
       <box
@@ -116,7 +120,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <box
                   flexDirection="row"
                   gap={1}
-                  onMouseDown={() => { if (mcpEntries().length > 2) setExpanded("mcp", !expanded.mcp); }}
+                  onMouseDown={() => {
+                    if (mcpEntries().length > 2) setExpanded("mcp", !expanded.mcp)
+                  }}
                 >
                   <Show when={mcpEntries().length > 2}>
                     <text fg={theme.text}>{expanded.mcp ? "▼" : "▶"}</text>
@@ -127,7 +133,10 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                       <span style={{ fg: theme.textMuted }}>
                         {" "}
                         ({connectedMcpCount()} active
-                        {errorMcpCount() > 0 ? `, ${String(errorMcpCount())} error${errorMcpCount() > 1 ? "s" : ""}` : ""})
+                        {errorMcpCount() > 0
+                          ? `, ${String(errorMcpCount())} error${errorMcpCount() > 1 ? "s" : ""}`
+                          : ""}
+                        )
                       </span>
                     </Show>
                   </text>
@@ -135,7 +144,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <Show when={mcpEntries().length <= 2 || expanded.mcp}>
                   <For each={mcpEntries()}>
                     {([key, item]) => (
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                       <box flexDirection="row" gap={1}>
                         <text
                           flexShrink={0}
@@ -158,7 +166,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                           <span style={{ fg: theme.textMuted }}>
                             <Switch fallback={item.status}>
                               <Match when={item.status === "connected"}>Connected</Match>
-                              {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
                               <Match when={item.status === "failed" && item}>{(val) => <i>{val().error}</i>}</Match>
                               <Match when={item.status === "disabled"}>Disabled</Match>
                               <Match when={(item.status as string) === "needs_auth"}>Needs auth</Match>
@@ -178,7 +185,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
               <box
                 flexDirection="row"
                 gap={1}
-                onMouseDown={() => { if (sync.data.lsp.length > 2) setExpanded("lsp", !expanded.lsp); }}
+                onMouseDown={() => {
+                  if (sync.data.lsp.length > 2) setExpanded("lsp", !expanded.lsp)
+                }}
               >
                 <Show when={sync.data.lsp.length > 2}>
                   <text fg={theme.text}>{expanded.lsp ? "▼" : "▶"}</text>
@@ -197,7 +206,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 </Show>
                 <For each={sync.data.lsp}>
                   {(item) => (
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                     <box flexDirection="row" gap={1}>
                       <text
                         flexShrink={0}
@@ -223,7 +231,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <box
                   flexDirection="row"
                   gap={1}
-                  onMouseDown={() => { if (todo().length > 2) setExpanded("todo", !expanded.todo); }}
+                  onMouseDown={() => {
+                    if (todo().length > 2) setExpanded("todo", !expanded.todo)
+                  }}
                 >
                   <Show when={todo().length > 2}>
                     <text fg={theme.text}>{expanded.todo ? "▼" : "▶"}</text>
@@ -233,8 +243,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                   </text>
                 </box>
                 <Show when={todo().length <= 2 || expanded.todo}>
-                  {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
-                  <For each={todo()}>{(todoEntry) => <TodoItem status={todoEntry.status} content={todoEntry.content} />}</For>
+                  <For each={todo()}>
+                    {(todoEntry) => <TodoItem status={todoEntry.status} content={todoEntry.content} />}
+                  </For>
                 </Show>
               </box>
             </Show>
@@ -243,7 +254,9 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <box
                   flexDirection="row"
                   gap={1}
-                  onMouseDown={() => { if (diff().length > 2) setExpanded("diff", !expanded.diff); }}
+                  onMouseDown={() => {
+                    if (diff().length > 2) setExpanded("diff", !expanded.diff)
+                  }}
                 >
                   <Show when={diff().length > 2}>
                     <text fg={theme.text}>{expanded.diff ? "▼" : "▶"}</text>
@@ -255,7 +268,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <Show when={diff().length <= 2 || expanded.diff}>
                   <For each={diff()}>
                     {(item) => {
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                       return (
                         <box flexDirection="row" gap={1} justifyContent="space-between">
                           <text fg={theme.textMuted} wrapMode="none">
@@ -298,7 +310,12 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                   <text fg={theme.text}>
                     <b>Getting started</b>
                   </text>
-                  <text fg={theme.textMuted} onMouseDown={() => { kv.set("dismissed_getting_started", true); }}>
+                  <text
+                    fg={theme.textMuted}
+                    onMouseDown={() => {
+                      kv.set("dismissed_getting_started", true)
+                    }}
+                  >
                     ✕
                   </text>
                 </box>
@@ -318,7 +335,10 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
             <span style={{ fg: theme.text }}>{directory().split("/").at(-1)}</span>
           </text>
           <text fg={theme.textMuted}>
-            <span style={{ fg: theme.success }}>•</span> <span style={{ fg: theme.text }}><b>Orbit</b></span>{" "}
+            <span style={{ fg: theme.success }}>•</span>{" "}
+            <span style={{ fg: theme.text }}>
+              <b>Orbit</b>
+            </span>{" "}
             <span>{Installation.VERSION}</span>
           </text>
         </box>

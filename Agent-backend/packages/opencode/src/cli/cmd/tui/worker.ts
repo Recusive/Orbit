@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises"
 
-import { createOpencodeClient } from "@opencode-ai/sdk/v2"
+import { createOpencodeClient } from "@orbit.build/sdk/v2"
 
 import type { BunWebSocketData } from "hono/bun"
 
@@ -61,7 +61,7 @@ const startEventStream = (input: { directory: string; workspaceID?: string }): v
   }) as typeof globalThis.fetch
 
   const sdk = createOpencodeClient({
-    baseUrl: "http://opencode.internal",
+    baseUrl: "http://orbit.internal",
     directory: input.directory,
     experimental_workspaceID: input.workspaceID,
     fetch: fetchFn,
@@ -124,12 +124,7 @@ export const rpc = {
       body,
     }
   },
-  async server(input: {
-    port: number
-    hostname: string
-    mdns?: boolean
-    cors?: string[]
-  }): Promise<{ url: string }> {
+  async server(input: { port: number; hostname: string; mdns?: boolean; cors?: string[] }): Promise<{ url: string }> {
     if (server) await server.stop(true)
     server = Server.listen(input)
     return { url: server.url.toString() }

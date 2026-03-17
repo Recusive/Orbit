@@ -11,6 +11,7 @@ import type {
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { DialogOverlay } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -271,10 +272,11 @@ const CommandEditor: FC<CommandEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/15 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogOverlay className="z-60" />
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
+            data-settings-child-dialog="true"
             className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-sidebar border-0 shadow-none rounded-[14px] pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();

@@ -26,7 +26,7 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> => Instance.reload(input)
+    const reload = Instance.reload.bind(Instance)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -46,9 +46,11 @@ describe("project.initGit endpoint", () => {
       })
       expect(reloadSpy).toHaveBeenCalledTimes(1)
       expect(reloadSpy.mock.calls[0]?.[0]?.init).toBe(InstanceBootstrap)
-      expect(seen.some((evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed")).toBe(
-        true,
-      )
+      expect(
+        seen.some(
+          (evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed",
+        ),
+      ).toBe(true)
       expect(Filesystem.exists(path.join(tmp.path, ".git", "opencode"))).toBe(false)
 
       const current = await app.request("/project/current", {
@@ -82,7 +84,7 @@ describe("project.initGit endpoint", () => {
     const fn = (evt: { directory?: string; payload: unknown }): void => {
       seen.push(evt)
     }
-    const reload = (input: Parameters<typeof Instance.reload>[0]): ReturnType<typeof Instance.reload> => Instance.reload(input)
+    const reload = Instance.reload.bind(Instance)
     const reloadSpy = spyOn(Instance, "reload").mockImplementation((input) => reload(input))
     GlobalBus.on("event", fn)
 
@@ -99,7 +101,9 @@ describe("project.initGit endpoint", () => {
         worktree: tmp.path,
       })
       expect(
-        seen.filter((evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed").length,
+        seen.filter(
+          (evt) => evt.directory === tmp.path && (evt.payload as { type?: string }).type === "server.instance.disposed",
+        ).length,
       ).toBe(0)
       expect(reloadSpy).toHaveBeenCalledTimes(0)
 
@@ -117,5 +121,22 @@ describe("project.initGit endpoint", () => {
       reloadSpy.mockRestore()
       GlobalBus.off("event", fn)
     }
+  })
+
+  test("accepts x-orbit-directory headers", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const app = Server.Default()
+
+    const current = await app.request("/project/current", {
+      headers: {
+        "x-orbit-directory": tmp.path,
+      },
+    })
+
+    expect(current.status).toBe(200)
+    expect(await current.json()).toMatchObject({
+      vcs: "git",
+      worktree: tmp.path,
+    })
   })
 })

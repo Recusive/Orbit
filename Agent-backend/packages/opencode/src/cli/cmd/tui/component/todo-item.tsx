@@ -10,7 +10,6 @@ export interface TodoItemProps {
 export function TodoItem(props: TodoItemProps): JSX.Element {
   const { theme } = useTheme()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box flexDirection="row" gap={0}>
       <text

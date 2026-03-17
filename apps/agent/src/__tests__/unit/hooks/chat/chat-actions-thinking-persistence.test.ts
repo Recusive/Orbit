@@ -23,6 +23,11 @@ vi.mock('@/lib/api', () => ({
   conversationLoad: mockConversationLoad,
 }));
 
+vi.mock('@/services/chat/image-attachment-cache', () => ({
+  buildOptimisticAttachedImages: (images?: unknown[]) => images,
+  cacheAttachedImagesForMessage: vi.fn(),
+}));
+
 import { createChatActions } from '@/hooks/chat/handlers/chat-actions';
 import { chatMessageService } from '@/services/chat/chat-message-service';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
@@ -50,7 +55,7 @@ function resetStores(): void {
     rewindEpoch: 0,
     conversationLoadEpoch: 0,
     loadedSessions: {},
-    compactingMessageId: null,
+    activeCompactions: {},
     lruOrder: [],
   });
   useUIStore.setState({

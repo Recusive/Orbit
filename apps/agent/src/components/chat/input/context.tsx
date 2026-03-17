@@ -101,7 +101,7 @@ interface ContextProps {
 }
 
 export const Context: FC<ContextProps> = ({ maxTokens, usedTokens, usage, children }) => {
-  const percentage = Math.min(100, Math.round((usedTokens / maxTokens) * 100));
+  const percentage = maxTokens > 0 ? Math.min(100, Math.round((usedTokens / maxTokens) * 100)) : 0;
 
   return (
     <ContextContext.Provider value={{ maxTokens, usedTokens, usage, percentage }}>

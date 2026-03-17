@@ -12,7 +12,6 @@ import { Provider } from "../../provider/provider"
 import { Filesystem } from "../../util/filesystem"
 import { UI } from "../ui"
 
-
 import { cmd } from "./cmd"
 
 import type { Argv } from "yargs"
@@ -127,7 +126,8 @@ const AgentCreateCommand = cmd({
         const model = args.model ? Provider.parseModel(args.model) : undefined
         const generated = await Agent.generate({ description, model }).catch((error: unknown) => {
           spinner.stop(`LLM failed to generate agent: ${error instanceof Error ? error.message : String(error)}`, 1)
-          if (cliPath !== undefined && cliDescription !== undefined && cliMode !== undefined && cliTools !== undefined) process.exit(1)
+          if (cliPath !== undefined && cliDescription !== undefined && cliMode !== undefined && cliTools !== undefined)
+            process.exit(1)
           throw new UI.CancelledError()
         })
         spinner.stop(`Agent ${generated.identifier} generated`)
@@ -207,7 +207,12 @@ const AgentCreateCommand = cmd({
         await fs.mkdir(targetPath, { recursive: true })
 
         if (Filesystem.exists(filePath)) {
-          if (cliPath !== undefined && cliDescription !== undefined && cliMode !== undefined && cliTools !== undefined) {
+          if (
+            cliPath !== undefined &&
+            cliDescription !== undefined &&
+            cliMode !== undefined &&
+            cliTools !== undefined
+          ) {
             console.error(`Error: Agent file already exists: ${filePath}`)
             process.exit(1)
           }

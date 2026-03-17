@@ -8,6 +8,7 @@ import { lazy } from "../../util/lazy"
 import { errors } from "../error"
 
 import { Pty } from "@/pty"
+import { PtyID } from "@/pty/schema"
 
 export const PtyRoutes = lazy(() =>
   new Hono()
@@ -76,7 +77,7 @@ export const PtyRoutes = lazy(() =>
       }),
       validator("param", z.object({ ptyID: z.string() })),
       (c) => {
-        const info = Pty.get(c.req.valid("param").ptyID)
+        const info = Pty.get(PtyID.make(c.req.valid("param").ptyID))
         if (info === undefined) {
           throw new NotFoundError({ message: "Session not found" })
         }
@@ -104,7 +105,7 @@ export const PtyRoutes = lazy(() =>
       validator("param", z.object({ ptyID: z.string() })),
       validator("json", Pty.UpdateInput),
       (c) => {
-        const info = Pty.update(c.req.valid("param").ptyID, c.req.valid("json"))
+        const info = Pty.update(PtyID.make(c.req.valid("param").ptyID), c.req.valid("json"))
         return c.json(info)
       },
     )
@@ -128,7 +129,7 @@ export const PtyRoutes = lazy(() =>
       }),
       validator("param", z.object({ ptyID: z.string() })),
       (c) => {
-        Pty.remove(c.req.valid("param").ptyID)
+        Pty.remove(PtyID.make(c.req.valid("param").ptyID))
         return c.json(true)
       },
     )
@@ -152,7 +153,7 @@ export const PtyRoutes = lazy(() =>
       }),
       validator("param", z.object({ ptyID: z.string() })),
       upgradeWebSocket((c) => {
-        const id = c.req.param("ptyID")
+        const id = PtyID.make(c.req.param("ptyID"))
         const cursor = (() => {
           const raw = c.req.query("cursor")
           if (raw === undefined) return undefined

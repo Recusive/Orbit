@@ -1,4 +1,4 @@
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { Hono } from "hono"
 import { basicAuth } from "hono/basic-auth"
 import { websocket } from "hono/bun"
@@ -14,6 +14,7 @@ import { Auth } from "../auth"
 import { Command } from "../command"
 import { WorkspaceContext } from "../control-plane/workspace-context"
 import { WorkspaceRouterMiddleware } from "../control-plane/workspace-router-middleware"
+import { WorkspaceID } from "../control-plane/schema"
 import { Flag } from "../flag/flag"
 import { Format } from "../format"
 import { Global } from "../global"
@@ -22,6 +23,7 @@ import { InstanceBootstrap } from "../project/bootstrap"
 import { Instance } from "../project/instance"
 import { Vcs } from "../project/vcs"
 import { Provider } from "../provider/provider"
+import { ProviderID } from "../provider/schema"
 import { Skill } from "../skill/skill"
 import { NotFoundError } from "../storage/db"
 import { Log } from "../util/log"
@@ -117,8 +119,11 @@ export namespace Server {
             )
               return input
 
-            // *.opencode.ai (https only, adjust if needed)
+            // *.opencode.ai and *.orbit.build (https only, adjust if needed)
             if (/^https:\/\/([a-z0-9-]+\.)*opencode\.ai$/.test(input)) {
+              return input
+            }
+            if (/^https:\/\/([a-z0-9-]+\.)*orbit\.build$/.test(input)) {
               return input
             }
             if (opts.cors?.includes(input)) {
@@ -151,7 +156,7 @@ export namespace Server {
         validator(
           "param",
           z.object({
-            providerID: z.string(),
+            providerID: ProviderID.zod,
           }),
         ),
         validator("json", Auth.Info),
@@ -159,6 +164,7 @@ export namespace Server {
           const providerID = c.req.valid("param").providerID
           const info = c.req.valid("json")
           await Auth.set(providerID, info)
+          Provider.reset()
           return c.json(true)
         },
       )
@@ -183,19 +189,25 @@ export namespace Server {
         validator(
           "param",
           z.object({
-            providerID: z.string(),
+            providerID: ProviderID.zod,
           }),
         ),
         async (c) => {
           const providerID = c.req.valid("param").providerID
           await Auth.remove(providerID)
+          Provider.reset()
           return c.json(true)
         },
       )
       .use(async (c, next) => {
         if (c.req.path === "/log") return next()
-        const workspaceID = c.req.query("workspace") ?? c.req.header("x-opencode-workspace")
-        const raw = c.req.query("directory") ?? c.req.header("x-opencode-directory") ?? process.cwd()
+        const rawWorkspaceID =
+          c.req.query("workspace") ?? c.req.header("x-orbit-workspace") ?? c.req.header("x-opencode-workspace")
+        const raw =
+          c.req.query("directory") ??
+          c.req.header("x-orbit-directory") ??
+          c.req.header("x-opencode-directory") ??
+          process.cwd()
         const directory = Filesystem.resolve(
           (() => {
             try {
@@ -207,7 +219,7 @@ export namespace Server {
         )
 
         return WorkspaceContext.provide({
-          workspaceID,
+          workspaceID: rawWorkspaceID ? WorkspaceID.make(rawWorkspaceID) : undefined,
           async fn() {
             return Instance.provide({
               directory,
@@ -560,9 +572,9 @@ export namespace Server {
       .all("/*", async (c) => {
         const path = c.req.path
         const headers = Object.fromEntries(c.req.raw.headers.entries())
-        headers.host = "app.opencode.ai"
+        headers.host = "app.orbit.build"
 
-        const response = await proxy(`https://app.opencode.ai${path}`, {
+        const response = await proxy(`https://app.orbit.build${path}`, {
           method: c.req.method,
           headers,
         })

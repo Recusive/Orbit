@@ -1,9 +1,8 @@
 import { TextAttributes } from "@opentui/core"
 import { useTerminalDimensions } from "@opentui/solid"
 import { useTheme } from "@tui/context/theme"
-import { createContext, useContext,  Show } from "solid-js"
+import { createContext, useContext, Show } from "solid-js"
 import { createStore } from "solid-js/store"
-
 
 import { SplitBorder } from "../component/border"
 import { TuiEvent } from "../event"
@@ -13,17 +12,14 @@ import type z from "zod"
 
 export type ToastOptions = z.infer<typeof TuiEvent.ToastShow.properties>
 
- 
 export function Toast(): JSX.Element {
   const toast = useToast()
   const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <Show when={toast.currentToast}>
       {(current) => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
         <box
           position="absolute"
           justifyContent="center"
@@ -72,11 +68,13 @@ function init(): ToastContext {
       }, duration).unref()
     },
     error: (err: unknown) => {
-      if (err instanceof Error)
-        { toast.show({
+      if (err instanceof Error) {
+        toast.show({
           variant: "error",
           message: err.message,
-        }); return; }
+        })
+        return
+      }
       toast.show({
         variant: "error",
         message: "An unknown error has occurred",
@@ -97,10 +95,8 @@ export interface ToastContext {
 
 const ctx = createContext<ToastContext>()
 
- 
 export function ToastProvider(props: ParentProps): JSX.Element {
   const value = init()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return <ctx.Provider value={value}>{props.children}</ctx.Provider>
 }
 

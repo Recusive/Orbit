@@ -1,5 +1,5 @@
 import { Hono } from "hono"
-import { describeRoute, validator, resolver  } from "hono-openapi"
+import { describeRoute, validator, resolver } from "hono-openapi"
 import z from "zod"
 
 import { InstanceBootstrap } from "../../project/bootstrap"
@@ -105,12 +105,12 @@ export const ProjectRoutes = lazy(() =>
           ...errors(400, 404),
         },
       }),
-      validator("param", z.object({ projectID: z.string() })),
+      validator("param", z.object({ projectID: Project.Info.shape.id })),
       validator("json", Project.update.schema.omit({ projectID: true })),
-      (c) => {
+      async (c) => {
         const projectID = c.req.valid("param").projectID
         const body = c.req.valid("json")
-        const project = Project.update({ ...body, projectID })
+        const project = await Project.update({ ...body, projectID })
         return c.json(project)
       },
     ),

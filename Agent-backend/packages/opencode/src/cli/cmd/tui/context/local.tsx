@@ -7,7 +7,6 @@ import { uniqueBy } from "remeda"
 import { batch, createEffect, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 
-
 import { useToast } from "../ui/toast"
 
 import { useArgs } from "./args"
@@ -18,10 +17,6 @@ import { Global } from "@/global"
 import { Provider } from "@/provider/provider"
 import { Filesystem } from "@/util/filesystem"
 import { iife } from "@/util/iife"
-
-
-
-
 
 export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
   name: "Local",
@@ -35,7 +30,9 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       return provider?.models[model.modelID] !== undefined
     }
 
-    function getFirstValidModel(...modelFns: (() => { providerID: string; modelID: string } | undefined)[]): { providerID: string; modelID: string } | undefined {
+    function getFirstValidModel(
+      ...modelFns: (() => { providerID: string; modelID: string } | undefined)[]
+    ): { providerID: string; modelID: string } | undefined {
       for (const modelFn of modelFns) {
         const model = modelFn()
         if (!model) continue
@@ -72,12 +69,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           return found
         },
         set(name: string) {
-          if (!agents().some((x) => x.name === name))
-            { toast.show({
+          if (!agents().some((x) => x.name === name)) {
+            toast.show({
               variant: "warning",
               message: `Agent not found: ${name}`,
               duration: 3000,
-            }); return; }
+            })
+            return
+          }
           setAgentStore("current", name)
         },
         move(direction: 1 | -1) {
@@ -154,10 +153,14 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
         .then((raw) => {
           const x = raw as Record<string, unknown>
           if (Array.isArray(x.recent)) setModelStore("recent", x.recent as { providerID: string; modelID: string }[])
-          if (Array.isArray(x.favorite)) setModelStore("favorite", x.favorite as { providerID: string; modelID: string }[])
-          if (typeof x.variant === "object" && x.variant !== null) setModelStore("variant", x.variant as Record<string, string | undefined>)
+          if (Array.isArray(x.favorite))
+            setModelStore("favorite", x.favorite as { providerID: string; modelID: string }[])
+          if (typeof x.variant === "object" && x.variant !== null)
+            setModelStore("variant", x.variant as Record<string, string | undefined>)
         })
-        .catch(() => { /* noop */ })
+        .catch(() => {
+          /* noop */
+        })
         .finally(() => {
           setModelStore("ready", true)
           if (state.pending) save()
@@ -191,7 +194,7 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
           }
         }
 
-        const provider = sync.data.provider[0] as typeof sync.data.provider[0] | undefined
+        const provider = sync.data.provider[0] as (typeof sync.data.provider)[0] | undefined
         if (provider === undefined) return undefined
         const defaultModel = sync.data.provider_default[provider.id] as string | undefined
         const firstModel = Object.values(provider.models)[0] as { id: string; name: string } | undefined

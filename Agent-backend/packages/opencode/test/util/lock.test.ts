@@ -3,7 +3,9 @@ import { describe, expect, test } from "bun:test"
 import { Lock } from "../../src/util/lock"
 
 function tick(): Promise<void> {
-  return new Promise<void>((r) => { queueMicrotask(r); })
+  return new Promise<void>((r) => {
+    queueMicrotask(r)
+  })
 }
 
 async function flush(n = 5): Promise<void> {

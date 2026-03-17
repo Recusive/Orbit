@@ -22,7 +22,7 @@ function isChatRole(role: ConversationMessageDto['role']): role is 'user' | 'ass
 
 export function handleConversationCreate(
   message: Extract<WebviewMessage, { type: 'conversation:create' }>
-): void {
+): string {
   // Generate a temp session ID for the frontend. The SDK will write the JSONL file
   // when the first message is sent, using its own session ID. The system:init handler
   // in ChatMessageService remaps the frontend to the SDK ID at that point.
@@ -39,6 +39,7 @@ export function handleConversationCreate(
     },
     '*'
   );
+  return sessionId;
 }
 
 export async function handleConversationList(
@@ -114,6 +115,9 @@ export async function handleConversationLoad(
             ...(m.isInterrupted === true ? { isInterrupted: true } : {}),
             ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
             ...(m.toolUses && m.toolUses.length > 0 ? { toolUses: m.toolUses } : {}),
+            ...(m.attachedImages && m.attachedImages.length > 0
+              ? { attachedImages: m.attachedImages }
+              : {}),
             ...(m.usage ? { usage: m.usage } : {}),
             // parentUuid for active chain resolution (getActiveChain defense-in-depth)
             ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),

@@ -1,8 +1,10 @@
 import { test, expect } from "bun:test"
-
-import { parseShareUrl, transformShareData  } from "../../src/cli/cmd/import"
-
-import type {ShareData} from "../../src/cli/cmd/import";
+import {
+  parseShareUrl,
+  shouldAttachShareAuthHeaders,
+  transformShareData,
+  type ShareData,
+} from "../../src/cli/cmd/import"
 
 // parseShareUrl tests
 test("parses valid share URLs", () => {
@@ -18,6 +20,17 @@ test("rejects invalid URLs", () => {
   expect(parseShareUrl("not-a-url")).toBeNull()
 })
 
+test("only attaches share auth headers for same-origin URLs", () => {
+  expect(shouldAttachShareAuthHeaders("https://control.example.com/share/abc", "https://control.example.com")).toBe(
+    true,
+  )
+  expect(shouldAttachShareAuthHeaders("https://other.example.com/share/abc", "https://control.example.com")).toBe(false)
+  expect(shouldAttachShareAuthHeaders("https://control.example.com:443/share/abc", "https://control.example.com")).toBe(
+    true,
+  )
+  expect(shouldAttachShareAuthHeaders("not-a-url", "https://control.example.com")).toBe(false)
+})
+
 // transformShareData tests
 test("transforms share data to storage format", () => {
   const data: ShareData[] = [
@@ -27,8 +40,7 @@ test("transforms share data to storage format", () => {
     { type: "part", data: { id: "part-2", messageID: "msg-1" } as any },
   ]
 
-  const result = transformShareData(data)
-  if (result === null) throw new Error("expected non-null result")
+  const result = transformShareData(data)!
 
   expect(result.info.id).toBe("sess-1")
   expect(result.messages).toHaveLength(1)

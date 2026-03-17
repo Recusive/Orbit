@@ -158,7 +158,7 @@ fn lookup_and_configure(
 }
 
 /// Allocate a 2× `NSBitmapImageRep`, draw the image into it, and return the bitmap.
-#[allow(
+#[expect(
     clippy::cast_possible_truncation,
     reason = "pixel dimensions from CGSize are small enough for i64"
 )]
@@ -231,7 +231,7 @@ fn rasterize(image: *mut AnyObject, size: CGSize) -> Result<*mut AnyObject, Stri
 }
 
 /// Extract PNG bytes from a rendered `NSBitmapImageRep`.
-#[allow(
+#[expect(
     clippy::cast_possible_truncation,
     reason = "pixel dimensions logged for debugging"
 )]

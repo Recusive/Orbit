@@ -6,6 +6,7 @@ import { lazy } from "../../util/lazy"
 import { errors } from "../error"
 
 import { PermissionNext } from "@/permission/next"
+import { PermissionID } from "@/permission/schema"
 
 export const PermissionRoutes = lazy(() =>
   new Hono()
@@ -38,7 +39,7 @@ export const PermissionRoutes = lazy(() =>
         const params = c.req.valid("param")
         const json = c.req.valid("json")
         PermissionNext.reply({
-          requestID: params.requestID,
+          requestID: PermissionID.make(params.requestID),
           reply: json.reply,
           message: json.message,
         })

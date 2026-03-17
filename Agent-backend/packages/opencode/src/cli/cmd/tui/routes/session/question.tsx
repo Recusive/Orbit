@@ -9,7 +9,7 @@ import { useSDK } from "../../context/sdk"
 import { selectedForeground, tint, useTheme } from "../../context/theme"
 import { useDialog } from "../../ui/dialog"
 
-import type { QuestionAnswer, QuestionInfo, QuestionRequest } from "@opencode-ai/sdk/v2"
+import type { QuestionAnswer, QuestionInfo, QuestionRequest } from "@orbit.build/sdk/v2"
 import type { TextareaRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 
@@ -252,7 +252,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box
       backgroundColor={theme.backgroundPanel}
@@ -269,7 +268,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
                 const isAnswered = (): boolean => {
                   return (store.answers[index()]?.length ?? 0) > 0
                 }
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
                   <box
                     paddingLeft={1}
@@ -283,7 +281,9 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
                     }
                     onMouseOver={() => setTabHover(index())}
                     onMouseOut={() => setTabHover(null)}
-                    onMouseUp={() => { selectTab(index()); }}
+                    onMouseUp={() => {
+                      selectTab(index())
+                    }}
                   >
                     <text
                       fg={
@@ -308,7 +308,9 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
               }
               onMouseOver={() => setTabHover("confirm")}
               onMouseOut={() => setTabHover(null)}
-              onMouseUp={() => { selectTab(questions().length); }}
+              onMouseUp={() => {
+                selectTab(questions().length)
+              }}
             >
               <text fg={confirm() ? selectedForeground(theme, theme.accent) : theme.textMuted}>Confirm</text>
             </box>
@@ -328,12 +330,17 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
                 {(opt, i) => {
                   const active = (): boolean => i() === store.selected
                   const picked = (): boolean => store.answers[store.tab]?.includes(opt.label) ?? false
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                   return (
                     <box
-                      onMouseOver={() => { moveTo(i()); }}
-                      onMouseDown={() => { moveTo(i()); }}
-                      onMouseUp={() => { selectOption(); }}
+                      onMouseOver={() => {
+                        moveTo(i())
+                      }}
+                      onMouseDown={() => {
+                        moveTo(i())
+                      }}
+                      onMouseUp={() => {
+                        selectOption()
+                      }}
                     >
                       <box flexDirection="row">
                         <box backgroundColor={active() ? theme.backgroundElement : undefined} paddingRight={1}>
@@ -360,9 +367,15 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
               </For>
               <Show when={custom()}>
                 <box
-                  onMouseOver={() => { moveTo(options().length); }}
-                  onMouseDown={() => { moveTo(options().length); }}
-                  onMouseUp={() => { selectOption(); }}
+                  onMouseOver={() => {
+                    moveTo(options().length)
+                  }}
+                  onMouseDown={() => {
+                    moveTo(options().length)
+                  }}
+                  onMouseUp={() => {
+                    selectOption()
+                  }}
                 >
                   <box flexDirection="row">
                     <box backgroundColor={other() ? theme.backgroundElement : undefined} paddingRight={1}>
@@ -420,7 +433,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
             {(q, index) => {
               const value = (): string => store.answers[index()]?.join(", ") ?? ""
               const answered = (): boolean => value() !== ""
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box paddingLeft={1}>
                   <text>

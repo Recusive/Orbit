@@ -4,7 +4,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js"
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from "@modelcontextprotocol/sdk/types.js"
-import { NamedError } from "@opencode-ai/util/error"
+import { NamedError } from "@orbit.build/util/error"
 import { dynamicTool, jsonSchema } from "ai"
 import open from "open"
 import z from "zod/v4"
@@ -304,7 +304,10 @@ export namespace MCP {
     return commands
   }
 
-  export async function add(name: string, mcp: Config.Mcp): Promise<{
+  export async function add(
+    name: string,
+    mcp: Config.Mcp,
+  ): Promise<{
     status: Status | Record<string, Status>
   }> {
     const s = await state()
@@ -330,10 +333,7 @@ export namespace MCP {
     }
   }
 
-  async function create(
-    key: string,
-    mcp: Config.Mcp,
-  ): Promise<{ mcpClient: MCPClient | undefined; status: Status }> {
+  async function create(key: string, mcp: Config.Mcp): Promise<{ mcpClient: MCPClient | undefined; status: Status }> {
     if (mcp.enabled === false) {
       log.info("mcp server disabled", { key })
       return {
@@ -599,8 +599,7 @@ export namespace MCP {
       await client.close().catch((error: unknown) => {
         log.error("Failed to close MCP client", { name, error })
       })
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing entry from dynamic record
-      delete s.clients[name]
+      Reflect.deleteProperty(s.clients, name)
     }
     s.status[name] = { status: "disabled" }
   }
@@ -626,8 +625,7 @@ export namespace MCP {
             error: e instanceof Error ? e.message : String(e),
           }
           s.status[clientName] = failedStatus
-          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing entry from dynamic record
-          delete s.clients[clientName]
+          Reflect.deleteProperty(s.clients, clientName)
           return undefined
         })
         return { clientName, client, toolsResult }

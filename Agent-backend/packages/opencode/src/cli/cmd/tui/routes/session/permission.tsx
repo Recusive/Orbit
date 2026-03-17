@@ -1,6 +1,6 @@
 import path from "path"
 
-import { Portal, useKeyboard, useTerminalDimensions  } from "@opentui/solid"
+import { Portal, useKeyboard, useTerminalDimensions } from "@opentui/solid"
 import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { createStore } from "solid-js/store"
 
@@ -13,7 +13,7 @@ import { useTheme, selectedForeground } from "../../context/theme"
 import { useTuiConfig } from "../../context/tui-config"
 import { useDialog } from "../../ui/dialog"
 
-import type { PermissionRequest } from "@opencode-ai/sdk/v2"
+import type { PermissionRequest } from "@orbit.build/sdk/v2"
 import type { TextareaRenderable } from "@opentui/core"
 import type { JSX } from "solid-js"
 
@@ -21,7 +21,6 @@ import { Global } from "@/global"
 import { LANGUAGE_EXTENSIONS } from "@/lsp/language"
 import { Keybind } from "@/util/keybind"
 import { Locale } from "@/util/locale"
-
 
 type PermissionStage = "permission" | "always" | "reject"
 
@@ -75,7 +74,6 @@ function EditBody(props: { request: PermissionRequest }): JSX.Element {
 
   const ft = createMemo(() => filetype(filepath()))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box flexDirection="column" gap={1}>
       <Show when={diff()}>
@@ -120,7 +118,6 @@ function EditBody(props: { request: PermissionRequest }): JSX.Element {
 
 function TextBody(props: { title: string; description?: string; icon?: string }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <box flexDirection="row" gap={1} paddingLeft={1}>
@@ -163,7 +160,6 @@ export function PermissionPrompt(props: { request: PermissionRequest }): JSX.Ele
 
   const { theme } = useTheme()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Switch>
       <Match when={store.stage === "always"}>
@@ -181,7 +177,6 @@ export function PermissionPrompt(props: { request: PermissionRequest }): JSX.Ele
                   <box>
                     <For each={props.request.always}>
                       {(pattern) => (
-                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                         <text fg={theme.text}>
                           {"- "}
                           {pattern}
@@ -407,7 +402,6 @@ export function PermissionPrompt(props: { request: PermissionRequest }): JSX.Ele
                     <box paddingLeft={1} gap={1}>
                       <text fg={theme.textMuted}>Patterns</text>
                       <box>
-                        {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
                         <For each={patterns}>{(p) => <text fg={theme.text}>{"- " + p}</text>}</For>
                       </box>
                     </box>
@@ -445,7 +439,6 @@ export function PermissionPrompt(props: { request: PermissionRequest }): JSX.Ele
 
           // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- inferred JSX return
           const header = () => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             <box flexDirection="column" gap={0}>
               <box flexDirection="row" gap={1} flexShrink={0}>
                 <text fg={theme.warning}>{"△"}</text>
@@ -495,7 +488,6 @@ export function PermissionPrompt(props: { request: PermissionRequest }): JSX.Ele
             />
           )
 
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return body
         })()}
       </Match>
@@ -526,7 +518,6 @@ function RejectPrompt(props: { onConfirm: (message: string) => void; onCancel: (
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box
       backgroundColor={theme.backgroundPanel}
@@ -635,7 +626,6 @@ function Prompt<const T extends Record<string, string>>(props: {
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type -- inferred JSX return
   const content = () => (
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     <box
       backgroundColor={theme.backgroundPanel}
       border={["left"]}
@@ -684,12 +674,13 @@ function Prompt<const T extends Record<string, string>>(props: {
         <box flexDirection="row" gap={1} flexShrink={0}>
           <For each={keys}>
             {(option) => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box
                 paddingLeft={1}
                 paddingRight={1}
                 backgroundColor={option === store.selected ? theme.warning : theme.backgroundMenu}
-                onMouseOver={() => { setStore("selected", option); }}
+                onMouseOver={() => {
+                  setStore("selected", option)
+                }}
                 onMouseUp={() => {
                   setStore("selected", option)
                   props.onSelect(option)
@@ -719,7 +710,6 @@ function Prompt<const T extends Record<string, string>>(props: {
     </box>
   )
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX types
     <Show when={!store.expanded} fallback={<Portal>{content()}</Portal>}>

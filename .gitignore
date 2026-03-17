@@ -83,6 +83,7 @@ audits/
 Prompt and Info/
 
 # SDK docs and local RAG (indexed locally, not project code)
-SDK/
+# Anchored to root so it doesn't match Agent-backend/packages/sdk/ on case-insensitive filesystems
+/SDK/
 models/
 lancedb/

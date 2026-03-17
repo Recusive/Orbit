@@ -65,7 +65,9 @@ const _frecencyContext = createSimpleContext({
 
       if (sorted.length > 0) {
         const content = sorted.map((entry) => JSON.stringify(entry)).join("\n") + "\n"
-        writeFile(frecencyPath, content).catch(() => { /* noop */ })
+        writeFile(frecencyPath, content).catch(() => {
+          /* noop */
+        })
       }
     })()
 
@@ -76,7 +78,9 @@ const _frecencyContext = createSimpleContext({
         lastOpen: Date.now(),
       }
       setStore("data", absolutePath, newEntry)
-      appendFile(frecencyPath, JSON.stringify({ path: absolutePath, ...newEntry }) + "\n").catch(() => { /* noop */ })
+      appendFile(frecencyPath, JSON.stringify({ path: absolutePath, ...newEntry }) + "\n").catch(() => {
+        /* noop */
+      })
 
       if (Object.keys(store.data).length > MAX_FRECENCY_ENTRIES) {
         const sorted = Object.entries(store.data)
@@ -84,7 +88,9 @@ const _frecencyContext = createSimpleContext({
           .slice(0, MAX_FRECENCY_ENTRIES)
         setStore("data", Object.fromEntries(sorted))
         const content = sorted.map(([p, entry]) => JSON.stringify({ path: p, ...entry })).join("\n") + "\n"
-        writeFile(frecencyPath, content).catch(() => { /* noop */ })
+        writeFile(frecencyPath, content).catch(() => {
+          /* noop */
+        })
       }
     }
 

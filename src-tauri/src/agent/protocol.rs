@@ -2,7 +2,7 @@
 //!
 //! Matches the TypeScript types in agent-bridge/src/protocol.ts
 
-#![allow(
+#![expect(
     missing_docs,
     reason = "IPC data types mirror TypeScript definitions; field names are self-documenting"
 )]

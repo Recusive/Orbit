@@ -132,8 +132,8 @@ Shared utility functions for the OpenCode web app. Framework-agnostic (mostly pu
 
 - **SolidJS:** `solid-js` (only in `persist.ts` and `solid-dnd.tsx`)
 - **Internal:** `@/context/platform`, `@/context/server` (for server utils)
-- **UI library:** `@opencode-ai/ui/audio/*` (46 AAC sound files), `@opencode-ai/ui/theme`
-- **Utilities:** `@opencode-ai/util/encode` (`checksum`), `@solid-primitives/storage` (`makePersisted`)
+- **UI library:** `@orbit.build/ui/audio/*` (46 AAC sound files), `@orbit.build/ui/theme`
+- **Utilities:** `@orbit.build/util/encode` (`checksum`), `@solid-primitives/storage` (`makePersisted`)
 - **External:** `@thisbeyond/solid-dnd` (drag helpers)
 
 ## Development Guide
@@ -152,7 +152,7 @@ For Orbit, these utilities are most directly reusable:
 
 ## Notes
 
-- **`sound.ts` imports 46 AAC files** — all from `@opencode-ai/ui/audio/`. These are Vite asset imports (resolved to URLs at build time). Categories: alert (10), bip-bop (10), staplebops (7), nope (12), yup (6). Each has a string ID for settings persistence.
+- **`sound.ts` imports 46 AAC files** — all from `@orbit.build/ui/audio/`. These are Vite asset imports (resolved to URLs at build time). Categories: alert (10), bip-bop (10), staplebops (7), nope (12), yup (6). Each has a string ID for settings persistence.
 - **`persist.ts` LRU cache** is localStorage-level, not application-level. It caches raw `getItem()` values (max 500 entries, 8MB) to avoid repeated localStorage reads. Separate from `scoped-cache.ts` which is a general-purpose data cache.
 - **`index.ts` is minimal** — only re-exports `dom.ts`. Most utils are imported directly by path.
 - **9 test files** — most utilities have accompanying tests. Tests use HappyDOM (via `happydom.ts` preload).

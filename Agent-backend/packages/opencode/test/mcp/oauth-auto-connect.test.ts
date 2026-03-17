@@ -58,7 +58,9 @@ void mock.module("@modelcontextprotocol/sdk/client/streamableHttp.js", () => ({
       }
       throw new MockUnauthorizedError()
     }
-    async finishAuth(_code: string): Promise<void> { /* noop */ }
+    async finishAuth(_code: string): Promise<void> {
+      /* noop */
+    }
   },
 }))
 
@@ -152,7 +154,11 @@ test("state() generates a new state when none is saved", async () => {
         "test-state-gen",
         "https://example.com/mcp",
         {},
-        { onRedirect: async () => { /* noop */ } },
+        {
+          onRedirect: async () => {
+            /* noop */
+          },
+        },
       )
 
       // Ensure no state exists
@@ -184,7 +190,11 @@ test("state() returns existing state when one is saved", async () => {
         "test-state-existing",
         "https://example.com/mcp",
         {},
-        { onRedirect: async () => { /* noop */ } },
+        {
+          onRedirect: async () => {
+            /* noop */
+          },
+        },
       )
 
       // Pre-save a state

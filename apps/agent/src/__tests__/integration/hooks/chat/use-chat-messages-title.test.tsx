@@ -2,6 +2,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 
 const {
   mockApplySessionTitle,
+  mockCacheAttachedImagesForMessage,
   mockConversationAddMessage,
   mockConversationLoad,
   mockGenerateAITitle,
@@ -9,6 +10,7 @@ const {
   mockPostMessage,
 } = vi.hoisted(() => ({
   mockApplySessionTitle: vi.fn<(sessionId: string, title: string) => void>(),
+  mockCacheAttachedImagesForMessage: vi.fn<(sessionId: string, messageId: string) => void>(),
   mockConversationAddMessage: vi.fn<
     [string, Record<string, unknown>, string | undefined, string | undefined],
     Promise<void>
@@ -38,6 +40,11 @@ vi.mock('@/services/session', () => ({
   generateFallbackTitle: mockGenerateFallbackTitle,
 }));
 
+vi.mock('@/services/chat/image-attachment-cache', () => ({
+  buildOptimisticAttachedImages: (images?: unknown[]) => images,
+  cacheAttachedImagesForMessage: mockCacheAttachedImagesForMessage,
+}));
+
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
@@ -56,7 +63,7 @@ function resetStores(): void {
     rewindEpoch: 0,
     conversationLoadEpoch: 0,
     loadedSessions: {},
-    compactingMessageId: null,
+    activeCompactions: {},
     lruOrder: [],
   });
   useUIStore.setState({
@@ -97,5 +104,37 @@ describe('new conversation title generation', () => {
     });
 
     expect(mockGenerateAITitle).toHaveBeenCalledWith('new-session', 'help me debug');
+  });
+
+  it('uses the image conversation fallback when the pending message has no text', async () => {
+    useChatStore.getState().setPendingMessage({
+      text: '',
+      images: [
+        {
+          name: 'diagram.png',
+          mimeType: 'image/png',
+          data: 'abc',
+          previewUrl: 'data:image/png;base64,abc',
+        },
+      ],
+    });
+
+    renderHook(() => useChatMessages());
+
+    await waitFor(() => {
+      expect(mockApplySessionTitle).toHaveBeenCalledWith(
+        'new-session',
+        'Fallback: Image conversation'
+      );
+    });
+
+    expect(mockGenerateAITitle).toHaveBeenCalledWith('new-session', 'Image conversation');
+    expect(mockCacheAttachedImagesForMessage).toHaveBeenCalled();
+    expect(mockPostMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'message:send',
+        content: '',
+      })
+    );
   });
 });

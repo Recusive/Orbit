@@ -1,7 +1,6 @@
 import z from "zod"
 
 import { Config } from "../config/config"
-import { Identifier } from "../id/id"
 import { MCP } from "../mcp"
 import { Instance } from "../project/instance"
 import { Skill } from "../skill"
@@ -9,8 +8,8 @@ import { Skill } from "../skill"
 import PROMPT_INITIALIZE from "./template/initialize.txt"
 import PROMPT_REVIEW from "./template/review.txt"
 
-
 import { BusEvent } from "@/bus/bus-event"
+import { MessageID, SessionID } from "@/session/schema"
 
 export namespace Command {
   export const Event = {
@@ -18,9 +17,9 @@ export namespace Command {
       "command.executed",
       z.object({
         name: z.string(),
-        sessionID: Identifier.schema("session"),
+        sessionID: SessionID.zod,
         arguments: z.string(),
-        messageID: Identifier.schema("message"),
+        messageID: MessageID.zod,
       }),
     ),
   }

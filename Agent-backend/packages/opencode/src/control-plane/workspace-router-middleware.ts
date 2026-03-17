@@ -1,6 +1,7 @@
 import { Flag } from "../flag/flag"
 
 import { getAdaptor } from "./adaptors"
+import { WorkspaceID } from "./schema"
 import { Workspace } from "./workspace"
 import { WorkspaceContext } from "./workspace-context"
 
@@ -17,7 +18,7 @@ async function routeRequest(req: Request): Promise<Response | undefined> {
 
   if (WorkspaceContext.workspaceID === undefined) return undefined
 
-  const workspace = Workspace.get(WorkspaceContext.workspaceID)
+  const workspace = Workspace.get(WorkspaceID.make(WorkspaceContext.workspaceID))
   if (workspace === undefined) {
     return new Response(`Workspace not found: ${WorkspaceContext.workspaceID}`, {
       status: 500,

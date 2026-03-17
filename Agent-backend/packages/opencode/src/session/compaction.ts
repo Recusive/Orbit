@@ -1,6 +1,5 @@
 import z from "zod"
 
-import { Identifier } from "../id/id"
 import { Instance } from "../project/instance"
 import { Provider } from "../provider/provider"
 import { Log } from "../util/log"
@@ -8,6 +7,7 @@ import { Token } from "../util/token"
 
 import { MessageV2 } from "./message-v2"
 import { SessionProcessor } from "./processor"
+import { MessageID, PartID, SessionID } from "./schema"
 
 import { Session } from "."
 
@@ -16,6 +16,7 @@ import { Bus } from "@/bus"
 import { BusEvent } from "@/bus/bus-event"
 import { Config } from "@/config/config"
 import { Plugin } from "@/plugin"
+import { ModelID, ProviderID } from "@/provider/schema"
 import { ProviderTransform } from "@/provider/transform"
 import { fn } from "@/util/fn"
 
@@ -26,7 +27,7 @@ export namespace SessionCompaction {
     Compacted: BusEvent.define(
       "session.compacted",
       z.object({
-        sessionID: z.string(),
+        sessionID: SessionID.zod,
       }),
     ),
   }
@@ -66,7 +67,7 @@ export namespace SessionCompaction {
   // goes backwards through parts until there are 40_000 tokens worth of tool
   // calls. then erases output of previous tool calls. idea is to throw away old
   // tool calls that are no longer relevant.
-  export async function prune(input: { sessionID: string }): Promise<void> {
+  export async function prune(input: { sessionID: SessionID }): Promise<void> {
     const config = await Config.get()
     if (config.compaction?.prune === false) return
     log.info("pruning")
@@ -110,9 +111,9 @@ export namespace SessionCompaction {
   }
 
   export async function process(input: {
-    parentID: string
+    parentID: MessageID
     messages: MessageV2.WithParts[]
-    sessionID: string
+    sessionID: SessionID
     abort: AbortSignal
     auto: boolean
     overflow?: boolean
@@ -147,7 +148,7 @@ export namespace SessionCompaction {
       ? await Provider.getModel(agent.model.providerID, agent.model.modelID)
       : await Provider.getModel(userMessage.model.providerID, userMessage.model.modelID)
     const msg = Session.updateMessage({
-      id: Identifier.ascending("message"),
+      id: MessageID.ascending(),
       role: "assistant",
       parentID: input.parentID,
       sessionID: input.sessionID,
@@ -166,8 +167,8 @@ export namespace SessionCompaction {
         reasoning: 0,
         cache: { read: 0, write: 0 },
       },
-      modelID: model.id,
-      providerID: model.providerID,
+      modelID: ModelID.make(model.id),
+      providerID: ProviderID.make(model.providerID),
       time: {
         created: Date.now(),
       },
@@ -250,7 +251,7 @@ When constructing the summary, try to stick to this template:
       if (replay) {
         const original = replay.info as MessageV2.User
         const replayMsg = Session.updateMessage({
-          id: Identifier.ascending("message"),
+          id: MessageID.ascending(),
           role: "user",
           sessionID: input.sessionID,
           time: { created: Date.now() },
@@ -269,14 +270,14 @@ When constructing the summary, try to stick to this template:
               : part
           Session.updatePart({
             ...replayPart,
-            id: Identifier.ascending("part"),
+            id: PartID.ascending(),
             messageID: replayMsg.id,
             sessionID: input.sessionID,
           })
         }
       } else {
         const continueMsg = Session.updateMessage({
-          id: Identifier.ascending("message"),
+          id: MessageID.ascending(),
           role: "user",
           sessionID: input.sessionID,
           time: { created: Date.now() },
@@ -289,7 +290,7 @@ When constructing the summary, try to stick to this template:
             : "") +
           "Continue if you have next steps, or stop and ask for clarification if you are unsure how to proceed."
         Session.updatePart({
-          id: Identifier.ascending("part"),
+          id: PartID.ascending(),
           messageID: continueMsg.id,
           sessionID: input.sessionID,
           type: "text",
@@ -309,18 +310,18 @@ When constructing the summary, try to stick to this template:
 
   export const create = fn(
     z.object({
-      sessionID: Identifier.schema("session"),
+      sessionID: SessionID.zod,
       agent: z.string(),
       model: z.object({
-        providerID: z.string(),
-        modelID: z.string(),
+        providerID: ProviderID.zod,
+        modelID: ModelID.zod,
       }),
       auto: z.boolean(),
       overflow: z.boolean().optional(),
     }),
     (input) => {
       const msg = Session.updateMessage({
-        id: Identifier.ascending("message"),
+        id: MessageID.ascending(),
         role: "user",
         model: input.model,
         sessionID: input.sessionID,
@@ -330,7 +331,7 @@ When constructing the summary, try to stick to this template:
         },
       })
       Session.updatePart({
-        id: Identifier.ascending("part"),
+        id: PartID.ascending(),
         messageID: msg.id,
         sessionID: msg.sessionID,
         type: "compaction",

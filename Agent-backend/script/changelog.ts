@@ -2,8 +2,8 @@
 
 import { parseArgs } from "util"
 
-import { Script } from "@opencode-ai/script"
-import { createOpencode } from "@opencode-ai/sdk/v2"
+import { Script } from "@orbit.build/script"
+import { createOpencode } from "@orbit.build/sdk/v2"
 import { $ } from "bun"
 
 interface Release {
@@ -252,8 +252,7 @@ export async function buildNotes(from: string, to: string): Promise<string[]> {
     if (error instanceof Error && error.name === "TimeoutError") {
       console.log("Changelog generation timed out, using raw commits")
       for (const commit of commits) {
-        const attribution =
-          commit.author !== null && !Script.team.includes(commit.author) ? ` (@${commit.author})` : ""
+        const attribution = commit.author !== null && !Script.team.includes(commit.author) ? ` (@${commit.author})` : ""
         notes.push(`- ${commit.message}${attribution}`)
       }
     } else {
@@ -268,7 +267,9 @@ export async function buildNotes(from: string, to: string): Promise<string[]> {
 
   if (contributors.size > 0) {
     notes.push("")
-    notes.push(`**Thank you to ${String(contributors.size)} community contributor${contributors.size > 1 ? "s" : ""}:**`)
+    notes.push(
+      `**Thank you to ${String(contributors.size)} community contributor${contributors.size > 1 ? "s" : ""}:**`,
+    )
     for (const [username, userCommits] of contributors) {
       notes.push(`- @${username}:`)
       for (const c of userCommits) {

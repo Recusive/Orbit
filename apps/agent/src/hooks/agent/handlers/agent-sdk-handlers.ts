@@ -34,7 +34,11 @@ export async function handleMessageSend(
 
     // Mark message as compacting when /compact is sent (cleared by compact_complete event)
     if (message.content.trim() === '/compact') {
-      useChatStore.getState().markCompacting(message.uuid);
+      useChatStore.getState().markCompacting(message.session_id, {
+        backend: 'claude',
+        messageId: message.uuid,
+        status: 'pending',
+      });
     }
 
     // Convert context images to attachments if present

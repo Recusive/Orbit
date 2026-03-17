@@ -92,7 +92,6 @@ export function DialogSessionList(props: { workspaceID?: string; localOnly?: boo
     dialog.setSize("large")
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title={props.workspaceID ? `Workspace Sessions` : props.localOnly ? "Local Sessions" : "Sessions"}
@@ -149,7 +148,6 @@ export function DialogSessionList(props: { workspaceID?: string; localOnly?: boo
           keybind: keybind.all.session_rename[0],
           title: "rename",
           onTrigger: (option) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogSessionRename session={option.value} />)
           },
         },

@@ -1,27 +1,30 @@
-import { spawn  } from "child_process"
+import { spawn } from "child_process"
 import { setTimeout as sleep } from "node:timers/promises"
 import path from "path"
 
-import type {ChildProcess} from "child_process";
+import type { ChildProcess } from "child_process"
 
 import { Flag } from "@/flag/flag"
 import { Filesystem } from "@/util/filesystem"
 import { lazy } from "@/util/lazy"
 import { which } from "@/util/which"
 
-
 const SIGKILL_TIMEOUT_MS = 200
 
 export namespace Shell {
   export async function killTree(proc: ChildProcess, opts?: { exited?: () => boolean }): Promise<void> {
     const pid = proc.pid
-    if (pid === undefined || (opts?.exited?.() === true)) return
+    if (pid === undefined || opts?.exited?.() === true) return
 
     if (process.platform === "win32") {
       await new Promise<void>((resolve) => {
         const killer = spawn("taskkill", ["/pid", String(pid), "/f", "/t"], { stdio: "ignore" })
-        killer.once("exit", () => { resolve() })
-        killer.once("error", () => { resolve() })
+        killer.once("exit", () => {
+          resolve()
+        })
+        killer.once("error", () => {
+          resolve()
+        })
       })
       return
     }
@@ -68,7 +71,12 @@ export namespace Shell {
 
   export const acceptable = lazy(() => {
     const s = process.env.SHELL
-    if (s !== undefined && s !== "" && !BLACKLIST.has(process.platform === "win32" ? path.win32.basename(s) : path.basename(s))) return s
+    if (
+      s !== undefined &&
+      s !== "" &&
+      !BLACKLIST.has(process.platform === "win32" ? path.win32.basename(s) : path.basename(s))
+    )
+      return s
     return fallback()
   })
 }

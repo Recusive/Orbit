@@ -14,7 +14,9 @@ export function abortAfter(ms: number): { controller: AbortController; signal: A
   return {
     controller,
     signal: controller.signal,
-    clearTimeout: () => { globalThis.clearTimeout(id); },
+    clearTimeout: () => {
+      globalThis.clearTimeout(id)
+    },
   }
 }
 
@@ -25,7 +27,10 @@ export function abortAfter(ms: number): { controller: AbortController; signal: A
  * @param signals Additional signals to combine
  * @returns Combined signal that aborts on timeout or when any input signal aborts
  */
-export function abortAfterAny(ms: number, ...signals: AbortSignal[]): { signal: AbortSignal; clearTimeout: () => void } {
+export function abortAfterAny(
+  ms: number,
+  ...signals: AbortSignal[]
+): { signal: AbortSignal; clearTimeout: () => void } {
   const timeout = abortAfter(ms)
   const signal = AbortSignal.any([timeout.signal, ...signals])
   return {

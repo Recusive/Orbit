@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
 
 export type SettingsSection =
+  | 'backend'
   | 'general'
   | 'appearance'
   | 'agent'
+  | 'providers'
   | 'subagents'
   | 'commands'
   | 'shortcuts'
@@ -14,12 +16,6 @@ export type SettingsSection =
   | 'tabs'
   | 'account'
   | 'feedback';
-
-export interface SettingsDialogProps {
-  readonly open: boolean;
-  readonly onOpenChange: (open: boolean) => void;
-  readonly defaultSection?: SettingsSection;
-}
 
 export interface NavItemProps {
   readonly icon: ReactNode;

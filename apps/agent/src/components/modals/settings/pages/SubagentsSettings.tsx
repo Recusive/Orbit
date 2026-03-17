@@ -6,6 +6,7 @@ import type { ExtensionMessage, SubagentDefinition, WebviewMessage } from '@/typ
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
+import { DialogOverlay } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -18,6 +19,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
+import {
+  useSubagents,
+  useSubagentsError,
+  useSubagentsHasFetched,
+  useSubagentsLoading,
+  useSubagentsStore,
+} from '@/stores/agent';
 
 // Available tools that can be selected
 const AVAILABLE_TOOLS = [
@@ -216,10 +224,11 @@ const AgentEditor: FC<AgentEditorProps> = ({
       }}
     >
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-60 bg-black/15 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogOverlay className="z-60" />
         {/* Flexbox centering wrapper - avoids blurry text from transform translate(-50%) subpixel issues */}
         <div className="fixed inset-0 z-60 flex items-center justify-center pointer-events-none">
           <DialogPrimitive.Content
+            data-settings-child-dialog="true"
             className="relative w-[600px] max-w-[90vw] max-h-[80vh] glass-popover bg-sidebar border-0 shadow-none rounded-[14px] pointer-events-auto"
             onPointerDownOutside={(e) => {
               e.preventDefault();
@@ -457,43 +466,52 @@ const AgentEditor: FC<AgentEditorProps> = ({
 
 // Main SubagentsSettings component
 export const SubagentsSettings: FC = () => {
-  const [agents, setAgents] = useState<SubagentDefinition[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const agents = useSubagents();
+  const error = useSubagentsError();
+  const isLoading = useSubagentsLoading();
+  const hasFetched = useSubagentsHasFetched();
+  const fetchSubagents = useSubagentsStore((state) => state.fetchSubagents);
+  const setAgents = useSubagentsStore((state) => state.setAgents);
+  const addAgent = useSubagentsStore((state) => state.addAgent);
+  const updateAgent = useSubagentsStore((state) => state.updateAgent);
+  const removeAgent = useSubagentsStore((state) => state.removeAgent);
+  const setError = useSubagentsStore((state) => state.setError);
+  const markFetched = useSubagentsStore((state) => state.markFetched);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<SubagentDefinition | undefined>(undefined);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-
-  // Use ref for the initial fetch flag to avoid re-fetching
-  const hasFetched = useRef(false);
 
   // Callback ref for generated agent handler
   const generatedAgentCallbackRef = useRef<((agent: SubagentDefinition) => void) | null>(null);
 
+  const isInitialLoad = isLoading && !hasFetched;
+
   // Message handler for subagent-related messages
-  const handleMessage = useCallback((message: ExtensionMessage): void => {
-    if (message.type === 'subagents:list:response') {
-      setAgents(message.agents);
-      setError(null);
-      setIsInitialLoad(false);
-    } else if (message.type === 'subagents:created') {
-      setAgents((prev) => [...prev, message.agent]);
-      setError(null);
-    } else if (message.type === 'subagents:updated') {
-      setAgents((prev) => prev.map((a) => (a.name === message.agent.name ? message.agent : a)));
-      setError(null);
-    } else if (message.type === 'subagents:deleted') {
-      setAgents((prev) => prev.filter((a) => a.name !== message.name));
-      setError(null);
-    } else if (message.type === 'subagents:error') {
-      setError(message.error);
-    } else if (message.type === 'subagents:generated') {
-      // Call the registered callback with the generated agent
-      if (generatedAgentCallbackRef.current) {
-        generatedAgentCallbackRef.current(message.agent);
+  const handleMessage = useCallback(
+    (message: ExtensionMessage): void => {
+      if (message.type === 'subagents:list:response') {
+        setAgents(message.agents);
+        markFetched();
+      } else if (message.type === 'subagents:created') {
+        addAgent(message.agent);
+        setError(null);
+      } else if (message.type === 'subagents:updated') {
+        updateAgent(message.agent);
+        setError(null);
+      } else if (message.type === 'subagents:deleted') {
+        removeAgent(message.name);
+        setError(null);
+      } else if (message.type === 'subagents:error') {
+        setError(message.error);
+      } else if (message.type === 'subagents:generated') {
+        // Call the registered callback with the generated agent
+        if (generatedAgentCallbackRef.current) {
+          generatedAgentCallbackRef.current(message.agent);
+        }
       }
-    }
-    // Ignore other message types
-  }, []);
+      // Ignore other message types
+    },
+    [addAgent, markFetched, removeAgent, setAgents, setError, updateAgent]
+  );
 
   // Register callback for generated agent
   const handleRegisterGeneratedCallback = useCallback(
@@ -506,16 +524,10 @@ export const SubagentsSettings: FC = () => {
   // Use VS Code API with message handler
   const { postMessage } = useTauri({ onMessage: handleMessage });
 
-  // Fetch agents on mount
+  // Fetch agents on mount (store dedupes concurrent and repeat requests)
   useEffect(() => {
-    if (!hasFetched.current) {
-      hasFetched.current = true;
-      postMessage({
-        type: 'subagents:list',
-        uuid: crypto.randomUUID(),
-      });
-    }
-  }, [postMessage]);
+    fetchSubagents(postMessage);
+  }, [fetchSubagents, postMessage]);
 
   const handleCreateAgent = useCallback((): void => {
     setEditingAgent(undefined);

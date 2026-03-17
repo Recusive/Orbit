@@ -1,17 +1,18 @@
 import { describe, expect, test, spyOn, beforeEach, afterEach } from "bun:test"
-
-import * as QuestionModule from "../../src/question"
+import { z } from "zod"
 import { QuestionTool } from "../../src/tool/question"
+import * as QuestionModule from "../../src/question"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const ctx = {
-  sessionID: "test-session",
-  messageID: "test-message",
+  sessionID: SessionID.make("ses_test-session"),
+  messageID: MessageID.make("test-message"),
   callID: "test-call",
   agent: "test-agent",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 describe("tool.question", () => {

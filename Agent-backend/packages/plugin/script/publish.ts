@@ -1,14 +1,14 @@
 #!/usr/bin/env bun
 import { fileURLToPath } from "url"
 
-import { Script } from "@opencode-ai/script"
+import { Script } from "@orbit.build/script"
 import { $ } from "bun"
 
 const dir = fileURLToPath(new URL("..", import.meta.url))
 process.chdir(dir)
 
 await $`bun tsc`
-const pkg = await import("../package.json").then((m) => m.default) as Record<string, unknown> & {
+const pkg = (await import("../package.json").then((m) => m.default)) as Record<string, unknown> & {
   exports: Record<string, string>
 }
 const original = JSON.parse(JSON.stringify(pkg)) as typeof pkg

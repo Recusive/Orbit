@@ -1,26 +1,23 @@
+import { describe, expect, test } from "bun:test"
 import os from "os"
 import path from "path"
-
-import { describe, expect, test } from "bun:test"
-
-import { Instance } from "../../src/project/instance"
 import { BashTool } from "../../src/tool/bash"
-import { Truncate } from "../../src/tool/truncation"
+import { Instance } from "../../src/project/instance"
 import { Filesystem } from "../../src/util/filesystem"
 import { tmpdir } from "../fixture/fixture"
-
 import type { PermissionNext } from "../../src/permission/next"
-
+import { Truncate } from "../../src/tool/truncation"
+import { SessionID, MessageID } from "../../src/session/schema"
 
 const ctx = {
-  sessionID: "test",
-  messageID: "",
+  sessionID: SessionID.make("ses_test"),
+  messageID: MessageID.make(""),
   callID: "",
   agent: "build",
   abort: AbortSignal.any([]),
   messages: [],
-  metadata: () => { /* noop */ },
-  ask: async () => { /* noop */ },
+  metadata: () => {},
+  ask: async () => {},
 }
 
 const projectRoot = path.join(__dirname, "../..")
@@ -52,7 +49,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -79,7 +76,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -107,7 +104,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -133,7 +130,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -166,7 +163,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -196,7 +193,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -226,7 +223,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -253,7 +250,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -279,7 +276,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -300,7 +297,7 @@ describe("tool.bash permissions", () => {
       directory: tmp.path,
       fn: async () => {
         const bash = await BashTool.init()
-        const requests: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">[] = []
+        const requests: Array<Omit<PermissionNext.Request, "id" | "sessionID" | "tool">> = []
         const testCtx = {
           ...ctx,
           ask: async (req: Omit<PermissionNext.Request, "id" | "sessionID" | "tool">) => {
@@ -326,7 +323,7 @@ describe("tool.bash truncation", () => {
         const lineCount = Truncate.MAX_LINES + 500
         const result = await bash.execute(
           {
-            command: `seq 1 ${String(lineCount)}`,
+            command: `seq 1 ${lineCount}`,
             description: "Generate lines exceeding limit",
           },
           ctx,
@@ -346,7 +343,7 @@ describe("tool.bash truncation", () => {
         const byteCount = Truncate.MAX_BYTES + 10000
         const result = await bash.execute(
           {
-            command: `head -c ${String(byteCount)} /dev/zero | tr '\\0' 'a'`,
+            command: `head -c ${byteCount} /dev/zero | tr '\\0' 'a'`,
             description: "Generate bytes exceeding limit",
           },
           ctx,
@@ -385,7 +382,7 @@ describe("tool.bash truncation", () => {
         const lineCount = Truncate.MAX_LINES + 100
         const result = await bash.execute(
           {
-            command: `seq 1 ${String(lineCount)}`,
+            command: `seq 1 ${lineCount}`,
             description: "Generate lines for file check",
           },
           ctx,

@@ -70,8 +70,7 @@ export namespace McpAuth {
 
   export async function remove(mcpName: string): Promise<void> {
     const data = await all()
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- keyed by user-provided MCP server name
-    delete data[mcpName]
+    Reflect.deleteProperty(data, mcpName)
     await Filesystem.writeJson(filepath, data, 0o600)
   }
 

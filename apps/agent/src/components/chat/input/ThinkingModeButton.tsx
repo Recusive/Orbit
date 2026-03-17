@@ -33,7 +33,7 @@ export const ThinkingModeButton: FC<ThinkingModeButtonProps> = ({
             onClick={cycleThinkingMode}
             aria-label={`Extended thinking: ${thinkingInfo.level}. Click to change.`}
             className={cn(
-              'h-7 flex items-center justify-center gap-1 px-1.5 rounded-lg',
+              'h-7 flex items-center justify-center gap-1 px-1.5 rounded-full',
               TRANSITION_CLASSES.button,
               'hover:bg-lg-control-hover hover:scale-[1.02]',
               'active:scale-95',

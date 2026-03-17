@@ -155,7 +155,24 @@ pub struct PreviewServerInfo {
 
 /// Find an available port in the range.
 fn find_available_port() -> Option<u16> {
-    (PORT_RANGE_START..=PORT_RANGE_END).find(|&port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+    find_available_port_in(PORT_RANGE_START..=PORT_RANGE_END)
+}
+
+/// Find an available port from the provided candidates.
+fn find_available_port_in<I>(ports: I) -> Option<u16>
+where
+    I: IntoIterator<Item = u16>,
+{
+    find_available_port_in_with(ports, |port| TcpListener::bind(("127.0.0.1", port)).is_ok())
+}
+
+/// Find an available port from the provided candidates using a custom availability check.
+fn find_available_port_in_with<I, F>(ports: I, mut is_available: F) -> Option<u16>
+where
+    I: IntoIterator<Item = u16>,
+    F: FnMut(u16) -> bool,
+{
+    ports.into_iter().find(|&port| is_available(port))
 }
 
 /// Attempt graceful shutdown with SIGTERM, fallback to SIGKILL after timeout.
@@ -1355,15 +1372,22 @@ mod tests {
     }
 
     #[test]
-    fn test_find_available_port() {
-        // This test may be flaky if ports are in use, but it should work most of the time
-        let port = find_available_port();
-        assert!(port.is_some(), "Should find an available port");
-
-        let port = port.expect("Port should be available");
-        assert!(
-            (PORT_RANGE_START..=PORT_RANGE_END).contains(&port),
-            "Port should be in expected range"
+    fn test_find_available_port_in_skips_unavailable_candidates() {
+        let port = find_available_port_in_with([5199, 5200, 5201], |candidate| candidate == 5200);
+        assert_eq!(
+            port,
+            Some(5200),
+            "Should skip unavailable ports and return the first available candidate"
         );
+    }
+
+    #[test]
+    fn test_find_available_port_returns_configured_range_port_when_available() {
+        if let Some(port) = find_available_port() {
+            assert!(
+                (PORT_RANGE_START..=PORT_RANGE_END).contains(&port),
+                "Port should be in expected range"
+            );
+        }
     }
 }

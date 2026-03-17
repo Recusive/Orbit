@@ -1,20 +1,12 @@
 import { useKeyboard } from "@opentui/solid"
-import {  useKeybind } from "@tui/context/keybind"
+import { useKeybind } from "@tui/context/keybind"
 import { useDialog } from "@tui/ui/dialog"
-import { DialogSelect   } from "@tui/ui/dialog-select"
-import {
-  createContext,
-  createMemo,
-  createSignal,
-  onCleanup,
-  useContext
+import { DialogSelect } from "@tui/ui/dialog-select"
+import { createContext, createMemo, createSignal, onCleanup, useContext } from "solid-js"
 
-
-} from "solid-js"
-
-import type {KeybindKey} from "@tui/context/keybind";
-import type {DialogSelectOption, DialogSelectRef} from "@tui/ui/dialog-select";
-import type {Accessor, JSX, ParentProps} from "solid-js";
+import type { KeybindKey } from "@tui/context/keybind"
+import type { DialogSelectOption, DialogSelectRef } from "@tui/ui/dialog-select"
+import type { Accessor, JSX, ParentProps } from "solid-js"
 
 type Context = ReturnType<typeof init>
 const ctx = createContext<Context>()
@@ -53,7 +45,9 @@ function init(): {
   const keybind = useKeybind()
 
   const entries = createMemo(() => {
-    const all = registrations().flatMap((x) => x()).filter(Boolean)
+    const all = registrations()
+      .flatMap((x) => x())
+      .filter(Boolean)
     return all.map((x) => ({
       ...x,
       footer: x.keybind ? keybind.print(x.keybind) : undefined,
@@ -106,7 +100,9 @@ function init(): {
           display: "/" + slash.name,
           description: option.description ?? option.title,
           aliases: slash.aliases?.map((alias) => "/" + alias),
-          onSelect: () => { result.trigger(option.value); },
+          onSelect: () => {
+            result.trigger(option.value)
+          },
         }
       })
     },
@@ -115,7 +111,6 @@ function init(): {
     },
     suspended,
     show(): void {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
       dialog.replace(() => <DialogCommand options={visibleOptions()} suggestedOptions={suggestedOptions()} />)
     },
     register(cb: () => CommandOption[]): void {
@@ -153,7 +148,6 @@ export function CommandProvider(props: ParentProps): JSX.Element {
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <ctx.Provider value={value}>{props.children}</ctx.Provider>
 }
 
@@ -163,6 +157,5 @@ function DialogCommand(props: { options: CommandOption[]; suggestedOptions: Comm
     if (ref?.filter) return props.options
     return [...props.suggestedOptions, ...props.options]
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <DialogSelect ref={(r) => (ref = r)} title="Commands" options={list()} />
 }
