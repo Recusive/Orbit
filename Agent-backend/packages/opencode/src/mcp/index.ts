@@ -599,8 +599,7 @@ export namespace MCP {
       await client.close().catch((error: unknown) => {
         log.error("Failed to close MCP client", { name, error })
       })
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing entry from dynamic record
-      delete s.clients[name]
+      Reflect.deleteProperty(s.clients, name)
     }
     s.status[name] = { status: "disabled" }
   }
@@ -626,8 +625,7 @@ export namespace MCP {
             error: e instanceof Error ? e.message : String(e),
           }
           s.status[clientName] = failedStatus
-          // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- removing entry from dynamic record
-          delete s.clients[clientName]
+          Reflect.deleteProperty(s.clients, clientName)
           return undefined
         })
         return { clientName, client, toolsResult }

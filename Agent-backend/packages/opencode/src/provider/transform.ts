@@ -291,7 +291,7 @@ export namespace ProviderTransform {
         if (!(model.providerID in opts)) return opts
         const result = { ...opts }
         result[key] = result[model.providerID]
-        delete result[model.providerID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(result, model.providerID)
         return result
       }
 

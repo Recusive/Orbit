@@ -609,7 +609,6 @@ export function Autocomplete(props: {
 
   let scroll: ScrollBoxRenderable | undefined
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box
       visible={store.visible !== false}
@@ -637,7 +636,6 @@ export function Autocomplete(props: {
           }
         >
           {(option, index) => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             return (
               <box
                 paddingLeft={1}

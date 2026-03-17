@@ -5,11 +5,6 @@
 //!
 //! Errors are captured to Sentry for monitoring credential storage issues.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned types from JSON deserialization"
-)]
-
 use std::fs;
 use std::path::PathBuf;
 #[cfg(target_os = "macos")]

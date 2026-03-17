@@ -17,7 +17,6 @@ export function DialogSessionRename(props: DialogSessionRenameProps): JSX.Elemen
   const sdk = useSDK()
   const session = createMemo(() => sync.session.get(props.session))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogPrompt
       title="Rename Session"

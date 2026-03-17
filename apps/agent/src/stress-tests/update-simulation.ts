@@ -1,3 +1,6 @@
+/* eslint-disable no-console -- stress test: console output is the diagnostic interface */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- loop guards check externally-mutated state */
+
 /**
  * Update simulation — drives the update store through every state with rich card toasts.
  *
@@ -56,7 +59,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   const config = { ...DEFAULT_CONFIG, ...userConfig };
   const store = useUpdateStore;
 
-  // eslint-disable-next-line no-console
   console.log(
     '%c[UpdateSim] Starting update simulation',
     'color: #f97316; font-weight: bold',
@@ -68,7 +70,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   await delay(300);
 
   // ── Step 2: Checking ──
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] → checking', 'color: #f97316');
   store.setState({ status: 'checking', error: null });
 
@@ -76,7 +77,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
 
   // ── Step 3: Error path ──
   if (config.showError) {
-    // eslint-disable-next-line no-console
     console.log('%c[UpdateSim] → error', 'color: #ef4444');
     store.setState({
       status: 'error',
@@ -90,7 +90,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   }
 
   // ── Step 4: Available — show card toast with action buttons ──
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] → available (v%s)', 'color: #f97316', config.version);
   store.setState({
     status: 'available',
@@ -111,15 +110,12 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   );
 
   // Wait for user to click "Update now" or "Later"
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] Waiting for user action...', 'color: #f97316');
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   while (true) {
     await delay(200);
     const state = store.getState();
     if (state.status === 'downloading') break;
     if (state.status !== 'available' || state.toastDismissed) {
-      // eslint-disable-next-line no-console
       console.log(
         '%c[UpdateSim] User dismissed (status: %s), ending simulation',
         'color: #f97316',
@@ -130,7 +126,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   }
 
   // ── Step 5: Downloading — animate progress in card toast ──
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] → downloading', 'color: #f97316');
   store.setState({ status: 'downloading', downloadProgress: 0 });
 
@@ -147,12 +142,10 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
   }
 
   // ── Step 6: Ready — show restart card toast ──
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] → ready (restart to apply)', 'color: #22c55e; font-weight: bold');
   store.setState({ status: 'ready', downloadProgress: 100 });
 
   showUpdateReady(() => {
-    // eslint-disable-next-line no-console
     console.log('%c[UpdateSim] Restart clicked (no-op in simulation)', 'color: #22c55e');
     dismissUpdateToast();
     store.getState().reset();
@@ -163,7 +156,6 @@ export async function simulateUpdate(userConfig?: UpdateSimulationConfig): Promi
  * Quick cycle: show each toast state for 2 seconds.
  */
 export async function simulateUpdateQuickCycle(): Promise<void> {
-  // eslint-disable-next-line no-console
   console.log(
     '%c[UpdateSim] Quick cycle — showing every toast state for 2s each',
     'color: #f97316; font-weight: bold'
@@ -208,6 +200,5 @@ export async function simulateUpdateQuickCycle(): Promise<void> {
   // Cleanup
   dismissUpdateToast();
 
-  // eslint-disable-next-line no-console
   console.log('%c[UpdateSim] Quick cycle complete', 'color: #22c55e; font-weight: bold');
 }

@@ -472,7 +472,6 @@ export function Session(): JSX.Element {
         name: "rename",
       },
       onSelect: (dialog) => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
         dialog.replace(() => <DialogSessionRename session={route.sessionID} />)
       },
     },
@@ -486,7 +485,6 @@ export function Session(): JSX.Element {
       },
       onSelect: (dialog) => {
         dialog.replace(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <DialogTimeline
               onMove={(messageID: string): void => {
@@ -514,7 +512,6 @@ export function Session(): JSX.Element {
       },
       onSelect: (dialog) => {
         dialog.replace(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <DialogForkFromTimeline
               onMove={(messageID: string): void => {
@@ -1139,7 +1136,6 @@ export function Session(): JSX.Element {
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <context.Provider
       value={{
@@ -1219,7 +1215,6 @@ export function Session(): JSX.Element {
             >
               <For each={messages()}>
                 {(message, index) => {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                   return (
                     <Switch>
                       <Match when={message.id === revert()?.messageID}>
@@ -1242,7 +1237,6 @@ export function Session(): JSX.Element {
                           }
 
                           const revertData = revert()
-                          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                           return (
                             <box
                               onMouseOver={() => setHover(true)}
@@ -1269,7 +1263,6 @@ export function Session(): JSX.Element {
                                   <box marginTop={1}>
                                     <For each={revertData?.diffFiles ?? []}>
                                       {(file) => {
-                                        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                                         return (
                                           <text fg={theme.text}>
                                             {file.filename}
@@ -1299,7 +1292,6 @@ export function Session(): JSX.Element {
                           onMouseUp={() => {
                             if (renderer.getSelection()?.getSelectedText()) return
                             dialog.replace(() => {
-                              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                               return (
                                 <DialogMessage
                                   messageID={message.id}
@@ -1432,7 +1424,6 @@ function UserMessage(props: {
 
   const compaction = createMemo(() => props.parts.find((x) => x.type === "compaction"))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <Show when={text()}>
@@ -1467,7 +1458,6 @@ function UserMessage(props: {
                       if (file.mime === "application/pdf") return theme.primary
                       return theme.secondary
                     })
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
                     return (
                       <text fg={theme.text}>
                         <span style={{ bg: bg(), fg: theme.background }}> {MIME_BADGE[file.mime] ?? file.mime} </span>
@@ -1532,13 +1522,11 @@ function AssistantMessage(props: { message: AssistantMessage; parts: Part[]; las
 
   const _keybind = useKeybind()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <>
       <For each={props.parts}>
         {(part) => {
           const component = createMemo(() => PART_MAPPING[part.type as keyof typeof PART_MAPPING])
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
           return (
             <Show when={component()}>
               {}
@@ -1618,7 +1606,6 @@ function ReasoningPart(props: { part: ReasoningPart; message: AssistantMessage }
     // OpenRouter sends encrypted reasoning data that appears as [REDACTED]
     return props.part.text.replace("[REDACTED]", "").trim()
   })
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={content() && ctx.showThinking()}>
       <box
@@ -1647,7 +1634,6 @@ function ReasoningPart(props: { part: ReasoningPart; message: AssistantMessage }
 function TextPart(props: { part: TextPart; message: AssistantMessage }): JSX.Element {
   const ctx = use()
   const { theme, syntax } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.part.text.trim()}>
       <box id={"text-" + props.part.id} paddingLeft={3} marginTop={1} flexShrink={0}>
@@ -1713,7 +1699,6 @@ function ToolPart(props: { part: ToolPart; message: AssistantMessage }): JSX.Ele
     },
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={!shouldHide()}>
       <Switch>
@@ -1792,7 +1777,7 @@ function GenericTool(props: ToolProps<any>): JSX.Element {
     return [...lines().slice(0, maxLines), "…"].join("\n")
   })
 
-  /* eslint-disable @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment -- opentui JSX types */
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment -- opentui JSX types */
   return (
     <Show
       when={props.output !== undefined && ctx.showGenericToolOutput()}

@@ -35,6 +35,5 @@ export function DialogSkill(props: DialogSkillProps): JSX.Element {
     }))
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <DialogSelect title="Skills" placeholder="Search skills..." options={options()} />
 }

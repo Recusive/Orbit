@@ -150,7 +150,6 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
 
   const title = createMemo(() => provider()?.name ?? "Select model")
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect<ReturnType<typeof options>[number]["value"]>
       options={options()}
@@ -159,7 +158,6 @@ export function DialogModel(props: { providerID?: string }): JSX.Element {
           keybind: keybind.all.model_provider_list[0],
           title: connected() ? "Connect provider" : "View all providers",
           onTrigger() {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogProvider />)
           },
         },

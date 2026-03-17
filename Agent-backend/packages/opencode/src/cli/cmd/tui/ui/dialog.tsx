@@ -24,7 +24,6 @@ export function Dialog(
 
   let dismiss = false
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box
       onMouseDown={() => {
@@ -158,7 +157,6 @@ export function DialogProvider(props: ParentProps): JSX.Element {
   const value = init()
   const renderer = useRenderer()
   const toast = useToast()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <ctx.Provider value={value}>
       {props.children}

@@ -6,11 +6,6 @@
 //! All operations are dev-only - in production builds, the frontend
 //! should never call these commands.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned types from JSON deserialization"
-)]
-
 use std::path::Path;
 
 use orbit_core::{Error, Result};

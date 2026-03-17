@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-dynamic-delete */
-
 import { createLogger } from '@orbit/common/lib';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
@@ -147,14 +145,14 @@ export const useOcMessageStore = create<OcMessageState>()(
           return;
         }
 
-        delete session.messagesById[messageId];
+        Reflect.deleteProperty(session.messagesById, messageId);
         session.messageOrder = session.messageOrder.filter((id) => id !== messageId);
         const parts = session.partsByMessage[messageId] ?? [];
-        delete session.partsByMessage[messageId];
+        Reflect.deleteProperty(session.partsByMessage, messageId);
 
         for (const part of parts) {
-          delete session.partsById[part.id];
-          delete session.deltaBufferByPart[part.id];
+          Reflect.deleteProperty(session.partsById, part.id);
+          Reflect.deleteProperty(session.deltaBufferByPart, part.id);
         }
       });
     },
@@ -182,8 +180,8 @@ export const useOcMessageStore = create<OcMessageState>()(
           return;
         }
 
-        delete session.partsById[partId];
-        delete session.deltaBufferByPart[partId];
+        Reflect.deleteProperty(session.partsById, partId);
+        Reflect.deleteProperty(session.deltaBufferByPart, partId);
         session.partsByMessage[part.messageID] =
           session.partsByMessage[part.messageID]?.filter((candidate) => candidate.id !== partId) ??
           [];
@@ -273,7 +271,7 @@ export const useOcMessageStore = create<OcMessageState>()(
           return;
         }
 
-        delete session.deltaBufferByPart[partId];
+        Reflect.deleteProperty(session.deltaBufferByPart, partId);
         for (const entry of buffered) {
           const part = session.partsById[partId];
           if (!part) {
@@ -296,7 +294,7 @@ export const useOcMessageStore = create<OcMessageState>()(
     clearSession: (sessionId) => {
       logger.debug('Session cleared', { sessionId });
       set((state) => {
-        delete state.sessions[sessionId];
+        Reflect.deleteProperty(state.sessions, sessionId);
       });
     },
     clearAll: () => {

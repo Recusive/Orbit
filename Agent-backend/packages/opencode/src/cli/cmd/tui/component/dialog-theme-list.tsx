@@ -25,7 +25,6 @@ export function DialogThemeList(): JSX.Element {
     if (!confirmed) theme.set(initial)
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title="Themes"

@@ -1,8 +1,6 @@
 import { readdir } from "fs/promises"
 import path from "path"
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment -- @parcel/watcher/wrapper has no type declarations
-// @ts-ignore - @parcel/watcher/wrapper has no type declarations
 import { createWrapper } from "@parcel/watcher/wrapper"
 import z from "zod"
 
@@ -45,8 +43,7 @@ export namespace FileWatcher {
       const binding = require(
         `@parcel/watcher-${process.platform}-${process.arch}${process.platform === "linux" ? `-${OPENCODE_LIBC ?? "glibc"}` : ""}`,
       ) as Record<string, unknown>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- createWrapper has no type declarations (imported via @ts-ignore)
-      return createWrapper(binding) as typeof ParcelWatcher
+      return createWrapper(binding)
     } catch (error) {
       log.error("failed to load watcher binding", { error })
       return undefined

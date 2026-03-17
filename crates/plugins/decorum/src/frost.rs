@@ -301,9 +301,9 @@ pub(crate) unsafe fn set_tint_opacity(opacity: f64) {
     if tint.is_null() {
         return;
     }
-    #[allow(
+    #[expect(
         clippy::cast_possible_truncation,
-        reason = "opacity is clamped to 0.0..=1.0, safe for f32"
+        reason = "rgba u8 values are always within range"
     )]
     let clamped = opacity.clamp(0.0, 1.0) as f32;
     let layer: *mut AnyObject = msg_send![tint, layer];

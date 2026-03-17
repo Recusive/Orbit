@@ -18,7 +18,6 @@ export function DialogMessage(props: {
   const message = createMemo(() => (sync.data.message[props.sessionID] ?? []).find((x) => x.id === props.messageID))
   const route = useRoute()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <DialogSelect
       title="Message Actions"

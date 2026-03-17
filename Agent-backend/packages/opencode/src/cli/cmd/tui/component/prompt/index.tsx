@@ -94,7 +94,6 @@ export function Prompt(props: PromptProps): JSX.Element {
       duration: 3000,
     })
     if (sync.data.provider.length === 0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
       dialog.replace(() => <DialogProviderConnect />)
     }
   }
@@ -351,7 +350,6 @@ export function Prompt(props: PromptProps): JSX.Element {
         },
         onSelect: () => {
           dialog.replace(() => {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             return (
               <DialogSkill
                 onSelect={(skill) => {
@@ -526,7 +524,6 @@ export function Prompt(props: PromptProps): JSX.Element {
       enabled: stash.list().length > 0,
       onSelect: (dialog) => {
         dialog.replace(() => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           return (
             <DialogStash
               onSelect={(entry) => {
@@ -812,7 +809,6 @@ export function Prompt(props: PromptProps): JSX.Element {
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <>
       <Autocomplete
@@ -1153,7 +1149,6 @@ export function Prompt(props: PromptProps): JSX.Element {
                       return baseMessage + truncatedHint + retryInfo
                     }
 
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                     return (
                       <Show when={retry()}>
                         <box onMouseUp={handleMessageClick}>

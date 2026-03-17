@@ -39,7 +39,6 @@ export function Tips(): JSX.Element {
   const theme = useTheme().theme
   const parts = parse(TIPS[Math.floor(Math.random() * TIPS.length)])
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box flexDirection="row" maxWidth="100%">
       <text flexShrink={0} style={{ fg: theme.warning }}>
@@ -47,7 +46,6 @@ export function Tips(): JSX.Element {
       </text>
       <text flexShrink={1}>
         <For each={parts}>
-          {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
           {(part) => <span style={{ fg: part.highlight ? theme.text : theme.textMuted }}>{part.text}</span>}
         </For>
       </text>

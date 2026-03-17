@@ -252,7 +252,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box
       backgroundColor={theme.backgroundPanel}
@@ -269,7 +268,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
                 const isAnswered = (): boolean => {
                   return (store.answers[index()]?.length ?? 0) > 0
                 }
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
                   <box
                     paddingLeft={1}
@@ -332,7 +330,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
                 {(opt, i) => {
                   const active = (): boolean => i() === store.selected
                   const picked = (): boolean => store.answers[store.tab]?.includes(opt.label) ?? false
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                   return (
                     <box
                       onMouseOver={() => {
@@ -436,7 +433,6 @@ export function QuestionPrompt(props: { request: QuestionRequest }): JSX.Element
             {(q, index) => {
               const value = (): string => store.answers[index()]?.join(", ") ?? ""
               const answered = (): boolean => value() !== ""
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box paddingLeft={1}>
                   <text>

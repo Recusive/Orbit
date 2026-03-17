@@ -77,7 +77,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
   )
   const gettingStartedDismissed = createMemo(() => kv.get<boolean>("dismissed_getting_started", false))
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={session()}>
       <box
@@ -145,7 +144,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <Show when={mcpEntries().length <= 2 || expanded.mcp}>
                   <For each={mcpEntries()}>
                     {([key, item]) => (
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                       <box flexDirection="row" gap={1}>
                         <text
                           flexShrink={0}
@@ -168,7 +166,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                           <span style={{ fg: theme.textMuted }}>
                             <Switch fallback={item.status}>
                               <Match when={item.status === "connected"}>Connected</Match>
-                              {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
                               <Match when={item.status === "failed" && item}>{(val) => <i>{val().error}</i>}</Match>
                               <Match when={item.status === "disabled"}>Disabled</Match>
                               <Match when={(item.status as string) === "needs_auth"}>Needs auth</Match>
@@ -209,7 +206,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 </Show>
                 <For each={sync.data.lsp}>
                   {(item) => (
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                     <box flexDirection="row" gap={1}>
                       <text
                         flexShrink={0}
@@ -247,7 +243,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                   </text>
                 </box>
                 <Show when={todo().length <= 2 || expanded.todo}>
-                  {/* eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types */}
                   <For each={todo()}>
                     {(todoEntry) => <TodoItem status={todoEntry.status} content={todoEntry.content} />}
                   </For>
@@ -273,7 +268,6 @@ export function Sidebar(props: { sessionID: string; overlay?: boolean }): JSX.El
                 <Show when={diff().length <= 2 || expanded.diff}>
                   <For each={diff()}>
                     {(item) => {
-                      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                       return (
                         <box flexDirection="row" gap={1} justifyContent="space-between">
                           <text fg={theme.textMuted} wrapMode="none">

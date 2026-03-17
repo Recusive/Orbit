@@ -128,6 +128,15 @@ export default defineConfig(
       "no-console": "off",
     },
   },
+  /* opentui TUI components — ESLint cannot resolve SolidJS JSX return types.
+     Only no-unsafe-return is disabled globally; other unsafe-* rules stay enforced
+     so non-JSX unsafe logic (e.g. Proxy accessors, dynamic dispatch) is still caught. */
+  {
+    files: ["packages/opencode/src/cli/cmd/tui/**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-unsafe-return": "off",
+    },
+  },
   /* Logging utility — wraps console by design */
   {
     files: ["packages/opencode/src/util/log.ts"],

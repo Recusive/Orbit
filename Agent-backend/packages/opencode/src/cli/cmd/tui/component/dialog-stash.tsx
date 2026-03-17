@@ -58,7 +58,6 @@ export function DialogStash(props: { onSelect: (entry: StashEntry) => void }): J
       .toReversed()
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       title="Stash"

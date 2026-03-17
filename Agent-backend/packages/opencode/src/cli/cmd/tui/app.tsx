@@ -139,11 +139,10 @@ export function tui(input: {
 
       void render(
         () => {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
           return (
             <ErrorBoundary
               fallback={(error, reset) => (
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-assignment -- opentui JSX element
+                // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- opentui JSX element
                 <ErrorComponent error={error} reset={reset} onExit={onExit} mode={mode} />
               )}
             >
@@ -373,7 +372,6 @@ function App(): JSX.Element {
       (isEmpty, wasEmpty) => {
         // only trigger when we transition into an empty-provider state
         if (!isEmpty || wasEmpty) return
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogProviderList />)
       },
     ),
@@ -392,7 +390,6 @@ function App(): JSX.Element {
         aliases: ["resume", "continue"],
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogSessionList />)
       },
     },
@@ -407,7 +404,6 @@ function App(): JSX.Element {
               name: "workspaces",
             },
             onSelect: () => {
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
               dialog.replace(() => <DialogWorkspaceList />)
             },
           },
@@ -447,7 +443,6 @@ function App(): JSX.Element {
         name: "models",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogModel />)
       },
     },
@@ -500,7 +495,6 @@ function App(): JSX.Element {
         name: "agents",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogAgent />)
       },
     },
@@ -512,7 +506,6 @@ function App(): JSX.Element {
         name: "mcps",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogMcp />)
       },
     },
@@ -554,7 +547,6 @@ function App(): JSX.Element {
         name: "connect",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogProviderList />)
       },
       category: "Provider",
@@ -567,7 +559,6 @@ function App(): JSX.Element {
         name: "status",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogStatus />)
       },
       category: "System",
@@ -580,7 +571,6 @@ function App(): JSX.Element {
         name: "themes",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogThemeList />)
       },
       category: "System",
@@ -601,7 +591,6 @@ function App(): JSX.Element {
         name: "help",
       },
       onSelect: () => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
         dialog.replace(() => <DialogHelp />)
       },
       category: "System",
@@ -772,7 +761,6 @@ function App(): JSX.Element {
     })
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <box
       width={dimensions().width}
@@ -853,7 +841,6 @@ function ErrorComponent(props: {
     })
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <box flexDirection="column" gap={1} backgroundColor={colors.bg}>
       <box flexDirection="row" gap={1} alignItems="center">

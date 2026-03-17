@@ -96,7 +96,10 @@ fn ensure_quartz_core_loaded() {
 /// # Safety
 ///
 /// Called by the Objective-C runtime on every display refresh.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 unsafe extern "C" fn promotion_step(_this: *mut AnyObject, _sel: Sel, _sender: *mut c_void) {
     // Intentionally empty — the display link's existence in the run loop
     // is sufficient to request 120Hz from the ProMotion controller.
@@ -329,7 +332,10 @@ fn register_unlocker_class() -> Option<&'static AnyClass> {
 /// # Safety
 ///
 /// Called by the Objective-C runtime via `performSelector:withObject:afterDelay:`.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 unsafe extern "C" fn on_attempt_unlock(_this: *mut AnyObject, _sel: Sel, _sender: *mut AnyObject) {
     let attempt = UNLOCK_ATTEMPTS.fetch_add(1, Ordering::SeqCst) + 1;
 

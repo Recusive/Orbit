@@ -16,7 +16,6 @@ import { Flag } from "@/flag/flag"
 
 function Title(props: { session: Accessor<Session> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <text fg={theme.text}>
       <span style={{ bold: true }}>#</span> <span style={{ bold: true }}>{props.session().title}</span>
@@ -26,7 +25,6 @@ function Title(props: { session: Accessor<Session> }): JSX.Element {
 
 function ContextInfo(props: { context: Accessor<string | undefined>; cost: Accessor<string> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.context()}>
       <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
@@ -38,7 +36,6 @@ function ContextInfo(props: { context: Accessor<string | undefined>; cost: Acces
 
 function WorkspaceInfo(props: { workspace: Accessor<string | undefined> }): JSX.Element {
   const { theme } = useTheme()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.workspace()}>
       <text fg={theme.textMuted} wrapMode="none" flexShrink={0}>
@@ -99,7 +96,6 @@ export function Header(): JSX.Element {
   const dimensions = useTerminalDimensions()
   const narrow = createMemo(() => dimensions().width < 80)
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <box flexShrink={0}>
       <box

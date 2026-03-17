@@ -51,7 +51,6 @@ export function FileViewer(props: {
     return path.relative(process.cwd(), props.filePath) || props.filePath
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <Show when={props.filePath && fileContent()}>
       <box
@@ -66,7 +65,6 @@ export function FileViewer(props: {
             {(tab) => {
               const active = (): boolean => tab === props.filePath
               const name = path.basename(tab)
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               return (
                 <box
                   flexDirection="row"
@@ -114,7 +112,6 @@ export function FileViewer(props: {
         >
           <Show when={content}>
             {(c) => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <line_number fg={theme.textMuted} minWidth={4} paddingRight={1}>
                 <code conceal={false} fg={theme.text} filetype={ft()} syntaxStyle={syntax()} content={c()} />
               </line_number>

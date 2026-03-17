@@ -229,7 +229,6 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
 
   const keybinds = createMemo(() => props.keybind?.filter((x) => x.disabled !== true && x.keybind !== undefined) ?? [])
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <box gap={1} paddingBottom={1}>
       <box paddingLeft={4} paddingRight={4}>
@@ -286,7 +285,6 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
         >
           <For each={grouped()}>
             {([category, options], index) => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
               <>
                 <Show when={category}>
                   <box paddingTop={index() > 0 ? 1 : 0} paddingLeft={3}>
@@ -299,7 +297,6 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
                   {(option) => {
                     const active = createMemo(() => isDeepEqual(option.value, selected().value))
                     const current = createMemo(() => isDeepEqual(option.value, props.current))
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
                     return (
                       <box
                         id={JSON.stringify(option.value)}
@@ -354,7 +351,6 @@ export function DialogSelect<T>(props: DialogSelectProps<T>): JSX.Element {
         <box paddingRight={2} paddingLeft={4} flexDirection="row" gap={2} flexShrink={0} paddingTop={1}>
           <For each={keybinds()}>
             {(item) => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
               <text>
                 <span style={{ fg: theme.text }}>
                   <b>{item.title}</b>{" "}
@@ -381,7 +377,6 @@ function Option(props: {
   const { theme } = useTheme()
   const fg = selectedForeground(theme)
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX element
   return (
     <>
       <Show when={props.current}>

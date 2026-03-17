@@ -1,14 +1,5 @@
 //! Vault CRUD, context config, and unified search commands.
 
-#![allow(
-    clippy::needless_pass_by_value,
-    reason = "Tauri commands receive owned payloads from JSON"
-)]
-#![allow(
-    clippy::too_many_lines,
-    reason = "This module intentionally groups all Vault command handlers"
-)]
-
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ffi::OsStr;

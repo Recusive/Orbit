@@ -17,7 +17,6 @@ export interface LinkProps {
 export function Link(props: LinkProps): JSX.Element {
   const displayText = props.children ?? props.href
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <text
       fg={props.fg}

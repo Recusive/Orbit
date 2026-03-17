@@ -2,7 +2,7 @@
 //!
 //! This is the safe Tauri-facing wrapper around `orbit-app-icons`.
 
-#![allow(
+#![expect(
     clippy::needless_pass_by_value,
     reason = "Tauri commands receive owned types from JSON deserialization"
 )]

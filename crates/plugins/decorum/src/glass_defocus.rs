@@ -301,7 +301,10 @@ unsafe fn notification_window_has_glass(notification: *mut AnyObject) -> bool {
 /// # Safety
 ///
 /// Called by the Objective-C runtime via `NSNotificationCenter`.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 unsafe extern "C" fn on_resign_key(_this: *mut AnyObject, _cmd: Sel, notification: *mut AnyObject) {
     if SUSPENDED.load(Ordering::Relaxed) {
         return;
@@ -327,7 +330,10 @@ unsafe extern "C" fn on_resign_key(_this: *mut AnyObject, _cmd: Sel, notificatio
 /// # Safety
 ///
 /// Called by the Objective-C runtime via `NSNotificationCenter`.
-#[allow(clippy::missing_const_for_fn)]
+#[allow(
+    clippy::missing_const_for_fn,
+    reason = "platform-conditional: lint fires on non-macOS stub but not on macOS FFI body"
+)]
 unsafe extern "C" fn on_become_key(_this: *mut AnyObject, _cmd: Sel, notification: *mut AnyObject) {
     if SUSPENDED.load(Ordering::Relaxed) {
         return;

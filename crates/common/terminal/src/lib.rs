@@ -3,7 +3,7 @@
 //! This crate provides pseudo-terminal (PTY) support for running shell sessions.
 //! It uses `portable-pty` for cross-platform PTY spawning and management.
 
-#![allow(
+#![expect(
     clippy::significant_drop_tightening,
     reason = "false positives with Mutex guards"
 )]
@@ -224,7 +224,7 @@ impl ForegroundProcessTracker {
     /// Check if the foreground process has changed since last check.
     ///
     /// Returns `Some(new_process)` if changed, `None` if unchanged.
-    #[allow(
+    #[expect(
         clippy::if_then_some_else_none,
         reason = "bool::then doesn't work well with mutable state and returning a different value"
     )]
@@ -331,11 +331,11 @@ impl Terminal {
         clippy::iter_over_hash_type,
         reason = "iteration order doesn't matter for environment variables"
     )]
-    #[allow(
+    #[expect(
         clippy::too_many_lines,
         reason = "PTY setup requires sequential initialization that shouldn't be split"
     )]
-    #[allow(
+    #[expect(
         clippy::cognitive_complexity,
         reason = "UTF-8 boundary detection logic in reader thread adds necessary complexity"
     )]

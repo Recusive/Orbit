@@ -111,7 +111,6 @@ function init(): {
     },
     suspended,
     show(): void {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
       dialog.replace(() => <DialogCommand options={visibleOptions()} suggestedOptions={suggestedOptions()} />)
     },
     register(cb: () => CommandOption[]): void {
@@ -149,7 +148,6 @@ export function CommandProvider(props: ParentProps): JSX.Element {
     }
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <ctx.Provider value={value}>{props.children}</ctx.Provider>
 }
 
@@ -159,6 +157,5 @@ function DialogCommand(props: { options: CommandOption[]; suggestedOptions: Comm
     if (ref?.filter) return props.options
     return [...props.suggestedOptions, ...props.options]
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <DialogSelect ref={(r) => (ref = r)} title="Commands" options={list()} />
 }

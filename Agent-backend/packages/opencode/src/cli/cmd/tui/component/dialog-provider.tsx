@@ -65,7 +65,6 @@ export function createDialogProviderOptions(): Accessor<
             index = await new Promise<number | null>((resolve) => {
               dialog.replace(
                 () => {
-                  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                   return (
                     <DialogSelect
                       title="Select auth method"
@@ -96,7 +95,6 @@ export function createDialogProviderOptions(): Accessor<
               const codeAuth = result.data
               const codeIndex = index
               dialog.replace(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
                   <CodeMethod
                     providerID={provider.id}
@@ -111,7 +109,6 @@ export function createDialogProviderOptions(): Accessor<
               const autoAuth = result.data
               const autoIndex = index
               dialog.replace(() => {
-                // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
                 return (
                   <AutoMethod
                     providerID={provider.id}
@@ -124,7 +121,6 @@ export function createDialogProviderOptions(): Accessor<
             }
           }
           if (method.type === "api") {
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <ApiMethod providerID={provider.id} title={method.label} />)
             return
           }
@@ -137,7 +133,6 @@ export function createDialogProviderOptions(): Accessor<
 
 export function DialogProvider(): JSX.Element {
   const options = createDialogProviderOptions()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <DialogSelect title="Connect a provider" options={options()} />
 }
 
@@ -176,11 +171,9 @@ function AutoMethod(props: AutoMethodProps): JSX.Element {
     }
     await sdk.client.instance.dispose()
     await sync.bootstrap()
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     dialog.replace(() => <DialogModel providerID={props.providerID} />)
   })()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <box paddingLeft={2} paddingRight={2} gap={1} paddingBottom={1}>
       <box flexDirection="row" justifyContent="space-between">
@@ -221,7 +214,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
   const dialog = useDialog()
   const [error, setError] = createSignal(false)
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogPrompt
       title={props.title}
@@ -236,7 +228,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
           if (!error) {
             await sdk.client.instance.dispose()
             await sync.bootstrap()
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
             dialog.replace(() => <DialogModel providerID={props.providerID} />)
             return
           }
@@ -244,7 +235,6 @@ function CodeMethod(props: CodeMethodProps): JSX.Element {
         })()
       }}
       description={() => {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
         return (
           <box gap={1}>
             <text fg={theme.textMuted}>{props.authorization.instructions}</text>
@@ -269,7 +259,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
   const sync = useSync()
   const { theme } = useTheme()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogPrompt
       title={props.title}
@@ -278,7 +267,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
         (
           {
             orbit: (() => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box gap={1}>
                 <text fg={theme.textMuted}>
                   OpenCode Zen gives you access to the best coding models with a single API key.
@@ -289,7 +277,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
               </box>
             )) as () => JSX.Element,
             opencode: (() => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box gap={1}>
                 <text fg={theme.textMuted}>
                   OpenCode Zen gives you access to the best coding models with a single API key.
@@ -300,7 +287,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
               </box>
             )) as () => JSX.Element,
             "opencode-go": (() => (
-              // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
               <box gap={1}>
                 <text fg={theme.textMuted}>
                   OpenCode Go provides reliable access to popular coding models with generous usage limits.
@@ -325,7 +311,6 @@ function ApiMethod(props: ApiMethodProps): JSX.Element {
           })
           await sdk.client.instance.dispose()
           await sync.bootstrap()
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
           dialog.replace(() => <DialogModel providerID={props.providerID} />)
         })()
       }}

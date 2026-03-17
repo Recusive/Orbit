@@ -39,7 +39,6 @@ export function DialogPrompt(props: DialogPromptProps): JSX.Element {
     textarea.gotoLineEnd()
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <box paddingLeft={2} paddingRight={2} gap={1}>
       <box flexDirection="row" justifyContent="space-between">
@@ -88,7 +87,6 @@ DialogPrompt.show = (
   return new Promise<string | null>((resolve) => {
     dialog.replace(
       () => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
         <DialogPrompt
           title={title}
           {...options}

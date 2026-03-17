@@ -16,14 +16,11 @@ import { Keybind } from "@/util/keybind"
 function Status(props: { enabled: boolean; loading: boolean }): JSX.Element {
   const { theme } = useTheme()
   if (props.loading) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     return <span style={{ fg: theme.textMuted }}>⋯ Loading</span>
   }
   if (props.enabled) {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
     return <span style={{ fg: theme.success, attributes: TextAttributes.BOLD }}>✓ Enabled</span>
   }
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return <span style={{ fg: theme.textMuted }}>○ Disabled</span>
 }
 
@@ -81,7 +78,6 @@ export function DialogMcp(): JSX.Element {
     },
   ])
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types
   return (
     <DialogSelect
       ref={setRef}

@@ -37,7 +37,6 @@ export function DialogTimeline(props: {
         footer: Locale.time(message.time.created),
         onSelect: (dlg) => {
           dlg.replace(() => (
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
             <DialogMessage messageID={message.id} sessionID={props.sessionID} setPrompt={props.setPrompt} />
           ))
         },
@@ -47,7 +46,6 @@ export function DialogTimeline(props: {
     return result
   })
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- opentui JSX types unresolvable by ESLint type-checker
   return (
     <DialogSelect
       onMove={(option) => {

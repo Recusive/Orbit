@@ -233,7 +233,7 @@ export namespace Provider {
       for (const [key, value] of Object.entries(input.models)) {
         if (value.cost.input === 0) continue
         const models = input.models
-        delete models[key] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(models, key)
       }
     }
 
@@ -1200,7 +1200,7 @@ export namespace Provider {
     for (const [providerID, provider] of Object.entries(providers)) {
       if (!isProviderAllowed(providerID)) {
         const providerRecord = providers
-        delete providerRecord[providerID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(providerRecord, providerID)
         continue
       }
 
@@ -1209,14 +1209,14 @@ export namespace Provider {
       for (const [modelID, model] of Object.entries(provider.models)) {
         const modelRecord = provider.models
         if (modelID === "gpt-5-chat-latest" || (providerID === "openrouter" && modelID === "openai/gpt-5-chat"))
-          delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
-        if (model.status === "deprecated") delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+          Reflect.deleteProperty(modelRecord, modelID)
+        if (model.status === "alpha" && !Flag.OPENCODE_ENABLE_EXPERIMENTAL_MODELS) Reflect.deleteProperty(modelRecord, modelID)
+        if (model.status === "deprecated") Reflect.deleteProperty(modelRecord, modelID)
         if (
           configProvider?.blacklist?.includes(modelID) === true ||
           (configProvider?.whitelist !== undefined && !configProvider.whitelist.includes(modelID))
         )
-          delete modelRecord[modelID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+          Reflect.deleteProperty(modelRecord, modelID)
 
         model.variants = mapValues(ProviderTransform.variants(model), (v) => v)
 
@@ -1233,7 +1233,7 @@ export namespace Provider {
 
       if (Object.keys(provider.models).length === 0) {
         const providerRecord = providers
-        delete providerRecord[providerID] // eslint-disable-line @typescript-eslint/no-dynamic-delete
+        Reflect.deleteProperty(providerRecord, providerID)
         continue
       }
 

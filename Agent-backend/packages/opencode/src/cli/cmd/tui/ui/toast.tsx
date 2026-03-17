@@ -17,11 +17,9 @@ export function Toast(): JSX.Element {
   const { theme } = useTheme()
   const dimensions = useTerminalDimensions()
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return (
     <Show when={toast.currentToast}>
       {(current) => (
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
         <box
           position="absolute"
           justifyContent="center"
@@ -99,7 +97,6 @@ const ctx = createContext<ToastContext>()
 
 export function ToastProvider(props: ParentProps): JSX.Element {
   const value = init()
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-return -- SolidJS JSX return type from opentui
   return <ctx.Provider value={value}>{props.children}</ctx.Provider>
 }
 

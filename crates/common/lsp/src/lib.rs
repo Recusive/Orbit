@@ -4,54 +4,54 @@
 //! IDE features like completion, hover, and go-to-definition.
 
 // Allow certain clippy lints for LSP protocol code which has specific requirements
-#![allow(
+#![expect(
     clippy::impl_trait_in_params,
     reason = "ergonomic API for builder pattern"
 )]
 #![allow(
     clippy::iter_over_hash_type,
-    reason = "iteration order doesn't matter for shutdown"
+    reason = "hashbrown-sensitive: lint may not fire consistently on hashbrown::HashMap"
 )]
-#![allow(
+#![expect(
     clippy::cast_possible_truncation,
     reason = "LSP protocol values fit in u32/i32"
 )]
-#![allow(clippy::str_to_string, reason = "common pattern for JSON parsing")]
-#![allow(
+#![expect(clippy::str_to_string, reason = "common pattern for JSON parsing")]
+#![expect(
     clippy::uninlined_format_args,
     reason = "more readable for error messages"
 )]
-#![allow(clippy::indexing_slicing, reason = "bounds checked before slicing")]
-#![allow(clippy::absolute_paths, reason = "std types are clear with full paths")]
-#![allow(
+#![expect(clippy::indexing_slicing, reason = "bounds checked before slicing")]
+#![expect(clippy::absolute_paths, reason = "std types are clear with full paths")]
+#![expect(
     clippy::trait_duplication_in_bounds,
     reason = "serde derive requires this"
 )]
-#![allow(
+#![expect(
     clippy::significant_drop_tightening,
     reason = "mutex guards need to be held"
 )]
-#![allow(clippy::type_complexity, reason = "LSP protocol types are complex")]
-#![allow(
+#![expect(clippy::type_complexity, reason = "LSP protocol types are complex")]
+#![expect(
     clippy::redundant_closure_for_method_calls,
     reason = "clearer with explicit closures"
 )]
-#![allow(
+#![expect(
     clippy::let_underscore_must_use,
     reason = "send results are intentionally ignored"
 )]
-#![allow(clippy::future_not_send, reason = "LSP client is single-threaded")]
-#![allow(clippy::map_err_ignore, reason = "original error context not needed")]
-#![allow(
+#![expect(clippy::future_not_send, reason = "LSP client is single-threaded")]
+#![expect(clippy::map_err_ignore, reason = "original error context not needed")]
+#![expect(
     clippy::needless_pass_by_value,
     reason = "JSON values are consumed during parsing"
 )]
-#![allow(
+#![expect(
     clippy::option_if_let_else,
     reason = "if-let-else is clearer for this pattern"
 )]
-#![allow(clippy::map_unwrap_or, reason = "map().unwrap_or() is clearer here")]
-#![allow(
+#![expect(clippy::map_unwrap_or, reason = "map().unwrap_or() is clearer here")]
+#![expect(
     clippy::default_numeric_fallback,
     reason = "type is clear from context"
 )]

@@ -429,7 +429,20 @@ impl CrashManager {
     reason = "Tests ignore some results intentionally"
 )]
 mod tests {
+    use std::env::temp_dir;
+    use std::process::id;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
     use super::*;
+
+    fn create_test_manager(test_name: &str) -> CrashManager {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("System time should be after Unix epoch")
+            .as_nanos();
+        let log_dir = temp_dir().join(format!("orbit-core-crash-{test_name}-{}-{unique}", id()));
+        CrashManager { log_dir }
+    }
 
     // ========================================================================
     // Parsing Tests
@@ -664,22 +677,15 @@ Backtrace:
 
     #[test]
     fn test_crash_log_write_and_read() {
-        use std::io::Write as _;
-
-        let test_app = "orbit_test_write_read";
-        let manager = CrashManager::new(test_app);
-        let Some(m) = manager.as_ref() else {
-            return; // Skip if can't create manager
-        };
-
+        let m = create_test_manager("write-read");
         let log_path = m.crash_log_path();
 
         // Clean up any existing log
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
 
         // Create parent directory
         if let Some(parent) = log_path.parent() {
-            drop(fs::create_dir_all(parent));
+            fs::create_dir_all(parent).expect("Should create crash log directory");
         }
 
         // Write a test crash log
@@ -692,12 +698,7 @@ Backtrace:
 ==================
 ";
 
-        {
-            let mut file = File::create(&log_path);
-            if let Ok(ref mut f) = file {
-                drop(f.write_all(test_content.as_bytes()));
-            }
-        }
+        fs::write(&log_path, test_content).expect("Should write crash log");
 
         // Verify has_pending_crashes returns true
         assert!(m.has_pending_crashes());
@@ -714,34 +715,22 @@ Backtrace:
         assert_eq!(reports[0].message, "test message");
 
         // Clean up
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
     }
 
     #[test]
     fn test_crash_log_consume() {
-        use std::io::Write as _;
-
-        let test_app = "orbit_test_consume";
-        let manager = CrashManager::new(test_app);
-        let Some(m) = manager.as_ref() else {
-            return;
-        };
-
+        let m = create_test_manager("consume");
         let log_path = m.crash_log_path();
 
         // Clean up and create
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
         if let Some(parent) = log_path.parent() {
-            drop(fs::create_dir_all(parent));
+            fs::create_dir_all(parent).expect("Should create crash log directory");
         }
 
         // Write test content
-        {
-            let mut file = File::create(&log_path);
-            if let Ok(ref mut f) = file {
-                drop(f.write_all(b"test content"));
-            }
-        }
+        fs::write(&log_path, "test content").expect("Should write crash log");
 
         // Consume should read and clear
         let contents = m.consume_crash_log();
@@ -753,34 +742,22 @@ Backtrace:
         assert!(!m.has_pending_crashes());
 
         // Clean up
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
     }
 
     #[test]
     fn test_crash_log_clear() {
-        use std::io::Write as _;
-
-        let test_app = "orbit_test_clear";
-        let manager = CrashManager::new(test_app);
-        let Some(m) = manager.as_ref() else {
-            return;
-        };
-
+        let m = create_test_manager("clear");
         let log_path = m.crash_log_path();
 
         // Clean up and create
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
         if let Some(parent) = log_path.parent() {
-            drop(fs::create_dir_all(parent));
+            fs::create_dir_all(parent).expect("Should create crash log directory");
         }
 
         // Write test content
-        {
-            let mut file = File::create(&log_path);
-            if let Ok(f) = &mut file {
-                drop(f.write_all(b"content to clear"));
-            }
-        }
+        fs::write(&log_path, "content to clear").expect("Should write crash log");
 
         assert!(m.has_pending_crashes());
 
@@ -791,7 +768,7 @@ Backtrace:
         assert!(!m.has_pending_crashes());
 
         // Clean up
-        drop(fs::remove_file(&log_path));
+        drop(fs::remove_dir_all(&m.log_dir));
     }
 
     // ========================================================================

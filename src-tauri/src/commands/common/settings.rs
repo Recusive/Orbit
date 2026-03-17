@@ -3,7 +3,7 @@
 //! These commands provide settings management operations.
 //! Errors are captured to Sentry for monitoring via the `SentryCapture` trait.
 
-#![allow(
+#![expect(
     clippy::needless_pass_by_value,
     reason = "Tauri commands receive owned types from JSON deserialization"
 )]

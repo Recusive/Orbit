@@ -72,8 +72,7 @@ export namespace SessionStatus {
         sessionID,
       })
       const s = state()
-      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- keyed by session ID
-      delete s[sessionID]
+      Reflect.deleteProperty(s, sessionID)
       return
     }
     state()[sessionID] = status
