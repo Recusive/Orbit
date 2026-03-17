@@ -170,6 +170,7 @@ describe('InputControls Mode Picker Button', () => {
               id: 'claude-sonnet-4-5',
               name: 'Claude Sonnet 4.5',
               reasoning: true,
+              supportsImageInput: true,
               variants: {
                 high: {},
                 max: {},

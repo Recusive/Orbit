@@ -29,6 +29,29 @@ export interface OcSendMessageOptions {
   readonly images?: readonly ImageAttachment[];
 }
 
+type ProviderListModel = ProviderListResponses[200]['all'][number]['models'][string];
+type ProviderListModelMaybeMalformed = Omit<ProviderListModel, 'capabilities' | 'limit'> & {
+  capabilities?: Partial<ProviderListModel['capabilities']> & {
+    input?: Partial<ProviderListModel['capabilities']['input']>;
+  };
+  limit?: ProviderListModel['limit'];
+};
+
+function resolveProviderModelSupportsImageInput(model: ProviderListModel): boolean {
+  const capabilities = (model as ProviderListModelMaybeMalformed).capabilities;
+  return capabilities?.input?.image ?? capabilities?.attachment ?? false;
+}
+
+function resolveProviderModelReasoning(model: ProviderListModel): boolean {
+  return (model as ProviderListModelMaybeMalformed).capabilities?.reasoning === true;
+}
+
+function resolveProviderModelLimit(
+  model: ProviderListModel
+): ProviderListModelMaybeMalformed['limit'] | undefined {
+  return (model as ProviderListModelMaybeMalformed).limit;
+}
+
 function mapProviders(response: ProviderListResponses[200]): {
   providers: OcProviderInfo[];
   connectedProviders: string[];
@@ -40,35 +63,19 @@ function mapProviders(response: ProviderListResponses[200]): {
       name: provider.name,
       env: provider.env,
       models: Object.fromEntries(
-        Object.values(
-          provider.models as Record<
-            string,
-            {
-              id: string;
-              name: string;
-              reasoning: boolean;
-              attachment: boolean;
-              modalities?: {
-                input: ('text' | 'audio' | 'image' | 'video' | 'pdf')[];
-                output: ('text' | 'audio' | 'image' | 'video' | 'pdf')[];
-              };
-              variants?: Record<string, Record<string, unknown>>;
-              limit?: { context: number; input?: number; output: number };
-            }
-          >
-        ).map((model) => [
-          model.id,
-          {
+        Object.values(provider.models).map((model) => {
+          const limit = resolveProviderModelLimit(model);
+          const mappedModel = {
             id: model.id,
             name: model.name,
-            ...(model.reasoning ? { reasoning: true } : {}),
-            supportsImageInput: model.modalities
-              ? model.modalities.input.includes('image')
-              : model.attachment,
-            ...(model.variants ? { variants: model.variants } : {}),
-            ...(model.limit ? { limit: model.limit } : {}),
-          },
-        ])
+            ...(resolveProviderModelReasoning(model) ? { reasoning: true } : {}),
+            supportsImageInput: resolveProviderModelSupportsImageInput(model),
+            ...(model.variants !== undefined ? { variants: model.variants } : {}),
+            ...(limit !== undefined ? { limit } : {}),
+          } satisfies OcProviderInfo['models'][string];
+
+          return [model.id, mappedModel];
+        })
       ),
     })),
     connectedProviders: response.connected,

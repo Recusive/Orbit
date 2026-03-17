@@ -82,7 +82,10 @@ function createProvider(
     name,
     env: [],
     models: Object.fromEntries(
-      models.map((model) => [model.id, { id: model.id, name: model.name }])
+      models.map((model) => [
+        model.id,
+        { id: model.id, name: model.name, supportsImageInput: true },
+      ])
     ),
   };
 }

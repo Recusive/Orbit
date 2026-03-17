@@ -94,6 +94,7 @@ describe('useOcChatAdapter helpers', () => {
             'claude-sonnet-4-5': {
               id: 'claude-sonnet-4-5',
               name: 'Claude Sonnet 4.5',
+              supportsImageInput: true,
               variants: {
                 high: {},
                 max: {},
@@ -516,6 +517,7 @@ describe('useOcChatAdapter', () => {
             'claude-sonnet-4-5': {
               id: 'claude-sonnet-4-5',
               name: 'Claude Sonnet 4.5',
+              supportsImageInput: true,
               variants: {
                 high: {},
                 max: {},

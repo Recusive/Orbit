@@ -27,7 +27,12 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { ocSessionService } from '@/services/opencode/oc-session-service';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
-import { useOcPermissionStore, useOcProviderStore, useOcSessionStore } from '@/stores/opencode';
+import {
+  resolveOcModelSupportsImageInput,
+  useOcPermissionStore,
+  useOcProviderStore,
+  useOcSessionStore,
+} from '@/stores/opencode';
 
 type OcRenderedMessage = ReturnType<typeof useOcChat>['messages'][number];
 
@@ -722,9 +727,7 @@ export function useOcChatAdapter(): UseOcChatAdapterResult {
         return;
       }
 
-      const modelSupportsImages =
-        useOcProviderStore.getState().providers.find((provider) => provider.id === providerId)
-          ?.models[modelId ?? '']?.supportsImageInput ?? true;
+      const modelSupportsImages = resolveOcModelSupportsImageInput(useOcProviderStore.getState());
       const safeImages = modelSupportsImages ? images : undefined;
       if (trimmed.length === 0 && (safeImages?.length ?? 0) === 0) {
         return;

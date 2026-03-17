@@ -635,45 +635,41 @@ export interface ProviderAuthAuthorization {
 export interface ProviderListResponses {
   200: {
     all: Array<{
-      api?: string;
+      id: string;
       name: string;
       env: string[];
-      id: string;
-      npm?: string;
+      source?: 'env' | 'config' | 'custom' | 'api';
+      options?: Record<string, unknown>;
       models: Record<
         string,
         {
           id: string;
           name: string;
-          family?: string;
-          release_date: string;
-          attachment: boolean;
-          reasoning: boolean;
-          temperature: boolean;
-          tool_call: boolean;
-          interleaved?: true | { field: 'reasoning_content' | 'reasoning_details' };
-          cost?: {
-            input: number;
-            output: number;
-            cache_read?: number;
-            cache_write?: number;
+          capabilities: {
+            temperature: boolean;
+            reasoning: boolean;
+            attachment: boolean;
+            toolcall: boolean;
+            input: {
+              text: boolean;
+              audio: boolean;
+              image: boolean;
+              video: boolean;
+              pdf: boolean;
+            };
+            output: {
+              text: boolean;
+              audio: boolean;
+              image: boolean;
+              video: boolean;
+              pdf: boolean;
+            };
+            interleaved: boolean | { field: 'reasoning_content' | 'reasoning_details' };
           };
           limit: {
             context: number;
             input?: number;
             output: number;
-          };
-          modalities?: {
-            input: Array<'text' | 'audio' | 'image' | 'video' | 'pdf'>;
-            output: Array<'text' | 'audio' | 'image' | 'video' | 'pdf'>;
-          };
-          experimental?: boolean;
-          status?: 'alpha' | 'beta' | 'deprecated';
-          options: Record<string, unknown>;
-          headers?: Record<string, string>;
-          provider?: {
-            npm?: string;
-            api?: string;
           };
           variants?: Record<string, Record<string, unknown>>;
         }

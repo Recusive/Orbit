@@ -76,6 +76,7 @@ function resetProviderStore(): void {
           'claude-sonnet-4-5': {
             id: 'claude-sonnet-4-5',
             name: 'Claude Sonnet 4.5',
+            supportsImageInput: true,
             variants: {
               high: {},
             },
