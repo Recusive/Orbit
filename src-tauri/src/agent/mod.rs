@@ -15,9 +15,11 @@
 #![expect(clippy::exhaustive_enums, reason = "internal IPC protocol types")]
 
 pub mod bridge;
+pub mod credential_bridge;
 pub mod protocol;
 pub mod session;
 
 pub use bridge::AgentBridge;
+pub use credential_bridge::CredentialBridge;
 pub use protocol::*;
 pub use session::SessionManager;

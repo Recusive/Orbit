@@ -44,7 +44,7 @@ pub struct AuthTriggerResult {
 pub async fn check_claude_keychain() -> KeychainStatus {
     #[cfg(target_os = "macos")]
     {
-        check_macos_keychain_validated().await
+        keychain_status_sync()
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -75,7 +75,7 @@ pub async fn trigger_claude_auth(app: tauri::AppHandle) -> AuthTriggerResult {
 /// Uses the same discovery logic as `agent/bridge.rs`: the binary lives in the
 /// same directory as the app executable (production) or in `src-tauri/binaries/`
 /// (development).
-fn resolve_claude_binary_path() -> Option<PathBuf> {
+pub(crate) fn resolve_claude_binary_path() -> Option<PathBuf> {
     use std::env;
 
     let target_triple = if cfg!(target_os = "macos") {
@@ -194,7 +194,7 @@ fn parse_expires_at(json: &serde_json::Value) -> Option<i64> {
 
 /// Check macOS keychain and validate the OAuth token contents.
 #[cfg(target_os = "macos")]
-async fn check_macos_keychain_validated() -> KeychainStatus {
+pub fn keychain_status_sync() -> KeychainStatus {
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 

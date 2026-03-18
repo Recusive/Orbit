@@ -3,7 +3,7 @@ import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 import type { ChatContentProps } from './types';
 import type { FC } from 'react';
 
-import { ChatInput, ChatMessages, TodoBar } from '@/components/chat';
+import { AuthErrorBanner, ChatInput, ChatMessages, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
 import { useVaultOpen } from '@/stores/ui/ui-store';
@@ -93,6 +93,8 @@ export const ChatContent: FC<ChatContentProps> = ({
         loadingMessage="Agent is processing your request..."
         completeMessage={messages.length > 0 ? 'Agent response complete' : 'Ready for input'}
       />
+
+      <AuthErrorBanner />
 
       {vaultOpen ? (
         /* Vault page: Note tiles grid */

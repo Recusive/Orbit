@@ -26,6 +26,7 @@ export * from './agent';
 // Conversation operations
 export * from './conversations';
 export * from './image-cache';
+export * from './diagnostics';
 
 // Search operations
 export * from './search';

@@ -70,11 +70,13 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## plans/tracked/todo/ (9 entries)
 
+- `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
 - `agent-skills-validator-port.md` — Agent skills validator port
+- `auth-method-picker.md` — Auth method picker
 - `browser-enhancement-12-features.md` — Browser enhancement features
 - `browser-navigate-verification-fix.md` — Browser navigate verification fix
 - `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
@@ -82,10 +84,15 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `kanban-ticket-board.md` — Kanban ticket board
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
-- `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
+- `terminal-app/` — Orbit Terminal: native macOS app (forghostty + Ratatui TUI). Contains:
+  - `ORBIT-CLI-RATATUI-SPEC.md` — **PRIMARY SPEC** — Complete Ratatui CLI spec (Codex fork + orbit-server integration, three-panel layout, "+" inline comments, testing strategy, development phases)
+  - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
+  - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (33 entries)
+## plans/tracked/done/ (35 entries)
 
+- `fix-works-then-stops-credential-deletion.md` — Fix shell env API key deletion by OAuth (protect `ANTHROPIC_API_KEY` from `startSession()` wipe when OAuth temporarily wins)
+- `production-ready-credentials.md` — Production-ready credential system + startup health checks (connect Settings UI keys to agent-bridge, AES-256-GCM → sidecar flow)
 - `file-based-changelog-system.md` — File-based changelog system (auto-discovery via import.meta.glob, hybrid bundled + remote notes, JSX renderer)
 - `changelog-settings-page.md` — Changelog dialog → settings page (timeline layout, toast UX fix, sidebar "What's new" link)
 - `lexical-chat-input-migration.md` — Migrate chat input from raw contentEditable + overlay to Lexical editor (fixes WebKit cursor bug, unifies text/decoration/cursor)

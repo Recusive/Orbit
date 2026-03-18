@@ -372,7 +372,12 @@ export class OrbitAgent {
    * Called when the consumer catch block detects an auth error and explicitly awaits refresh.
    */
   markNeedsSessionRestart(): void {
-    this._needsSessionRestart = true;
+    this.setNeedsSessionRestart(true);
+  }
+
+  /** Force a session restart on the next send. */
+  setNeedsSessionRestart(value: boolean): void {
+    this._needsSessionRestart = value;
   }
 
   constructor(config: OrbitAgentConfig = {}) {
@@ -1204,6 +1209,10 @@ You may also have access to iOS simulator automation tools via MCP when the \`mc
       if (credentials.token) {
         process.env.CLAUDE_CODE_OAUTH_TOKEN = credentials.token;
       }
+      const envApiKey = process.env.ANTHROPIC_API_KEY;
+      if (envApiKey !== undefined && envApiKey !== '') {
+        ClaudeCredentials.saveEnvApiKeyFallback(envApiKey);
+      }
       delete process.env.ANTHROPIC_API_KEY;
       delete process.env.ANTHROPIC_AUTH_TOKEN;
 
@@ -1282,6 +1291,11 @@ You may also have access to iOS simulator automation tools via MCP when the \`mc
     // (Code review: Opus cycle 4, #6)
     if (result.error !== undefined) {
       logger.warn({ error: result.error }, 'Credential refresh failed in pre-send check');
+      if (ClaudeCredentials.restoreEnvApiKeyFallback()) {
+        logger.info('Restored shell API key fallback, marking session for restart');
+        this.setNeedsSessionRestart(true);
+        return true;
+      }
       return false;
     }
     // No refresh was needed — credentials still valid (API key or unexpired token)

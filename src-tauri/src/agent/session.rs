@@ -3,6 +3,7 @@
 //! Wraps the bridge and provides a clean API for the Tauri commands.
 
 use super::bridge::{AgentBridge, BridgeError, EventCallback, Result};
+use super::credential_bridge::CredentialBridge;
 use super::protocol::{
     AttachmentContentBlock, BridgeRequest, CanvasSessionConfig, CanvasState, CommandResponse,
     CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse, Model,
@@ -22,15 +23,18 @@ pub struct SessionManager {
     sidecar_path: PathBuf,
     /// Active session IDs
     active_sessions: Mutex<HashSet<String>>,
+    /// Runtime credential synchronization for the sidecar.
+    credential_bridge: Arc<CredentialBridge>,
 }
 
 impl SessionManager {
     /// Create a new session manager
-    pub fn new(sidecar_path: PathBuf) -> Self {
+    pub fn new(sidecar_path: PathBuf, credential_bridge: Arc<CredentialBridge>) -> Self {
         Self {
             bridge: Mutex::new(AgentBridge::new()),
             sidecar_path,
             active_sessions: Mutex::new(HashSet::new()),
+            credential_bridge,
         }
     }
 
@@ -44,8 +48,30 @@ impl SessionManager {
     fn ensure_running(&self) -> Result<()> {
         let mut bridge = self.bridge.lock();
         if !bridge.is_running() {
+            let credential_bridge = Arc::clone(&self.credential_bridge);
             let path = self.sidecar_path.to_str().unwrap_or("agent-bridge");
-            bridge.spawn(path)?;
+            bridge.spawn_with_extra_env(path, move |cmd| {
+                credential_bridge.inject_at_spawn(cmd);
+            })?;
+            if self.credential_bridge.has_api_key() {
+                self.credential_bridge.push_to_running(&bridge)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Update the sidecar credential state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a running sidecar cannot be updated.
+    pub fn update_credentials(&self, api_key: Option<&str>) -> Result<()> {
+        self.credential_bridge
+            .set_api_key(api_key.map(str::to_owned));
+
+        let mut bridge = self.bridge.lock();
+        if bridge.check_and_recover() {
+            self.credential_bridge.push_to_running(&bridge)?;
         }
         Ok(())
     }
@@ -184,7 +210,7 @@ impl SessionManager {
             session_id: session_id.to_owned(),
         };
 
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if bridge.is_running() {
             let response = bridge.send_request(&request)?;
             Self::check_response(response)?;
@@ -222,7 +248,7 @@ impl SessionManager {
             session_id: session_id.to_owned(),
         };
 
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if bridge.is_running() {
             let response = bridge.send_request(&request)?;
             Self::check_response(response)?;
@@ -235,7 +261,7 @@ impl SessionManager {
     pub fn respond_to_permission(&self, response: PermissionResponse) -> Result<()> {
         let request = BridgeRequest::PermissionResponse { response };
 
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if bridge.is_running() {
             let resp = bridge.send_request(&request)?;
             Self::check_response(resp)?;
@@ -361,7 +387,7 @@ impl SessionManager {
 
     /// Check if a session is ready
     pub fn is_session_ready(&self, session_id: &str) -> Result<bool> {
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if !bridge.is_running() {
             return Ok(false);
         }
@@ -376,7 +402,7 @@ impl SessionManager {
 
     /// Get the SDK session ID
     pub fn get_sdk_session_id(&self, session_id: &str) -> Result<Option<String>> {
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if !bridge.is_running() {
             return Ok(None);
         }
@@ -775,7 +801,7 @@ impl SessionManager {
             session_id: session_id.to_owned(),
         };
 
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if bridge.is_running() {
             let response = bridge.send_request(&request)?;
             Self::check_response(response)?;
@@ -809,7 +835,7 @@ impl SessionManager {
             session_id: session_id.to_owned(),
         };
 
-        let bridge = self.bridge.lock();
+        let mut bridge = self.bridge.lock();
         if bridge.is_running() {
             let response = bridge.send_request(&request)?;
             Self::check_response(response)?;
@@ -855,6 +881,9 @@ impl SessionManager {
 }
 
 /// Create a global session manager
-pub fn create_session_manager(sidecar_path: PathBuf) -> Arc<SessionManager> {
-    Arc::new(SessionManager::new(sidecar_path))
+pub fn create_session_manager(
+    sidecar_path: PathBuf,
+    credential_bridge: Arc<CredentialBridge>,
+) -> Arc<SessionManager> {
+    Arc::new(SessionManager::new(sidecar_path, credential_bridge))
 }

@@ -92,6 +92,19 @@ impl AgentBridge {
     ///
     /// Returns an error if the sidecar cannot be spawned or doesn't become ready.
     pub fn spawn(&mut self, sidecar_path: &str) -> Result<()> {
+        self.spawn_with_extra_env(sidecar_path, |_| {})
+    }
+
+    /// Spawn the sidecar process with additional environment injection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sidecar cannot be spawned or doesn't become ready.
+    pub fn spawn_with_extra_env<F: FnOnce(&mut Command)>(
+        &mut self,
+        sidecar_path: &str,
+        env_fn: F,
+    ) -> Result<()> {
         if self.child.is_some() {
             return Ok(()); // Already running
         }
@@ -110,9 +123,11 @@ impl AgentBridge {
         // Spawn the compiled sidecar binary directly
         // Pass CLAUDE_CLI_PATH env var so the sidecar can find the bundled claude binary
         // Pass CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING to enable file checkpointing for rewind
-        let mut child = Command::new(sidecar_path)
-            .env("CLAUDE_CLI_PATH", &claude_path)
-            .env("CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING", "1")
+        let mut child_cmd = Command::new(sidecar_path);
+        let _ = child_cmd.env("CLAUDE_CLI_PATH", &claude_path);
+        let _ = child_cmd.env("CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING", "1");
+        env_fn(&mut child_cmd);
+        let mut child = child_cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit()) // Let stderr go to parent's stderr for debugging
@@ -149,6 +164,30 @@ impl AgentBridge {
 
         log::info!("Agent bridge sidecar ready");
         Ok(())
+    }
+
+    /// Check whether the sidecar process is still alive and clear stale state if it exited.
+    #[must_use]
+    pub fn check_and_recover(&mut self) -> bool {
+        if let Some(ref mut child) = self.child {
+            match child.try_wait() {
+                Ok(None) => return true,
+                Ok(Some(status)) => {
+                    log::warn!("Agent bridge sidecar exited with status: {status}");
+                },
+                Err(error) => {
+                    log::warn!("Failed to check agent bridge sidecar status: {error}");
+                },
+            }
+        } else {
+            return false;
+        }
+
+        self.child = None;
+        self.stdin = None;
+        self.response_rx = None;
+        self.ready = false;
+        false
     }
 
     /// Reader thread - reads JSON lines from stdout
@@ -292,8 +331,8 @@ impl AgentBridge {
 
     /// Check if the bridge is running
     #[must_use]
-    pub fn is_running(&self) -> bool {
-        self.ready && self.child.is_some()
+    pub fn is_running(&mut self) -> bool {
+        self.ready && self.check_and_recover()
     }
 
     /// Shutdown the bridge

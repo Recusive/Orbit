@@ -79,6 +79,11 @@ export interface TokenRefreshResult {
 /** Callback invoked when a scheduled auto-refresh fails */
 export type AutoRefreshFailureCallback = (error: string) => void;
 
+// Module-level credential override set from Orbit Settings.
+// When present, this takes precedence over Keychain and shell env lookup.
+let credentialOverride: CredentialResult | null = null;
+let savedEnvApiKeyFallback: string | null = null;
+
 function parseExpiryMs(expiresAt: number | string): number | null {
   if (typeof expiresAt === 'number') {
     return Number.isFinite(expiresAt) ? expiresAt : null;
@@ -294,6 +299,72 @@ function getApiKeyFromEnv(): string | null {
 }
 
 /**
+ * Save the shell-provided API key before OAuth startup clears it from process.env.
+ *
+ * [warning] TESTED: Shell env fallback save/restore behavior is covered by
+ * integration tests. If you modify this, run: cd agent-bridge && bun test
+ * Test file: src/__tests__/credentials-override.test.ts
+ */
+function saveEnvApiKeyFallback(apiKey: string): void {
+  savedEnvApiKeyFallback = apiKey;
+  logger.debug('Saved shell env API key as OAuth fallback');
+}
+
+/**
+ * Restore the saved shell API key after OAuth auth failure. Returns true when
+ * a fallback key was restored and clears the saved copy so restore is one-shot.
+ *
+ * [warning] TESTED: Shell env fallback save/restore behavior is covered by
+ * integration tests. If you modify this, run: cd agent-bridge && bun test
+ * Test file: src/__tests__/credentials-override.test.ts
+ */
+function restoreEnvApiKeyFallback(): boolean {
+  if (savedEnvApiKeyFallback === null) {
+    return false;
+  }
+
+  process.env.ANTHROPIC_API_KEY = savedEnvApiKeyFallback;
+  delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  delete process.env.ANTHROPIC_AUTH_TOKEN;
+
+  savedEnvApiKeyFallback = null;
+  logger.info('Restored shell env API key after OAuth failure');
+  return true;
+}
+
+/**
+ * Set or clear the credential override pushed from Orbit Settings.
+ *
+ * [warning] TESTED: Settings override precedence in this module is covered by
+ * integration tests. If you modify this, run: cd agent-bridge && bun test
+ * Test file: src/__tests__/credentials-override.test.ts
+ */
+function setCredentialOverride(apiKey: string | undefined): void {
+  if (apiKey !== undefined && apiKey !== '') {
+    credentialOverride = { type: 'apikey', hasCredentials: true, token: apiKey };
+    logger.info('Credential override set from Orbit Settings');
+    return;
+  }
+
+  credentialOverride = null;
+  logger.info('Credential override cleared; falling back to Keychain/env');
+}
+
+/**
+ * Initialize the credential override from startup env injected by Rust.
+ *
+ * [warning] TESTED: Startup override initialization is covered by integration
+ * tests. If you modify this, run: cd agent-bridge && bun test
+ * Test file: src/__tests__/credentials-override.test.ts
+ */
+function initOverrideFromEnv(): void {
+  if (process.env.ORBIT_SETTINGS_API_KEY === '1' && process.env.ANTHROPIC_API_KEY !== undefined) {
+    setCredentialOverride(process.env.ANTHROPIC_API_KEY);
+    logger.info('Credential override initialized from startup env');
+  }
+}
+
+/**
  * Read the OAuth token expiry from macOS Keychain without performing a full
  * credential validation. Returns the expiry timestamp in milliseconds, or
  * null if the token is not OAuth or the expiry cannot be determined.
@@ -471,8 +542,19 @@ function scheduleAutoRefresh(onFailure: AutoRefreshFailureCallback): () => void 
  * the CLI subprocess to read from Keychain.
  *
  * @returns Object with credential info including the token value
+ *
+ * [warning] TESTED: Credential priority, including the Settings override path,
+ * is covered by integration tests. If you modify this, run:
+ * cd agent-bridge && bun test
+ * Test files: src/__tests__/credentials-refresh.test.ts,
+ * src/__tests__/credentials-override.test.ts
  */
 async function getCredentials(): Promise<CredentialResult> {
+  if (credentialOverride !== null) {
+    logger.info('Using credential override from Orbit Settings');
+    return credentialOverride;
+  }
+
   // Try OAuth token first
   const oauthToken = await getOAuthTokenFromKeychain();
 
@@ -505,6 +587,10 @@ export const ClaudeCredentials = {
   getOAuthTokenFromKeychain,
   getApiKeyFromEnv,
   getCredentials,
+  saveEnvApiKeyFallback,
+  restoreEnvApiKeyFallback,
+  setCredentialOverride,
+  initOverrideFromEnv,
   refreshOAuthToken,
   getTokenExpiry,
   refreshIfNeeded,

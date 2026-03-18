@@ -369,6 +369,10 @@ pub enum BridgeRequest {
         #[serde(rename = "maxAgeDays", skip_serializing_if = "Option::is_none")]
         max_age_days: Option<u32>,
     },
+    UpdateCredentials {
+        #[serde(rename = "apiKey", skip_serializing_if = "Option::is_none")]
+        api_key: Option<String>,
+    },
     // Agent Definition Operations
     ListAgents {
         #[serde(rename = "workspacePath")]

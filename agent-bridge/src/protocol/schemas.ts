@@ -310,6 +310,14 @@ export const CleanupSessionsRequestSchema = z
   .strict();
 export type CleanupSessionsRequest = z.infer<typeof CleanupSessionsRequestSchema>;
 
+export const UpdateCredentialsRequestSchema = z
+  .object({
+    type: z.literal('update_credentials'),
+    apiKey: z.string().optional(),
+  })
+  .strict();
+export type UpdateCredentialsRequest = z.infer<typeof UpdateCredentialsRequestSchema>;
+
 export const ListAgentsRequestSchema = z
   .object({
     type: z.literal('list_agents'),
@@ -622,6 +630,7 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   GetSDKSessionIdRequestSchema,
   GetStoredSessionRequestSchema,
   CleanupSessionsRequestSchema,
+  UpdateCredentialsRequestSchema,
   ListAgentsRequestSchema,
   GetAgentRequestSchema,
   CreateAgentRequestSchema,

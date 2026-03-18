@@ -54,3 +54,7 @@ export type {
   PermissionRequest,
   ToolState,
 } from './tool-store';
+
+// Auth store
+export { useAuthStore } from './auth-store';
+export type { AuthState, AuthStatus, AuthCredentialType, AuthErrorCategory } from './auth-store';

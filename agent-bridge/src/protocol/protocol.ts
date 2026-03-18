@@ -175,6 +175,14 @@ export interface CleanupSessionsRequest {
   maxAgeDays?: number;
 }
 
+/**
+ * Update the credential state used by the running sidecar.
+ */
+export interface UpdateCredentialsRequest {
+  type: 'update_credentials';
+  apiKey?: string;
+}
+
 // ============================================================================
 // Agent Definition Requests
 // ============================================================================
@@ -451,6 +459,7 @@ export type BridgeRequest =
   | GetSDKSessionIdRequest
   | GetStoredSessionRequest
   | CleanupSessionsRequest
+  | UpdateCredentialsRequest
   | ListAgentsRequest
   | GetAgentRequest
   | CreateAgentRequest
