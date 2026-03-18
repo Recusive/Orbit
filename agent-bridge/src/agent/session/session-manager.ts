@@ -965,6 +965,14 @@ export class SessionManager extends Disposable {
     }, 16);
   }
 
+  /** Mark all active sessions so they restart with fresh credentials on the next send. */
+  markAllSessionsForRestart(): void {
+    for (const [sessionId, agent] of this.activeSessions.entries()) {
+      agent.setNeedsSessionRestart(true);
+      logger.info({ sessionId }, 'Marked session for restart after credential change');
+    }
+  }
+
   /**
    * Re-key all internal Maps from oldId to newId.
    *
@@ -1127,6 +1135,15 @@ export class SessionManager extends Disposable {
       resumeSessionAt: config?.resumeSessionAt,
       forkSession: config?.forkSession,
       onAuthFailure: (message: string) => {
+        if (ClaudeCredentials.restoreEnvApiKeyFallback()) {
+          agent.setNeedsSessionRestart(true);
+          logger.info(
+            { sessionId: agent.effectiveSessionId },
+            'Restored shell API key fallback after OAuth auth failure'
+          );
+          return;
+        }
+
         this._onAuthError.fire({
           sessionId: agent.effectiveSessionId,
           category: 'REFRESH_FAILED',
@@ -1779,6 +1796,12 @@ export class SessionManager extends Disposable {
           const refreshResult = await ClaudeCredentials.refreshIfNeeded();
           if (refreshResult.refreshed) {
             agent.markNeedsSessionRestart();
+          } else if (ClaudeCredentials.restoreEnvApiKeyFallback()) {
+            agent.setNeedsSessionRestart(true);
+            logger.info(
+              { sessionId },
+              'Restored shell API key fallback after active-query auth failure'
+            );
           }
         }
 

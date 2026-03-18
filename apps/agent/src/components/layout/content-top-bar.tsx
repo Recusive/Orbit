@@ -15,7 +15,7 @@ import { useShallow } from 'zustand/shallow';
 import type { FC } from 'react';
 
 import { SquareAndPencil } from '@/components/icons';
-import { SFSymbol } from '@/components/shared';
+import { HealthIndicator, SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useVaultContextManager } from '@/features/vault/hooks';
 import { useVaultEditorStore } from '@/features/vault/stores';
@@ -508,6 +508,10 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
       {/* Right section: Git controls + Panel toggles */}
       {hasWorkspace || isDemo ? (
         <div className="flex items-center pr-1 shrink-0" style={{ gap: '0.3rem' }}>
+          <div className="mr-1" data-tauri-drag-region={false}>
+            <HealthIndicator />
+          </div>
+
           {/* Vault actions (when open) or Git diff stats */}
           <div className="flex items-center gap-2 mr-1" data-tauri-drag-region={false}>
             {vaultOpen ? <VaultActions /> : <DiffStatsButton />}

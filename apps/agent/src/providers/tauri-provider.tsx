@@ -41,10 +41,17 @@ import {
   onTerminalExit,
   onTerminalForeground,
   onTerminalOutput,
+  getPreflightReport,
   getWorkspacePath,
   buildFileIndex,
+  onPreflightReport,
 } from '@/lib/api';
+import { invoke } from '@/lib/api/core';
+import { classifyAgentError } from '@/lib/error-classifier';
+import { useAuthStore } from '@/stores/agent/auth-store';
 import { useBackendStore } from '@/stores/backend';
+import { useHealthStore } from '@/stores/health';
+import { useUIStore } from '@/stores/ui/ui-store';
 import { WebviewMessageSchema } from '@/types/protocol';
 
 // ============================================================================
@@ -52,6 +59,19 @@ import { WebviewMessageSchema } from '@/types/protocol';
 // ============================================================================
 
 const logger = createLogger('TauriProvider');
+
+interface KeychainStatus {
+  hasCredentials: boolean;
+  credentialType: string | null;
+  expiresAt: number | null;
+  entryExists: boolean;
+  error: string | null;
+}
+
+interface RetrieveResult {
+  key: string | null;
+  error: string | null;
+}
 
 /**
  * Post a message to window for other hooks to receive
@@ -163,6 +183,55 @@ async function setupFileIndex(controller: ListenerAbortController): Promise<void
   }
 }
 
+async function bootstrapRuntimeHealth(controller: ListenerAbortController): Promise<void> {
+  const results = await Promise.allSettled([
+    invoke<RetrieveResult>('retrieve_api_key', { provider: 'claude' }),
+    invoke<KeychainStatus>('check_claude_keychain'),
+    getPreflightReport(),
+  ]);
+
+  if (controller.isAborted()) return;
+
+  const apiKeyResult = results[0];
+  const keychainResult = results[1];
+  const preflightResult = results[2];
+
+  const authStore = useAuthStore.getState();
+  if (apiKeyResult.status === 'fulfilled' && apiKeyResult.value.key) {
+    authStore.setAuthenticated('apikey', null);
+  } else if (keychainResult.status === 'fulfilled' && keychainResult.value.hasCredentials) {
+    authStore.setAuthenticated('oauth', keychainResult.value.expiresAt);
+  } else if (
+    keychainResult.status === 'fulfilled' &&
+    keychainResult.value.entryExists &&
+    keychainResult.value.credentialType === 'oauth'
+  ) {
+    authStore.setExpired(
+      keychainResult.value.error ?? 'Claude authentication expired.',
+      true,
+      keychainResult.value.expiresAt
+    );
+  } else {
+    authStore.setError(
+      'NO_CREDENTIALS',
+      'No credentials configured. Add an API key in Settings or sign in with Claude Code.',
+      true,
+      null
+    );
+  }
+
+  if (preflightResult.status === 'fulfilled') {
+    useHealthStore.getState().setReport(preflightResult.value);
+  } else {
+    logger.warn('Failed to fetch preflight report', {
+      error:
+        preflightResult.reason instanceof Error
+          ? preflightResult.reason.message
+          : String(preflightResult.reason),
+    });
+  }
+}
+
 // ============================================================================
 // Provider Component
 // ============================================================================
@@ -194,6 +263,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
 
     async function initializeListeners(): Promise<void> {
       logger.info('Initializing Tauri event listeners');
+      await bootstrapRuntimeHealth(controller);
 
       // Set up all listeners in parallel for faster initialization
       const listenerPromises: Promise<void>[] = [];
@@ -436,8 +506,41 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
       // Agent errors (from bridge error_event — sessionId may be absent for startup errors)
       listenerPromises.push(
         onAgentError((event) => {
+          const authStore = useAuthStore.getState();
+          const classified = classifyAgentError(event.message, authStore.credentialType);
+
+          if (classified.kind === 'auth') {
+            authStore.setError(
+              'REFRESH_FAILED',
+              classified.description,
+              true,
+              authStore.credentialType
+            );
+          }
+
           if (!event.sessionId) {
-            logger.error(`Global agent error (no session): ${event.message}`);
+            if (classified.kind === 'auth') {
+              toast.error(classified.title, {
+                description: classified.description,
+                duration: 10_000,
+                action:
+                  classified.copyCommand !== undefined
+                    ? {
+                        label: classified.actionLabel ?? 'Copy command',
+                        onClick: (): void => {
+                          void navigator.clipboard.writeText(classified.copyCommand ?? '');
+                        },
+                      }
+                    : {
+                        label: classified.actionLabel ?? 'Open Account Settings',
+                        onClick: (): void => {
+                          useUIStore.getState().openSettings('account');
+                        },
+                      },
+              });
+            } else {
+              logger.error(`Global agent error (no session): ${event.message}`);
+            }
             return;
           }
           postWindowMessage({
@@ -445,7 +548,7 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             uuid: crypto.randomUUID(),
             session_id: event.sessionId,
             message_id: crypto.randomUUID(),
-            error: event.message,
+            error: classified.description,
           });
         })
           .then((unlisten) => {
@@ -508,22 +611,58 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             recoverable: event.recoverable,
           });
 
-          // Show "Copy command" for recoverable errors that need manual re-auth,
-          // but NOT for AUTH_RECOVERED (token was already refreshed automatically)
-          const showCopyCommand = event.recoverable && event.category !== 'AUTH_RECOVERED';
+          const authStore = useAuthStore.getState();
+          if (event.category === 'AUTH_RECOVERED') {
+            authStore.setRecovered(event.message);
+            toast.success('Authentication Recovered', {
+              description: event.message,
+              duration: 5000,
+            });
+            return;
+          }
 
-          toast.error('Authentication Error', {
-            description: event.message,
+          if (event.category === 'NO_CREDENTIALS') {
+            authStore.setError('NO_CREDENTIALS', event.message, event.recoverable, null);
+          } else if (authStore.credentialType === 'apikey') {
+            authStore.setError('REFRESH_FAILED', event.message, event.recoverable, 'apikey');
+          } else {
+            authStore.setExpired(event.message, event.recoverable, authStore.expiresAt);
+          }
+
+          const classified = classifyAgentError(event.message, authStore.credentialType);
+          toast.error(classified.title, {
+            description: classified.description,
             duration: 10_000,
-            action: showCopyCommand
-              ? {
-                  label: 'Copy command',
-                  onClick: (): void => {
-                    void navigator.clipboard.writeText('claude login');
+            action:
+              classified.copyCommand !== undefined
+                ? {
+                    label: classified.actionLabel ?? 'Copy command',
+                    onClick: (): void => {
+                      void navigator.clipboard.writeText(classified.copyCommand ?? '');
+                    },
+                  }
+                : {
+                    label: classified.actionLabel ?? 'Open Account Settings',
+                    onClick: (): void => {
+                      useUIStore.getState().openSettings('account');
+                    },
                   },
-                }
-              : undefined,
           });
+        })
+          .then((unlisten) => {
+            controller.addUnlisten(unlisten);
+          })
+          .catch((err: unknown) => {
+            logger.error(
+              'Listener registration failed',
+              err instanceof Error ? err : new Error(String(err))
+            );
+          })
+      );
+
+      listenerPromises.push(
+        onPreflightReport((report) => {
+          useHealthStore.getState().setReport(report);
         })
           .then((unlisten) => {
             controller.addUnlisten(unlisten);

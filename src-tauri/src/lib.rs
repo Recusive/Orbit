@@ -18,7 +18,7 @@ use std::sync::Arc;
 use orbit_search::FileIndex;
 use parking_lot::RwLock;
 
-use agent::SessionManager;
+use agent::{CredentialBridge, SessionManager};
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations, marketplace};
 use commands::browser::{self, BrowserResultState, BrowserWindowState};
@@ -41,7 +41,7 @@ use opencode::process::{resolve_opencode_binary_path, OpenCodeProcessState};
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
 use tauri::async_runtime::block_on;
-use tauri::Manager as _;
+use tauri::{Emitter as _, Manager as _};
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
@@ -262,10 +262,21 @@ pub fn run() {
     // - Development: in src-tauri/binaries/
     let sidecar_path = resolve_sidecar_path();
     log::info!("Agent bridge sidecar path: {}", sidecar_path.display());
-    let session_manager = Arc::new(SessionManager::new(sidecar_path));
+    let credential_bridge = Arc::new(CredentialBridge::new());
+    if let Some(api_key) = credentials::load_api_key("claude") {
+        credential_bridge.set_api_key(Some(api_key));
+    }
+    let preflight_report = core::preflight::run_preflight(&sidecar_path);
+    let session_manager = Arc::new(SessionManager::new(
+        sidecar_path,
+        Arc::clone(&credential_bridge),
+    ));
+    let preflight_state = Arc::new(RwLock::new(preflight_report));
 
     // Clone for .manage() before moving into .setup()
     let session_manager_for_state = Arc::clone(&session_manager);
+    let credential_bridge_for_state = Arc::clone(&credential_bridge);
+    let preflight_state_for_setup = Arc::clone(&preflight_state);
 
     // Initialize browser window state
     let browser_state = Arc::new(BrowserWindowState::new());
@@ -290,7 +301,9 @@ pub fn run() {
         // Managed state
         .manage(settings_manager)
         .manage(conversation_manager)
+        .manage(credential_bridge_for_state)
         .manage(session_manager_for_state)
+        .manage(preflight_state)
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(PreviewServerState::new())
@@ -311,6 +324,7 @@ pub fn run() {
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
+            drop(app.emit("preflight:report", preflight_state_for_setup.read().clone()));
             #[cfg(target_os = "macos")]
             icons::reapply_persisted_icon(app.handle());
             browser::register_browser_large_eval_result_listener(
@@ -591,6 +605,7 @@ pub fn run() {
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
             diagnostics::get_crash_log_path,
+            diagnostics::get_preflight_report,
             diagnostics::sentry_test_capture,
             diagnostics::sentry_test_error,
             // Conversation commands

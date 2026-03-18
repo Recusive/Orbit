@@ -59,6 +59,7 @@ hostname = "0.4"  # For non-macOS device ID generation
 regex = "1"  # Component name validation
 ignore = { workspace = true } # Workspace doc discovery for Vault
 tempfile = { workspace = true }
+secrecy = "0.10"
 
 # Tauri
 tauri = { workspace = true, features = ["tray-icon", "macos-private-api", "protocol-asset"] }

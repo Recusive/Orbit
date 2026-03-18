@@ -11,3 +11,4 @@ export { ScrambleAsciiPre } from './ScrambleAsciiPre';
 export { SFSymbol } from './sf-symbol';
 export type { SFSymbolWeight } from './sf-symbol';
 export { StatusAnnouncer } from './StatusAnnouncer';
+export { HealthIndicator } from './health-indicator';

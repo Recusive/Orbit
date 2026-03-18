@@ -9,7 +9,9 @@ use std::fs;
 use std::path::PathBuf;
 #[cfg(target_os = "macos")]
 use std::process::Command;
+use std::sync::Arc;
 
+use crate::agent::{CredentialBridge, SessionManager};
 use crate::core::sentry_utils::capture_command_error;
 
 use aes_gcm::aead::generic_array::GenericArray;
@@ -20,6 +22,7 @@ use rand::rngs::OsRng;
 use rand::RngCore as _;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
+use tauri::State;
 
 /// Result of storing an API key.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,23 +227,49 @@ fn save_credentials(credentials: &StoredCredentials) -> Result<(), String> {
     Ok(())
 }
 
+/// Load the stored API key for a provider for startup bootstrapping.
+pub fn load_api_key(provider: &str) -> Option<String> {
+    match load_credentials() {
+        Ok(credentials) => match provider {
+            "claude" | "anthropic" => credentials.anthropic_api_key,
+            "openai" => credentials.openai_api_key,
+            "google" => credentials.google_api_key,
+            _ => None,
+        },
+        Err(error) => {
+            log::warn!("Failed to load credentials: {error}");
+            None
+        },
+    }
+}
+
 /// Store an API key securely.
 ///
 /// Encrypts the key using AES-256-GCM with a machine-specific key.
 #[tauri::command]
-pub async fn store_api_key(provider: String, key: String) -> StoreResult {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri commands require owned parameters for deserialization"
+)]
+pub fn store_api_key(
+    provider: String,
+    key: String,
+    credential_bridge: State<'_, Arc<CredentialBridge>>,
+    session_manager: State<'_, Arc<SessionManager>>,
+) -> StoreResult {
     let result = (|| -> Result<(), String> {
+        let _file_guard = credential_bridge.lock_file();
         let mut credentials = load_credentials()?;
 
         match provider.as_str() {
             "claude" | "anthropic" => {
-                credentials.anthropic_api_key = Some(key);
+                credentials.anthropic_api_key = Some(key.clone());
             },
             "openai" => {
-                credentials.openai_api_key = Some(key);
+                credentials.openai_api_key = Some(key.clone());
             },
             "google" => {
-                credentials.google_api_key = Some(key);
+                credentials.google_api_key = Some(key.clone());
             },
             _ => {
                 return Err(format!("Unknown provider: {provider}"));
@@ -248,6 +277,11 @@ pub async fn store_api_key(provider: String, key: String) -> StoreResult {
         }
 
         save_credentials(&credentials)?;
+        if provider == "claude" || provider == "anthropic" {
+            session_manager
+                .update_credentials(Some(&key))
+                .map_err(|error| format!("Failed to push credentials to sidecar: {error}"))?;
+        }
         Ok(())
     })();
 
@@ -332,8 +366,17 @@ pub async fn validate_api_key(key: String) -> ValidationResult {
 
 /// Delete a stored API key.
 #[tauri::command]
-pub async fn delete_api_key(provider: String) -> StoreResult {
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri commands require owned parameters for deserialization"
+)]
+pub fn delete_api_key(
+    provider: String,
+    credential_bridge: State<'_, Arc<CredentialBridge>>,
+    session_manager: State<'_, Arc<SessionManager>>,
+) -> StoreResult {
     let result = (|| -> Result<(), String> {
+        let _file_guard = credential_bridge.lock_file();
         let mut credentials = load_credentials()?;
 
         match provider.as_str() {
@@ -352,6 +395,11 @@ pub async fn delete_api_key(provider: String) -> StoreResult {
         }
 
         save_credentials(&credentials)?;
+        if provider == "claude" || provider == "anthropic" {
+            session_manager
+                .update_credentials(None)
+                .map_err(|error| format!("Failed to clear credentials in sidecar: {error}"))?;
+        }
         Ok(())
     })();
 

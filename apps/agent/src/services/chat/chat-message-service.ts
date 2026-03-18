@@ -33,6 +33,7 @@ import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
+import { classifyAgentError } from '@/lib/error-classifier';
 import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
@@ -46,6 +47,7 @@ import {
   remapSessionTitleState,
   retryPendingPersistence,
 } from '@/services/session';
+import { useAuthStore } from '@/stores/agent/auth-store';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
@@ -872,15 +874,13 @@ class ChatMessageService {
     useChatStore.getState().setStopPending(sid, false);
     retryPendingPersistence(sid);
 
-    // Detect auth-related errors
     const rawError = message.error;
-    const isAuthError =
-      /no credentials found|oauth.*token|auth(?:entication|orization)?\s+(?:failed|error)|unauthorized/i.test(
-        rawError
-      );
-    const errorContent = isAuthError
-      ? 'Error: Authentication failed. Please run `claude login` in your terminal to re-authenticate.'
-      : `Error: ${rawError}`;
+    const credentialType = useAuthStore.getState().credentialType;
+    const classifiedError = classifyAgentError(rawError, credentialType);
+    const errorContent =
+      classifiedError.kind === 'auth'
+        ? `Error: ${classifiedError.description}`
+        : `Error: ${rawError}`;
 
     const store = useChatStore.getState();
     const session = store.sessions[sid];

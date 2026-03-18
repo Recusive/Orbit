@@ -3,7 +3,13 @@
 //! These commands allow the frontend to check for crashes from previous
 //! sessions and manage crash logs.
 
+use std::sync::Arc;
+
+use parking_lot::RwLock;
+use tauri::State;
+
 use crate::core::crash;
+use crate::core::preflight::PreflightReport;
 
 // ============================================
 // Sentry Test Commands (Development Only)
@@ -91,4 +97,14 @@ pub fn clear_crash_log() -> bool {
 #[tauri::command]
 pub fn get_crash_log_path() -> Option<String> {
     crash::get_manager().map(|m| m.crash_log_path().to_string_lossy().into_owned())
+}
+
+/// Return the latest startup preflight report.
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri commands require owned State<> parameters"
+)]
+pub fn get_preflight_report(state: State<'_, Arc<RwLock<PreflightReport>>>) -> PreflightReport {
+    state.read().clone()
 }

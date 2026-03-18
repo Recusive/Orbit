@@ -59,6 +59,7 @@ import {
   touchSession,
 } from './agent/session/session-storage.js';
 import { CanvasSessionManager } from './canvas/index.js';
+import { ClaudeCredentials } from './common/auth/credentials.js';
 import { createLogger } from './common/logging/logger.js';
 import { canEnableIOS } from './ios/ios-service.js';
 import { BridgeRequestSchema } from './protocol/schemas.js';
@@ -132,6 +133,8 @@ async function main(): Promise<void> {
   // Invalidate session cache to ensure fresh state on restart
   // This handles cases where the bridge process was killed and restarted
   invalidateSessionCache();
+
+  ClaudeCredentials.initOverrideFromEnv();
 
   let iosService: IOSService | undefined;
   if (await canEnableIOS()) {
@@ -540,6 +543,24 @@ async function handleRequest(
     case 'cleanup_sessions': {
       const removed = cleanupOldSessions(request.maxAgeDays ?? 30);
       sendResponse({ type: 'number', requestType: request.type, value: removed });
+      break;
+    }
+
+    case 'update_credentials': {
+      ClaudeCredentials.setCredentialOverride(request.apiKey);
+
+      delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+      delete process.env.ANTHROPIC_AUTH_TOKEN;
+      delete process.env.ANTHROPIC_API_KEY;
+      delete process.env.ORBIT_SETTINGS_API_KEY;
+
+      if (request.apiKey !== undefined && request.apiKey !== '') {
+        process.env.ANTHROPIC_API_KEY = request.apiKey;
+        process.env.ORBIT_SETTINGS_API_KEY = '1';
+      }
+
+      sessionManager.markAllSessionsForRestart();
+      sendResponse({ type: 'success', requestType: request.type });
       break;
     }
 

@@ -56,7 +56,7 @@ const UpdateCard: FC<UpdateCardProps> = ({
     <div className="flex flex-col gap-2.5 px-4 pt-4 pb-1">
       {/* Icon + Title */}
       <div className="flex w-full items-center gap-3">
-        <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10 !w-8 !h-8 !rounded-lg">
+        <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10 w-8! h-8! rounded-lg!">
           <span className="text-primary">{icon}</span>
         </div>
         <div className="flex flex-col gap-0.5 min-w-0">
@@ -74,7 +74,7 @@ const UpdateCard: FC<UpdateCardProps> = ({
               style={{ width: `${String(progress)}%` }}
             />
           </div>
-          <span className="text-[11px] font-medium tabular-nums text-muted-foreground min-w-[2rem] text-right">
+          <span className="text-[11px] font-medium tabular-nums text-muted-foreground min-w-8 text-right">
             {String(progress)}%
           </span>
         </div>
