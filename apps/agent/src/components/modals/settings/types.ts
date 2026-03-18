@@ -15,6 +15,7 @@ export type SettingsSection =
   | 'notifications'
   | 'tabs'
   | 'account'
+  | 'changelog'
   | 'feedback';
 
 export interface NavItemProps {

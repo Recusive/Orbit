@@ -11,6 +11,7 @@ import {
   Globe,
   Icon,
   Keyboard,
+  Newspaper,
   Slash,
   User,
 } from 'lucide-react';
@@ -104,6 +105,11 @@ const NAV_ITEMS: NavItemConfig[] = [
     id: 'account',
     label: 'Account',
     icon: <User className="h-4 w-4" />,
+  },
+  {
+    id: 'changelog',
+    label: 'Changelog',
+    icon: <Newspaper className="h-4 w-4" />,
   },
 ];
 

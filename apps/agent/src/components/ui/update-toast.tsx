@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 
 import type { FC, ReactNode } from 'react';
 
+import { useUIStore } from '@/stores/ui/ui-store';
+
 // ── Constants ─────────────────────────────────────────────────────────
 
 const UPDATE_TOAST_ID = 'orbit-update';
@@ -39,8 +41,8 @@ const UpdateCard: FC<UpdateCardProps> = ({
   <div className="glass-surface w-full max-w-[24rem] overflow-hidden p-0 gap-0">
     {/* Hero area */}
     <div
-      className="relative mx-1.5 mt-1.5 overflow-hidden rounded-md bg-sidebar dark:bg-chat-area"
-      style={{ aspectRatio: '16 / 9' }}
+      className="relative mx-1.5 mt-1.5 overflow-hidden bg-sidebar dark:bg-chat-area"
+      style={{ aspectRatio: '16 / 9', borderRadius: '9px' }}
     >
       <div
         className="absolute inset-0 z-10 flex items-center justify-center text-center text-primary pointer-events-none"
@@ -134,6 +136,13 @@ export function showUpdateAvailable(
               onClick={() => {
                 toast.dismiss(UPDATE_TOAST_ID);
                 onDismiss?.();
+              }}
+            />
+            <ToastButton
+              label="Changelog"
+              variant="secondary"
+              onClick={() => {
+                useUIStore.getState().openSettings('changelog');
               }}
             />
             <ToastButton label="Update now" onClick={onUpdate} />

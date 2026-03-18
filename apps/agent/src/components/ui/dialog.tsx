@@ -98,11 +98,15 @@ DialogContentTopCenter.displayName = 'DialogContentTopCenter';
 // Apple Liquid Glass dialog — dim overlay without blur so the app stays crisp behind it
 const DialogContentGlass = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+    readonly overlayClassName?: string;
+  }
+>(({ className, children, overlayClassName, ...props }, ref) => (
   <DialogPortal>
     {/* Dim overlay without blur */}
-    <DialogOverlay className="flex items-center justify-center backdrop-blur-none" />
+    <DialogOverlay
+      className={cn('flex items-center justify-center backdrop-blur-none', overlayClassName)}
+    />
     <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
       <div className="relative">
         <DialogPrimitive.Content

@@ -14,8 +14,8 @@ interface NavGroup {
   readonly ids: readonly SettingsSection[];
 }
 
-const NAV_GROUPS: readonly NavGroup[] = [
-  { label: 'General', ids: ['general', 'appearance', 'account'] },
+export const NAV_GROUPS: readonly NavGroup[] = [
+  { label: 'General', ids: ['general', 'appearance', 'account', 'changelog'] },
   { label: 'Agent', ids: ['backend', 'agent', 'providers', 'subagents', 'commands'] },
   { label: 'Features', ids: ['editor', 'browser', 'git', 'shortcuts', 'notifications', 'tabs'] },
 ] as const;

@@ -202,12 +202,13 @@
   --color-lg-destructive-bg: var(--lg-destructive-bg);
 }
 
-/* Lock the viewport — prevent ProseMirror's scrollIntoView() from calling
-   window.scrollBy() when it walks up to document.body. The app is a
-   full-viewport SPA; page-level scrolling is never wanted. */
+/* Lock the viewport — overflow:clip (not hidden!) prevents scrollIntoView()
+   from programmatically setting scrollTop on html/body. overflow:hidden still
+   creates a scroll container that scrollIntoView can target. overflow:clip
+   does not create a scroll container at all — scrollTop stays 0, period. */
 html,
 body {
-  overflow: hidden;
+  overflow: clip;
   height: 100%;
 }
 
@@ -722,6 +723,17 @@ html.window-mode-liquid-glass:not(.dark) .glass-popover::after {
    hover-reveal copy button with backdrop blur.
    Easing: ease-out-quart — matches TOOL_EXPAND_TRANSITION.
    ───────────────────────────────────────────────────────── */
+
+/* Inline code — subtle border + tinted background, matching Claude.ai style */
+[data-streamdown='inline-code'] {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent) !important;
+  border: 0.5px solid color-mix(in oklch, var(--border) 50%, transparent) !important;
+  border-radius: 0.25rem !important;
+  padding: 1px 4px !important;
+  font-size: 0.9em !important;
+  color: var(--primary) !important;
+  white-space: pre-wrap !important;
+}
 
 /* Outer frame — matches tool widget content boxes (bash, edit, etc.) */
 [data-streamdown='code-block'],
@@ -1894,24 +1906,28 @@ html:not(.dark) .glass-popover::after {
 /* ── Glass Surface ──────────────────────────────────────
    Token-based glass surface for Radix popovers/hover-cards.
    Unlike .glass-popover (pseudo-element material), this uses flat
-   properties that don't conflict with Radix animation states. */
-.glass-surface {
-  background: var(--glass-popover-bg);
-  border: 1px solid var(--border-menu);
-  border-radius: 9px;
-  box-shadow: var(--orbit-shadow-menu);
-  -webkit-backdrop-filter: blur(4px);
-  backdrop-filter: blur(4px);
-}
+   properties that don't conflict with Radix animation states.
+   Wrapped in @layer components so Tailwind utilities (rounded-*, etc.)
+   can override defaults. */
+@layer components {
+  .glass-surface {
+    background: var(--glass-popover-bg);
+    border: 1px solid var(--border-menu);
+    border-radius: 9px;
+    box-shadow: var(--orbit-shadow-menu);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
 
-/* Directional shadow — Radix sets data-side on popover/dropdown/context-menu content */
-.glass-surface[data-side='top'] {
-  box-shadow: var(--orbit-shadow-menu-up);
-}
+  /* Directional shadow — Radix sets data-side on popover/dropdown/context-menu content */
+  .glass-surface[data-side='top'] {
+    box-shadow: var(--orbit-shadow-menu-up);
+  }
 
-html.dark .glass-surface {
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
+  html.dark .glass-surface {
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+  }
 }
 
 /* ── Frosted Input Container ────────────────────────────
@@ -2466,4 +2482,3 @@ html.dark .apple-tooltip {
     clip-path: none !important;
   }
 }
-

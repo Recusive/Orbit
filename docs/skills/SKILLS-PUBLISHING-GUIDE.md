@@ -203,12 +203,13 @@ Skills work across: Orbit, Claude Code, Cursor, Codex, Cline, Windsurf, VS Code 
 
 ## Current Skills in Recusive/Skills
 
-| Skill                       | What It Does                                 |
-| --------------------------- | -------------------------------------------- |
-| component-test              | Vitest tests from DevTools HTML elements     |
-| mosaic                      | In-app stress tests from DevTools — no mocks |
-| problem-clarifier           | Reflect-back interview before planning       |
-| stress-test                 | Stress tests via DevTools console            |
-| test-engineer               | Meaningful tests for TS/React + Rust         |
-| vercel-react-best-practices | React/Next.js perf guidelines                |
-| web-design-guidelines       | UI review for accessibility/compliance       |
+| Skill                       | What It Does                                            |
+| --------------------------- | ------------------------------------------------------- |
+| component-test              | Vitest tests from DevTools HTML elements                |
+| fazxes                      | Production scope gatekeeper — catches buried scope cuts |
+| mosaic                      | In-app stress tests from DevTools — no mocks            |
+| problem-clarifier           | Reflect-back interview before planning                  |
+| stress-test                 | Stress tests via DevTools console                       |
+| test-engineer               | Meaningful tests for TS/React + Rust                    |
+| vercel-react-best-practices | React/Next.js perf guidelines                           |
+| web-design-guidelines       | UI review for accessibility/compliance                  |

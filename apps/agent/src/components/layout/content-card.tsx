@@ -77,7 +77,7 @@ export const ContentCard: FC<ContentCardProps> = ({
   return (
     <div
       data-content-card
-      className="flex flex-col flex-1 min-w-0 overflow-hidden relative"
+      className="flex flex-col flex-1 min-h-0 min-w-0 overflow-clip relative"
       style={style}
     >
       {children}
