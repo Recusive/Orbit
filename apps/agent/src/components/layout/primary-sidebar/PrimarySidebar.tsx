@@ -13,7 +13,6 @@ import {
   ArrowLeft,
   ArrowRight,
   ChevronRight,
-  Gift,
   FlaskConical,
   FolderOpen,
   GitBranch,
@@ -30,6 +29,7 @@ import { PowersSection } from './components/PowersSection';
 import { SettingsNavList } from './components/SettingsNavList';
 import { SidebarItem } from './components/SidebarItem';
 import { SidebarToggleIcon } from './components/SidebarToggleIcon';
+import { SidebarUpdateActions } from './components/SidebarUpdateActions';
 import { VaultNoteList } from './components/VaultNoteList';
 import { WorkspaceItem } from './components/WorkspaceItem';
 import { TriStateSwitch } from './components/tri-state-switch';
@@ -805,22 +805,21 @@ export const PrimarySidebar: FC = () => {
         className="flex flex-col shrink-0 gap-1 py-1.5 animate-title-in"
       >
         {/* Update indicator — visible after user dismisses the update toast */}
-        {(updateStatus === 'available' || updateStatus === 'ready') && updateDismissed ? (
-          <SidebarItem
-            icon={Gift}
-            label={updateStatus === 'ready' ? 'Restart to update' : 'Update available'}
-            badge={updateStatus === 'ready' ? 'Restart' : 'Update'}
-            badgeVariant="primary"
-            onClick={() => {
-              const store = useUpdateStore.getState();
-              if (store.status === 'ready') {
-                void store.relaunch();
-              } else {
-                void store.downloadAndInstall();
-              }
-            }}
-          />
-        ) : null}
+        <SidebarUpdateActions
+          status={updateStatus}
+          dismissed={updateDismissed}
+          onDownloadOrRestart={() => {
+            const store = useUpdateStore.getState();
+            if (store.status === 'ready') {
+              void store.relaunch();
+            } else {
+              void store.downloadAndInstall();
+            }
+          }}
+          onOpenChangelog={() => {
+            openSettings('changelog');
+          }}
+        />
         {isWelcome ? null : settingsOpen ? (
           <button
             className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"

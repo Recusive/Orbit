@@ -844,9 +844,9 @@ const App: FC = () => {
               transitionOverride={launchTransitionOverride}
             >
               {/* Main content wrapper — flex column for cards row + full-width terminal.
-                overflow-hidden clips the activity panel's slide animation (previously
-                on the activity wrapper, but that blocked terminal height transitions). */}
-              <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
+                overflow-clip (not hidden!) clips the activity panel's slide animation
+                without creating a scroll container — scrollIntoView cannot shift this. */}
+              <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-clip">
                 {/* Cards row — content column + activity column side by side */}
                 <div ref={cardsRowRef} className="flex-1 flex min-h-0">
                   {/* ── Content column ── */}

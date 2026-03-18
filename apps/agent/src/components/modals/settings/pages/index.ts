@@ -8,6 +8,7 @@ export { AgentSettings } from './AgentSettings';
 export { AppearanceSettings } from './AppearanceSettings';
 export { BackendSettings } from './BackendSettings';
 export { BrowserSettings } from './BrowserSettings';
+export { ChangelogSettings } from './ChangelogSettings';
 export { EditorSettings } from './EditorSettings';
 export { FeedbackSettings } from './FeedbackSettings';
 export { GeneralSettings } from './GeneralSettings';
@@ -54,6 +55,7 @@ export const SETTINGS_PAGE_COMPONENTS: Partial<
   commands: lazyWithMinDelay(() => import('./SlashCommandsSettings')),
   shortcuts: lazyWithMinDelay(() => import('./ShortcutsSettings')),
   browser: lazyWithMinDelay(() => import('./BrowserSettings')),
+  changelog: lazyWithMinDelay(() => import('./ChangelogSettings')),
   editor: lazyWithMinDelay(() => import('./EditorSettings')),
   git: lazyWithMinDelay(() => import('./GitSettings')),
   notifications: lazyWithMinDelay(() => import('./NotificationsSettings')),

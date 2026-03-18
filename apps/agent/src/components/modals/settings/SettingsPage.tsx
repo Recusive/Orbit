@@ -42,35 +42,49 @@ export const SettingsPage: FC = () => {
   }
 
   return (
-    <div
-      ref={scrollRef}
-      className="h-full overflow-auto overscroll-y-contain p-6"
-      style={{ scrollbarGutter: 'stable both-edges' }}
-    >
+    <div className="relative h-full">
+      {/* Top fade mask */}
       <div
-        className="mx-auto"
-        style={{
-          maxWidth: fullWidth
-            ? undefined
-            : `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
-        }}
+        className="absolute inset-x-0 top-0 h-8 z-10 pointer-events-none"
+        style={{ background: 'linear-gradient(to bottom, var(--chat-area), transparent)' }}
+        aria-hidden="true"
+      />
+      {/* Bottom fade mask */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-8 z-10 pointer-events-none"
+        style={{ background: 'linear-gradient(to top, var(--chat-area), transparent)' }}
+        aria-hidden="true"
+      />
+      <div
+        ref={scrollRef}
+        className="h-full overflow-auto overscroll-y-contain p-6"
+        style={{ scrollbarGutter: 'stable both-edges' }}
       >
-        <div className="flex justify-end mb-3">
-          <button
-            onClick={toggleFullWidth}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60"
-            aria-label={fullWidth ? 'Constrain width' : 'Expand to full width'}
-          >
-            {fullWidth ? (
-              <Minimize2 className="h-3.5 w-3.5" />
-            ) : (
-              <Maximize2 className="h-3.5 w-3.5" />
-            )}
-          </button>
+        <div
+          className="mx-auto"
+          style={{
+            maxWidth: fullWidth
+              ? undefined
+              : `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
+          }}
+        >
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={toggleFullWidth}
+              className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/60"
+              aria-label={fullWidth ? 'Constrain width' : 'Expand to full width'}
+            >
+              {fullWidth ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </div>
+          <Suspense key={activeSection} fallback={<SettingsSkeleton />}>
+            <PageComponent />
+          </Suspense>
         </div>
-        <Suspense key={activeSection} fallback={<SettingsSkeleton />}>
-          <PageComponent />
-        </Suspense>
       </div>
     </div>
   );

@@ -20,13 +20,14 @@ Use this to find the right file. Read the file directly — no links needed.
 | `skills/`               | Agent skill creation and publishing | Creating/publishing skills       |
 | `orbitweb/`             | Marketing site context              | Orbitweb-specific (read-only)    |
 
-## decisions/ (5 files)
+## decisions/ (6 files)
 
 - `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
 - `CHAT-PANEL-MINIMUM-WIDTH.md` — Constant 400px chat floor via dynamic activity cap, sidebar auto-collapse, header overflow fade
 - `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` — Why sidebar uses single margin-left slide instead of two-property transition (eliminates desync jank)
 - `INSTANT-HOVER-SIDEBAR-LISTS.md` — Instant hover for all list items: removed backdrop-blur, bg transitions, and transition-all (Frequency Principle)
 - `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md` — Container-level blur reveal for sidebar view switches: skeleton hold timer, key-based remount, GPU compositing lesson
+- `OVERFLOW-CLIP-VS-HIDDEN.md` — overflow-clip over overflow-hidden for layout containers: prevents scrollIntoView from shifting ContentCard
 
 ## architecture/ (12 files)
 
@@ -83,8 +84,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forked Ghostty + SwiftUI sidebars, auto-launches orbit CLI). Design spec + implementation plan.
 
-## plans/tracked/done/ (31 entries)
+## plans/tracked/done/ (33 entries)
 
+- `file-based-changelog-system.md` — File-based changelog system (auto-discovery via import.meta.glob, hybrid bundled + remote notes, JSX renderer)
+- `changelog-settings-page.md` — Changelog dialog → settings page (timeline layout, toast UX fix, sidebar "What's new" link)
 - `lexical-chat-input-migration.md` — Migrate chat input from raw contentEditable + overlay to Lexical editor (fixes WebKit cursor bug, unifies text/decoration/cursor)
 - `DUAL-BACKEND-AGENT-BRIDGE-OPENCODE.md` — Dual backend architecture (agent-bridge + OpenCode)
 - `OC-TITLE-SKELETON-WIRING.md` — Wire OpenCode title generation into existing skeleton UI

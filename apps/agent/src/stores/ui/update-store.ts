@@ -27,7 +27,7 @@ import {
 const logger = createLogger('UpdateStore');
 
 /** Possible update statuses. */
-type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
+export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
 
 /** Update store state shape. */
 interface UpdateState {
