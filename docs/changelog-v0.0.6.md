@@ -36,6 +36,8 @@ March 2026
 
 **Tool card redesign.** Plain-language headers ("Reading", "Edited", "Ran", "Searching"), collapsible code search results, and paginated question prompts with keyboard navigation.
 
+**Changelog.** Full release history available in Settings → Changelog. Timeline layout with version badges. The update toast links directly to the changelog without dismissing itself, and a "What's new" link appears in the sidebar after dismissal.
+
 **Visual refresh.** Unified color system across light and dark themes. Frosted glass notifications. Blur-reveal transitions in the sidebar and top bar.
 
 ## Bug Fixes
