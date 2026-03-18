@@ -89,7 +89,7 @@ describe('ClaudeCredentials settings override', () => {
     delete process.env.ANTHROPIC_API_KEY;
 
     expect(ClaudeCredentials.restoreEnvApiKeyFallback()).toBe(true);
-    expect(process.env.ANTHROPIC_API_KEY).toBe(shellFallback);
+    expect(process.env.ANTHROPIC_API_KEY ?? '').toBe(shellFallback);
     expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBeUndefined();
     expect(process.env.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(ClaudeCredentials.restoreEnvApiKeyFallback()).toBe(false);
