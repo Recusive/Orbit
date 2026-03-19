@@ -50,6 +50,7 @@
         "enable": true,
         "scope": {
           "allow": [
+            "$RESOURCE/**",
             "$HOME/**",
             "$TEMP/**",
             "$DESKTOP/**",
