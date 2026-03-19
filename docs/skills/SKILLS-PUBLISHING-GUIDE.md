@@ -203,13 +203,26 @@ Skills work across: Orbit, Claude Code, Cursor, Codex, Cline, Windsurf, VS Code 
 
 ## Current Skills in Recusive/Skills
 
-| Skill                       | What It Does                                            |
-| --------------------------- | ------------------------------------------------------- |
-| component-test              | Vitest tests from DevTools HTML elements                |
-| fazxes                      | Production scope gatekeeper — catches buried scope cuts |
-| mosaic                      | In-app stress tests from DevTools — no mocks            |
-| problem-clarifier           | Reflect-back interview before planning                  |
-| stress-test                 | Stress tests via DevTools console                       |
-| test-engineer               | Meaningful tests for TS/React + Rust                    |
-| vercel-react-best-practices | React/Next.js perf guidelines                           |
-| web-design-guidelines       | UI review for accessibility/compliance                  |
+| Skill                       | What It Does                                             |
+| --------------------------- | -------------------------------------------------------- |
+| component-test              | Vitest tests from DevTools HTML elements                 |
+| fazxes                      | Production scope gatekeeper — catches buried scope cuts  |
+| mosaic                      | In-app stress tests from DevTools — no mocks             |
+| problem-clarifier           | Reflect-back interview before planning                   |
+| stress-test                 | Stress tests via DevTools console                        |
+| test-engineer               | Meaningful tests for TS/React + Rust                     |
+| vercel-react-best-practices | React/Next.js perf guidelines                            |
+| web-design-guidelines       | UI review for accessibility/compliance                   |
+|                             |                                                          |
+| **Orbit Audit Suite**       | **10 expert audit lenses + orchestrator**                |
+| audit-as-design-eng         | Design Engineer lens — tokens, dark mode, states         |
+| audit-as-ux-eng             | UX Engineer lens — journeys, mental models, feedback     |
+| audit-as-frontend-eng       | Frontend Engineer lens — React, Zustand, types, renders  |
+| audit-as-backend-eng        | Backend Engineer lens — Rust, concurrency, IPC           |
+| audit-as-structural-eng     | Structural Architect lens — coupling, boundaries, deps   |
+| audit-as-repo-maintainer    | Repo Maintainer lens — conventions, exports, naming      |
+| audit-as-prod-readiness     | Production Readiness lens — E2E, env parity, rollback    |
+| audit-as-dx-eng             | DX Engineer lens — error messages, CLI, defaults         |
+| audit-as-perf-eng           | Performance Engineer lens — memory, IPC, streaming       |
+| audit-as-a11y-eng           | Accessibility lens — ARIA, keyboard nav, focus, contrast |
+| full-audit                  | Orchestrator — all 10 lenses into one document           |
