@@ -24,7 +24,7 @@ export const EditorSettings: FC = () => {
   const [minimap, setMinimap] = useState(false);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Appearance">Customize the editor appearance</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

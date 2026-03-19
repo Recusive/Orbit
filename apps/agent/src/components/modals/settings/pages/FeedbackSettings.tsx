@@ -17,7 +17,7 @@ export const FeedbackSettings: FC = () => {
   }, []);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Provide Feedback">Help us improve Orbit</SectionHeader>
 
       <div className="space-y-3">

@@ -500,7 +500,7 @@ export const ProvidersSettings: FC = () => {
   }
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Providers">
         {activeBackend === 'opencode'
           ? 'Connect model providers to use with OpenCode.'

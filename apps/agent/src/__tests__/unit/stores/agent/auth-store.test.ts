@@ -15,6 +15,7 @@ describe('auth-store', () => {
     const state = useAuthStore.getState();
     expect(state.status).toBe('authenticated');
     expect(state.credentialType).toBe('apikey');
+    expect(state.preferredMethod).toBeNull();
     expect(state.expiresAt).toBeNull();
     expect(state.lastError).toBeNull();
   });
@@ -27,6 +28,15 @@ describe('auth-store', () => {
     expect(state.credentialType).toBe('oauth');
     expect(state.lastErrorCategory).toBe('REFRESH_FAILED');
     expect(state.recoverable).toBe(true);
+  });
+
+  it('tracks the preferred auth method separately from the active credential type', () => {
+    useAuthStore.getState().setPreferredMethod('apikey');
+    useAuthStore.getState().setAuthenticated('oauth', Date.now() + 60_000);
+
+    const state = useAuthStore.getState();
+    expect(state.preferredMethod).toBe('apikey');
+    expect(state.credentialType).toBe('oauth');
   });
 
   it('records the no-credentials state without inventing a credential type', () => {

@@ -19,7 +19,7 @@ export const GeneralSettings: FC = () => {
   const [telemetry, setTelemetry] = useState(false);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Application">General application settings</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

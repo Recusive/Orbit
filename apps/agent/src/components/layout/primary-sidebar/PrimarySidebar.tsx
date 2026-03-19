@@ -822,17 +822,19 @@ export const PrimarySidebar: FC = () => {
         />
         {isWelcome ? null : settingsOpen ? (
           <button
-            className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 px-2 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
+            className="flex items-center gap-1.5 h-8 rounded-[9px] mx-1.5 hover:bg-lg-sidebar-hover active:scale-[0.98] transition-transform duration-75 text-sidebar-foreground hover:text-foreground overflow-hidden"
             onClick={() => {
               openSettings('feedback');
             }}
           >
-            <SFSymbol
-              name="exclamationmark.bubble"
-              size={18}
-              weight="medium"
-              fallback={<FlaskConical className="h-4 w-4" />}
-            />
+            <div className="flex items-center justify-center shrink-0" style={{ width: 23 }}>
+              <SFSymbol
+                name="exclamationmark.bubble"
+                size={18}
+                weight="medium"
+                fallback={<FlaskConical className="h-4 w-4" />}
+              />
+            </div>
             <span className="text-base whitespace-nowrap">Feedback</span>
           </button>
         ) : (

@@ -263,8 +263,15 @@ pub fn run() {
     let sidecar_path = resolve_sidecar_path();
     log::info!("Agent bridge sidecar path: {}", sidecar_path.display());
     let credential_bridge = Arc::new(CredentialBridge::new());
-    if let Some(api_key) = credentials::load_api_key("claude") {
-        credential_bridge.set_api_key(Some(api_key));
+    let stored_api_key = credentials::load_api_key("claude");
+    let preferred_auth_method = credentials::load_preferred_auth_method();
+    if credentials::should_inject_claude_api_key(
+        stored_api_key.as_deref(),
+        preferred_auth_method.as_deref(),
+    ) {
+        if let Some(api_key) = stored_api_key {
+            credential_bridge.set_api_key(Some(api_key));
+        }
     }
     let preflight_report = core::preflight::run_preflight(&sidecar_path);
     let session_manager = Arc::new(SessionManager::new(
@@ -627,6 +634,8 @@ pub fn run() {
             // Credentials commands
             credentials::store_api_key,
             credentials::retrieve_api_key,
+            credentials::get_preferred_auth_method,
+            credentials::set_preferred_auth_method,
             credentials::validate_api_key,
             credentials::delete_api_key,
             // Embedded browser commands

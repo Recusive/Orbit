@@ -2,20 +2,28 @@ import { create } from 'zustand';
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'expired' | 'no_credentials' | 'error';
 export type AuthCredentialType = 'oauth' | 'apikey' | null;
+export type PreferredAuthMethod = 'oauth' | 'apikey' | null;
 export type AuthErrorCategory = 'NO_CREDENTIALS' | 'REFRESH_FAILED' | 'AUTH_RECOVERED';
 
 export interface AuthState {
   status: AuthStatus;
   credentialType: AuthCredentialType;
+  preferredMethod: PreferredAuthMethod;
   expiresAt: number | null;
   lastError: string | null;
   lastErrorCategory: AuthErrorCategory | null;
   recoverable: boolean;
+  setPreferredMethod: (method: PreferredAuthMethod) => void;
   setAuthenticated: (
     credentialType: Exclude<AuthCredentialType, null>,
     expiresAt: number | null
   ) => void;
-  setExpired: (message: string, recoverable: boolean, expiresAt: number | null) => void;
+  setExpired: (
+    message: string,
+    recoverable: boolean,
+    expiresAt: number | null,
+    credentialType?: Exclude<AuthCredentialType, null>
+  ) => void;
   setError: (
     category: Exclude<AuthErrorCategory, 'AUTH_RECOVERED'>,
     message: string,
@@ -29,10 +37,15 @@ export interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   status: 'unknown',
   credentialType: null,
+  preferredMethod: null,
   expiresAt: null,
   lastError: null,
   lastErrorCategory: null,
   recoverable: false,
+
+  setPreferredMethod: (preferredMethod) => {
+    set({ preferredMethod });
+  },
 
   setAuthenticated: (credentialType, expiresAt) => {
     set({
@@ -45,10 +58,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  setExpired: (message, recoverable, expiresAt) => {
-    set((state) => ({
+  setExpired: (message, recoverable, expiresAt, credentialType = 'oauth') => {
+    set(() => ({
       status: 'expired',
-      credentialType: state.credentialType ?? 'oauth',
+      credentialType,
       expiresAt,
       lastError: message,
       lastErrorCategory: 'REFRESH_FAILED',

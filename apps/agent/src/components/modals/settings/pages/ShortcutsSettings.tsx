@@ -8,7 +8,7 @@ export const ShortcutsSettings: FC = () => {
   const mod = getModifierSymbols();
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="General">Global keyboard shortcuts</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

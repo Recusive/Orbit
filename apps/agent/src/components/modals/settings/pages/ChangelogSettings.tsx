@@ -115,7 +115,7 @@ export const ChangelogSettings: FC = () => {
   );
 
   return (
-    <div className="pb-10">
+    <div className="pb-10 animate-settings-in">
       {entries.length === 0 ? (
         <div className="flex items-center justify-center rounded-2xl border border-dashed border-border/50 px-5 py-12 text-sm text-muted-foreground/60">
           No changelogs available

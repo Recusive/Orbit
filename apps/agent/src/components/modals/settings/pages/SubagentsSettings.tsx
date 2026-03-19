@@ -601,7 +601,7 @@ export const SubagentsSettings: FC = () => {
   }
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Subagents">
         Custom agents that can be invoked via the Task tool for specialized tasks. Subagents
         maintain separate context and can run in parallel.

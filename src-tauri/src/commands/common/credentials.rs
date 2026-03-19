@@ -67,10 +67,6 @@ struct EncryptedCredentials {
 
 /// Stored credentials (after decryption).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[expect(
-    clippy::struct_field_names,
-    reason = "Provider-namespaced keys for clarity"
-)]
 struct StoredCredentials {
     /// Anthropic/Claude API key.
     anthropic_api_key: Option<String>,
@@ -78,6 +74,10 @@ struct StoredCredentials {
     openai_api_key: Option<String>,
     /// Google API key (future use).
     google_api_key: Option<String>,
+    /// User's preferred Claude auth method.
+    ///
+    /// `None` preserves the legacy behavior where a stored API key wins.
+    preferred_auth_method: Option<String>,
 }
 
 /// Get the path to the credentials file.
@@ -243,6 +243,40 @@ pub fn load_api_key(provider: &str) -> Option<String> {
     }
 }
 
+/// Load the stored preferred Claude auth method for startup bootstrapping.
+pub fn load_preferred_auth_method() -> Option<String> {
+    match load_credentials() {
+        Ok(credentials) => credentials.preferred_auth_method,
+        Err(error) => {
+            log::warn!("Failed to load preferred auth method: {error}");
+            None
+        },
+    }
+}
+
+/// Sanitize the stored auth method value.
+#[must_use]
+pub fn sanitize_preferred_auth_method(preferred: Option<&str>) -> Option<&'static str> {
+    match preferred {
+        Some("oauth") => Some("oauth"),
+        Some("apikey") => Some("apikey"),
+        _ => None,
+    }
+}
+
+fn validate_preferred_auth_method(method: &str) -> Result<(), String> {
+    match method {
+        "oauth" | "apikey" => Ok(()),
+        _ => Err(format!("Invalid auth method: {method}")),
+    }
+}
+
+/// Decide whether the stored Claude API key should be injected into the sidecar.
+#[must_use]
+pub fn should_inject_claude_api_key(stored_api_key: Option<&str>, preferred: Option<&str>) -> bool {
+    stored_api_key.is_some() && sanitize_preferred_auth_method(preferred) != Some("oauth")
+}
+
 /// Store an API key securely.
 ///
 /// Encrypts the key using AES-256-GCM with a machine-specific key.
@@ -277,7 +311,9 @@ pub fn store_api_key(
         }
 
         save_credentials(&credentials)?;
-        if provider == "claude" || provider == "anthropic" {
+        if (provider == "claude" || provider == "anthropic")
+            && credentials.preferred_auth_method.as_deref() != Some("oauth")
+        {
             session_manager
                 .update_credentials(Some(&key))
                 .map_err(|error| format!("Failed to push credentials to sidecar: {error}"))?;
@@ -334,6 +370,13 @@ pub async fn retrieve_api_key(provider: String) -> RetrieveResult {
     }
 }
 
+/// Retrieve the stored preferred Claude auth method.
+#[tauri::command]
+pub async fn get_preferred_auth_method() -> Result<Option<String>, String> {
+    let credentials = load_credentials()?;
+    Ok(credentials.preferred_auth_method)
+}
+
 /// Validate an API key by making a test request to the provider.
 ///
 /// For Claude/Anthropic, makes a minimal API call to verify the key works.
@@ -361,6 +404,57 @@ pub async fn validate_api_key(key: String) -> ValidationResult {
     ValidationResult {
         valid: true,
         error: None,
+    }
+}
+
+/// Persist the preferred Claude auth method and reconfigure the sidecar.
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri commands require owned parameters for deserialization"
+)]
+pub fn set_preferred_auth_method(
+    method: String,
+    credential_bridge: State<'_, Arc<CredentialBridge>>,
+    session_manager: State<'_, Arc<SessionManager>>,
+) -> StoreResult {
+    let result = (|| -> Result<(), String> {
+        let _file_guard = credential_bridge.lock_file();
+        validate_preferred_auth_method(&method)?;
+
+        let mut credentials = load_credentials()?;
+        credentials.preferred_auth_method = Some(method.clone());
+        save_credentials(&credentials)?;
+
+        if method == "apikey" {
+            if let Some(key) = &credentials.anthropic_api_key {
+                credential_bridge.set_api_key(Some(key.clone()));
+                session_manager
+                    .update_credentials(Some(key))
+                    .map_err(|error| format!("Failed to push credentials to sidecar: {error}"))?;
+            }
+        } else {
+            credential_bridge.set_api_key(None);
+            session_manager
+                .update_credentials(None)
+                .map_err(|error| format!("Failed to clear credentials in sidecar: {error}"))?;
+        }
+
+        Ok(())
+    })();
+
+    match result {
+        Ok(()) => StoreResult {
+            success: true,
+            error: None,
+        },
+        Err(e) => {
+            let _ = capture_command_error("set_preferred_auth_method", &e);
+            StoreResult {
+                success: false,
+                error: Some(e),
+            }
+        },
     }
 }
 
@@ -416,5 +510,89 @@ pub fn delete_api_key(
                 error: Some(e),
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        sanitize_preferred_auth_method, should_inject_claude_api_key,
+        validate_preferred_auth_method, StoredCredentials,
+    };
+
+    #[test]
+    fn stored_credentials_backwards_compatible_without_preference() {
+        let parsed = serde_json::from_str::<StoredCredentials>(
+            r#"{
+                "anthropic_api_key":"sk-ant-123",
+                "openai_api_key":null,
+                "google_api_key":null
+            }"#,
+        );
+        let succeeded = parsed.is_ok();
+        assert!(succeeded, "legacy credentials should deserialize");
+
+        if let Ok(credentials) = parsed {
+            assert_eq!(credentials.anthropic_api_key.as_deref(), Some("sk-ant-123"));
+            assert_eq!(credentials.preferred_auth_method, None);
+        }
+    }
+
+    #[test]
+    fn stored_credentials_round_trip_with_preference() {
+        for preferred in ["oauth", "apikey"] {
+            let credentials = StoredCredentials {
+                anthropic_api_key: Some("sk-ant-123".to_owned()),
+                openai_api_key: None,
+                google_api_key: None,
+                preferred_auth_method: Some(preferred.to_owned()),
+            };
+
+            let serialized = serde_json::to_string(&credentials);
+            let ser_ok = serialized.is_ok();
+            assert!(ser_ok, "credentials should serialize");
+
+            if let Ok(json) = serialized {
+                let deserialized = serde_json::from_str::<StoredCredentials>(&json);
+                let de_ok = deserialized.is_ok();
+                assert!(de_ok, "credentials should deserialize");
+
+                if let Ok(result) = deserialized {
+                    assert_eq!(result.preferred_auth_method.as_deref(), Some(preferred));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn preferred_auth_method_validation_accepts_supported_values() {
+        let oauth_ok = validate_preferred_auth_method("oauth").is_ok();
+        let apikey_ok = validate_preferred_auth_method("apikey").is_ok();
+        let invalid_err = validate_preferred_auth_method("invalid").is_err();
+
+        assert!(oauth_ok, "oauth should be accepted");
+        assert!(apikey_ok, "apikey should be accepted");
+        assert!(invalid_err, "invalid should be rejected");
+    }
+
+    #[test]
+    fn startup_injection_respects_preference() {
+        assert!(!should_inject_claude_api_key(
+            Some("sk-ant-123"),
+            Some("oauth")
+        ));
+        assert!(should_inject_claude_api_key(
+            Some("sk-ant-123"),
+            Some("apikey")
+        ));
+        assert!(should_inject_claude_api_key(Some("sk-ant-123"), None));
+        assert!(!should_inject_claude_api_key(None, Some("apikey")));
+    }
+
+    #[test]
+    fn corrupted_preference_is_sanitized_to_none() {
+        assert_eq!(sanitize_preferred_auth_method(Some("garbage")), None);
+        assert_eq!(sanitize_preferred_auth_method(Some("")), None);
+        assert_eq!(sanitize_preferred_auth_method(None), None);
     }
 }
