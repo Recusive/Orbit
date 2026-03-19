@@ -81,6 +81,10 @@ jobs:
           bun build ./src/index.ts --compile --target=bun-darwin-arm64 --outfile=../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
           chmod +x ../src-tauri/binaries/agent-bridge-aarch64-apple-darwin
 
+      # Build orbit-server sidecar (OpenCode engine, Bun standalone binary)
+      - name: Build orbit-server sidecar
+        run: bun run build:opencode
+
       # Install Claude Code CLI and copy the binary
       - name: Install Claude Code CLI
         run: |
