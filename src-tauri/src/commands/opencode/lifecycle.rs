@@ -95,6 +95,7 @@ pub async fn opencode_start(
 
         let mut child = Command::new(&binary_path)
             .args(["serve", "--port", &port.to_string()])
+            .env("OPENCODE_DISABLE_CHANNEL_DB", "1")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()

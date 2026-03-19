@@ -231,6 +231,7 @@ async function runOpenCodeBuild(snapshotPath: string): Promise<void> {
     env: {
       ...process.env,
       MODELS_DEV_API_JSON: normalizedSnapshotPath,
+      OPENCODE_CHANNEL: process.env.OPENCODE_CHANNEL ?? 'latest',
     },
   });
 
