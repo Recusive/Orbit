@@ -18,6 +18,7 @@ Use this to find the right file. Read the file directly — no links needed.
 | `reference/`            | SDK docs, prompts, external guides  | API references, prompt templates |
 | `specs/`                | Behavior specs, acceptance criteria | What "done" looks like           |
 | `skills/`               | Agent skill creation and publishing | Creating/publishing skills       |
+| `changelog/`            | Release notes per version           | What shipped in each version     |
 | `orbitweb/`             | Marketing site context              | Orbitweb-specific (read-only)    |
 
 ## decisions/ (6 files)
