@@ -325,7 +325,8 @@ git push origin vX.Y.Z
 | v0.0.4  | Feb 2026 | Auto-update test. Verified v0.0.3 → v0.0.4 update works end-to-end.                                              |
 | v0.0.5  | Mar 2026 | Dependency bumps (lucide-react, @anthropic-ai/sdk, ESLint 10, Sentry, upload-artifact v7).                       |
 | v0.0.6  | Mar 2026 | Multi-engine support, Skills Marketplace, subagents, settings redesign, changelog, credential system.            |
-| v0.0.7  | Mar 2026 | Patch: OpenCode channel config and database isolation for sidecar.                                               |
+| v0.0.7  | Mar 2026 | Patch: Engine v2 channel config and database isolation for sidecar.                                              |
+| v0.0.8  | Mar 2026 | Patch: asset protocol scope for release builds, refreshed model catalog.                                         |
 
 ---
 
