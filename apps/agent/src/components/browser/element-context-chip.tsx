@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { ReactElementContext } from '@/types/protocol';
 import type { FC } from 'react';
 
+import { ElementContextDetailDialog } from '@/components/browser/element-context-detail-dialog';
 import { cn } from '@/lib/utils';
 
 export interface ElementContextChipProps {
@@ -18,6 +19,7 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
   compact = false,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   // Format props for display (truncate long values)
   const formatProps = (props: Record<string, unknown>): string => {
@@ -41,19 +43,57 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
     return entries.join(', ');
   };
 
+  // Build compact chip label: "<tagName> preview..." or fallback to componentName
+  const compactLabel =
+    element.textContent !== undefined && element.textContent !== ''
+      ? `<${element.tagName}> ${element.textContent.length > 30 ? element.textContent.slice(0, 30) + '...' : element.textContent}`
+      : element.componentName;
+
+  // Longer tooltip preview
+  const compactTitle =
+    element.textContent !== undefined && element.textContent !== ''
+      ? `<${element.tagName}> ${element.textContent}`
+      : element.componentName;
+
   if (compact) {
     return (
-      <div className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs rounded-[7px] bg-foreground/[0.06] hover:bg-foreground/[0.1] text-foreground/70 hover:text-foreground/90 transition-all duration-150 shrink-0 max-w-[200px]">
-        <Code2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
-        <span className="truncate">{element.componentName}</span>
-        <button
-          onClick={onRemove}
-          className="h-4 w-4 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-foreground/10 shrink-0 transition-opacity duration-150"
-          title="Remove"
+      <>
+        <div
+          className="group flex items-center gap-1.5 pl-2 pr-1 py-1 text-xs rounded-[7px] bg-foreground/[0.06] hover:bg-foreground/[0.1] text-foreground/70 hover:text-foreground/90 transition-all duration-150 shrink-0 max-w-[200px] cursor-pointer"
+          title={compactTitle}
+          role="button"
+          tabIndex={0}
+          aria-label={`View details for ${element.componentName}`}
+          onClick={(): void => {
+            setDialogOpen(true);
+          }}
+          onKeyDown={(e): void => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setDialogOpen(true);
+            }
+          }}
         >
-          <X className="h-2.5 w-2.5" />
-        </button>
-      </div>
+          <Code2 className="h-3.5 w-3.5 shrink-0 opacity-60" />
+          <span className="truncate">{compactLabel}</span>
+          <button
+            onClick={(e): void => {
+              e.stopPropagation();
+              onRemove();
+            }}
+            className="h-4 w-4 flex items-center justify-center rounded-full opacity-0 group-hover:opacity-60 hover:!opacity-100 hover:bg-foreground/10 shrink-0 transition-opacity duration-150"
+            title="Remove"
+            aria-label="Remove element context"
+          >
+            <X className="h-2.5 w-2.5" />
+          </button>
+        </div>
+        <ElementContextDetailDialog
+          element={element}
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+        />
+      </>
     );
   }
 
@@ -91,13 +131,15 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
       {/* Expanded content */}
       {isExpanded ? (
         <div className="px-3 pb-3 space-y-2 border-t border-border">
-          {/* File path */}
-          <div className="pt-2">
-            <span className="text-xs text-muted-foreground">File:</span>
-            <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1 truncate">
-              {element.filePath}:{element.lineNumber}
+          {/* File path — only show when available (empty after sync-only capture) */}
+          {element.filePath ? (
+            <div className="pt-2">
+              <span className="text-xs text-muted-foreground">File:</span>
+              <div className="font-mono text-xs bg-lg-control px-2 py-1 rounded mt-1 truncate">
+                {element.filePath}:{element.lineNumber}
+              </div>
             </div>
-          </div>
+          ) : null}
 
           {/* Props */}
           {Object.keys(element.props).length > 0 ? (

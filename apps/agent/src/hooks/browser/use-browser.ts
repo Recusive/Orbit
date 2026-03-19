@@ -6,7 +6,7 @@ import type { ExtensionMessage, ReactElementContext } from '@/types/protocol';
 
 import { executeBrowserTool } from '@/hooks/agent/handlers/browser-tool-handler';
 import { useTauri } from '@/hooks/agent/use-tauri';
-import { onBrowserElementSelected } from '@/lib/api/browser';
+import { onBrowserElementEnriched, onBrowserElementSelected } from '@/lib/api/browser';
 import { useBrowserStore } from '@/stores/browser/browser-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 import { generateUUID } from '@/types/protocol';
@@ -27,6 +27,7 @@ export function useBrowser(): void {
     reset,
     setViewId,
     setCreating,
+    enrichElementContext,
   } = useBrowserStore(
     useShallow((s) => ({
       setNavigation: s.setNavigation,
@@ -37,6 +38,7 @@ export function useBrowser(): void {
       reset: s.reset,
       setViewId: s.setViewId,
       setCreating: s.setCreating,
+      enrichElementContext: s.enrichElementContext,
     }))
   );
 
@@ -126,6 +128,10 @@ export function useBrowser(): void {
 
         case 'browser:element-selected':
           setSelectedElement(message.element);
+          break;
+
+        case 'browser:element-enriched':
+          enrichElementContext(message.patch);
           break;
 
         case 'browser:error':
@@ -225,6 +231,7 @@ export function useBrowser(): void {
       reset,
       setViewId,
       setCreating,
+      enrichElementContext,
       postMessage,
     ]
   );
@@ -260,6 +267,45 @@ export function useBrowser(): void {
         })
         .catch((err: unknown) => {
           logger.warn('Failed to unlisten browser element selection handler', { err });
+        });
+    };
+  }, []);
+
+  // Bridge Tauri `browser:element-enriched` event → window.postMessage.
+  // Deferred React source metadata arrives after the initial element selection.
+  useEffect(() => {
+    const unlistenPromise = onBrowserElementEnriched((data: string) => {
+      try {
+        const patch = JSON.parse(data) as {
+          selector: string;
+          epoch: number;
+          componentName: string;
+          filePath: string;
+          lineNumber: number;
+        };
+        window.postMessage(
+          {
+            type: 'browser:element-enriched',
+            uuid: generateUUID(),
+            patch,
+          },
+          '*'
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to parse element enrichment data',
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    });
+
+    return (): void => {
+      void unlistenPromise
+        .then((dispose) => {
+          dispose();
+        })
+        .catch((err: unknown) => {
+          logger.warn('Failed to unlisten browser element enrichment handler', { err });
         });
     };
   }, []);

@@ -30,7 +30,7 @@ const REACT_GRAB_CDN_URL = 'https://unpkg.com/react-grab@0.1/dist/index.global.j
  * 3. When the user selects an element, captures its context (React component
  *    info, CSS selector, tag name, truncated outerHTML)
  * 4. Sends the data back via `orbit-eval://element-selected?data=<json>`
- * 5. Returns false from onElementSelect to prevent the default copy behavior
+ * 5. Returns true from onElementSelect to signal interception (prevents "failed to copy")
  */
 function buildInjectionScript(): string {
   // NOTE: This string is eval'd inside the embedded WKWebView.
@@ -85,37 +85,54 @@ function buildInjectionScript(): string {
   api.registerPlugin({
     name: 'orbit',
     hooks: {
-      onElementSelect: async (element) => {
-        // Get React source info (returns null on non-React sites)
-        let source = null;
-        try {
-          source = await api.getSource(element);
-        } catch (_) {
-          // Ignore - not a React site or devtools not available
-        }
+      onElementSelect: (element) => {
         const displayName = api.getDisplayName(element);
+        const epoch = Date.now();
 
+        // Capture textContent synchronously (sanitized, max 200 chars)
+        const skipTags = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT']);
+        const rawText = skipTags.has(element.tagName) ? '' : (element.textContent || '');
+        const textContent = rawText.replace(/\\s+/g, ' ').trim().substring(0, 200);
+
+        const selector = buildCSSSelector(element);
         const data = {
-          componentName: (source && source.componentName) || displayName || element.tagName.toLowerCase(),
-          filePath: (source && source.filePath) || '',
-          lineNumber: (source && source.lineNumber) || 0,
+          componentName: displayName || element.tagName.toLowerCase(),
+          filePath: '',
+          lineNumber: 0,
           props: {},
           componentStack: [],
           tagName: element.tagName.toLowerCase(),
-          selector: buildCSSSelector(element),
+          selector: selector,
           outerHTML: element.outerHTML.substring(0, 5000),
-          displayName: (source && source.componentName) || displayName || element.tagName.toLowerCase(),
+          displayName: displayName || element.tagName.toLowerCase(),
+          textContent: textContent,
+          epoch: epoch,
         };
 
-        // Send data back to Orbit via URL scheme interception
+        // Fire initial capture immediately (synchronous)
         const encoded = encodeURIComponent(JSON.stringify(data));
         window.location.href = 'orbit-eval://element-selected?data=' + encoded;
+
+        // Deferred: enrich with React source info via SEPARATE URL scheme
+        Promise.resolve().then(function() { return api.getSource(element); }).then(function(source) {
+          if (!source) return;
+          if (!document.querySelector(selector)) return;
+          var patch = {
+            selector: selector,
+            epoch: epoch,
+            componentName: source.componentName || displayName || element.tagName.toLowerCase(),
+            filePath: source.filePath || '',
+            lineNumber: source.lineNumber || 0,
+          };
+          var enc = encodeURIComponent(JSON.stringify(patch));
+          window.location.href = 'orbit-eval://element-enriched?data=' + enc;
+        }).catch(function() { /* non-fatal — not a React site */ });
 
         // Deactivate after selection (one-shot mode for Orbit)
         api.deactivate();
 
-        // Prevent default copy behavior
-        return false;
+        // Return true to signal interception (prevents "failed to copy" tooltip)
+        return true;
       },
     },
     // Customize theme: hide toolbar and crosshair (Orbit has its own UI)

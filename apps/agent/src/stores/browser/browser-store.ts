@@ -36,6 +36,9 @@ interface BrowserState {
   // Element context for chat input (can have multiple)
   elementContexts: ReactElementContext[];
 
+  // Monotonic epoch for staleness detection on deferred enrichments
+  lastSelectionEpoch: number;
+
   // Error state
   error: string | null;
 }
@@ -61,6 +64,15 @@ interface BrowserActions {
   addElementContext: (element: ReactElementContext) => void;
   removeElementContext: (index: number) => void;
   clearElementContexts: () => void;
+
+  // Deferred enrichment (merge-only — patches existing entry, never adds new ones)
+  enrichElementContext: (patch: {
+    selector: string;
+    epoch: number;
+    componentName: string;
+    filePath: string;
+    lineNumber: number;
+  }) => void;
 
   // Error handling
   setError: (error: string | null) => void;
@@ -99,6 +111,7 @@ const cleanInitialState: BrowserState = {
   isSelectingElement: false,
   selectedElement: null,
   elementContexts: [],
+  lastSelectionEpoch: 0,
   error: null,
 };
 
@@ -203,6 +216,10 @@ export const useBrowserStore = create<BrowserStore>()(
       set((state) => {
         state.selectedElement = element;
         state.isSelectingElement = false;
+        // Track epoch for staleness detection on deferred enrichments
+        if (element?.epoch !== undefined) {
+          state.lastSelectionEpoch = element.epoch;
+        }
         // Auto-add to contexts when selected
         if (element !== null) {
           // Avoid duplicates by checking selector (unique CSS path to element)
@@ -233,6 +250,40 @@ export const useBrowserStore = create<BrowserStore>()(
     clearElementContexts: (): void => {
       set((state) => {
         state.elementContexts = [];
+        state.lastSelectionEpoch = 0;
+      });
+    },
+
+    enrichElementContext: (patch): void => {
+      set((state) => {
+        // Reject stale enrichments (epoch mismatch means a newer selection occurred)
+        if (patch.epoch !== state.lastSelectionEpoch) {
+          logger.debug('Rejected stale element enrichment', {
+            patchEpoch: patch.epoch,
+            currentEpoch: state.lastSelectionEpoch,
+          });
+          return;
+        }
+        // Merge-only: find existing entry by selector, do nothing if not found
+        const index = state.elementContexts.findIndex((ctx) => ctx.selector === patch.selector);
+        if (index === -1) {
+          logger.debug('Enrichment target not found (chip may have been removed)', {
+            selector: patch.selector,
+          });
+          return;
+        }
+        // Patch the existing entry with React source metadata (direct mutation — idiomatic Immer)
+        const entry = state.elementContexts[index];
+        if (entry === undefined) return;
+        entry.componentName = patch.componentName;
+        entry.filePath = patch.filePath;
+        entry.lineNumber = patch.lineNumber;
+        entry.displayName = patch.componentName;
+        logger.info('Enriched element context with React source', {
+          selector: patch.selector,
+          componentName: patch.componentName,
+          filePath: patch.filePath,
+        });
       });
     },
 

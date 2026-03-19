@@ -246,6 +246,27 @@ fn handle_element_selected_url(url: &tauri::Url, app: &AppHandle) -> bool {
     true
 }
 
+/// Handle an `orbit-eval://element-enriched?data=...` navigation callback.
+///
+/// Decodes the `data` query param and emits a `browser:element-enriched` Tauri
+/// event. Returns `true` if the URL matched.
+fn handle_element_enriched_url(url: &tauri::Url, app: &AppHandle) -> bool {
+    let url_str = url.as_str();
+    if !url_str.starts_with("orbit-eval://element-enriched?") {
+        return false;
+    }
+    if let Some(query) = url.query() {
+        for pair in query.split('&') {
+            if let Some(("data", value)) = pair.split_once('=') {
+                if let Ok(decoded) = urlencoding::decode(value) {
+                    let _ = app.emit("browser:element-enriched", decoded.into_owned());
+                }
+            }
+        }
+    }
+    true
+}
+
 /// Information about the embedded browser.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BrowserInfo {
@@ -679,6 +700,9 @@ pub async fn browser_create(
                 return false;
             }
             if handle_element_selected_url(url, &app_for_navigation) {
+                return false;
+            }
+            if handle_element_enriched_url(url, &app_for_navigation) {
                 return false;
             }
 

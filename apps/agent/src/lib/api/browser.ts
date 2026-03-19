@@ -372,6 +372,18 @@ export async function onBrowserElementSelected(
 }
 
 /**
+ * Listen for deferred element enrichment events from react-grab in the embedded browser.
+ *
+ * Called when async React source metadata arrives for a previously selected element.
+ * The data payload is a JSON string with selector, epoch, componentName, filePath, lineNumber.
+ */
+export async function onBrowserElementEnriched(
+  callback: (data: string) => void
+): Promise<() => void> {
+  return listen<string>('browser:element-enriched', callback);
+}
+
+/**
  * Listen for browser navigation events.
  *
  * Called when the embedded browser navigates to a new URL.
