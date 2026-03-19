@@ -47,6 +47,11 @@ import {
   onPreflightReport,
 } from '@/lib/api';
 import { invoke } from '@/lib/api/core';
+import {
+  applyResolvedClaudeAuthState,
+  resolveClaudeAuthState,
+  sanitizePreferredAuthMethod,
+} from '@/lib/claude-auth';
 import { classifyAgentError } from '@/lib/error-classifier';
 import { useAuthStore } from '@/stores/agent/auth-store';
 import { useBackendStore } from '@/stores/backend';
@@ -188,6 +193,7 @@ async function bootstrapRuntimeHealth(controller: ListenerAbortController): Prom
     invoke<RetrieveResult>('retrieve_api_key', { provider: 'claude' }),
     invoke<KeychainStatus>('check_claude_keychain'),
     getPreflightReport(),
+    invoke<string | null>('get_preferred_auth_method'),
   ]);
 
   if (controller.isAborted()) return;
@@ -195,30 +201,29 @@ async function bootstrapRuntimeHealth(controller: ListenerAbortController): Prom
   const apiKeyResult = results[0];
   const keychainResult = results[1];
   const preflightResult = results[2];
+  const preferredMethodResult = results[3];
 
   const authStore = useAuthStore.getState();
-  if (apiKeyResult.status === 'fulfilled' && apiKeyResult.value.key) {
-    authStore.setAuthenticated('apikey', null);
-  } else if (keychainResult.status === 'fulfilled' && keychainResult.value.hasCredentials) {
-    authStore.setAuthenticated('oauth', keychainResult.value.expiresAt);
-  } else if (
-    keychainResult.status === 'fulfilled' &&
-    keychainResult.value.entryExists &&
-    keychainResult.value.credentialType === 'oauth'
-  ) {
-    authStore.setExpired(
-      keychainResult.value.error ?? 'Claude authentication expired.',
-      true,
-      keychainResult.value.expiresAt
-    );
-  } else {
-    authStore.setError(
-      'NO_CREDENTIALS',
-      'No credentials configured. Add an API key in Settings or sign in with Claude Code.',
-      true,
-      null
-    );
-  }
+  const preferredMethod =
+    preferredMethodResult.status === 'fulfilled'
+      ? sanitizePreferredAuthMethod(preferredMethodResult.value)
+      : null;
+  const keychainStatus =
+    keychainResult.status === 'fulfilled'
+      ? keychainResult.value
+      : {
+          hasCredentials: false,
+          credentialType: null,
+          expiresAt: null,
+          entryExists: false,
+          error: null,
+        };
+  const resolved = resolveClaudeAuthState({
+    preferredMethod,
+    hasApiKey: apiKeyResult.status === 'fulfilled' && apiKeyResult.value.key !== null,
+    keychainStatus,
+  });
+  applyResolvedClaudeAuthState(authStore, resolved);
 
   if (preflightResult.status === 'fulfilled') {
     useHealthStore.getState().setReport(preflightResult.value);

@@ -57,4 +57,10 @@ export type {
 
 // Auth store
 export { useAuthStore } from './auth-store';
-export type { AuthState, AuthStatus, AuthCredentialType, AuthErrorCategory } from './auth-store';
+export type {
+  AuthState,
+  AuthStatus,
+  AuthCredentialType,
+  AuthErrorCategory,
+  PreferredAuthMethod,
+} from './auth-store';

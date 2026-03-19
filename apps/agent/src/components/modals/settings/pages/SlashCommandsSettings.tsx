@@ -719,7 +719,7 @@ export const SlashCommandsSettings: FC = () => {
   }
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Slash Commands">
         Custom commands that expand into prompts. Type / in the chat to see available commands.
       </SectionHeader>

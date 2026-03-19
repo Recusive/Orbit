@@ -4,13 +4,21 @@ import { Clock, Info, Key, Loader2, RefreshCw, ShieldCheck, Trash2, X } from 'lu
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SiClaude } from 'react-icons/si';
 
-import { SectionDivider, SectionHeader } from '../components';
+import { SectionDivider } from '../components/SectionDivider';
+import { SectionHeader } from '../components/SectionHeader';
 
 import type { FC } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  applyResolvedClaudeAuthState,
+  resolveClaudeAuthState,
+  sanitizePreferredAuthMethod,
+} from '@/lib/claude-auth';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/agent';
+import { useActiveBackend } from '@/stores/backend';
 
 const logger = createLogger('AccountSettings');
 
@@ -45,6 +53,16 @@ interface RetrieveResult {
   key: string | null;
   error: string | null;
 }
+
+type PreferredAuthMethod = 'oauth' | 'apikey' | null;
+
+const EMPTY_KEYCHAIN_STATUS: KeychainStatus = {
+  hasCredentials: false,
+  credentialType: null,
+  expiresAt: null,
+  entryExists: false,
+  error: null,
+};
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -112,9 +130,11 @@ function dotColor(expiresAtMs: number | null, hasCredentials: boolean): string {
 // ---------------------------------------------------------------------------
 
 export const AccountSettings: FC = () => {
+  const activeBackend = useActiveBackend();
+  const credentialType = useAuthStore((state) => state.credentialType);
+
   // OAuth status
   const [keychainStatus, setKeychainStatus] = useState<KeychainStatus | null>(null);
-  const [isChecking, setIsChecking] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastChecked, setLastChecked] = useState<number | null>(null);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
@@ -126,11 +146,28 @@ export const AccountSettings: FC = () => {
   const [isSavingKey, setIsSavingKey] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
   const [isRemovingKey, setIsRemovingKey] = useState(false);
+  const [preferredMethod, setPreferredMethod] = useState<PreferredAuthMethod>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
+  const [methodError, setMethodError] = useState<string | null>(null);
+
+  const applyAuthSnapshot = useCallback(
+    (
+      nextPreferredMethod: PreferredAuthMethod,
+      nextStoredApiKey: string | null,
+      nextKeychainStatus: KeychainStatus
+    ): void => {
+      const resolved = resolveClaudeAuthState({
+        preferredMethod: nextPreferredMethod,
+        hasApiKey: nextStoredApiKey !== null,
+        keychainStatus: nextKeychainStatus,
+      });
+      applyResolvedClaudeAuthState(useAuthStore.getState(), resolved);
+    },
+    []
+  );
 
   // ── Fetch status on mount ────────────────────────────────────────────
   const fetchStatus = useCallback(async (): Promise<void> => {
-    setIsChecking(true);
-
     // In demo mode (marketing site iframe), skip Tauri invocations and show mock connected state
     const params = new URLSearchParams(window.location.search);
     if (params.get('demo') === 'true') {
@@ -141,25 +178,34 @@ export const AccountSettings: FC = () => {
         entryExists: true,
         error: null,
       });
+      setPreferredMethod('oauth');
+      setStoredApiKey(null);
+      applyAuthSnapshot('oauth', null, {
+        hasCredentials: true,
+        credentialType: 'oauth',
+        expiresAt: Date.now() + 4 * 60 * 60_000,
+        entryExists: true,
+        error: null,
+      });
       setLastChecked(Date.now());
-      setIsChecking(false);
       return;
     }
 
     try {
-      const [status, apiKeyResult] = await Promise.all([
+      const [status, apiKeyResult, preferredResult] = await Promise.all([
         invoke<KeychainStatus>('check_claude_keychain'),
         invoke<RetrieveResult>('retrieve_api_key', { provider: 'claude' }),
+        invoke<string | null>('get_preferred_auth_method'),
       ]);
 
-      setKeychainStatus(status);
-      setLastChecked(Date.now());
+      const maskedApiKey = apiKeyResult.key !== null ? maskApiKey(apiKeyResult.key) : null;
+      const nextPreferredMethod = sanitizePreferredAuthMethod(preferredResult);
 
-      if (apiKeyResult.key !== null) {
-        setStoredApiKey(maskApiKey(apiKeyResult.key));
-      } else {
-        setStoredApiKey(null);
-      }
+      setKeychainStatus(status);
+      setStoredApiKey(maskedApiKey);
+      setPreferredMethod(nextPreferredMethod);
+      setLastChecked(Date.now());
+      applyAuthSnapshot(nextPreferredMethod, maskedApiKey, status);
     } catch {
       setKeychainStatus({
         hasCredentials: false,
@@ -168,11 +214,12 @@ export const AccountSettings: FC = () => {
         entryExists: false,
         error: 'Failed to check credentials',
       });
+      setPreferredMethod(null);
       setLastChecked(Date.now());
     } finally {
-      setIsChecking(false);
+      // data loaded
     }
-  }, []);
+  }, [applyAuthSnapshot]);
 
   useEffect(() => {
     fetchStatus().catch((error: unknown) => {
@@ -206,6 +253,7 @@ export const AccountSettings: FC = () => {
       const status = await invoke<KeychainStatus>('check_claude_keychain');
       setKeychainStatus(status);
       setLastChecked(Date.now());
+      applyAuthSnapshot(preferredMethod, storedApiKey, status);
 
       // Compare old and new expiry to give user feedback
       if (status.hasCredentials && status.expiresAt !== null) {
@@ -230,7 +278,55 @@ export const AccountSettings: FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [keychainStatus?.expiresAt]);
+  }, [applyAuthSnapshot, keychainStatus?.expiresAt, preferredMethod, storedApiKey]);
+
+  // ── Switch auth method handler ───────────────────────────────────────
+  const handleMethodChange = useCallback(
+    async (method: Exclude<PreferredAuthMethod, null>): Promise<void> => {
+      setIsSwitching(true);
+      setMethodError(null);
+
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('demo') === 'true') {
+        const demoStatus: KeychainStatus = {
+          hasCredentials: true,
+          credentialType: 'oauth',
+          expiresAt: Date.now() + 4 * 60 * 60_000,
+          entryExists: true,
+          error: null,
+        };
+        setPreferredMethod(method);
+        setKeychainStatus(demoStatus);
+        setLastChecked(Date.now());
+        applyAuthSnapshot(method, storedApiKey, demoStatus);
+        setIsSwitching(false);
+        return;
+      }
+
+      try {
+        const result = await invoke<StoreResult>('set_preferred_auth_method', { method });
+        if (!result.success) {
+          setMethodError(result.error ?? 'Failed to update preferred auth method');
+          return;
+        }
+
+        setPreferredMethod(method);
+        useAuthStore.getState().setPreferredMethod(method);
+
+        // Use existing keychainStatus — no need to re-fetch mid-switch.
+        // This keeps the transition synchronous and avoids skeleton flash.
+        setLastChecked(Date.now());
+        applyAuthSnapshot(method, storedApiKey, keychainStatus ?? EMPTY_KEYCHAIN_STATUS);
+      } catch (error) {
+        setMethodError(
+          error instanceof Error ? error.message : 'Failed to update preferred auth method'
+        );
+      } finally {
+        setIsSwitching(false);
+      }
+    },
+    [applyAuthSnapshot, keychainStatus, storedApiKey]
+  );
 
   // ── Save API key handler ─────────────────────────────────────────────
   const handleSaveKey = useCallback(async (): Promise<void> => {
@@ -260,15 +356,18 @@ export const AccountSettings: FC = () => {
         return;
       }
 
-      setStoredApiKey(maskApiKey(trimmed));
+      const maskedKey = maskApiKey(trimmed);
+      setStoredApiKey(maskedKey);
       setApiKeyInput('');
       setKeyError(null);
+      setLastChecked(Date.now());
+      applyAuthSnapshot(preferredMethod, maskedKey, keychainStatus ?? EMPTY_KEYCHAIN_STATUS);
     } catch (err) {
       setKeyError(err instanceof Error ? err.message : 'Failed to save API key');
     } finally {
       setIsSavingKey(false);
     }
-  }, [apiKeyInput]);
+  }, [apiKeyInput, applyAuthSnapshot, keychainStatus, preferredMethod]);
 
   // ── Remove API key handler ───────────────────────────────────────────
   const handleRemoveKey = useCallback(async (): Promise<void> => {
@@ -278,6 +377,8 @@ export const AccountSettings: FC = () => {
       if (result.success) {
         setStoredApiKey(null);
         setKeyError(null);
+        setLastChecked(Date.now());
+        applyAuthSnapshot(preferredMethod, null, keychainStatus ?? EMPTY_KEYCHAIN_STATUS);
       } else {
         setKeyError(result.error ?? 'Failed to remove API key');
       }
@@ -286,7 +387,7 @@ export const AccountSettings: FC = () => {
     } finally {
       setIsRemovingKey(false);
     }
-  }, []);
+  }, [applyAuthSnapshot, keychainStatus, preferredMethod]);
 
   // ── Cleanup refresh timer on unmount ─────────────────────────────────
   useEffect(() => {
@@ -301,222 +402,355 @@ export const AccountSettings: FC = () => {
   // ── Derived display values ───────────────────────────────────────────
   const isConnected = keychainStatus?.hasCredentials === true;
   const connectionLabel = isConnected ? 'Connected' : 'Not connected';
+  const apiKeyConfigured = storedApiKey !== null;
+  const selectedMethod = preferredMethod ?? credentialType;
+  const showLegacyHint = preferredMethod === null;
+  const usingNote =
+    preferredMethod === 'apikey' && credentialType === 'oauth'
+      ? 'Using OAuth because no API key is configured'
+      : preferredMethod === 'oauth' && credentialType === 'apikey'
+        ? 'Using API key'
+        : null;
+
+  const dataLoaded = keychainStatus !== null;
 
   return (
-    <div>
-      <SectionHeader title="Authentication">Manage your Claude authentication</SectionHeader>
+    <div className={dataLoaded ? 'animate-settings-in' : 'opacity-0'}>
+      <SectionHeader title="Authentication">
+        Choose your preferred Claude authentication method
+      </SectionHeader>
+
+      {activeBackend !== 'opencode' ? (
+        <div className="space-y-3">
+          <div role="radiogroup" aria-label="Claude authentication method" className="space-y-2">
+            {[
+              {
+                id: 'oauth',
+                title: 'OAuth',
+                description: 'Use Claude Code credentials from your local sign-in',
+                status: connectionLabel,
+                connected: isConnected,
+              },
+              {
+                id: 'apikey',
+                title: 'API Key',
+                description: 'Use a stored Anthropic API key from Settings',
+                status: apiKeyConfigured ? 'Configured' : 'Not configured',
+                connected: apiKeyConfigured,
+              },
+            ].map((option) => {
+              const isSelected = selectedMethod === option.id;
+              const isPreferred = preferredMethod === option.id;
+
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={isSelected}
+                  disabled={isSwitching}
+                  onClick={() => {
+                    void handleMethodChange(option.id as Exclude<PreferredAuthMethod, null>);
+                  }}
+                  className={cn(
+                    'group flex min-h-11 w-full items-start gap-3.5 rounded-xl px-4 py-3.5 text-left transition-colors disabled:opacity-60',
+                    isSelected ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/3'
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+                      isSelected
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground/30 group-hover:border-muted-foreground/50'
+                    )}
+                  >
+                    {isSelected ? (
+                      <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                    ) : null}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[13px] font-medium text-foreground">
+                        {option.title}
+                      </span>
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
+                          option.connected
+                            ? 'bg-success-muted text-success'
+                            : 'bg-muted-foreground/10 text-muted-foreground'
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            'h-1.5 w-1.5 rounded-full',
+                            option.id === 'oauth'
+                              ? dotColor(keychainStatus?.expiresAt ?? null, isConnected)
+                              : option.connected
+                                ? 'bg-success'
+                                : 'bg-muted-foreground/40'
+                          )}
+                        />
+                        {option.status}
+                      </span>
+                    </div>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {option.description}
+                    </span>
+                    {usingNote !== null && isPreferred ? (
+                      <span className="mt-2 block text-[11px] text-muted-foreground">
+                        {usingNote}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {isPreferred ? (
+                    <span className="shrink-0 inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-medium text-success">
+                      Preferred
+                    </span>
+                  ) : isSelected ? (
+                    <span className="shrink-0 inline-flex items-center rounded-full bg-muted-foreground/10 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                      Current
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          {showLegacyHint ? (
+            <p className="text-sm text-muted-foreground">
+              No preferred method is saved yet. Picking one makes Claude startup behavior explicit.
+            </p>
+          ) : null}
+
+          {methodError !== null ? <p className="text-sm text-destructive">{methodError}</p> : null}
+        </div>
+      ) : null}
+
+      <SectionDivider />
 
       {/* ── OAuth Status Card ─────────────────────────────────────── */}
-      <div className="rounded-[14px] border border-lg-separator bg-background min-h-[120px] overflow-hidden">
-        {isChecking ? (
-          <div className="p-4 pb-3 animate-pulse">
-            <div className="flex items-start gap-3">
-              <div className="h-9 w-9 rounded-lg bg-muted-foreground/10 shrink-0" />
-              <div className="flex flex-col gap-2 pt-0.5">
-                <div className="h-3.5 w-28 rounded bg-muted-foreground/10" />
-                <div className="h-3 w-16 rounded bg-muted-foreground/10" />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Top section: icon + status + refresh */}
-            <div className="flex items-start justify-between gap-4 p-4 pb-3">
-              <div className="flex items-start gap-3">
-                {/* Status icon */}
-                <div
-                  className="flex items-center justify-center h-9 w-9 rounded-lg shrink-0"
-                  style={{ backgroundColor: isConnected ? 'var(--orbit-alpha-200)' : undefined }}
-                >
-                  <SiClaude
-                    className={cn('h-4 w-4', isConnected ? undefined : 'text-muted-foreground/60')}
-                    style={isConnected ? { color: 'var(--primary)' } : undefined}
-                  />
-                </div>
-
-                {/* Text block */}
-                <div className="flex flex-col gap-0.5 pt-0.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Claude Code</span>
-                    <span
-                      className={cn(
-                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
-                        isConnected
-                          ? 'bg-success-muted text-success'
-                          : 'bg-muted-foreground/10 text-muted-foreground'
-                      )}
-                    >
-                      <div
-                        className={cn(
-                          'h-1.5 w-1.5 rounded-full',
-                          dotColor(keychainStatus?.expiresAt ?? null, isConnected)
-                        )}
-                      />
-                      {connectionLabel}
-                    </span>
-                  </div>
-                  <span className="text-xs text-muted-foreground/60">OAuth</span>
-                </div>
-              </div>
-
-              {/* Refresh button */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs shrink-0"
-                disabled={isRefreshing}
-                onClick={() => {
-                  handleRefreshToken().catch((error: unknown) => {
-                    logger.error('Failed to refresh token', error);
-                  });
-                }}
-              >
-                {isRefreshing ? (
-                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                )}
-                Refresh
-              </Button>
-            </div>
-
-            {/* Token expiry details */}
-            {isConnected && keychainStatus.expiresAt !== null ? (
-              <div className="mx-4 mb-4 rounded-[12px] bg-lg-control px-3 py-2.5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock
-                    className={cn('h-3.5 w-3.5 shrink-0', expiryColor(keychainStatus.expiresAt))}
-                  />
-                  <span
-                    className={cn('text-xs font-medium', expiryColor(keychainStatus.expiresAt))}
-                    style={{ fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {formatTimeUntilExpiry(keychainStatus.expiresAt)}
-                  </span>
-                  <span className="text-xs text-muted-foreground/90">
-                    {formatAbsoluteTime(keychainStatus.expiresAt)}
-                  </span>
-                </div>
-                {lastChecked !== null ? (
-                  <span className="text-[11px] text-muted-foreground/90">
-                    {formatLastChecked(lastChecked)}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
-
-            {/* Error */}
-            {keychainStatus?.error !== null && keychainStatus?.error !== undefined ? (
-              <div className="px-4 py-2.5 border-t border-destructive/20 bg-destructive/5">
-                <p className="text-xs text-destructive">{keychainStatus.error}</p>
-              </div>
-            ) : null}
-          </>
+      <div
+        className={cn(
+          'rounded-[14px] bg-foreground/[0.06] overflow-hidden transition-opacity',
+          preferredMethod !== null && preferredMethod !== 'oauth' && 'opacity-60'
         )}
+      >
+        <div>
+          {/* Top section: icon + status + refresh */}
+          <div className="flex items-start justify-between gap-4 p-4 pb-3">
+            <div className="flex items-start gap-3">
+              {/* Status icon */}
+              <div
+                className="flex items-center justify-center h-9 w-9 rounded-lg shrink-0"
+                style={{ backgroundColor: isConnected ? 'var(--orbit-alpha-200)' : undefined }}
+              >
+                <SiClaude
+                  className={cn('h-4 w-4', isConnected ? undefined : 'text-muted-foreground/60')}
+                  style={isConnected ? { color: 'var(--primary)' } : undefined}
+                />
+              </div>
+
+              {/* Text block */}
+              <div className="flex flex-col gap-0.5 pt-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-base font-medium">Claude Code</span>
+                  {preferredMethod !== null && preferredMethod !== 'oauth' ? (
+                    <span className="text-[11px] text-muted-foreground">(not preferred)</span>
+                  ) : null}
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
+                      isConnected
+                        ? 'bg-success-muted text-success'
+                        : 'bg-muted-foreground/10 text-muted-foreground'
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'h-1.5 w-1.5 rounded-full',
+                        dotColor(keychainStatus?.expiresAt ?? null, isConnected)
+                      )}
+                    />
+                    {connectionLabel}
+                  </span>
+                </div>
+                <span className="text-sm text-muted-foreground/60">OAuth</span>
+              </div>
+            </div>
+
+            {/* Refresh button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 gap-1.5 text-[12px] shrink-0 [&_svg]:size-[14px]"
+              disabled={isRefreshing}
+              onClick={() => {
+                handleRefreshToken().catch((error: unknown) => {
+                  logger.error('Failed to refresh token', error);
+                });
+              }}
+            >
+              {isRefreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+              Refresh
+            </Button>
+          </div>
+
+          {/* Token expiry details */}
+          {isConnected && keychainStatus.expiresAt !== null ? (
+            <div className="mx-4 mb-4 rounded-[12px] bg-lg-control px-3 py-2.5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Clock
+                  className={cn('h-3.5 w-3.5 shrink-0', expiryColor(keychainStatus.expiresAt))}
+                />
+                <span
+                  className={cn('text-sm font-medium', expiryColor(keychainStatus.expiresAt))}
+                  style={{ fontVariantNumeric: 'tabular-nums' }}
+                >
+                  {formatTimeUntilExpiry(keychainStatus.expiresAt)}
+                </span>
+                <span className="text-sm text-muted-foreground/90">
+                  {formatAbsoluteTime(keychainStatus.expiresAt)}
+                </span>
+              </div>
+              {lastChecked !== null ? (
+                <span className="text-[11px] text-muted-foreground/90">
+                  {formatLastChecked(lastChecked)}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* Error */}
+          {keychainStatus?.error !== null && keychainStatus?.error !== undefined ? (
+            <div className="px-4 py-2.5 border-t border-destructive/20 bg-destructive/5">
+              <p className="text-sm text-destructive">{keychainStatus.error}</p>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <SectionDivider />
 
       {/* ── API Key Fallback Section ──────────────────────────────── */}
-      <SectionHeader title="API Key">
-        Use an Anthropic API key if you don&apos;t have Claude Code
-      </SectionHeader>
+      <div
+        className={cn(
+          'transition-opacity',
+          preferredMethod !== null && preferredMethod !== 'apikey' && 'opacity-60'
+        )}
+      >
+        <SectionHeader title="API Key">
+          Use an Anthropic API key if you don&apos;t have Claude Code
+        </SectionHeader>
 
-      {storedApiKey !== null ? (
-        /* Key is saved — show masked key with remove button */
-        <div className="rounded-[14px] border border-lg-separator p-4 bg-background">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-2.5 w-2.5 rounded-full bg-success shrink-0" />
-              <div className="flex items-center gap-2 text-sm">
-                <ShieldCheck className="h-3.5 w-3.5 text-success" />
-                <span className="font-medium">Anthropic API Key</span>
-                <span className="text-muted-foreground/60">·</span>
-                <span className="text-muted-foreground font-mono text-xs">{storedApiKey}</span>
+        {storedApiKey !== null ? (
+          /* Key is saved — show masked key with remove button */
+          <div className="rounded-[14px] bg-foreground/[0.06]">
+            <div className="flex items-start justify-between gap-4 p-4 pb-3">
+              <div className="flex items-start gap-3">
+                <div className="flex items-center justify-center h-9 w-9 rounded-lg shrink-0 bg-success/10">
+                  <ShieldCheck className="h-4 w-4 text-success" />
+                </div>
+                <div className="flex flex-col gap-0.5 pt-0.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-medium">Anthropic API Key</span>
+                    {preferredMethod !== null && preferredMethod !== 'apikey' ? (
+                      <span className="text-[11px] text-muted-foreground">(not preferred)</span>
+                    ) : null}
+                    <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none bg-success-muted text-success">
+                      <div className="h-1.5 w-1.5 rounded-full bg-success" />
+                      Configured
+                    </span>
+                  </div>
+                  <span className="text-sm text-muted-foreground/60 font-mono">{storedApiKey}</span>
+                </div>
               </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
-              disabled={isRemovingKey}
-              onClick={() => {
-                handleRemoveKey().catch((error: unknown) => {
-                  logger.error('Failed to remove API key', error);
-                });
-              }}
-            >
-              {isRemovingKey ? (
-                <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-              ) : (
-                <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              Remove Key
-            </Button>
-          </div>
-        </div>
-      ) : (
-        /* No key saved — show input form */
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSaveKey().catch((error: unknown) => {
-              logger.error('Failed to save API key', error);
-            });
-          }}
-        >
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Key className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
-              <Input
-                type="password"
-                placeholder="sk-ant-..."
-                value={apiKeyInput}
-                spellCheck={false}
-                autoComplete="off"
-                onChange={(e) => {
-                  setApiKeyInput(e.target.value);
-                  setKeyError(null);
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-[12px] border border-foreground/10 text-destructive hover:border-transparent hover:text-destructive hover:bg-destructive/10 shrink-0 [&_svg]:size-[14px]"
+                disabled={isRemovingKey}
+                onClick={() => {
+                  handleRemoveKey().catch((error: unknown) => {
+                    logger.error('Failed to remove API key', error);
+                  });
                 }}
-                className={cn(
-                  'h-8 text-sm pl-8 placeholder:text-muted-foreground/90',
-                  keyError !== null && 'border-destructive focus-visible:ring-destructive'
+              >
+                {isRemovingKey ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
                 )}
-              />
+                Remove Key
+              </Button>
             </div>
-            <Button
-              type="submit"
-              variant="outline"
-              size="sm"
-              className="h-8 text-xs"
-              disabled={isSavingKey || apiKeyInput.trim().length === 0}
-            >
-              {isSavingKey ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
-              Save Key
-            </Button>
           </div>
-          {keyError !== null ? <p className="text-xs text-destructive">{keyError}</p> : null}
-          <p className="text-xs text-muted-foreground/70">
-            Get your key from{' '}
-            <a
-              href="https://console.anthropic.com/settings/keys"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-lg-text-secondary hover:text-foreground hover:underline"
-            >
-              console.anthropic.com
-            </a>
-          </p>
-        </form>
-      )}
+        ) : (
+          /* No key saved — show input form */
+          <form
+            className="space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveKey().catch((error: unknown) => {
+                logger.error('Failed to save API key', error);
+              });
+            }}
+          >
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Key className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/50 pointer-events-none" />
+                <Input
+                  type="password"
+                  placeholder="sk-ant-..."
+                  value={apiKeyInput}
+                  spellCheck={false}
+                  autoComplete="off"
+                  onChange={(e) => {
+                    setApiKeyInput(e.target.value);
+                    setKeyError(null);
+                  }}
+                  className={cn(
+                    'h-8 text-base pl-8 placeholder:text-muted-foreground/90',
+                    keyError !== null && 'border-destructive focus-visible:ring-destructive'
+                  )}
+                />
+              </div>
+              <Button
+                type="submit"
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs"
+                disabled={isSavingKey || apiKeyInput.trim().length === 0}
+              >
+                {isSavingKey ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : null}
+                Save Key
+              </Button>
+            </div>
+            {keyError !== null ? <p className="text-sm text-destructive">{keyError}</p> : null}
+            <p className="text-sm text-muted-foreground/70">
+              Get your key from{' '}
+              <a
+                href="https://console.anthropic.com/settings/keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-lg-text-secondary hover:text-foreground hover:underline"
+              >
+                console.anthropic.com
+              </a>
+            </p>
+          </form>
+        )}
+      </div>
 
       {/* Refresh feedback bar */}
       {refreshMessage !== null ? (
         <div className="mt-6 flex w-full items-center justify-between rounded-[14px] border border-lg-separator bg-background">
           <div className="flex flex-1 items-center gap-3 py-2.5 pl-3.5">
             <Info className="h-4 w-4 shrink-0 text-lg-text-secondary" />
-            <span className="text-sm font-medium">{refreshMessage}</span>
+            <span className="text-base font-medium">{refreshMessage}</span>
           </div>
           <div className="flex items-center border-l border-lg-separator">
             <button

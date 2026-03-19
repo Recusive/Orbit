@@ -114,7 +114,7 @@ describe('ChangelogSettings', () => {
     expect(screen.queryByText('Available now')).not.toBeInTheDocument();
   });
 
-  it('renders quick-jump links, version badges, and formatted dates', () => {
+  it('renders version badges and formatted dates', () => {
     mockGetMergedChangelogs.mockReturnValue([
       createEntry('0.0.2', 'Orbit v0.0.2', '2026-03-10', '## Stable\n- Shipped polish'),
       createEntry('0.0.1', 'Orbit v0.0.1', '2026-02-28', '## First\n- Initial release'),
@@ -122,9 +122,8 @@ describe('ChangelogSettings', () => {
 
     render(<ChangelogSettings />);
 
-    expect(screen.getByRole('link', { name: 'v0.0.2' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'v0.0.1' })).toBeInTheDocument();
-    expect(screen.getAllByText('v0.0.2').length).toBeGreaterThan(1);
+    expect(screen.getByText('0.0.2')).toBeInTheDocument();
+    expect(screen.getByText('0.0.1')).toBeInTheDocument();
     expect(screen.getByText('Mar 10, 2026')).toBeInTheDocument();
   });
 

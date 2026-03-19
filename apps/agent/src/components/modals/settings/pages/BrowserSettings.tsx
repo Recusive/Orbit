@@ -11,7 +11,7 @@ export const BrowserSettings: FC = () => {
   const [headless, setHeadless] = useState(true);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Browser">Configure browser automation settings</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

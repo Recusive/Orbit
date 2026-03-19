@@ -69,7 +69,7 @@ export const AppearanceSettings: FC = () => {
   };
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Theme">Customize the look of the application</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

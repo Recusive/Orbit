@@ -68,7 +68,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (9 entries)
+## plans/tracked/todo/ (14 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
@@ -76,7 +76,6 @@ Use this to find the right file. Read the file directly — no links needed.
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
 - `agent-skills-validator-port.md` — Agent skills validator port
-- `auth-method-picker.md` — Auth method picker
 - `browser-enhancement-12-features.md` — Browser enhancement features
 - `browser-navigate-verification-fix.md` — Browser navigate verification fix
 - `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
@@ -89,7 +88,7 @@ Use this to find the right file. Read the file directly — no links needed.
   - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
   - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (35 entries)
+## plans/tracked/done/ (36 entries)
 
 - `fix-works-then-stops-credential-deletion.md` — Fix shell env API key deletion by OAuth (protect `ANTHROPIC_API_KEY` from `startSession()` wipe when OAuth temporarily wins)
 - `production-ready-credentials.md` — Production-ready credential system + startup health checks (connect Settings UI keys to agent-bridge, AES-256-GCM → sidecar flow)
@@ -131,6 +130,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `fix-base64-leak-image-dialog.md` — Fix base64 data leaking into DOM via image src attributes (SafeImage component converts data: URLs to opaque blob: URLs across all four rendering surfaces)
 - `FIX-IMAGE-BUTTON-TYPE-MISMATCH.md` — Fix image button enabled for all models (schema-data divergence: migrate to capabilities-based model schema, make supportsImageInput required)
 - `STRICT-TYPING-LINT-CLEANUP.md` — Strict typing and lint suppression cleanup (6-phase: config consolidation, Rust allow→expect, LSP audit, TS fixes, Agent-backend targeted, test standardization)
+- `auth-method-picker.md` — Auth method picker for Claude backend (radio-card selector in Account Settings, Rust preference persistence, bootstrap respect)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

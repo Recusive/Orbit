@@ -53,7 +53,7 @@ export const BackendSettings: FC = () => {
   }, [activeBackend]);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Engine">
         Switching engines changes the active session model, storage, and tool behavior.
       </SectionHeader>

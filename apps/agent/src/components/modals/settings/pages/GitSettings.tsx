@@ -54,7 +54,7 @@ export const GitSettings: FC = () => {
   };
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Auto-Fetch">
         Automatically fetch from remote to keep tracking refs updated
       </SectionHeader>

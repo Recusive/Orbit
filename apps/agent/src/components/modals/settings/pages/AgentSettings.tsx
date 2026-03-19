@@ -27,7 +27,7 @@ export const AgentSettings: FC = () => {
   const [maxTurns, setMaxTurns] = useState('50');
 
   return (
-    <div>
+    <div className="animate-settings-in">
       {/* Security */}
       <SectionHeader title="Security">
         Control which tools and capabilities the agent can use

@@ -13,7 +13,7 @@ export const TabsSettings: FC = () => {
   const [showIcons, setShowIcons] = useState(true);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Tab Behavior">Configure how tabs work</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">

@@ -13,7 +13,7 @@ export const NotificationsSettings: FC = () => {
   const [showWarnings, setShowWarnings] = useState(true);
 
   return (
-    <div>
+    <div className="animate-settings-in">
       <SectionHeader title="Notifications">Configure notification preferences</SectionHeader>
 
       <div className="space-y-0 divide-y divide-border/40">
