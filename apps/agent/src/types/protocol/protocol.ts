@@ -196,6 +196,8 @@ export const ElementContextSchema = z
     selector: z.string(),
     outerHTML: z.string(),
     displayName: z.string(),
+    textContent: z.string().optional(),
+    epoch: z.number().optional(),
   })
   .strict();
 
@@ -1622,6 +1624,10 @@ export const ReactElementContextSchema = z
     outerHTML: z.string(),
     // Display helper
     displayName: z.string(),
+    // Text preview (sanitized, max 200 chars)
+    textContent: z.string().optional(),
+    // Monotonic selection epoch for staleness detection
+    epoch: z.number().optional(),
   })
   .strict();
 
@@ -1667,6 +1673,23 @@ export const BrowserElementSelectedSchema = z
     type: z.literal('browser:element-selected'),
     uuid: UUIDSchema,
     element: ReactElementContextSchema,
+  })
+  .strict();
+
+// Deferred enrichment patch for a previously selected element
+export const BrowserElementEnrichedSchema = z
+  .object({
+    type: z.literal('browser:element-enriched'),
+    uuid: UUIDSchema,
+    patch: z
+      .object({
+        selector: z.string(),
+        epoch: z.number(),
+        componentName: z.string(),
+        filePath: z.string(),
+        lineNumber: z.number(),
+      })
+      .strict(),
   })
   .strict();
 
@@ -1947,6 +1970,7 @@ export const ExtensionMessageSchema = z.discriminatedUnion('type', [
   BrowserDetectedSchema, // @deprecated
   BrowserNavigatedSchema,
   BrowserElementSelectedSchema,
+  BrowserElementEnrichedSchema,
   BrowserLoadingSchema,
   BrowserErrorSchema,
   BrowserClearedSchema,
@@ -2090,6 +2114,7 @@ export type BrowserCreated = z.infer<typeof BrowserCreatedSchema>;
 export type BrowserDetected = z.infer<typeof BrowserDetectedSchema>; // @deprecated
 export type BrowserNavigated = z.infer<typeof BrowserNavigatedSchema>;
 export type BrowserElementSelected = z.infer<typeof BrowserElementSelectedSchema>;
+export type BrowserElementEnriched = z.infer<typeof BrowserElementEnrichedSchema>;
 export type BrowserLoading = z.infer<typeof BrowserLoadingSchema>;
 export type BrowserError = z.infer<typeof BrowserErrorSchema>;
 export type BrowserCleared = z.infer<typeof BrowserClearedSchema>;
@@ -2139,6 +2164,7 @@ export function isProtocolBrowserMessage(
   | BrowserDetected
   | BrowserNavigated
   | BrowserElementSelected
+  | BrowserElementEnriched
   | BrowserLoading
   | BrowserError
   | BrowserCleared

@@ -88,7 +88,7 @@ Use this to find the right file. Read the file directly — no links needed.
   - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
   - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (36 entries)
+## plans/tracked/done/ (38 entries)
 
 - `fix-works-then-stops-credential-deletion.md` — Fix shell env API key deletion by OAuth (protect `ANTHROPIC_API_KEY` from `startSession()` wipe when OAuth temporarily wins)
 - `production-ready-credentials.md` — Production-ready credential system + startup health checks (connect Settings UI keys to agent-bridge, AES-256-GCM → sidecar flow)
@@ -131,6 +131,8 @@ Use this to find the right file. Read the file directly — no links needed.
 - `FIX-IMAGE-BUTTON-TYPE-MISMATCH.md` — Fix image button enabled for all models (schema-data divergence: migrate to capabilities-based model schema, make supportsImageInput required)
 - `STRICT-TYPING-LINT-CLEANUP.md` — Strict typing and lint suppression cleanup (6-phase: config consolidation, Rust allow→expect, LSP audit, TS fixes, Agent-backend targeted, test standardization)
 - `auth-method-picker.md` — Auth method picker for Claude backend (radio-card selector in Account Settings, Rust preference persistence, bootstrap respect)
+- `react-grab-fix.md` — Fix React-grab element selection (sync handler returns true, deferred enrichment via separate URL scheme, textContent capture, epoch-based staleness)
+- `element-chip-detail-dialog.md` — Element context chip click-to-inspect dialog (syntax-highlighted HTML, copy buttons, click-to-open file, keyboard accessible)
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

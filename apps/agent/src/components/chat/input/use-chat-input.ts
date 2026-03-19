@@ -207,10 +207,21 @@ export function useChatInput(options: UseChatInputOptions): UseChatInputReturn {
       text = `${text} ${fileSuffix}`;
     }
 
-    // Append <ComponentName> tokens for selected browser elements so they
+    // Append element tokens for selected browser elements so they
     // persist in JSONL content and are visible in the user message bubble.
+    // Format: [tagName: "preview..."] when textContent available, otherwise <componentName>
     if (elementContexts.length > 0) {
-      const elementSuffix = elementContexts.map((el) => `<${el.componentName}>`).join(' ');
+      const elementSuffix = elementContexts
+        .map((el) => {
+          if (el.textContent !== undefined && el.textContent !== '') {
+            const preview = el.textContent.slice(0, 60);
+            // Strip characters that could cause ambiguity with HTML or markdown
+            const safePreview = preview.replace(/[<>""`]/g, '');
+            return `[${el.tagName}: "${safePreview}"]`;
+          }
+          return `<${el.componentName}>`;
+        })
+        .join(' ');
       text = `${text} ${elementSuffix}`;
     }
 

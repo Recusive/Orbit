@@ -456,6 +456,7 @@ class ChatMessageService {
       case 'browser:detected':
       case 'browser:navigated':
       case 'browser:element-selected':
+      case 'browser:element-enriched':
       case 'browser:loading':
       case 'browser:error':
       case 'browser:cleared':
