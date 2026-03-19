@@ -170,10 +170,11 @@ Use this to find the right file. Read the file directly — no links needed.
 - `System-Prompt.xml` — System prompt template
 - `canvas-rebuild-prompt.md` — Canvas rebuild prompt context
 
-## skills/ (2 files)
+## skills/ (3 files)
 
 - `skill-guide.md` — Definitive guide to building agent skills (compiled from Anthropic's official guide, AgentSkills spec, and skills-ref library)
 - `SKILLS-PUBLISHING-GUIDE.md` — How to create skills, publish to Recusive/Skills repo, CLI commands, skills.sh leaderboard mechanics, well-known endpoint hosting
+- `PLUGIN-PUBLISHING-GUIDE.md` — How to create Claude Code plugins, package skills into plugins, plugin.json manifest, marketplace distribution, Orbit-plugin reference
 
 ## orbitweb/ (1 file)
 
