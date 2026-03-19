@@ -324,6 +324,7 @@ git push origin vX.Y.Z
 | v0.0.3  | Feb 2026 | First successful end-to-end release. New signing key with password `build`.                                      |
 | v0.0.4  | Feb 2026 | Auto-update test. Verified v0.0.3 → v0.0.4 update works end-to-end.                                              |
 | v0.0.5  | Mar 2026 | Dependency bumps (lucide-react, @anthropic-ai/sdk, ESLint 10, Sentry, upload-artifact v7).                       |
+| v0.0.6  | Mar 2026 | Multi-engine support, Skills Marketplace, subagents, settings redesign, changelog, credential system.            |
 
 ---
 
