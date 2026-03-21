@@ -35,6 +35,7 @@ export {
   useSettingsOpen,
   useSettingsSection,
 } from './ui-store';
+export { useCanGoBack, useCanGoForward, useNavigationStore } from './navigation-store';
 
 export type {
   StoredConversationSummary,

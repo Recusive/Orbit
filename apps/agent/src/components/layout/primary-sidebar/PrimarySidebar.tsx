@@ -69,6 +69,7 @@ import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useOcActiveSessionId } from '@/stores/opencode';
+import { useCanGoBack, useCanGoForward, useNavigationStore } from '@/stores/ui';
 import {
   useUIStore,
   useSettingsOpen,
@@ -198,7 +199,6 @@ export const PrimarySidebar: FC = () => {
   // Use useShallow to prevent re-renders when unrelated store state changes
   const {
     toggleLeftSidebar,
-    setSettingsOpen,
     openSettings,
     toggleWorktreeExpanded,
     editingConversationId,
@@ -206,7 +206,6 @@ export const PrimarySidebar: FC = () => {
   } = useUIStore(
     useShallow((s) => ({
       toggleLeftSidebar: s.toggleLeftSidebar,
-      setSettingsOpen: s.setSettingsOpen,
       openSettings: s.openSettings,
       toggleWorktreeExpanded: s.toggleWorktreeExpanded,
       editingConversationId: s.editingConversationId,
@@ -235,6 +234,10 @@ export const PrimarySidebar: FC = () => {
 
   const updateStatus = useUpdateStore((s) => s.status);
   const updateDismissed = useUpdateStore((s) => s.toastDismissed);
+  const canGoBack = useCanGoBack();
+  const canGoForward = useCanGoForward();
+  const goBack = useNavigationStore((state) => state.goBack);
+  const goForward = useNavigationStore((state) => state.goForward);
 
   const globalActiveTab = useUIStore((s) => s.activeTab);
   const isEditorMode = globalActiveTab === 'editor';
@@ -386,20 +389,19 @@ export const PrimarySidebar: FC = () => {
             fallback={<SidebarToggleIcon expanded={true} />}
           />
         </button>
-        {/* Back / Forward navigation
-            TODO: Wire up full navigation history stack (session switches, tab changes, etc.).
-            Currently only the vault→sessions transition is handled. */}
+        {/* Back / Forward navigation */}
         <div className="flex items-center gap-0.5 ml-auto">
           <button
             aria-label="Go back"
-            className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
-            onClick={() => {
-              if (settingsOpen) {
-                setSettingsOpen(false);
-              } else if (vaultOpen) {
-                useUIStore.getState().setVaultOpen(false);
-              }
-            }}
+            title="Back (Ctrl+-)"
+            disabled={!canGoBack}
+            className={cn(
+              'h-7 w-7 flex items-center justify-center rounded-[9px] transition-transform duration-75',
+              canGoBack
+                ? 'text-sidebar-foreground hover:bg-lg-sidebar-hover hover:text-foreground active:scale-95'
+                : 'text-sidebar-foreground/40 cursor-default'
+            )}
+            onClick={goBack}
           >
             <SFSymbol
               name="arrow.left"
@@ -410,7 +412,15 @@ export const PrimarySidebar: FC = () => {
           </button>
           <button
             aria-label="Go forward"
-            className="h-7 w-7 flex items-center justify-center rounded-[9px] hover:bg-lg-sidebar-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
+            title="Forward (Ctrl+Shift+-)"
+            disabled={!canGoForward}
+            className={cn(
+              'h-7 w-7 flex items-center justify-center rounded-[9px] transition-transform duration-75',
+              canGoForward
+                ? 'text-sidebar-foreground hover:bg-lg-sidebar-hover hover:text-foreground active:scale-95'
+                : 'text-sidebar-foreground/40 cursor-default'
+            )}
+            onClick={goForward}
           >
             <SFSymbol
               name="arrow.right"

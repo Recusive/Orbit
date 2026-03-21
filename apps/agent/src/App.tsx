@@ -34,6 +34,7 @@ import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
+import { destroyNavigationTracker, initNavigationTracker } from '@/lib/navigation';
 import {
   CHAT_PANEL,
   CONTENT_CARD,
@@ -48,6 +49,7 @@ import { ThemeProvider } from '@/providers/theme-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useOnboardingStore } from '@/stores/onboarding/onboarding-store';
 import { useLaunchSequenceStore } from '@/stores/ui/launch-sequence-store';
+import { useNavigationStore } from '@/stores/ui/navigation-store';
 import {
   useHasWorkspace,
   useLeftSidebarWidth,
@@ -536,6 +538,7 @@ const App: FC = () => {
   // Auto-collapse sidebar when window becomes too narrow to fit all open panels.
   // Checks: sidebar + chat min + activity panel + actions bar + gaps > window width.
   const collapseLeftSidebar = useUIStore((s) => s.collapseLeftSidebar);
+  const clearNavigationHistory = useNavigationStore((state) => state.clearHistory);
   useEffect(() => {
     const handleResize = (): void => {
       const { leftSidebarWidth, reviewPanelOpen, reviewPanelWidth, rightSidebarOpen, activeTab } =
@@ -559,6 +562,19 @@ const App: FC = () => {
       window.removeEventListener('resize', handleResize);
     };
   }, [collapseLeftSidebar, hasWorkspace, isDemo]);
+
+  useEffect(() => {
+    if (!hasWorkspace) {
+      destroyNavigationTracker();
+      clearNavigationHistory();
+      return;
+    }
+
+    initNavigationTracker();
+    return (): void => {
+      destroyNavigationTracker();
+    };
+  }, [clearNavigationHistory, hasWorkspace]);
 
   // Activity panel slide wrapper — mirrors the sidebar's margin-slide pattern.
   // When closed, marginRight = -width slides the entire panel off the right edge

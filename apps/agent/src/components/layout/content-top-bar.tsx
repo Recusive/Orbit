@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 import { CONTENT_CARD, HEIGHTS } from '@/lib/utils/constants';
 import { getConversationUiBridge } from '@/services/conversations';
 import { useBranchDiffStats } from '@/stores/git/git-store';
+import { useCanGoBack, useCanGoForward, useNavigationStore } from '@/stores/ui';
 import {
   useUIStore,
   useWorkspaceName,
@@ -239,6 +240,10 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
   const vaultOpen = useVaultOpen();
 
   const isDemo = new URLSearchParams(window.location.search).get('demo') === 'true';
+  const canGoBack = useCanGoBack();
+  const canGoForward = useCanGoForward();
+  const goBack = useNavigationStore((state) => state.goBack);
+  const goForward = useNavigationStore((state) => state.goForward);
 
   /* ── Overflow-fade detection ─────────────────────────────────── */
   const leftSectionRef = useRef<HTMLDivElement>(null);
@@ -395,37 +400,60 @@ export const ContentTopBar: FC<ContentTopBarProps> = ({
                 <>
                   <div className="w-px h-3.5 bg-lg-separator shrink-0" />
                   {/* Back / Forward arrows — matches sidebar style */}
-                  <button
-                    data-tauri-drag-region={false}
-                    aria-label="Go back"
-                    tabIndex={sidebarOpen ? -1 : 0}
-                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
-                    onClick={() => {
-                      if (settingsOpen || vaultOpen) {
-                        closeSecondarySurface();
-                      }
-                    }}
-                  >
-                    <SFSymbol
-                      name="arrow.left"
-                      size={13}
-                      weight="semibold"
-                      fallback={<ArrowLeft className="h-3.5 w-3.5" />}
-                    />
-                  </button>
-                  <button
-                    data-tauri-drag-region={false}
-                    aria-label="Go forward"
-                    tabIndex={sidebarOpen ? -1 : 0}
-                    className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-lg-control-hover active:scale-95 transition-transform duration-75 text-sidebar-foreground hover:text-foreground"
-                  >
-                    <SFSymbol
-                      name="arrow.right"
-                      size={13}
-                      weight="semibold"
-                      fallback={<ArrowRight className="h-3.5 w-3.5" />}
-                    />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <button
+                          data-tauri-drag-region={false}
+                          aria-label="Go back"
+                          tabIndex={sidebarOpen ? -1 : 0}
+                          disabled={!canGoBack}
+                          onClick={goBack}
+                          className={cn(
+                            'h-7 w-7 flex items-center justify-center rounded-md transition-transform duration-75',
+                            canGoBack
+                              ? 'text-sidebar-foreground hover:bg-lg-control-hover hover:text-foreground active:scale-95'
+                              : 'text-sidebar-foreground/40 cursor-default'
+                          )}
+                        >
+                          <SFSymbol
+                            name="arrow.left"
+                            size={13}
+                            weight="semibold"
+                            fallback={<ArrowLeft className="h-3.5 w-3.5" />}
+                          />
+                        </button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Back (Ctrl+-)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex">
+                        <button
+                          data-tauri-drag-region={false}
+                          aria-label="Go forward"
+                          tabIndex={sidebarOpen ? -1 : 0}
+                          disabled={!canGoForward}
+                          onClick={goForward}
+                          className={cn(
+                            'h-7 w-7 flex items-center justify-center rounded-md transition-transform duration-75',
+                            canGoForward
+                              ? 'text-sidebar-foreground hover:bg-lg-control-hover hover:text-foreground active:scale-95'
+                              : 'text-sidebar-foreground/40 cursor-default'
+                          )}
+                        >
+                          <SFSymbol
+                            name="arrow.right"
+                            size={13}
+                            weight="semibold"
+                            fallback={<ArrowRight className="h-3.5 w-3.5" />}
+                          />
+                        </button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">Forward (Ctrl+Shift+-)</TooltipContent>
+                  </Tooltip>
                   {/* New session */}
                   <button
                     data-tauri-drag-region={false}
