@@ -115,7 +115,7 @@ describe('apply-snapshot', () => {
 
     const uiState = useUIStore.getState();
     expect(uiState.activeTab).toBe('editor');
-    expect(uiState.leftSidebarWidth).toBe(0);
+    // leftSidebarWidth is NOT restored — sidebar is a layout preference, not navigation
     expect(uiState.reviewPanelOpen).toBe(true);
     expect(uiState.bottomPanelOpen).toBe(true);
     expect(uiState.bottomPanelTab).toBe('problems');
