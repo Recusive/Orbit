@@ -112,7 +112,7 @@ export const OcModelSelector: FC = () => {
             className="bg-transparent"
           >
             {/* Search bar */}
-            <div className="flex items-center px-1.5 pt-1.5 pb-0.5">
+            <div className="flex items-center px-1 pt-1 pb-0.5">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
                 <input
@@ -142,7 +142,7 @@ export const OcModelSelector: FC = () => {
               className="max-h-52 overflow-y-auto overscroll-y-contain pb-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)]"
             >
               {/* Custom heading with filter toggle */}
-              <div className="flex items-center justify-between px-4 pt-2 pb-0">
+              <div className="flex items-center justify-between px-3 pt-2 pb-0">
                 <span className="text-xs font-medium text-muted-foreground uppercase tracking-widest">
                   Models
                 </span>
@@ -180,7 +180,7 @@ export const OcModelSelector: FC = () => {
                             toggleModelVisibility(providerId, model.id);
                           }
                         }}
-                        className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
+                        className="gap-1.5 min-w-0 text-foreground py-1.5 px-1.5 rounded-[9px]"
                       >
                         <div
                           className={cn(
@@ -213,7 +213,7 @@ export const OcModelSelector: FC = () => {
                         onSelect={() => {
                           handleModelSelect(model.id);
                         }}
-                        className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
+                        className="gap-1.5 min-w-0 text-foreground py-1.5 px-1.5 rounded-[9px]"
                       >
                         <span className="truncate text-[12px]">{model.name}</span>
                         {modelId === model.id ? (
@@ -229,7 +229,7 @@ export const OcModelSelector: FC = () => {
             {/* Sticky footer — outside scroll container */}
             <div className="mx-2.5 h-px bg-foreground/5" />
             <div
-              className="p-1"
+              className="px-1 pt-1 pb-1"
               onMouseEnter={() => {
                 setCmdkValue('');
               }}
@@ -237,7 +237,7 @@ export const OcModelSelector: FC = () => {
               <button
                 type="button"
                 onClick={handleConnectProvider}
-                className="group relative flex w-full cursor-default select-none items-center gap-1.5 min-w-0 rounded-[9px] px-2.5 py-1.5 text-foreground hover:bg-foreground/8"
+                className="group relative flex w-full cursor-default select-none items-center gap-1.5 min-w-0 rounded-[9px] px-1.5 py-1.5 text-foreground hover:bg-foreground/8"
               >
                 <IconPlusLarge className="h-3.5 w-3.5 shrink-0" />
                 <span className="text-[12px]">Connect a provider</span>

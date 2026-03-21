@@ -6,7 +6,6 @@ import type { FC } from 'react';
 
 import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useSmoothScroll } from '@/hooks/ui';
 import { cn, TRANSITION_CLASSES } from '@/lib/utils';
 import { useOcProviderStore } from '@/stores/opencode';
 
@@ -20,7 +19,6 @@ function format(value: string): string {
 
 export const OcThinkingSelector: FC = () => {
   const [open, setOpen] = useState(false);
-  const smoothScrollRef = useSmoothScroll(0.08);
 
   const providers = useOcProviderStore((state) => state.providers);
   const providerId = useOcProviderStore((state) => state.selectedProviderId);
@@ -91,17 +89,14 @@ export const OcThinkingSelector: FC = () => {
         }}
       >
         <Command shouldFilter={false} disablePointerSelection className="bg-transparent">
-          <CommandList
-            ref={smoothScrollRef}
-            className="max-h-52 overflow-y-auto overscroll-y-contain pb-0 [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)] [mask-image:linear-gradient(to_bottom,transparent,black_6px,black_calc(100%-6px),transparent)]"
-          >
-            <CommandGroup heading="Thinking level" className="[&_[cmdk-group-heading]]:px-2.5">
+          <CommandList className="pb-0">
+            <CommandGroup heading="Thinking level" className="[&_[cmdk-group-heading]]:px-1">
               <CommandItem
                 value="default"
                 onSelect={() => {
                   handleSelect('default');
                 }}
-                className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
+                className="gap-1.5 min-w-0 text-foreground py-1.5 px-1 rounded-[9px]"
               >
                 <IconImagine size={12} className="shrink-0" />
                 <span className="truncate text-md">Default</span>
@@ -116,7 +111,7 @@ export const OcThinkingSelector: FC = () => {
                   onSelect={() => {
                     handleSelect(variant);
                   }}
-                  className="gap-1.5 min-w-0 text-foreground py-1.5 px-2.5 rounded-[9px]"
+                  className="gap-1.5 min-w-0 text-foreground py-1.5 px-1 rounded-[9px]"
                 >
                   <IconImagine size={12} className="shrink-0" />
                   <span className="truncate text-md">{format(variant)}</span>
