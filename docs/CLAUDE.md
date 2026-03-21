@@ -4,22 +4,23 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## Folder Guide
 
-| Folder                  | What's in it                        | When to look                     |
-| ----------------------- | ----------------------------------- | -------------------------------- |
-| `decisions/`            | ADRs, why we chose X over Y         | Understanding past trade-offs    |
-| `architecture/`         | System design, technical decisions  | How something works internally   |
-| `design/`               | UI/UX guidelines, visual systems    | Typography, icons, themes        |
-| `development/`          | Build workflow, CI/CD, debugging    | Setup, builds, fixing issues     |
-| `plans/`                | Feature proposals, refactor plans   | What's been planned or proposed  |
-| `plans/tracked/todo/`   | Plans queued for implementation     | What needs to be built next      |
-| `plans/tracked/done/`   | Completed plans                     | What's already been shipped      |
-| `plans/others/<topic>/` | Uncategorized plans by topic        | Plans with unknown status        |
-| `quality/`              | Linting, audits, health metrics     | Code standards, audit results    |
-| `reference/`            | SDK docs, prompts, external guides  | API references, prompt templates |
-| `specs/`                | Behavior specs, acceptance criteria | What "done" looks like           |
-| `skills/`               | Agent skill creation and publishing | Creating/publishing skills       |
-| `changelog/`            | Release notes per version           | What shipped in each version     |
-| `orbitweb/`             | Marketing site context              | Orbitweb-specific (read-only)    |
+| Folder                  | What's in it                         | When to look                     |
+| ----------------------- | ------------------------------------ | -------------------------------- |
+| `decisions/`            | ADRs, why we chose X over Y          | Understanding past trade-offs    |
+| `architecture/`         | System design, technical decisions   | How something works internally   |
+| `design/`               | UI/UX guidelines, visual systems     | Typography, icons, themes        |
+| `development/`          | Build workflow, CI/CD, debugging     | Setup, builds, fixing issues     |
+| `plans/`                | Feature proposals, refactor plans    | What's been planned or proposed  |
+| `plans/tracked/todo/`   | Plans queued for implementation      | What needs to be built next      |
+| `plans/tracked/done/`   | Completed plans                      | What's already been shipped      |
+| `plans/others/<topic>/` | Uncategorized plans by topic         | Plans with unknown status        |
+| `strategy/`             | Product roadmap, vision, positioning | Where the product is headed      |
+| `quality/`              | Linting, audits, health metrics      | Code standards, audit results    |
+| `reference/`            | SDK docs, prompts, external guides   | API references, prompt templates |
+| `specs/`                | Behavior specs, acceptance criteria  | What "done" looks like           |
+| `skills/`               | Agent skill creation and publishing  | Creating/publishing skills       |
+| `changelog/`            | Release notes per version            | What shipped in each version     |
+| `orbitweb/`             | Marketing site context               | Orbitweb-specific (read-only)    |
 
 ## decisions/ (6 files)
 
@@ -180,6 +181,10 @@ Use this to find the right file. Read the file directly — no links needed.
 ## orbitweb/ (1 file)
 
 - `ORBITWEB-CONTEXT.md` — Orbitweb project context (read-only)
+
+## strategy/ (1 file)
+
+- `ROADMAP.md` — Product roadmap: three-product vision (CLI, Desktop, Terminal), Codex engine migration phases, feature roadmap, competitive positioning
 
 ## Conventions
 
