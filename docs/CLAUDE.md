@@ -90,8 +90,9 @@ Use this to find the right file. Read the file directly — no links needed.
   - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
   - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (38 entries)
+## plans/tracked/done/ (39 entries)
 
+- `GLOBAL-NAVIGATION-HISTORY.md` — Global back/forward navigation history (browser-like history across all modes, Zustand subscriptions, dual-backend support, rich tab snapshots)
 - `fix-works-then-stops-credential-deletion.md` — Fix shell env API key deletion by OAuth (protect `ANTHROPIC_API_KEY` from `startSession()` wipe when OAuth temporarily wins)
 - `production-ready-credentials.md` — Production-ready credential system + startup health checks (connect Settings UI keys to agent-bridge, AES-256-GCM → sidecar flow)
 - `file-based-changelog-system.md` — File-based changelog system (auto-discovery via import.meta.glob, hybrid bundled + remote notes, JSX renderer)
