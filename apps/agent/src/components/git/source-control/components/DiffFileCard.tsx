@@ -10,18 +10,17 @@ import { parseDiffFromFile } from '@pierre/diffs';
 import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
 import { AlertCircle, ChevronDown, Minus, Plus, X } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { FileItem } from '../types';
-import type { FileDiff } from '@/lib/api';
+import type { DiffScope, FileDiff, FileDiffStats } from '@/lib/api';
 import type { FileContents, FileDiffMetadata } from '@pierre/diffs/react';
 import type { FC } from 'react';
 
 import { DiffStat, useIsDarkMode } from '@/components/chat/tools/shared';
 import { FileIcon } from '@/components/files';
-import { readFile, readFileBytes } from '@/lib/api/files';
-import { gitFileAtRef } from '@/lib/api/git';
-import { cn, GIT_STATUS_STYLES } from '@/lib/utils';
+import { gitFileDiffContent, gitFileDiffStats } from '@/lib/api/git';
+import { cn, diffScheduler, GIT_STATUS_STYLES } from '@/lib/utils';
 import {
   PIERRE_DIFF_STYLE,
   PIERRE_DIFF_UNSAFE_CSS,
@@ -36,6 +35,7 @@ import { useGitStore } from '@/stores/git/git-store';
 interface DiffFileCardProps {
   readonly file: FileItem;
   readonly diff: FileDiff | undefined;
+  readonly deferredDiffMode: boolean;
   readonly isStaged: boolean;
   readonly isLoading: boolean;
   readonly onAction: (path: string) => Promise<void>;
@@ -83,23 +83,6 @@ function countPierreChanges(fileDiff: FileDiffMetadata): { additions: number; de
   return { additions, deletions };
 }
 
-/** Heuristic binary detection for raw bytes. */
-function isLikelyBinaryBytes(bytes: readonly number[]): boolean {
-  if (bytes.length === 0) return false;
-
-  const sample = bytes.slice(0, 8192);
-  let suspicious = 0;
-
-  for (const byte of sample) {
-    if (byte === 0) return true;
-    if (byte < 7 || (byte > 14 && byte < 32) || byte === 127) {
-      suspicious++;
-    }
-  }
-
-  return suspicious / sample.length > 0.3;
-}
-
 // ---------------------------------------------------------------------------
 // DiffFileCard
 // ---------------------------------------------------------------------------
@@ -107,6 +90,7 @@ function isLikelyBinaryBytes(bytes: readonly number[]): boolean {
 export const DiffFileCard: FC<DiffFileCardProps> = ({
   file,
   diff,
+  deferredDiffMode,
   isStaged,
   isLoading,
   onAction,
@@ -118,22 +102,19 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   const [isMounted, setIsMounted] = useState(false);
   const isDarkMode = useIsDarkMode();
   const repoPath = useGitStore((s) => s.repoPath);
+  const statusRevision = useGitStore((s) => s.statusRevision);
 
   const fileName = getFileName(file.path);
   const fileDir = getFileDirectory(file.path);
   const hasDiff = diff !== undefined && diff.hunks.length > 0;
   const isBinary = diff?.isBinary === true;
+  const scope: DiffScope = isStaged ? 'staged' : 'unstaged';
 
   // Prefetch file content, parse diff, AND preload Shiki highlighting on hover.
   // By the time the user clicks, the fully-highlighted HTML is ready — expand is instant.
   interface PreloadedDiff {
     fileDiff: FileDiffMetadata;
     prerenderedHTML: string;
-    additions: number;
-    deletions: number;
-  }
-  interface BaseDiffData {
-    fileDiff: FileDiffMetadata;
     additions: number;
     deletions: number;
   }
@@ -145,12 +126,12 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     deletions: number;
   } | null>(null);
   const [preloadError, setPreloadError] = useState<string | null>(null);
-  const prefetchRef = useRef<{ promise: Promise<PreloadedDiff | null>; key: string } | null>(null);
-  const baseDiffRef = useRef<{ promise: Promise<BaseDiffData | null>; key: string } | null>(null);
+  const preloadRef = useRef<{ key: string; promise: Promise<PreloadedDiff | null> } | null>(null);
   const cancelScheduledRef = useRef<(() => void) | null>(null);
 
   const showBinary = isBinary || isFallbackBinary;
   const canExpand = hasDiff || showBinary || diff === undefined;
+  const needsSingleFileFallback = diff === undefined && !showBinary;
 
   const { additions, deletions } = useMemo(() => {
     if (diff) return countChanges(diff);
@@ -171,8 +152,11 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     return `${diff.path}:${diff.oldPath ?? ''}:${diff.isBinary ? '1' : '0'}:${hunkSignature}`;
   }, [diff]);
 
-  /** Build a cache key from the inputs that affect fetched content and backend diff state. */
-  const prefetchKey = `${file.path}:${isStaged ? 'staged' : 'unstaged'}:${themeType}:${diffKey}`;
+  const fallbackRevision = statusRevision;
+  const displayStateKey = `${file.path}:${scope}:${themeType}:${diffKey}`;
+  const requestKey = `${displayStateKey}:${String(fallbackRevision)}`;
+  const latestRequestKeyRef = useRef(requestKey);
+  const lastStatsRequestKeyRef = useRef<string | null>(null);
   const pierreOptions = useMemo(
     () => ({
       theme: PIERRE_THEME,
@@ -187,87 +171,71 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     [themeType]
   );
 
-  /** Fetch file content and compute diff metadata/counts. */
-  const fetchBaseDiff = (): Promise<BaseDiffData | null> => {
-    if (baseDiffRef.current?.key === prefetchKey) return baseDiffRef.current.promise;
-    if (showBinary || !repoPath) return Promise.resolve(null);
+  const handleStatsResult = useCallback((stats: FileDiffStats | null): void => {
+    if (!stats) {
+      return;
+    }
 
-    const absolutePath = `${repoPath}/${file.path}`;
-    const oldPath = file.oldPath ?? file.path;
-    const oldRef = isStaged ? 'HEAD' : 'INDEX';
+    if (stats.isBinary) {
+      setIsFallbackBinary(true);
+      setPrefetchedCounts(null);
+      return;
+    }
 
-    const loadNewContent = async (): Promise<{ content: string; binary: boolean }> => {
-      if (isStaged) {
-        const content = await gitFileAtRef(repoPath, file.path, 'INDEX').catch(() => '');
-        const bytes = await readFileBytes(absolutePath).catch(() => null);
-        if (bytes && isLikelyBinaryBytes(bytes)) {
-          return { content: '', binary: true };
-        }
-        return { content, binary: false };
+    setIsFallbackBinary(false);
+    // Value-based dedup: skip state update if stats haven't changed (prevents re-render blink)
+    setPrefetchedCounts((prev) => {
+      if (prev?.additions === stats.additions && prev.deletions === stats.deletions) {
+        return prev; // Same reference = no re-render
       }
+      return { additions: stats.additions, deletions: stats.deletions };
+    });
+  }, []);
 
-      try {
-        const content = await readFile(absolutePath);
-        if (content.includes('\u0000')) {
-          return { content: '', binary: true };
-        }
-        return { content, binary: false };
-      } catch {
-        const bytes = await readFileBytes(absolutePath).catch(() => null);
-        if (bytes && isLikelyBinaryBytes(bytes)) {
-          return { content: '', binary: true };
-        }
-        return { content: '', binary: false };
-      }
-    };
-
-    const promise = Promise.all([
-      gitFileAtRef(repoPath, oldPath, oldRef).catch(() => ''),
-      loadNewContent(),
-    ])
-      .then(([oldContent, newFile]): BaseDiffData | null => {
-        if (newFile.binary) {
-          setIsFallbackBinary(true);
-          return null;
-        }
-
-        setIsFallbackBinary(false);
-        const oldFile: FileContents = { name: file.path, contents: oldContent };
-        const newFileContent: FileContents = { name: file.path, contents: newFile.content };
-        const fileDiff = parseDiffFromFile(oldFile, newFileContent);
-        const counts = countPierreChanges(fileDiff);
-        return {
-          fileDiff,
-          additions: counts.additions,
-          deletions: counts.deletions,
-        };
-      })
-      .catch(() => null);
-
-    baseDiffRef.current = { promise, key: prefetchKey };
-    return promise;
-  };
+  latestRequestKeyRef.current = requestKey;
 
   /** Fetch file content → parse diff → preload Shiki highlighting. */
-  const fetchAndPreload = (): Promise<PreloadedDiff | null> => {
-    if (prefetchRef.current?.key === prefetchKey) return prefetchRef.current.promise;
-    if (showBinary) return Promise.resolve(null);
+  const fetchAndPreload = useCallback((): Promise<PreloadedDiff | null> => {
+    if (preloadRef.current?.key === requestKey) {
+      return preloadRef.current.promise;
+    }
+    if (showBinary) {
+      return Promise.resolve(null);
+    }
     if (!repoPath) {
       setPreloadError('Repository path unavailable for this diff.');
       return Promise.resolve(null);
     }
 
     setPreloadError(null);
-    const promise = fetchBaseDiff()
-      .then(async (base): Promise<PreloadedDiff | null> => {
-        if (!base) return null;
-        // Preload Shiki highlighting — this is the expensive work
-        const result = await preloadFileDiff({ fileDiff: base.fileDiff, options: pierreOptions });
+    const promise = diffScheduler
+      .requestContent(requestKey, () =>
+        gitFileDiffContent(repoPath, file.path, scope, file.oldPath ?? undefined)
+      )
+      .then(async (content): Promise<PreloadedDiff | null> => {
+        if (!content || latestRequestKeyRef.current !== requestKey) {
+          return null;
+        }
+
+        if (content.isBinary) {
+          setIsFallbackBinary(true);
+          return null;
+        }
+
+        setIsFallbackBinary(false);
+        const oldFile: FileContents = { name: file.path, contents: content.oldContent };
+        const newFile: FileContents = { name: file.path, contents: content.newContent };
+        const fileDiff = parseDiffFromFile(oldFile, newFile);
+        const counts = countPierreChanges(fileDiff);
+        const result = await preloadFileDiff({ fileDiff, options: pierreOptions });
+        if (latestRequestKeyRef.current !== requestKey) {
+          return null;
+        }
         return {
           fileDiff: result.fileDiff,
           prerenderedHTML: result.prerenderedHTML,
-          additions: base.additions,
-          deletions: base.deletions,
+          additions: counts.additions,
+          deletions: counts.deletions,
         };
       })
       .catch(() => {
@@ -275,9 +243,9 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
         return null;
       });
 
-    prefetchRef.current = { promise, key: prefetchKey };
+    preloadRef.current = { key: requestKey, promise };
     return promise;
-  };
+  }, [file.oldPath, file.path, pierreOptions, repoPath, requestKey, scope, showBinary]);
 
   /** Start prefetching + preloading on hover — data is ready by the time user clicks. */
   const handleMouseEnter = (): void => {
@@ -302,7 +270,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     if (!isExpanded) {
       setPreloaded(null);
       setPreloadError(null);
-      prefetchRef.current = null;
+      preloadRef.current = null;
       return;
     }
 
@@ -319,39 +287,67 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     return (): void => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchAndPreload is stable via ref
-  }, [isExpanded, prefetchKey]);
+  }, [fetchAndPreload, isExpanded, requestKey]);
 
   // Populate header diff stats for cards missing bulk diff, without requiring hover.
   useEffect(() => {
-    if (diff || prefetchedCounts || showBinary || !repoPath) return;
+    if (!needsSingleFileFallback || !repoPath || lastStatsRequestKeyRef.current === requestKey) {
+      return;
+    }
     let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void fetchBaseDiff().then((base) => {
-        if (cancelled || !base) return;
-        setPrefetchedCounts({ additions: base.additions, deletions: base.deletions });
-      });
-    }, 220);
+
+    const requestStats = (): void => {
+      void diffScheduler
+        .requestStats(requestKey, () =>
+          gitFileDiffStats(repoPath, file.path, scope, file.oldPath ?? undefined)
+        )
+        .then((stats) => {
+          if (cancelled) return;
+          lastStatsRequestKeyRef.current = requestKey;
+          handleStatsResult(stats);
+        })
+        .catch(() => undefined);
+    };
+
+    const timer = deferredDiffMode ? window.setTimeout(requestStats, 220) : null;
+    if (!deferredDiffMode) {
+      requestStats();
+    }
+
     return (): void => {
       cancelled = true;
-      window.clearTimeout(timer);
+      if (timer !== null) {
+        window.clearTimeout(timer);
+      }
+      diffScheduler.cancel(requestKey);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchBaseDiff is keyed by prefetchKey
-  }, [diff, prefetchedCounts, showBinary, repoPath, prefetchKey]);
+  }, [
+    deferredDiffMode,
+    file.oldPath,
+    file.path,
+    handleStatsResult,
+    needsSingleFileFallback,
+    repoPath,
+    requestKey,
+    scope,
+  ]);
 
   useEffect(() => {
+    lastStatsRequestKeyRef.current = null;
+    setPreloaded(null);
+    setPreloadError(null);
     setPrefetchedCounts(null);
     setIsFallbackBinary(false);
-    baseDiffRef.current = null;
-    prefetchRef.current = null;
-  }, [prefetchKey]);
+    preloadRef.current = null;
+  }, [displayStateKey]);
 
   useEffect(() => {
     return (): void => {
       cancelScheduledRef.current?.();
       cancelScheduledRef.current = null;
+      diffScheduler.cancel(requestKey);
     };
-  }, []);
+  }, [requestKey]);
 
   const style = GIT_STATUS_STYLES[file.displayStatus];
 
@@ -393,7 +389,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     e.stopPropagation();
     setPreloaded(null);
     setPreloadError(null);
-    prefetchRef.current = null;
+    preloadRef.current = null;
     void fetchAndPreload().then((result) => {
       setPreloaded(result);
       if (result) {

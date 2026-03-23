@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -13,9 +14,12 @@ use tokio::process::Command;
 use tokio::time::timeout;
 
 use git2::{
-    BlameOptions, Delta, DiffOptions, IndexAddOption, Repository, StatusOptions, StatusShow,
+    BlameOptions, Delta, DiffFindOptions, DiffOptions, IndexAddOption, Repository, StatusOptions,
+    StatusShow,
 };
-use orbit_core::{Error, FileStatus, GitBranch, GitCommit, GitStatus, Result, StatusEntry};
+use orbit_core::{
+    Error, FileStatus, GitBranch, GitCommit, GitStatus, GitStatusResponse, Result, StatusEntry,
+};
 use serde::{Deserialize, Serialize};
 use tracing::{debug, error, info};
 
@@ -115,6 +119,41 @@ pub struct BranchDiffStats {
     pub deletions: usize,
     /// Number of files changed.
     pub files_changed: usize,
+}
+
+/// Summary counts for a single file diff.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileDiffStats {
+    /// Number of inserted lines.
+    pub additions: usize,
+    /// Number of deleted lines.
+    pub deletions: usize,
+    /// Whether the diff represents a binary file.
+    pub is_binary: bool,
+}
+
+/// Full old/new text content for a single file diff.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SingleFileContent {
+    /// Content at the old side of the diff.
+    pub old_content: String,
+    /// Content at the new side of the diff.
+    pub new_content: String,
+    /// Whether either side is binary.
+    pub is_binary: bool,
+}
+
+/// Scope for a single-file diff request.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum DiffScope {
+    /// Compare HEAD/tree to index.
+    Staged,
+    /// Compare index to working tree.
+    Unstaged,
 }
 
 /// Information about a git worktree.
@@ -340,6 +379,83 @@ pub fn status(path: &Path) -> Result<GitStatus> {
     Ok(result)
 }
 
+const FNV_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+fn mix_bytes(hash: &mut u64, bytes: &[u8]) {
+    for byte in bytes {
+        *hash ^= u64::from(*byte);
+        *hash = hash.wrapping_mul(FNV_PRIME);
+    }
+}
+
+fn mix_delimiter(hash: &mut u64) {
+    mix_bytes(hash, &[0xff]);
+}
+
+fn mix_str(hash: &mut u64, value: &str) {
+    mix_bytes(hash, value.as_bytes());
+    mix_delimiter(hash);
+}
+
+fn mix_u64(hash: &mut u64, value: u64) {
+    mix_bytes(hash, &value.to_le_bytes());
+    mix_delimiter(hash);
+}
+
+const fn file_status_tag(status: FileStatus) -> &'static str {
+    match status {
+        FileStatus::Added => "added",
+        FileStatus::Modified => "modified",
+        FileStatus::Deleted => "deleted",
+        FileStatus::Renamed => "renamed",
+        FileStatus::Copied => "copied",
+        FileStatus::Untracked => "untracked",
+        FileStatus::Conflicted => "conflicted",
+        FileStatus::TypeChange => "typechange",
+        _ => "unknown",
+    }
+}
+
+fn mix_status_entries(hash: &mut u64, entries: &[StatusEntry]) {
+    mix_u64(hash, entries.len() as u64);
+    for entry in entries {
+        mix_str(hash, &entry.path);
+        mix_str(hash, file_status_tag(entry.status));
+        mix_str(hash, entry.old_path.as_deref().unwrap_or(""));
+        mix_u64(hash, u64::from(entry.similarity.unwrap_or(0)));
+    }
+}
+
+/// Compute a stable fingerprint for a git status payload.
+#[must_use]
+pub fn compute_status_fingerprint(status: &GitStatus) -> String {
+    let mut hash = FNV_OFFSET_BASIS;
+
+    mix_str(&mut hash, &status.branch);
+    mix_str(&mut hash, status.upstream.as_deref().unwrap_or(""));
+    mix_u64(&mut hash, u64::from(status.ahead));
+    mix_u64(&mut hash, u64::from(status.behind));
+    mix_status_entries(&mut hash, &status.staged);
+    mix_status_entries(&mut hash, &status.modified);
+    mix_status_entries(&mut hash, &status.untracked);
+    mix_status_entries(&mut hash, &status.conflicted);
+
+    format!("{hash:016x}")
+}
+
+/// Return a full status response with a backend-computed fingerprint.
+pub fn status_response(path: &Path) -> Result<GitStatusResponse> {
+    let status = status(path)?;
+    let fingerprint = compute_status_fingerprint(&status);
+
+    Ok(GitStatusResponse {
+        changed: true,
+        fingerprint,
+        status: Some(status),
+    })
+}
+
 /// Extract rename info from a status entry.
 ///
 /// Note: The git2 crate doesn't expose similarity scores directly,
@@ -553,6 +669,187 @@ pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
     parse_diff(&diff)
 }
 
+fn to_repo_relative_path<'a>(repo_path: &Path, file: &'a Path) -> &'a Path {
+    if file.is_absolute() {
+        file.strip_prefix(repo_path).unwrap_or(file)
+    } else {
+        file
+    }
+}
+
+fn configure_single_file_diff_options(
+    opts: &mut DiffOptions,
+    file: &Path,
+    scope: DiffScope,
+    old_path: Option<&Path>,
+) {
+    let _self = opts.pathspec(file);
+    if let Some(old_path) = old_path.filter(|old_path| *old_path != file) {
+        let _self = opts.pathspec(old_path);
+    }
+
+    if matches!(scope, DiffScope::Unstaged) {
+        let _self = opts
+            .include_untracked(true)
+            .show_untracked_content(true)
+            .recurse_untracked_dirs(true);
+    }
+}
+
+fn build_single_file_diff<'repo>(
+    repo: &'repo Repository,
+    repo_path: &Path,
+    file: &Path,
+    scope: DiffScope,
+    old_path: Option<&Path>,
+) -> Result<git2::Diff<'repo>> {
+    let relative_file = to_repo_relative_path(repo_path, file);
+    let relative_old_path = old_path.map(|path| to_repo_relative_path(repo_path, path));
+    let mut opts = DiffOptions::new();
+    configure_single_file_diff_options(&mut opts, relative_file, scope, relative_old_path);
+
+    let mut diff = match scope {
+        DiffScope::Staged => {
+            let head_tree = repo.head().and_then(|head| head.peel_to_tree()).ok();
+            repo.diff_tree_to_index(head_tree.as_ref(), None, Some(&mut opts))
+                .map_err(|e| Error::Git(format!("Failed to get staged diff: {e}")))?
+        },
+        DiffScope::Unstaged => repo
+            .diff_index_to_workdir(None, Some(&mut opts))
+            .map_err(|e| Error::Git(format!("Failed to get diff: {e}")))?,
+    };
+
+    let mut find_opts = DiffFindOptions::new();
+    diff.find_similar(Some(&mut find_opts))
+        .map_err(|e| Error::Git(format!("Failed to detect renames: {e}")))?;
+
+    Ok(diff)
+}
+
+#[derive(Debug, Clone)]
+struct SingleFileDelta {
+    status: Delta,
+    old_path: Option<PathBuf>,
+    new_path: Option<PathBuf>,
+    is_binary: bool,
+}
+
+fn first_single_file_delta(diff: &git2::Diff<'_>) -> Option<SingleFileDelta> {
+    diff.deltas().next().map(|delta| SingleFileDelta {
+        status: delta.status(),
+        old_path: delta.old_file().path().map(Path::to_path_buf),
+        new_path: delta.new_file().path().map(Path::to_path_buf),
+        is_binary: delta.flags().is_binary(),
+    })
+}
+
+#[derive(Debug, Clone)]
+struct TextContent {
+    content: String,
+    is_binary: bool,
+}
+
+fn decode_text_content(bytes: Vec<u8>, path_label: &str) -> Result<TextContent> {
+    if bytes.contains(&0) {
+        return Ok(TextContent {
+            content: String::new(),
+            is_binary: true,
+        });
+    }
+
+    let content = String::from_utf8(bytes)
+        .map_err(|e| Error::Git(format!("File {path_label} is not valid UTF-8: {e}")))?;
+
+    Ok(TextContent {
+        content,
+        is_binary: false,
+    })
+}
+
+fn read_text_at_ref(
+    repo: &Repository,
+    repo_path: &Path,
+    file: &Path,
+    git_ref: &str,
+) -> Result<TextContent> {
+    let relative = to_repo_relative_path(repo_path, file);
+    let relative_str = relative.to_string_lossy();
+
+    let blob_id = if git_ref == "INDEX" {
+        let index = repo
+            .index()
+            .map_err(|e| Error::Git(format!("Failed to read index: {e}")))?;
+        match index.get_path(relative, 0) {
+            Some(entry) => entry.id,
+            None => {
+                return Ok(TextContent {
+                    content: String::new(),
+                    is_binary: false,
+                });
+            },
+        }
+    } else {
+        let spec = format!("{git_ref}:{relative_str}");
+        match repo.revparse_single(&spec) {
+            Ok(obj) => obj.id(),
+            Err(_) => {
+                return Ok(TextContent {
+                    content: String::new(),
+                    is_binary: false,
+                });
+            },
+        }
+    };
+
+    let blob = repo
+        .find_blob(blob_id)
+        .map_err(|e| Error::Git(format!("Failed to read blob for {relative_str}: {e}")))?;
+
+    if blob.is_binary() {
+        return Ok(TextContent {
+            content: String::new(),
+            is_binary: true,
+        });
+    }
+
+    decode_text_content(blob.content().to_vec(), &relative_str)
+}
+
+fn read_worktree_text(repo_path: &Path, file: &Path) -> Result<TextContent> {
+    let absolute_path = if file.is_absolute() {
+        file.to_path_buf()
+    } else {
+        repo_path.join(file)
+    };
+
+    match fs::symlink_metadata(&absolute_path) {
+        Ok(metadata) if metadata.file_type().is_symlink() => {
+            let target = fs::read_link(&absolute_path).map_err(Error::Io)?;
+            return Ok(TextContent {
+                content: target.to_string_lossy().into_owned(),
+                is_binary: false,
+            });
+        },
+        Ok(_) => {},
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            return Ok(TextContent {
+                content: String::new(),
+                is_binary: false,
+            });
+        },
+        Err(error) => return Err(Error::Io(error)),
+    }
+
+    match fs::read(&absolute_path) {
+        Ok(bytes) => decode_text_content(bytes, &absolute_path.to_string_lossy()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(TextContent {
+            content: String::new(),
+            is_binary: false,
+        }),
+        Err(error) => Err(Error::Io(error)),
+    }
+}
+
 /// Read a file's content at a given git ref.
 ///
 /// `git_ref` can be:
@@ -566,43 +863,115 @@ pub fn get_staged_diff(path: &Path) -> Result<Vec<FileDiff>> {
 /// Returns an error if the repository cannot be opened.
 pub fn get_file_at_ref(repo_path: &Path, file: &Path, git_ref: &str) -> Result<String> {
     let repo = open(repo_path)?;
+    Ok(read_text_at_ref(&repo, repo_path, file, git_ref)?.content)
+}
 
-    let relative = if file.is_absolute() {
-        file.strip_prefix(repo_path).unwrap_or(file)
-    } else {
-        file
-    };
+/// Get summary stats for a single file diff without materializing full diff lines.
+pub fn get_single_file_diff_stats(
+    repo_path: &Path,
+    file: &str,
+    scope: DiffScope,
+    old_path: Option<&str>,
+) -> Result<FileDiffStats> {
+    let repo = open(repo_path)?;
+    let relative_file = Path::new(file);
+    let relative_old_path = old_path.map(Path::new);
+    let diff = build_single_file_diff(&repo, repo_path, relative_file, scope, relative_old_path)?;
+    let stats = diff
+        .stats()
+        .map_err(|e| Error::Git(format!("Failed to get diff stats: {e}")))?;
+    let is_binary = diff.deltas().any(|delta| delta.flags().is_binary());
 
-    let relative_str = relative.to_string_lossy();
+    Ok(FileDiffStats {
+        additions: stats.insertions(),
+        deletions: stats.deletions(),
+        is_binary,
+    })
+}
 
-    let blob_id = if git_ref == "INDEX" {
-        // Read from the git index (staging area)
-        let index = repo
-            .index()
-            .map_err(|e| Error::Git(format!("Failed to read index: {e}")))?;
-        match index.get_path(relative, 0) {
-            Some(entry) => entry.id,
-            None => return Ok(String::new()), // not in index
-        }
-    } else {
-        // Read from a commit tree (HEAD, HEAD~1, etc.)
-        let spec = format!("{git_ref}:{relative_str}");
-        match repo.revparse_single(&spec) {
-            Ok(obj) => obj.id(),
-            Err(_) => return Ok(String::new()), // not in tree
-        }
-    };
+/// Get the full old/new text content for a single file diff.
+pub fn get_single_file_content(
+    repo_path: &Path,
+    file: &str,
+    scope: DiffScope,
+    old_path: Option<&str>,
+) -> Result<SingleFileContent> {
+    let repo = open(repo_path)?;
+    let relative_file = Path::new(file);
+    let relative_old_path = old_path.map(Path::new);
+    let diff = build_single_file_diff(&repo, repo_path, relative_file, scope, relative_old_path)?;
+    let delta = first_single_file_delta(&diff);
 
-    let blob = repo
-        .find_blob(blob_id)
-        .map_err(|e| Error::Git(format!("Failed to read blob for {relative_str}: {e}")))?;
-
-    if blob.is_binary() {
-        return Ok(String::new());
+    if delta.as_ref().is_some_and(|entry| entry.is_binary) {
+        return Ok(SingleFileContent {
+            old_content: String::new(),
+            new_content: String::new(),
+            is_binary: true,
+        });
     }
 
-    String::from_utf8(blob.content().to_vec())
-        .map_err(|e| Error::Git(format!("File {relative_str} is not valid UTF-8: {e}")))
+    let old_side_path = delta
+        .as_ref()
+        .and_then(|entry| entry.old_path.as_deref())
+        .or(relative_old_path)
+        .unwrap_or(relative_file);
+    let new_side_path = delta
+        .as_ref()
+        .and_then(|entry| entry.new_path.as_deref())
+        .unwrap_or(relative_file);
+
+    let (old_content, new_content) = match (scope, delta.as_ref().map(|entry| entry.status)) {
+        (DiffScope::Staged, Some(Delta::Added)) => (
+            TextContent {
+                content: String::new(),
+                is_binary: false,
+            },
+            read_text_at_ref(&repo, repo_path, new_side_path, "INDEX")?,
+        ),
+        (DiffScope::Staged, Some(Delta::Deleted)) => (
+            read_text_at_ref(&repo, repo_path, old_side_path, "HEAD")?,
+            TextContent {
+                content: String::new(),
+                is_binary: false,
+            },
+        ),
+        (DiffScope::Staged, _) => (
+            read_text_at_ref(&repo, repo_path, old_side_path, "HEAD")?,
+            read_text_at_ref(&repo, repo_path, new_side_path, "INDEX")?,
+        ),
+        (DiffScope::Unstaged, Some(Delta::Untracked)) => (
+            TextContent {
+                content: String::new(),
+                is_binary: false,
+            },
+            read_worktree_text(repo_path, new_side_path)?,
+        ),
+        (DiffScope::Unstaged, Some(Delta::Deleted)) => (
+            read_text_at_ref(&repo, repo_path, old_side_path, "INDEX")?,
+            TextContent {
+                content: String::new(),
+                is_binary: false,
+            },
+        ),
+        (DiffScope::Unstaged, _) => (
+            read_text_at_ref(&repo, repo_path, old_side_path, "INDEX")?,
+            read_worktree_text(repo_path, new_side_path)?,
+        ),
+    };
+
+    if old_content.is_binary || new_content.is_binary {
+        return Ok(SingleFileContent {
+            old_content: String::new(),
+            new_content: String::new(),
+            is_binary: true,
+        });
+    }
+
+    Ok(SingleFileContent {
+        old_content: old_content.content,
+        new_content: new_content.content,
+        is_binary: false,
+    })
 }
 
 /// Get the diff for a specific file.
@@ -2309,6 +2678,99 @@ mod tests {
 
         let stats = branch_diff_stats(repo_path, "main")?;
         assert!(stats.files_changed > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn status_fingerprint_includes_upstream_and_rename_metadata() {
+        let base = GitStatus {
+            branch: "main".to_owned(),
+            upstream: Some("origin/main".to_owned()),
+            ahead: 1,
+            behind: 2,
+            staged: vec![StatusEntry {
+                path: "src/new-name.ts".to_owned(),
+                status: FileStatus::Renamed,
+                old_path: Some("src/old-name.ts".to_owned()),
+                similarity: Some(98),
+            }],
+            modified: Vec::new(),
+            untracked: Vec::new(),
+            conflicted: Vec::new(),
+        };
+
+        let same = compute_status_fingerprint(&base);
+        let changed_upstream = compute_status_fingerprint(&GitStatus {
+            upstream: Some("origin/release".to_owned()),
+            ..base.clone()
+        });
+        let Some(base_staged_entry) = base.staged.first() else {
+            // Test fixture must have staged entries — fail assertion if missing.
+            assert!(
+                !base.staged.is_empty(),
+                "test fixture must have staged entries"
+            );
+            return;
+        };
+        let changed_similarity = compute_status_fingerprint(&GitStatus {
+            staged: vec![StatusEntry {
+                similarity: Some(50),
+                ..base_staged_entry.clone()
+            }],
+            ..base.clone()
+        });
+
+        assert_eq!(same, compute_status_fingerprint(&base));
+        assert_ne!(same, changed_upstream);
+        assert_ne!(same, changed_similarity);
+    }
+
+    #[test]
+    fn single_file_diff_stats_and_content_support_untracked_files() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join("fresh.txt"), "line one\nline two\n").map_err(Error::Io)?;
+
+        let stats = get_single_file_diff_stats(repo_path, "fresh.txt", DiffScope::Unstaged, None)?;
+        assert_eq!(stats.additions, 2);
+        assert_eq!(stats.deletions, 0);
+        assert!(!stats.is_binary);
+
+        let content = get_single_file_content(repo_path, "fresh.txt", DiffScope::Unstaged, None)?;
+        assert_eq!(content.old_content, "");
+        assert_eq!(content.new_content, "line one\nline two\n");
+        assert!(!content.is_binary);
+        Ok(())
+    }
+
+    #[test]
+    fn single_file_diff_content_reads_staged_deletions() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+
+        fs::write(repo_path.join("tracked.txt"), "tracked contents\n").map_err(Error::Io)?;
+        commit_all(&repo, "initial")?;
+        drop(repo);
+
+        fs::remove_file(repo_path.join("tracked.txt")).map_err(Error::Io)?;
+        stage_all(repo_path)?;
+
+        let stats = get_single_file_diff_stats(repo_path, "tracked.txt", DiffScope::Staged, None)?;
+        assert_eq!(stats.additions, 0);
+        assert_eq!(stats.deletions, 1);
+
+        let content = get_single_file_content(repo_path, "tracked.txt", DiffScope::Staged, None)?;
+        assert_eq!(content.old_content, "tracked contents\n");
+        assert_eq!(content.new_content, "");
+        assert!(!content.is_binary);
         Ok(())
     }
 

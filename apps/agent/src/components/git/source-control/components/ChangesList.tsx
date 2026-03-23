@@ -22,6 +22,7 @@ interface ChangesListProps {
   scrollParent: HTMLDivElement | null;
   stagedFiles: FileItem[];
   unstagedFiles: FileItem[];
+  untrackedDiffSkipped: boolean;
   stagedDiffs: FileDiff[];
   unstagedDiffs: FileDiff[];
   isStaging: boolean;
@@ -36,6 +37,7 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   scrollParent,
   stagedFiles,
   unstagedFiles,
+  untrackedDiffSkipped,
   stagedDiffs,
   unstagedDiffs,
   isStaging,
@@ -211,19 +213,24 @@ export const ChangesList: React.FC<ChangesListProps> = ({
               customScrollParent={scrollParent}
               data={activeFiles}
               overscan={10}
-              itemContent={(_index, file) => (
-                <div className="pb-1">
-                  <DiffFileCard
-                    file={file}
-                    diff={activeDiffMap.get(file.path)}
-                    isStaged={isStaged}
-                    isLoading={isStaging}
-                    onAction={activeAction}
-                    onDiscard={activeDiscard}
-                    schedulePrefetch={schedulePrefetch}
-                  />
-                </div>
-              )}
+              itemContent={(_index, file) => {
+                const isDeferredDiffMode =
+                  !isStaged && untrackedDiffSkipped && file.backendStatus === 'untracked';
+                return (
+                  <div className="pb-1">
+                    <DiffFileCard
+                      file={file}
+                      diff={activeDiffMap.get(file.path)}
+                      deferredDiffMode={isDeferredDiffMode}
+                      isStaged={isStaged}
+                      isLoading={isStaging}
+                      onAction={activeAction}
+                      onDiscard={activeDiscard}
+                      schedulePrefetch={schedulePrefetch}
+                    />
+                  </div>
+                );
+              }}
             />
           ) : (
             <div className="px-3 py-4 text-xs text-lg-text-secondary">Loading changes...</div>

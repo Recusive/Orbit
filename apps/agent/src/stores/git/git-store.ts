@@ -3,7 +3,14 @@ import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
-import type { BranchDiffStats, FileStatus, GitBranch, GitStatus, StatusEntry } from '@/lib/api';
+import type {
+  BranchDiffStats,
+  FileStatus,
+  GitBranch,
+  GitStatus,
+  GitStatusResponse,
+  StatusEntry,
+} from '@/lib/api';
 
 import { toRelativePath } from '@/lib/utils/path-utils';
 
@@ -27,6 +34,10 @@ interface GitState {
   error: string | null;
   /** Timestamp of last successful status update */
   lastUpdated: number | null;
+  /** Backend-computed fingerprint for the current status payload */
+  statusFingerprint: string | null;
+  /** Monotonic revision that only advances when the status payload materially changes */
+  statusRevision: number;
   /** List of branches */
   branches: GitBranch[];
   /** Whether a fetch from remote is in progress */
@@ -40,8 +51,10 @@ interface GitState {
 interface GitActions {
   /** Set the repository path */
   setRepoPath: (path: string | null) => void;
-  /** Set git status (also clears error and sets lastUpdated) */
+  /** Legacy full-status setter for tests and one-off local writes */
   setStatus: (status: GitStatus) => void;
+  /** Apply a polled/full status response from the backend */
+  applyPolledStatus: (result: GitStatusResponse) => void;
   /** Set loading state */
   setLoading: (loading: boolean) => void;
   /** Set error state (also clears loading) */
@@ -70,23 +83,13 @@ const initialState: GitState = {
   isLoading: false,
   error: null,
   lastUpdated: null,
+  statusFingerprint: null,
+  statusRevision: 0,
   branches: [],
   isFetching: false,
   lastFetchedAt: null,
   branchDiffStats: null,
 };
-
-/** Compute a stable, order-independent fingerprint for a status entry list */
-function listSignature(entries: readonly StatusEntry[]): string {
-  if (entries.length === 0) return '';
-
-  return entries
-    .map((entry) => {
-      return `${entry.path}\0${entry.status}\0${entry.oldPath ?? ''}\0${String(entry.similarity ?? '')}`;
-    })
-    .sort()
-    .join('\x01');
-}
 
 function isIgnoredNoiseUntrackedPath(path: string): boolean {
   const normalized = path.replace(/\\/g, '/').toLowerCase();
@@ -137,21 +140,60 @@ function normalizeEntryPath(entryPath: string, repoPath: string): string {
   return normalized;
 }
 
-function parentDir(relativePath: string): string | null {
-  if (relativePath === '') return null;
-
-  const lastSlash = relativePath.lastIndexOf('/');
-  return lastSlash === -1 ? '' : relativePath.slice(0, lastSlash);
+interface TrieNode {
+  status: FileStatus | null;
+  children: Map<string, TrieNode>;
 }
 
 interface StatusMaps {
   fileMap: Map<string, FileStatus>;
-  dirMap: Map<string, FileStatus>;
+  dirTrie: TrieNode;
+}
+
+function createTrieNode(): TrieNode {
+  return {
+    status: null,
+    children: new Map<string, TrieNode>(),
+  };
+}
+
+function insertDirectoryStatus(root: TrieNode, filePath: string, status: FileStatus): void {
+  root.status = pickHigherStatus(root.status, status);
+
+  const segments = filePath.split('/');
+  let node = root;
+
+  for (const segment of segments.slice(0, -1)) {
+    let child = node.children.get(segment);
+    if (!child) {
+      child = createTrieNode();
+      node.children.set(segment, child);
+    }
+
+    child.status = pickHigherStatus(child.status, status);
+    node = child;
+  }
+}
+
+function getDirectoryStatus(root: TrieNode, relativePath: string): FileStatus | null {
+  if (relativePath === '') {
+    return root.status;
+  }
+
+  let node: TrieNode | undefined = root;
+  for (const segment of relativePath.split('/')) {
+    node = node.children.get(segment);
+    if (!node) {
+      return null;
+    }
+  }
+
+  return node.status;
 }
 
 function buildStatusMaps(status: GitStatus, repoPath: string): StatusMaps {
   const fileMap = new Map<string, FileStatus>();
-  const dirMap = new Map<string, FileStatus>();
+  const dirTrie = createTrieNode();
 
   const allEntries = [
     ...status.staged,
@@ -165,23 +207,10 @@ function buildStatusMaps(status: GitStatus, repoPath: string): StatusMaps {
 
     const existingFile = fileMap.get(key);
     fileMap.set(key, pickHigherStatus(existingFile ?? null, entry.status));
-
-    let dir = parentDir(key);
-    while (dir !== null) {
-      const existingDir = dirMap.get(dir);
-      if (
-        existingDir !== undefined &&
-        STATUS_PRIORITY[existingDir] >= STATUS_PRIORITY[entry.status]
-      ) {
-        break;
-      }
-
-      dirMap.set(dir, pickHigherStatus(existingDir ?? null, entry.status));
-      dir = parentDir(dir);
-    }
+    insertDirectoryStatus(dirTrie, key, entry.status);
   }
 
-  return { fileMap, dirMap };
+  return { fileMap, dirTrie };
 }
 
 let cachedStatus: GitStatus | null = null;
@@ -215,30 +244,14 @@ export const useGitStore = create<GitStore>()(
           }
           logger.info(`Git repo path set: ${repoPath ?? 'none'}`);
           state.repoPath = repoPath;
+          state.statusFingerprint = null;
+          state.statusRevision = 0;
         });
       },
 
       setStatus: (status): void => {
         set((state) => {
           const sanitizedStatus = sanitizeStatus(status);
-
-          // Skip update if status hasn't meaningfully changed
-          const prev = state.status;
-          if (prev) {
-            const unchanged =
-              prev.branch === sanitizedStatus.branch &&
-              prev.ahead === sanitizedStatus.ahead &&
-              prev.behind === sanitizedStatus.behind &&
-              listSignature(prev.staged) === listSignature(sanitizedStatus.staged) &&
-              listSignature(prev.modified) === listSignature(sanitizedStatus.modified) &&
-              listSignature(prev.untracked) === listSignature(sanitizedStatus.untracked) &&
-              listSignature(prev.conflicted) === listSignature(sanitizedStatus.conflicted);
-            if (unchanged) {
-              // Only update lastUpdated for background refreshes, don't trigger re-renders
-              state.lastUpdated = Date.now();
-              return;
-            }
-          }
           logger.debug(`Git status updated`, {
             branch: sanitizedStatus.branch,
             ahead: sanitizedStatus.ahead,
@@ -248,6 +261,41 @@ export const useGitStore = create<GitStore>()(
           state.error = null;
           state.isLoading = false;
           state.lastUpdated = Date.now();
+          state.statusFingerprint = null;
+          state.statusRevision += 1;
+        });
+      },
+
+      applyPolledStatus: (result): void => {
+        set((state) => {
+          const previousFingerprint = state.statusFingerprint;
+
+          state.statusFingerprint = result.fingerprint;
+          state.lastUpdated = Date.now();
+          state.error = null;
+          state.isLoading = false;
+
+          if (!result.status) {
+            return;
+          }
+
+          const hasMaterialChange =
+            state.status === null ||
+            previousFingerprint === null ||
+            previousFingerprint !== result.fingerprint;
+
+          if (!hasMaterialChange) {
+            return;
+          }
+
+          const sanitizedStatus = sanitizeStatus(result.status);
+          logger.debug(`Git status updated`, {
+            branch: sanitizedStatus.branch,
+            ahead: sanitizedStatus.ahead,
+            behind: sanitizedStatus.behind,
+          });
+          state.status = sanitizedStatus;
+          state.statusRevision += 1;
         });
       },
 
@@ -299,6 +347,8 @@ export const useGitStore = create<GitStore>()(
           state.isLoading = initialState.isLoading;
           state.error = initialState.error;
           state.lastUpdated = initialState.lastUpdated;
+          state.statusFingerprint = initialState.statusFingerprint;
+          state.statusRevision = initialState.statusRevision;
           state.branches = initialState.branches;
           state.isFetching = initialState.isFetching;
           state.lastFetchedAt = initialState.lastFetchedAt;
@@ -367,7 +417,7 @@ export const selectFileStatus =
     const relativePath = toRelativePath(absolutePath, state.repoPath);
     if (relativePath === null) return null;
 
-    return maps.fileMap.get(relativePath) ?? null;
+    return maps.fileMap.get(normalizeEntryPath(relativePath, state.repoPath)) ?? null;
   };
 
 /**
@@ -383,7 +433,7 @@ export const selectDirectoryStatus =
     const relativePath = toRelativePath(absolutePath, state.repoPath);
     if (relativePath === null) return null;
 
-    return maps.dirMap.get(relativePath) ?? null;
+    return getDirectoryStatus(maps.dirTrie, normalizeEntryPath(relativePath, state.repoPath));
   };
 
 // ============================================

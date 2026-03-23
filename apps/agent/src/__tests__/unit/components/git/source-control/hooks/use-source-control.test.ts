@@ -8,7 +8,7 @@
  */
 import { act, renderHook, waitFor } from '@testing-library/react';
 
-import type { GitBranch, GitStatus } from '@/lib/api';
+import type { GitBranch, GitStatus, GitStatusResponse } from '@/lib/api';
 
 import {
   toUserGitError,
@@ -37,14 +37,14 @@ const {
   mockGitCheckout: vi.fn<[string, string], Promise<void>>(),
   mockGitCommit: vi.fn<[string, string], Promise<string>>(),
   mockGitCreateBranch: vi.fn<[string, string], Promise<void>>(),
-  mockGitDiffStructured: vi.fn<[string], Promise<[]>>(),
+  mockGitDiffStructured: vi.fn<[string, boolean?], Promise<[]>>(),
   mockGitDiscard: vi.fn<[string, string[]], Promise<void>>(),
   mockGitFetch: vi.fn<[string], Promise<void>>(),
   mockGitPull: vi.fn<[string], Promise<void>>(),
   mockGitPush: vi.fn<[string], Promise<void>>(),
   mockGitStage: vi.fn<[string, string[]], Promise<void>>(),
   mockGitStagedDiff: vi.fn<[string], Promise<[]>>(),
-  mockGitStatus: vi.fn<[string], Promise<GitStatus>>(),
+  mockGitStatus: vi.fn<[string], Promise<GitStatusResponse>>(),
   mockGitUnstage: vi.fn<[string, string[]], Promise<void>>(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
@@ -87,6 +87,18 @@ function createMockStatus(overrides: Partial<GitStatus> = {}): GitStatus {
   };
 }
 
+function createStatusResponse(
+  status: GitStatus,
+  overrides: Partial<GitStatusResponse> = {}
+): GitStatusResponse {
+  return {
+    changed: true,
+    fingerprint: overrides.fingerprint ?? 'status-fingerprint',
+    status,
+    ...overrides,
+  };
+}
+
 function createDeferred<T>(): {
   promise: Promise<T>;
   resolve: (value: T | PromiseLike<T>) => void;
@@ -118,7 +130,7 @@ beforeEach(() => {
   mockGitPush.mockResolvedValue(undefined);
   mockGitStage.mockResolvedValue(undefined);
   mockGitStagedDiff.mockResolvedValue([]);
-  mockGitStatus.mockResolvedValue(createMockStatus());
+  mockGitStatus.mockResolvedValue(createStatusResponse(createMockStatus()));
   mockGitUnstage.mockResolvedValue(undefined);
 });
 
@@ -153,7 +165,9 @@ describe('toUserGitError', () => {
 
 describe('useSourceControl handleCreateAndCheckout', () => {
   it('creates, checks out, refreshes, and shows success toast', async () => {
-    mockGitStatus.mockResolvedValue(createMockStatus({ branch: 'feature/new-ui' }));
+    mockGitStatus.mockResolvedValue(
+      createStatusResponse(createMockStatus({ branch: 'feature/new-ui' }))
+    );
 
     const { result } = renderHook(() => useSourceControl());
 
@@ -266,6 +280,23 @@ describe('useSourceControl handleCreateAndCheckout', () => {
 });
 
 describe('useSourceControl diff fetching behavior', () => {
+  it('exposes when eager untracked diffs are skipped', () => {
+    useGitStore.getState().setStatus(
+      createMockStatus({
+        untracked: Array.from({ length: 301 }, (_, index) => ({
+          path: `src/file-${String(index)}.ts`,
+          status: 'untracked',
+          oldPath: null,
+          similarity: null,
+        })),
+      })
+    );
+
+    const { result } = renderHook(() => useSourceControl(true));
+
+    expect(result.current.untrackedDiffSkipped).toBe(true);
+  });
+
   it('debounces status tick diff fetches to a single call', async () => {
     vi.useFakeTimers();
     renderHook(() => useSourceControl(true));

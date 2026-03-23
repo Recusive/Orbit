@@ -60,9 +60,8 @@ export function useGitPolling(): void {
   }, []);
 
   // Fetch branch diff stats only when git status meaningfully changes.
-  // The store's setStatus skips updates when nothing changed (only bumps lastUpdated),
-  // so the `status` object reference only changes on real changes — this effect
-  // won't fire on no-op background polls.
+  // useGitStatus writes through applyPolledStatus(), which preserves the status
+  // object reference on unchanged polls while still advancing lastUpdated.
   const status = useGitStore((s) => s.status);
   const setBranchDiffStats = useGitStore((s) => s.setBranchDiffStats);
   const prevStatusRef = useRef<GitStatus | null>(null);

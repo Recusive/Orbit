@@ -130,7 +130,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           gitBranches(worktree.path),
         ]);
         const gitStore = useGitStore.getState();
-        gitStore.setStatus(newStatus);
+        gitStore.applyPolledStatus(newStatus);
         gitStore.setBranches(newBranches);
         setBranches(newBranches);
         // Update the worktree's branch in UIStore so the badge text refreshes
@@ -184,7 +184,7 @@ export const WorktreeItem: FC<WorktreeItemProps> = ({
           gitBranches(worktree.path),
         ]);
         const gitStore = useGitStore.getState();
-        gitStore.setStatus(newStatus);
+        gitStore.applyPolledStatus(newStatus);
         gitStore.setBranches(newBranches);
         setBranches(newBranches);
         const uiStore = useUIStore.getState();

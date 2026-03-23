@@ -59,6 +59,12 @@ export interface GitStatus {
   conflicted: StatusEntry[];
 }
 
+export interface GitStatusResponse {
+  changed: boolean;
+  fingerprint: string;
+  status: GitStatus | null;
+}
+
 export interface GitCommit {
   sha: string;
   shortSha: string;
@@ -106,6 +112,20 @@ export interface BranchDiffStats {
   filesChanged: number;
 }
 
+export interface FileDiffStats {
+  additions: number;
+  deletions: number;
+  isBinary: boolean;
+}
+
+export interface SingleFileContent {
+  oldContent: string;
+  newContent: string;
+  isBinary: boolean;
+}
+
+export type DiffScope = 'staged' | 'unstaged';
+
 export interface BlameLine {
   lineNumber: number;
   commitHash: string;
@@ -150,8 +170,15 @@ export async function gitDiscover(path: string): Promise<string> {
   return invoke<string>('git_discover', { path });
 }
 
-export async function gitStatus(repoPath: string): Promise<GitStatus> {
-  return invoke<GitStatus>('git_status', { repoPath });
+export async function gitStatus(repoPath: string): Promise<GitStatusResponse> {
+  return invoke<GitStatusResponse>('git_status', { repoPath });
+}
+
+export async function gitStatusConditional(
+  repoPath: string,
+  fingerprint?: string | null
+): Promise<GitStatusResponse> {
+  return invoke<GitStatusResponse>('git_status_conditional', { repoPath, fingerprint });
 }
 
 export async function gitStage(repoPath: string, files: string[]): Promise<void> {
@@ -191,6 +218,24 @@ export async function gitFileAtRef(
   gitRef: string
 ): Promise<string> {
   return invoke<string>('git_file_at_ref', { repoPath, file, gitRef });
+}
+
+export async function gitFileDiffStats(
+  repoPath: string,
+  file: string,
+  scope: DiffScope,
+  oldPath?: string
+): Promise<FileDiffStats> {
+  return invoke<FileDiffStats>('git_file_diff_stats', { repoPath, file, scope, oldPath });
+}
+
+export async function gitFileDiffContent(
+  repoPath: string,
+  file: string,
+  scope: DiffScope,
+  oldPath?: string
+): Promise<SingleFileContent> {
+  return invoke<SingleFileContent>('git_file_diff_content', { repoPath, file, scope, oldPath });
 }
 
 export async function gitDiscard(repoPath: string, files: string[]): Promise<void> {

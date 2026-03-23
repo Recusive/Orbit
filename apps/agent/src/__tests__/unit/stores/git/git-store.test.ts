@@ -5,6 +5,7 @@
  * Uses subscribeWithSelector middleware for optimized subscriptions.
  */
 
+import type { GitStatusResponse } from '@/lib/api';
 import type { GitStatus, StatusEntry } from '@/stores/git/git-store';
 
 import {
@@ -42,6 +43,18 @@ function createGitStatus(overrides: Partial<GitStatus> = {}): GitStatus {
   };
 }
 
+function createStatusResponse(
+  status: GitStatus | null,
+  overrides: Partial<GitStatusResponse> = {}
+): GitStatusResponse {
+  return {
+    changed: status !== null,
+    fingerprint: overrides.fingerprint ?? 'fingerprint-1',
+    status,
+    ...overrides,
+  };
+}
+
 describe('git-store', () => {
   beforeEach(() => {
     // Reset store to initial state
@@ -69,6 +82,11 @@ describe('git-store', () => {
 
     it('should start with null error', () => {
       expect(useGitStore.getState().error).toBeNull();
+    });
+
+    it('should start with null fingerprint and zero status revision', () => {
+      expect(useGitStore.getState().statusFingerprint).toBeNull();
+      expect(useGitStore.getState().statusRevision).toBe(0);
     });
 
     it('should start with empty branches', () => {
@@ -133,26 +151,20 @@ describe('git-store', () => {
       expect(state.error).toBeNull();
       expect(state.isLoading).toBe(false);
       expect(state.lastUpdated).not.toBeNull();
+      expect(state.statusRevision).toBe(1);
+      expect(state.statusFingerprint).toBeNull();
     });
 
-    it('should skip update if status meaningfully unchanged (optimization)', () => {
+    it('should replace the status object on repeated legacy writes', () => {
       const { setStatus } = useGitStore.getState();
 
-      // Set initial status
       const status1 = createGitStatus({ branch: 'main', ahead: 0 });
       setStatus(status1);
-
-      const firstUpdate = useGitStore.getState().lastUpdated;
-
-      // Set "same" status (different object, same values)
       const status2 = createGitStatus({ branch: 'main', ahead: 0 });
       setStatus(status2);
 
-      // Status should be same reference (not updated)
-      expect(useGitStore.getState().status).toBe(status1);
-
-      // lastUpdated should still be updated for background refreshes
-      expect(useGitStore.getState().lastUpdated).toBeGreaterThanOrEqual(firstUpdate ?? 0);
+      expect(useGitStore.getState().status).toBe(status2);
+      expect(useGitStore.getState().statusRevision).toBe(2);
     });
 
     it('should update when status meaningfully changes', () => {
@@ -180,7 +192,7 @@ describe('git-store', () => {
       expect(useGitStore.getState().status?.modified[0]?.path).toBe('src/b.ts');
     });
 
-    it('should skip update for reordered entries with identical content', () => {
+    it('should replace the status object when entry order changes', () => {
       const { setStatus } = useGitStore.getState();
       const firstStatus = createGitStatus({
         modified: [
@@ -198,7 +210,7 @@ describe('git-store', () => {
       setStatus(firstStatus);
       setStatus(reorderedStatus);
 
-      expect(useGitStore.getState().status).toBe(firstStatus);
+      expect(useGitStore.getState().status).toBe(reorderedStatus);
     });
 
     it('should clear error when status is set', () => {
@@ -224,6 +236,42 @@ describe('git-store', () => {
 
       const untracked = useGitStore.getState().status?.untracked ?? [];
       expect(untracked.map((entry) => entry.path)).toEqual(['src/new-file.ts']);
+    });
+  });
+
+  describe('applyPolledStatus', () => {
+    it('advances lastUpdated without bumping statusRevision on unchanged polls', () => {
+      const { applyPolledStatus } = useGitStore.getState();
+      const first = createGitStatus({ branch: 'main', ahead: 0 });
+
+      applyPolledStatus(createStatusResponse(first, { fingerprint: 'abc123' }));
+      const previousLastUpdated = useGitStore.getState().lastUpdated;
+
+      applyPolledStatus(
+        createStatusResponse(null, {
+          changed: false,
+          fingerprint: 'abc123',
+        })
+      );
+
+      expect(useGitStore.getState().status).toEqual(first);
+      expect(useGitStore.getState().statusRevision).toBe(1);
+      expect(useGitStore.getState().lastUpdated).toBeGreaterThanOrEqual(previousLastUpdated ?? 0);
+    });
+
+    it('bumps statusRevision and fingerprint when the backend fingerprint changes', () => {
+      const { applyPolledStatus } = useGitStore.getState();
+
+      applyPolledStatus(
+        createStatusResponse(createGitStatus({ ahead: 0 }), { fingerprint: 'one' })
+      );
+      applyPolledStatus(
+        createStatusResponse(createGitStatus({ ahead: 2 }), { fingerprint: 'two' })
+      );
+
+      expect(useGitStore.getState().status?.ahead).toBe(2);
+      expect(useGitStore.getState().statusFingerprint).toBe('two');
+      expect(useGitStore.getState().statusRevision).toBe(2);
     });
   });
 
@@ -340,9 +388,22 @@ describe('git-store', () => {
       expect(state.status).toBeNull();
       expect(state.isLoading).toBe(false);
       expect(state.error).toBeNull();
+      expect(state.statusFingerprint).toBeNull();
+      expect(state.statusRevision).toBe(0);
       expect(state.branches).toEqual([]);
       expect(state.isFetching).toBe(false);
       expect(state.lastFetchedAt).toBeNull();
+    });
+
+    it('should clear fingerprint and revision when repo path changes', () => {
+      const { applyPolledStatus, setRepoPath } = useGitStore.getState();
+      setRepoPath('/repo');
+      applyPolledStatus(createStatusResponse(createGitStatus(), { fingerprint: 'repo-a' }));
+
+      setRepoPath('/other-repo');
+
+      expect(useGitStore.getState().statusFingerprint).toBeNull();
+      expect(useGitStore.getState().statusRevision).toBe(0);
     });
   });
 

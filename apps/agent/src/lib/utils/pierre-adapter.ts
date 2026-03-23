@@ -2,50 +2,18 @@
  * Pierre Diffs Adapter Layer
  *
  * Shared configuration for all Pierre diff rendering surfaces:
- *   - Custom Orbit themes (dark/light: sidebar-matched backgrounds)
+ *   - Shared Pierre themes (dark/light)
  *   - Shared CSS variable overrides and options
  *   - editToolToPierreDiff — for Edit tool widget (oldString + newString)
- *
- * Theme registration happens at module-load time; Pierre lazy-loads
- * the actual theme on first render via the async loader.
  */
-import { parseDiffFromFile, registerCustomTheme } from '@pierre/diffs';
+import { parseDiffFromFile } from '@pierre/diffs';
 
 import type { FileContents, FileDiffMetadata } from '@pierre/diffs/react';
-import type { ThemeRegistration } from 'shiki';
-
-// ---------------------------------------------------------------------------
-// Custom Orbit Themes
-// ---------------------------------------------------------------------------
-
-// Sidebar-matched background colors (from globals.css gray scale)
-const DARK_BG = '#232323'; // --gray-3 (dark sidebar)
-const LIGHT_BG = '#f2f2f2'; // matches bg-sidebar/50 (--gray-a2 at 50% on white)
 const DARK_SEPARATOR = '#313131'; // --gray-5 (two steps up from dark sidebar)
 const LIGHT_SEPARATOR = '#e2e2e2'; // proportional separator for lighter bg
 
-/** Custom dark theme: pierre-dark with sidebar-matched background */
-registerCustomTheme('orbit-dark', async (): Promise<ThemeRegistration> => {
-  const { default: pierreDark } = await import('@pierre/diffs/dist/themes/pierre-dark.js');
-  const theme = structuredClone(pierreDark);
-  theme.name = 'orbit-dark';
-  theme.bg = DARK_BG;
-  theme.colors = { ...theme.colors, 'editor.background': DARK_BG };
-  return theme;
-});
-
-/** Custom light theme: pierre-light with sidebar-matched background */
-registerCustomTheme('orbit-light', async (): Promise<ThemeRegistration> => {
-  const { default: pierreLight } = await import('@pierre/diffs/dist/themes/pierre-light.js');
-  const theme = structuredClone(pierreLight);
-  theme.name = 'orbit-light';
-  theme.bg = LIGHT_BG;
-  theme.colors = { ...theme.colors, 'editor.background': LIGHT_BG };
-  return theme;
-});
-
 /** Dual theme object — Pierre resolves both and uses `themeType` to pick one */
-export const PIERRE_THEME = { dark: 'orbit-dark', light: 'orbit-light' } as const;
+export const PIERRE_THEME = { dark: 'pierre-dark', light: 'pierre-light' } as const;
 
 // ---------------------------------------------------------------------------
 // Shared Config

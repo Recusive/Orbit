@@ -73,13 +73,6 @@ export default defineConfig({
       '@orbit.build/sdk/v2': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
       '@orbit.build/sdk': path.resolve(__dirname, './packages/orbit-sdk/src/v2/index.js'),
       '@orbit/common': path.resolve(__dirname, './apps/common/src'),
-      // Pierre's package.json exports don't include internal theme files.
-      // Alias bypasses the exports check so we can extend pierre-dark/light
-      // with custom sidebar-matched backgrounds in pierre-adapter.ts.
-      '@pierre/diffs/dist/themes': path.resolve(
-        __dirname,
-        'node_modules/@pierre/diffs/dist/themes'
-      ),
     },
   },
   // Keep function/class names in production for readable stack traces and profiling

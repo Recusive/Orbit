@@ -232,6 +232,18 @@ impl GitStatus {
     }
 }
 
+/// Git status polling response with fingerprint-based change detection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitStatusResponse {
+    /// Whether the caller should treat this poll as a material status change.
+    pub changed: bool,
+    /// Stable fingerprint for the full status payload.
+    pub fingerprint: String,
+    /// The full status payload when available.
+    pub status: Option<GitStatus>,
+}
+
 /// Renamed file pair (legacy - use StatusEntry instead)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

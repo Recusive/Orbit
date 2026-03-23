@@ -7,7 +7,7 @@
  * To change status colors or labels, update GIT_STATUS_STYLES in constants.ts.
  */
 import { AlertCircle, CloudDownload, GitBranch, Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { BranchSelector } from './components/BranchSelector';
 import { ChangesList } from './components/ChangesList';
@@ -22,7 +22,8 @@ import { useSourceControl } from './hooks/use-source-control';
 import type { SourceControlTabProps } from './types';
 
 import { useSmoothScroll } from '@/hooks/ui';
-import { cn } from '@/lib/utils';
+import { cn, diffScheduler } from '@/lib/utils';
+import { useGitStore } from '@/stores/git/git-store';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({
   className = '',
@@ -30,6 +31,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
 }) => {
   const smoothScrollRef = useSmoothScroll(0.08);
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null);
+  const repoPath = useGitStore((state) => state.repoPath);
   const mergedScrollRef = useCallback(
     (node: HTMLDivElement | null): void => {
       setScrollParent(node);
@@ -47,6 +49,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
     // File lists
     stagedFiles,
     unstagedFiles,
+    untrackedDiffSkipped,
 
     // Diffs
     stagedDiffs,
@@ -92,6 +95,10 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
     operationError,
     refresh,
   } = useSourceControl(isVisible);
+
+  useEffect(() => {
+    diffScheduler.cancelAll();
+  }, [repoPath]);
 
   // Loading state
   if (isLoading && !status) {
@@ -220,6 +227,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
           scrollParent={scrollParent}
           stagedFiles={stagedFiles}
           unstagedFiles={unstagedFiles}
+          untrackedDiffSkipped={untrackedDiffSkipped}
           stagedDiffs={stagedDiffs}
           unstagedDiffs={unstagedDiffs}
           isStaging={isStaging}

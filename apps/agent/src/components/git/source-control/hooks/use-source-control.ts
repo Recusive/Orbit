@@ -84,6 +84,7 @@ export interface UseSourceControlReturn {
   stagedFiles: FileItem[];
   unstagedFiles: FileItem[];
   hasChanges: boolean;
+  untrackedDiffSkipped: boolean;
 
   // Diffs (structured, per-file)
   stagedDiffs: FileDiff[];
@@ -234,7 +235,7 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
     const repo = useGitStore.getState().repoPath;
     if (!repo) return;
     const result = await gitStatus(repo);
-    useGitStore.getState().setStatus(result);
+    useGitStore.getState().applyPolledStatus(result);
     // Fire-and-forget: refresh diffs after status is updated
     if (isVisible) {
       void fetchDiffs();
@@ -286,6 +287,7 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
   );
 
   const hasChanges = stagedFiles.length > 0 || unstagedFiles.length > 0;
+  const untrackedDiffSkipped = (status?.untracked.length ?? 0) > MAX_EAGER_UNTRACKED;
 
   // Clear operation error after timeout
   const clearOperationError = useCallback((): void => {
@@ -576,6 +578,7 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
     stagedFiles,
     unstagedFiles,
     hasChanges,
+    untrackedDiffSkipped,
 
     // Diffs
     stagedDiffs,

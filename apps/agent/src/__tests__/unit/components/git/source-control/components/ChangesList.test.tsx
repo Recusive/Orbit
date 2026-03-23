@@ -9,6 +9,7 @@ import { ChangesList } from '@/components/git/source-control/components/ChangesL
 interface MockDiffFileCardProps {
   file: FileItem;
   diff: FileDiff | undefined;
+  deferredDiffMode: boolean;
   isStaged: boolean;
   isLoading: boolean;
   onAction: (path: string) => Promise<void>;
@@ -88,6 +89,7 @@ function renderChangesList(overrides: Partial<ComponentProps<typeof ChangesList>
       scrollParent={scrollParent}
       stagedFiles={stagedFiles}
       unstagedFiles={unstagedFiles}
+      untrackedDiffSkipped={false}
       stagedDiffs={stagedDiffs}
       unstagedDiffs={unstagedDiffs}
       isStaging={false}
@@ -135,6 +137,7 @@ describe('ChangesList', () => {
     expect(first).toBeDefined();
     expect(second).toBeDefined();
     expect(first?.isStaged).toBe(false);
+    expect(first?.deferredDiffMode).toBe(false);
     expect(first?.isLoading).toBe(false);
     expect(first?.diff?.path).toBe('src/a.ts');
     expect(first?.onAction).toBe(onStageFile);
@@ -214,5 +217,22 @@ describe('ChangesList', () => {
     });
 
     expect(start).not.toHaveBeenCalled();
+  });
+
+  it('marks untracked unstaged cards as deferred when eager untracked diffs are skipped', () => {
+    renderChangesList({
+      untrackedDiffSkipped: true,
+      unstagedFiles: [
+        {
+          path: 'src/new-file.ts',
+          displayStatus: 'untracked',
+          backendStatus: 'untracked',
+          oldPath: null,
+        },
+      ],
+      unstagedDiffs: [],
+    });
+
+    expect(receivedPropsByPath.get('src/new-file.ts')?.deferredDiffMode).toBe(true);
   });
 });

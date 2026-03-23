@@ -554,6 +554,7 @@ pub fn run() {
             // Git commands
             git::git_discover,
             git::git_status,
+            git::git_status_conditional,
             git::git_stage,
             git::git_unstage,
             git::git_stage_all,
@@ -562,6 +563,8 @@ pub fn run() {
             git::git_diff_structured,
             git::git_staged_diff,
             git::git_file_at_ref,
+            git::git_file_diff_stats,
+            git::git_file_diff_content,
             git::git_branch_diff_stats,
             git::git_discard,
             git::git_log,

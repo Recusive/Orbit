@@ -5,10 +5,10 @@
 
 use std::path::Path;
 
-use orbit_core::{Error, GitBranch, GitCommit, GitStatus, Result};
+use orbit_core::{Error, GitBranch, GitCommit, GitStatusResponse, Result};
 use orbit_git::{
-    BlameLine, BranchDiffStats, BranchInfo, FileDiff, GitManager, WorktreeAddOptions, WorktreeInfo,
-    WorktreeRemoveResult,
+    BlameLine, BranchDiffStats, BranchInfo, DiffScope, FileDiff, FileDiffStats, GitManager,
+    SingleFileContent, WorktreeAddOptions, WorktreeInfo, WorktreeRemoveResult,
 };
 use tokio::task::spawn_blocking;
 
@@ -39,10 +39,33 @@ pub async fn git_discover(path: String) -> Result<String> {
 
 /// Get git repository status.
 #[tauri::command]
-pub async fn git_status(repo_path: String) -> Result<GitStatus> {
+pub async fn git_status(repo_path: String) -> Result<GitStatusResponse> {
+    spawn_git(move || orbit_git::status_response(Path::new(&repo_path)).capture("git_status")).await
+}
+
+/// Get git repository status only when the fingerprint changes.
+#[tauri::command]
+pub async fn git_status_conditional(
+    repo_path: String,
+    fingerprint: Option<String>,
+) -> Result<GitStatusResponse> {
     spawn_git(move || {
-        let manager = GitManager::new();
-        manager.status(&repo_path).capture("git_status")
+        let status = orbit_git::status(Path::new(&repo_path)).capture("git_status_conditional")?;
+        let next_fingerprint = orbit_git::compute_status_fingerprint(&status);
+
+        if fingerprint.as_deref() == Some(next_fingerprint.as_str()) {
+            return Ok(GitStatusResponse {
+                changed: false,
+                fingerprint: next_fingerprint,
+                status: None,
+            });
+        }
+
+        Ok(GitStatusResponse {
+            changed: true,
+            fingerprint: next_fingerprint,
+            status: Some(status),
+        })
     })
     .await
 }
@@ -117,6 +140,41 @@ pub async fn git_file_at_ref(repo_path: String, file: String, git_ref: String) -
     spawn_git(move || {
         orbit_git::get_file_at_ref(Path::new(&repo_path), Path::new(&file), &git_ref)
             .capture("git_file_at_ref")
+    })
+    .await
+}
+
+/// Get summary stats for a single file diff.
+#[tauri::command]
+pub async fn git_file_diff_stats(
+    repo_path: String,
+    file: String,
+    scope: DiffScope,
+    old_path: Option<String>,
+) -> Result<FileDiffStats> {
+    spawn_git(move || {
+        orbit_git::get_single_file_diff_stats(
+            Path::new(&repo_path),
+            &file,
+            scope,
+            old_path.as_deref(),
+        )
+        .capture("git_file_diff_stats")
+    })
+    .await
+}
+
+/// Get the full old/new content for a single file diff.
+#[tauri::command]
+pub async fn git_file_diff_content(
+    repo_path: String,
+    file: String,
+    scope: DiffScope,
+    old_path: Option<String>,
+) -> Result<SingleFileContent> {
+    spawn_git(move || {
+        orbit_git::get_single_file_content(Path::new(&repo_path), &file, scope, old_path.as_deref())
+            .capture("git_file_diff_content")
     })
     .await
 }

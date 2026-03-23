@@ -13,6 +13,7 @@ import {
   gitPush,
   gitStage,
   gitStatus,
+  gitStatusConditional,
   gitUnstage,
 } from '@/lib/api';
 import {
@@ -118,7 +119,7 @@ export function useGitStatus(
 
   // Store actions (stable references from zustand)
   const setRepoPath = useGitStore((s) => s.setRepoPath);
-  const setStatus = useGitStore((s) => s.setStatus);
+  const applyPolledStatus = useGitStore((s) => s.applyPolledStatus);
   const setLoading = useGitStore((s) => s.setLoading);
   const setError = useGitStore((s) => s.setError);
   const setBranches = useGitStore((s) => s.setBranches);
@@ -138,8 +139,8 @@ export function useGitStatus(
   normalizedPathRef.current = normalizedPath;
 
   // Store action refs to avoid recreating loadStatus callback
-  const actionsRef = useRef({ reset, setRepoPath, setStatus, setLoading, setError });
-  actionsRef.current = { reset, setRepoPath, setStatus, setLoading, setError };
+  const actionsRef = useRef({ reset, setRepoPath, applyPolledStatus, setLoading, setError });
+  actionsRef.current = { reset, setRepoPath, applyPolledStatus, setLoading, setError };
 
   // loadStatus uses refs internally to avoid dependency changes causing effect re-runs
   const loadStatus = useCallback(async (isBackgroundRefresh: boolean): Promise<void> => {
@@ -167,13 +168,15 @@ export function useGitStatus(
 
       actions.setRepoPath(discovered);
 
-      const result = await gitStatus(discovered);
+      const result = isBackgroundRefresh
+        ? await gitStatusConditional(discovered, useGitStore.getState().statusFingerprint)
+        : await gitStatus(discovered);
 
       if (requestIdRef.current !== currentRequestId) {
         return;
       }
 
-      actions.setStatus(result);
+      actions.applyPolledStatus(result);
       hasLoadedRef.current = true;
     } catch (err) {
       if (requestIdRef.current !== currentRequestId) {
