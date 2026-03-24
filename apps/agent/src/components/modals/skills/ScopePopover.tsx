@@ -60,8 +60,8 @@ export const ScopePopover: FC<ScopePopoverProps> = ({
           type="button"
           disabled={isInstalling}
           className={cn(
-            'inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/60 px-2.5 text-[12px] font-medium',
-            'bg-control-fill text-foreground hover:bg-control-fill-hover transition-colors',
+            'inline-flex h-6 items-center gap-1 rounded-[9px] px-2 text-[11px] font-medium',
+            'bg-foreground text-background hover:bg-foreground/90',
             'disabled:opacity-60 disabled:cursor-wait'
           )}
         >

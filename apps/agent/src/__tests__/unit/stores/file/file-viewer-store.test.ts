@@ -47,7 +47,16 @@ function createMockDiffData(oldContent: string, newContent: string): ViewedFileD
       },
     ],
   };
-  return { oldContent, newContent, diff };
+  return {
+    oldContent,
+    newContent,
+    diff,
+    repoPath: '/repo',
+    scope: 'unstaged',
+    filePath: '/src/file.ts',
+    oldPath: null,
+    statusFingerprint: 'fingerprint-1',
+  };
 }
 
 function createMockImageData(overrides?: {
@@ -337,6 +346,8 @@ describe('file-viewer-store', () => {
       expect(state.openTabs).toHaveLength(1);
       expect(state.openTabs[0]?.viewMode).toBe('diff');
       expect(state.openTabs[0]?.diffData).toBe(diffData);
+      expect(state.openTabs[0]?.content).toBe('new');
+      expect(state.openTabs[0]?.originalContent).toBe('new');
     });
 
     it('should use provided language or detect from path', () => {

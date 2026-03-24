@@ -205,14 +205,16 @@ export const CreateWorktreeDialog: FC<CreateWorktreeDialogProps> = ({
           </DialogClose>
 
           {/* Icon + Title + Description */}
-          <div className="flex flex-col items-start gap-2.5">
+          <div className="flex items-start gap-3">
             <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
               <GitBranch className="h-7 w-7 text-primary" aria-hidden="true" />
             </div>
-            <DialogTitle className="liquid-glass-title">Create Worktree</DialogTitle>
-            <DialogDescription className="liquid-glass-desc">
-              Work on multiple branches simultaneously with isolated worktrees.
-            </DialogDescription>
+            <div className="flex flex-col gap-1 min-w-0 pt-2 pr-8">
+              <DialogTitle className="liquid-glass-title">Create Worktree</DialogTitle>
+              <DialogDescription className="liquid-glass-desc">
+                Work on multiple branches simultaneously with isolated worktrees.
+              </DialogDescription>
+            </div>
           </div>
 
           {/* Form fields */}

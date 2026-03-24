@@ -108,6 +108,11 @@ describe('ActivityPanel markdown preview controls', () => {
       diffData: {
         oldContent: 'old',
         newContent: 'new',
+        repoPath: '/repo',
+        scope: 'unstaged',
+        filePath: '/docs/README.md',
+        oldPath: null,
+        statusFingerprint: 'fingerprint-1',
         diff: {
           additions: 1,
           deletions: 1,

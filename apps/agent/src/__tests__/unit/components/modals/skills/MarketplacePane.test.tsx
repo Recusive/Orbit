@@ -115,13 +115,29 @@ describe('MarketplacePane', () => {
   it('shows desktop-only guard when not running in Tauri', () => {
     coreState.isTauri = false;
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     expect(screen.getByText('Marketplace requires the desktop app')).toBeInTheDocument();
   });
 
   it('shows pill toggle with Trending selected by default when search is empty', async () => {
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(mockBrowseMarketplaceSkills).toHaveBeenCalledWith('trending');
@@ -135,7 +151,15 @@ describe('MarketplacePane', () => {
   it('hides pill toggle when search has content', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    render(<MarketplacePane active search="react" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search="react"
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await waitFor(() => {
       expect(mockBrowseMarketplaceSkills).toHaveBeenCalledWith('trending');
     });
@@ -154,7 +178,15 @@ describe('MarketplacePane', () => {
   it('switches to Top category and renders cached data instantly when switching back', async () => {
     const user = userEvent.setup();
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
@@ -178,13 +210,29 @@ describe('MarketplacePane', () => {
     const searchDeferred = createDeferred<MarketplaceSkill[]>();
     mockSearchMarketplaceSkills.mockImplementationOnce(async () => searchDeferred.promise);
 
-    const { rerender } = render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    const { rerender } = render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
 
-    rerender(<MarketplacePane active search="slow-query" onInstalled={mockOnInstalled} />);
+    rerender(
+      <MarketplacePane
+        active
+        search="slow-query"
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(350);
     });
@@ -193,7 +241,15 @@ describe('MarketplacePane', () => {
       expect(mockSearchMarketplaceSkills).toHaveBeenCalledWith('slow-query', 50);
     });
 
-    rerender(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    rerender(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
@@ -213,7 +269,15 @@ describe('MarketplacePane', () => {
       .mockRejectedValueOnce(new Error('browse failed'))
       .mockResolvedValueOnce([trendingSkill]);
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('browse failed')).toBeInTheDocument();
@@ -235,7 +299,15 @@ describe('MarketplacePane', () => {
       .mockRejectedValueOnce(new Error('search failed'))
       .mockResolvedValueOnce([searchSkill]);
 
-    render(<MarketplacePane active search="react" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search="react"
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await waitFor(() => {
       expect(mockBrowseMarketplaceSkills).toHaveBeenCalledWith('trending');
     });
@@ -261,7 +333,15 @@ describe('MarketplacePane', () => {
     const user = userEvent.setup();
     mockBrowseMarketplaceSkills.mockResolvedValue([]);
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Couldn't load trending skills")).toBeInTheDocument();
@@ -276,7 +356,15 @@ describe('MarketplacePane', () => {
   it('treats whitespace-only search as empty and does not issue a search call', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    render(<MarketplacePane active search="   " onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search="   "
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Trending' })).toBeInTheDocument();
@@ -296,7 +384,15 @@ describe('MarketplacePane', () => {
     mockBrowseMarketplaceSkills
       .mockResolvedValueOnce([trendingSkill])
       .mockRejectedValueOnce(new Error('network offline'));
-    const { rerender } = render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    const { rerender } = render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
@@ -304,7 +400,15 @@ describe('MarketplacePane', () => {
 
     vi.setSystemTime(new Date('2026-03-05T12:05:01.000Z'));
 
-    rerender(<MarketplacePane active search="react" onInstalled={mockOnInstalled} />);
+    rerender(
+      <MarketplacePane
+        active
+        search="react"
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(350);
     });
@@ -312,7 +416,15 @@ describe('MarketplacePane', () => {
       expect(screen.getByText('search-skill')).toBeInTheDocument();
     });
 
-    rerender(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    rerender(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
@@ -322,7 +434,15 @@ describe('MarketplacePane', () => {
   it('shows installed badge for already-installed marketplace skills', async () => {
     mockGetInstalledMarketplaceIds.mockResolvedValue([trendingSkill.id]);
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
@@ -338,7 +458,15 @@ describe('MarketplacePane', () => {
     });
     const user = userEvent.setup();
 
-    render(<MarketplacePane active search="" onInstalled={mockOnInstalled} />);
+    render(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
 
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();

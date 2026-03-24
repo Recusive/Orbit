@@ -167,7 +167,7 @@ export const OcModelSelector: FC = () => {
                   No models found.
                 </div>
               ) : (
-                <CommandGroup>
+                <CommandGroup className="[&_[cmdk-group-items]]:space-y-0.5">
                   {visibleModels.map((model) => {
                     const isHidden = hiddenSet.has(model.id);
 

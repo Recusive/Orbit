@@ -3,7 +3,7 @@
  */
 import { createLogger } from '@orbit/common/lib';
 import { Facehash } from 'facehash';
-import { FolderPlus, Plus, Search, X } from 'lucide-react';
+import { FolderPlus, Maximize2, Minimize2, Plus, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { RecentProject } from '@/hooks/ui/use-recent-projects';
@@ -136,6 +136,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
   const { projects, isLoading } = useRecentProjects();
   const setRootPath = useFileStore((s) => s.setRootPath);
   const [search, setSearch] = useState('');
+  const [infoExpanded, setInfoExpanded] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   // Reset search and autofocus on open
@@ -208,7 +209,7 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContentGlass className="w-[640px] h-[520px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
         {/* Header — search bar + close */}
-        <div className="flex items-center shrink-0 p-3">
+        <div className="flex items-center shrink-0 p-2">
           {/* Search */}
           <div className="relative flex-1">
             <Search
@@ -292,18 +293,44 @@ export const ProjectsDialog: FC<ProjectsDialogProps> = ({ open, onOpenChange }) 
         </div>
 
         {/* Footer hint */}
-        <div className="shrink-0 px-4 pb-3">
-          <div className="p-3 rounded-[12px] bg-[var(--lg-control-bg)] text-sm text-muted-foreground/70">
-            <p className="font-medium mb-1 text-foreground/70">Projects</p>
-            <ul className="list-disc list-inside space-y-0.5 text-[12px]">
-              <li>Each project gets a unique icon based on its name</li>
-              <li>Click a project to open it, or use search to filter</li>
-              <li>
-                Use the{' '}
-                <code className="bg-[var(--lg-control-bg-hover)] px-1 py-0.5 rounded-md">+</code>{' '}
-                tile to add a new folder
-              </li>
-            </ul>
+        <div className="shrink-0 px-2 pb-2">
+          <div className="rounded-[12px] bg-[var(--lg-control-bg)] text-sm text-muted-foreground/70">
+            <div className="flex items-center justify-between p-3 py-2">
+              <p className="font-medium text-[12px] text-foreground/70">Projects</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setInfoExpanded((prev) => !prev);
+                }}
+                className="rounded-md p-0.5 text-muted-foreground/50 hover:text-foreground/70"
+                aria-label={infoExpanded ? 'Collapse' : 'Expand'}
+              >
+                {infoExpanded ? (
+                  <Minimize2 className="h-3 w-3" aria-hidden="true" />
+                ) : (
+                  <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                )}
+              </button>
+            </div>
+            <div
+              className="grid transition-[grid-template-rows,opacity,filter,padding] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] motion-reduce:transition-none"
+              style={{
+                gridTemplateRows: infoExpanded ? '1fr' : '0fr',
+                opacity: infoExpanded ? 1 : 0,
+                filter: infoExpanded ? 'blur(0px)' : 'blur(4px)',
+                paddingBottom: infoExpanded ? 12 : 0,
+              }}
+            >
+              <ul className="list-disc list-inside space-y-0.5 text-[12px] px-3 overflow-hidden min-h-0">
+                <li>Each project gets a unique icon based on its name</li>
+                <li>Click a project to open it, or use search to filter</li>
+                <li>
+                  Use the{' '}
+                  <code className="bg-[var(--lg-control-bg-hover)] px-1 py-0.5 rounded-md">+</code>{' '}
+                  tile to add a new folder
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </DialogContentGlass>

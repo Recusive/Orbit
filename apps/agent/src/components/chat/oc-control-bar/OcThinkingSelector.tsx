@@ -90,7 +90,10 @@ export const OcThinkingSelector: FC = () => {
       >
         <Command shouldFilter={false} disablePointerSelection className="bg-transparent">
           <CommandList className="pb-0">
-            <CommandGroup heading="Thinking level" className="[&_[cmdk-group-heading]]:px-1">
+            <CommandGroup
+              heading="Thinking level"
+              className="[&_[cmdk-group-heading]]:px-1 [&_[cmdk-group-heading]]:pt-1 [&_[cmdk-group-items]]:space-y-0.5"
+            >
               <CommandItem
                 value="default"
                 onSelect={() => {

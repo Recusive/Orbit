@@ -79,6 +79,9 @@ export default defineConfig({
   esbuild: {
     keepNames: true,
   },
+  worker: {
+    format: 'es',
+  },
   build: {
     // Tauri uses modern WebViews (WebKit/WebView2) that support latest JS features.
     // No need to transpile to older ES versions - results in smaller, faster code.

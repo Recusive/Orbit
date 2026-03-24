@@ -78,7 +78,7 @@ export const BranchPickerContent: FC<BranchPickerContentProps> = ({
       disablePointerSelection
       className="bg-transparent"
     >
-      <div className="flex items-center px-1.5 pt-1.5 pb-0.5">
+      <div className="flex items-center px-1 pt-1 pb-0.5">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
           <input
@@ -111,7 +111,7 @@ export const BranchPickerContent: FC<BranchPickerContentProps> = ({
             No branches found.
           </div>
         ) : (
-          <CommandGroup heading="Branches">
+          <CommandGroup heading="Branches" className="[&_[cmdk-group-heading]]:px-2.5">
             {visibleBranches.map((branch) => (
               <CommandItem
                 key={branch.name}

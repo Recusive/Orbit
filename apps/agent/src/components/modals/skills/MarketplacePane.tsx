@@ -22,6 +22,8 @@ import { cn } from '@/lib/utils';
 interface MarketplacePaneProps {
   readonly active: boolean;
   readonly search: string;
+  readonly browseCategory: BrowseCategory;
+  readonly onCategoryChange: (category: BrowseCategory) => void;
   readonly onInstalled: () => void;
 }
 
@@ -32,13 +34,19 @@ interface BrowseCacheEntry {
 
 const BROWSE_CACHE_TTL_MS = 300_000;
 
-export const MarketplacePane: FC<MarketplacePaneProps> = ({ active, search, onInstalled }) => {
+export const MarketplacePane: FC<MarketplacePaneProps> = ({
+  active,
+  search,
+  browseCategory,
+  onCategoryChange,
+  onInstalled,
+}) => {
   const smoothScrollRef = useSmoothScroll(0.08);
   const [results, setResults] = useState<MarketplaceSkill[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [browseCategory, setBrowseCategory] = useState<BrowseCategory>('trending');
+  const setBrowseCategory = onCategoryChange;
   const [isInitialized, setIsInitialized] = useState(false);
   const [workspacePath, setWorkspacePath] = useState<string | null>(null);
   const [installedIds, setInstalledIds] = useState<Set<string>>(new Set());
@@ -156,21 +164,17 @@ export const MarketplacePane: FC<MarketplacePaneProps> = ({ active, search, onIn
     [applyBrowseFromCache]
   );
 
-  const switchCategory = useCallback(
-    (category: BrowseCategory): void => {
-      setBrowseCategory(category);
-      if (isSearchActive) {
-        return;
-      }
+  useEffect(() => {
+    if (!active || isSearchActive) {
+      return;
+    }
 
-      if (applyBrowseFromCache(category)) {
-        return;
-      }
+    if (applyBrowseFromCache(browseCategory)) {
+      return;
+    }
 
-      void loadBrowse(category);
-    },
-    [applyBrowseFromCache, isSearchActive, loadBrowse]
-  );
+    void loadBrowse(browseCategory);
+  }, [active, browseCategory, isSearchActive, applyBrowseFromCache, loadBrowse]);
 
   useEffect(() => {
     if (!active || !IS_TAURI) {
@@ -209,7 +213,7 @@ export const MarketplacePane: FC<MarketplacePaneProps> = ({ active, search, onIn
       cancelled = true;
       setIsInitialized(false);
     };
-  }, [active, loadBrowse, refreshInstalled]);
+  }, [active, loadBrowse, refreshInstalled, setBrowseCategory]);
 
   useEffect(() => {
     if (!active || !IS_TAURI || !isInitialized) {
@@ -340,39 +344,6 @@ export const MarketplacePane: FC<MarketplacePaneProps> = ({ active, search, onIn
   return (
     <div className="h-full overflow-hidden">
       <div ref={smoothScrollRef} className="h-full overflow-auto overscroll-y-contain p-4">
-        {!isSearchActive && (
-          <div className="mb-3 inline-flex rounded-xl bg-lg-control p-1">
-            <button
-              type="button"
-              onClick={() => {
-                switchCategory('trending');
-              }}
-              className={cn(
-                'h-7 rounded-lg px-2.5 text-[11px] font-medium transition-colors',
-                browseCategory === 'trending'
-                  ? 'bg-control-fill text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Trending
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                switchCategory('top');
-              }}
-              className={cn(
-                'h-7 rounded-lg px-2.5 text-[11px] font-medium transition-colors',
-                browseCategory === 'top'
-                  ? 'bg-control-fill text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              Top
-            </button>
-          </div>
-        )}
-
         {isLoading ? (
           <SkillsSkeleton variant="grid" rows={6} />
         ) : error !== null ? (

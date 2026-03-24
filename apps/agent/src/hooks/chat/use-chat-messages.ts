@@ -24,6 +24,7 @@ import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
 import type { DemoConfig, DemoRunnerControls, DemoScript } from '@/demo/types';
+import type { GitScalingStressTestConfig } from '@/stress-tests/git-scaling-stress-test';
 import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-stress-test';
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
@@ -69,6 +70,7 @@ declare global {
           runSessionStressTest?: (config?: SessionStressTestConfig) => Promise<unknown>;
           runReviewFixesStressTest?: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
           runToolGauntletStressTest?: (config?: ToolGauntletStressTestConfig) => Promise<unknown>;
+          runGitScalingStressTest?: (config?: GitScalingStressTestConfig) => Promise<unknown>;
           runVerifiedReviewCycle1StressTest?: (
             config?: VerifiedReviewCycle1StressTestConfig
           ) => Promise<unknown>;
@@ -520,6 +522,10 @@ export function useChatMessages(): UseChatMessagesReturn {
           },
           config
         );
+      },
+      runGitScalingStressTest: async (config?: GitScalingStressTestConfig) => {
+        const { runGitScalingStressTest } = await import('@/stress-tests/git-scaling-stress-test');
+        return runGitScalingStressTest(config);
       },
       runVerifiedReviewCycle1StressTest: async (config?: VerifiedReviewCycle1StressTestConfig) => {
         const { runVerifiedReviewCycle1StressTest } =

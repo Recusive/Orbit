@@ -6,8 +6,10 @@
  * NOTE: Git status styling comes from @/lib/utils/constants.
  * To change status colors or labels, update GIT_STATUS_STYLES in constants.ts.
  */
+import { Virtualizer as PierreVirtualizerCore } from '@pierre/diffs';
+import { VirtualizerContext } from '@pierre/diffs/react';
 import { AlertCircle, CloudDownload, GitBranch, Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { BranchSelector } from './components/BranchSelector';
 import { ChangesList } from './components/ChangesList';
@@ -23,6 +25,8 @@ import type { SourceControlTabProps } from './types';
 
 import { useSmoothScroll } from '@/hooks/ui';
 import { cn, diffScheduler } from '@/lib/utils';
+import { PIERRE_VIRTUALIZER_OVERSCROLL_SIZE } from '@/lib/utils/pierre-adapter';
+import { clearParsedDiffCache } from '@/lib/utils/pierre-diff-cache';
 import { useGitStore } from '@/stores/git/git-store';
 
 export const SourceControlTab: React.FC<SourceControlTabProps> = ({
@@ -31,9 +35,14 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
 }) => {
   const smoothScrollRef = useSmoothScroll(0.08);
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null);
+  const [pierreVirtualizer, setPierreVirtualizer] = useState<PierreVirtualizerCore | undefined>();
+  const pierreVirtualizerRef = useRef<PierreVirtualizerCore | null>(null);
+  const scrollNodeRef = useRef<HTMLDivElement | null>(null);
+  const contentWrapperRef = useRef<HTMLDivElement | null>(null);
   const repoPath = useGitStore((state) => state.repoPath);
   const mergedScrollRef = useCallback(
     (node: HTMLDivElement | null): void => {
+      scrollNodeRef.current = node;
       setScrollParent(node);
       smoothScrollRef(node);
     },
@@ -98,7 +107,36 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
 
   useEffect(() => {
     diffScheduler.cancelAll();
+    clearParsedDiffCache();
   }, [repoPath]);
+
+  useLayoutEffect(() => {
+    const scrollNode = scrollNodeRef.current;
+    const contentNode = contentWrapperRef.current;
+
+    if (pierreVirtualizerRef.current) {
+      pierreVirtualizerRef.current.cleanUp();
+      pierreVirtualizerRef.current = null;
+    }
+
+    if (!scrollNode || !contentNode) {
+      setPierreVirtualizer(undefined);
+      return;
+    }
+
+    const instance = new PierreVirtualizerCore({
+      overscrollSize: PIERRE_VIRTUALIZER_OVERSCROLL_SIZE,
+    });
+    instance.setup(scrollNode, contentNode);
+    pierreVirtualizerRef.current = instance;
+    setPierreVirtualizer(instance);
+
+    return (): void => {
+      instance.cleanUp();
+      pierreVirtualizerRef.current = null;
+      setPierreVirtualizer(undefined);
+    };
+  }, [scrollParent]);
 
   // Loading state
   if (isLoading && !status) {
@@ -188,55 +226,55 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
       {/* Scrollable content */}
       <div
         ref={mergedScrollRef}
+        data-testid="source-control-scroll"
         className="flex-1 overflow-y-scroll overscroll-y-contain [scrollbar-gutter:stable_both-edges]"
       >
-        {/* Operation Error Banner */}
-        {operationError ? <OperationError message={operationError} /> : null}
+        <div ref={contentWrapperRef}>
+          {operationError ? <OperationError message={operationError} /> : null}
 
-        {/* Discard Confirmation */}
-        {pendingDiscard ? (
-          <DiscardConfirmation
-            path={pendingDiscard}
-            onConfirm={handleConfirmDiscard}
-            onCancel={handleCancelDiscard}
+          {pendingDiscard ? (
+            <DiscardConfirmation
+              path={pendingDiscard}
+              onConfirm={handleConfirmDiscard}
+              onCancel={handleCancelDiscard}
+            />
+          ) : null}
+
+          <CommitForm
+            value={commitMessage}
+            onChange={setCommitMessage}
+            onCommit={handleCommit}
+            error={commitError}
           />
-        ) : null}
+          <GitActions
+            onCommit={handleCommit}
+            isCommitting={isCommitting}
+            canCommit={canCommit}
+            onPull={handlePull}
+            isPulling={isPulling}
+            onPush={handlePush}
+            isPushing={isPushing}
+          />
 
-        {/* Commit Message + Actions */}
-        <CommitForm
-          value={commitMessage}
-          onChange={setCommitMessage}
-          onCommit={handleCommit}
-          error={commitError}
-        />
-        <GitActions
-          onCommit={handleCommit}
-          isCommitting={isCommitting}
-          canCommit={canCommit}
-          onPull={handlePull}
-          isPulling={isPulling}
-          onPush={handlePush}
-          isPushing={isPushing}
-        />
+          <div className="mx-3 my-1.5 h-px bg-foreground/5" />
 
-        {/* Section divider */}
-        <div className="mx-3 my-1.5 h-px bg-foreground/5" />
-
-        {/* Changes List */}
-        <ChangesList
-          scrollParent={scrollParent}
-          stagedFiles={stagedFiles}
-          unstagedFiles={unstagedFiles}
-          untrackedDiffSkipped={untrackedDiffSkipped}
-          stagedDiffs={stagedDiffs}
-          unstagedDiffs={unstagedDiffs}
-          isStaging={isStaging}
-          onStageFile={handleStageFile}
-          onUnstageFile={handleUnstageFile}
-          onStageAll={handleStageAll}
-          onUnstageAll={handleUnstageAll}
-          onRequestDiscard={handleRequestDiscard}
-        />
+          <VirtualizerContext.Provider value={pierreVirtualizer}>
+            <ChangesList
+              scrollParent={scrollParent}
+              stagedFiles={stagedFiles}
+              unstagedFiles={unstagedFiles}
+              untrackedDiffSkipped={untrackedDiffSkipped}
+              stagedDiffs={stagedDiffs}
+              unstagedDiffs={unstagedDiffs}
+              isStaging={isStaging}
+              onStageFile={handleStageFile}
+              onUnstageFile={handleUnstageFile}
+              onStageAll={handleStageAll}
+              onUnstageAll={handleUnstageAll}
+              onRequestDiscard={handleRequestDiscard}
+            />
+          </VirtualizerContext.Provider>
+        </div>
       </div>
     </div>
   );

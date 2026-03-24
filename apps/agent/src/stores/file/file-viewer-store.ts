@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
+import type { DiffScope } from '@/lib/api';
 import type { FileDiff } from '@/stores/file/file-store';
 
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -13,7 +14,12 @@ const logger = createLogger('FileViewerStore');
 export interface ViewedFileDiff {
   oldContent: string;
   newContent: string;
-  diff: FileDiff;
+  diff?: FileDiff;
+  repoPath: string;
+  scope: DiffScope;
+  filePath: string;
+  oldPath: string | null;
+  statusFingerprint: string | null;
 }
 
 // View mode for files with diff data
@@ -298,8 +304,12 @@ export const useFileViewerStore = create<FileViewerStore>()(
 
           if (existingTab) {
             // Update existing tab with diff data and switch to diff view
+            existingTab.content = diffData.newContent;
+            existingTab.originalContent = diffData.newContent;
             existingTab.diffData = diffData;
             existingTab.viewMode = 'diff';
+            existingTab.language = language ?? getLanguageFromPath(path);
+            existingTab.isModified = false;
             state.activeTabPath = path;
           } else {
             // Create new tab with diff data

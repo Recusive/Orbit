@@ -1,4 +1,4 @@
-import { Plug, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import type { OcProviderInfo } from '@/stores/opencode/oc-provider-store';
@@ -103,27 +103,13 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
       }}
     >
       <DialogContentGlass className="w-[520px] gap-0 overflow-hidden p-0 glass-surface [&>.absolute]:hidden">
-        <div className="relative flex flex-col gap-4 px-4 pb-4 pt-5">
-          {/* Close button */}
-          <DialogClose className="absolute right-4 top-4 z-10 rounded-[9px] p-1.5 bg-foreground/6 text-muted-foreground transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text active:bg-destructive-subtle-hover">
-            <X className="h-3.5 w-3.5" aria-hidden="true" />
-            <span className="sr-only">Close</span>
-          </DialogClose>
-
-          {/* Icon + Title + Description */}
-          <div className="flex flex-col items-start gap-2.5">
-            <div className="liquid-glass-icon flex shrink-0 items-center justify-center bg-primary/10">
-              <Plug className="h-7 w-7 text-primary" aria-hidden="true" />
-            </div>
-            <DialogTitle className="liquid-glass-title">Providers</DialogTitle>
-            <DialogDescription className="liquid-glass-desc">
-              Choose a connected provider or open settings to add another one.
-            </DialogDescription>
-          </div>
-
-          {/* Search */}
+        <div className="relative flex flex-col gap-4 p-2">
+          {/* Search + Close */}
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
+            <Search
+              className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
+              aria-hidden="true"
+            />
             <input
               ref={searchInputRef}
               autoFocus
@@ -143,10 +129,24 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
                 }
               }}
               placeholder="Search providers"
-              className="w-full h-7 rounded-[7px] bg-control-fill pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-control-fill-hover"
+              className={cn(
+                'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
+                'placeholder:text-muted-foreground/40 outline-none',
+                'transition-[background-color] duration-150',
+                'focus:bg-control-fill-hover'
+              )}
               aria-label="Search providers"
             />
+            <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
+              <X className="h-3 w-3" aria-hidden="true" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
           </div>
+
+          <DialogTitle className="sr-only">Providers</DialogTitle>
+          <DialogDescription className="sr-only">
+            Choose a connected provider or open settings to add another one.
+          </DialogDescription>
 
           {/* Provider list */}
           <div
@@ -193,7 +193,7 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
                         <div
                           key={provider.id}
                           className={cn(
-                            'flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors',
+                            'flex items-center gap-3 rounded-xl px-3.5 py-3',
                             isSelected
                               ? 'bg-foreground/5 ring-1 ring-foreground/8'
                               : 'hover:bg-foreground/3'
@@ -219,7 +219,7 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
                                 setSelectedProviderId(provider.id);
                                 onOpenChange(false);
                               }}
-                              className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-foreground transition-colors hover:bg-control-fill-hover active:scale-[0.97]"
+                              className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-foreground hover:bg-control-fill-hover active:scale-[0.97]"
                             >
                               Use
                             </button>
@@ -240,7 +240,7 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
                       return (
                         <div
                           key={provider.id}
-                          className="flex items-center gap-3 rounded-xl px-3.5 py-3 transition-colors hover:bg-foreground/3"
+                          className="flex items-center gap-3 rounded-xl px-3.5 py-3 hover:bg-foreground/3"
                         >
                           <div className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground/25" />
                           <div className="min-w-0 flex-1">
@@ -256,7 +256,7 @@ export const OcProviderDialog: FC<OcProviderDialogProps> = ({ open, onOpenChange
                             onClick={() => {
                               showProviders(openSettings, onOpenChange);
                             }}
-                            className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-control-fill-hover hover:text-foreground active:scale-[0.97]"
+                            className="shrink-0 rounded-full bg-control-fill px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:bg-control-fill-hover hover:text-foreground active:scale-[0.97]"
                           >
                             Setup
                           </button>

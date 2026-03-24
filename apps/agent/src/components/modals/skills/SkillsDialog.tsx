@@ -1,12 +1,13 @@
 /**
  * SkillsDialog — Installed skills and marketplace browser.
  */
-import { Search, X } from 'lucide-react';
+import { Maximize2, Minimize2, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { InstalledSkillsPane } from './InstalledSkillsPane';
 import { MarketplacePane } from './MarketplacePane';
 
+import type { BrowseCategory } from '@/lib/api/marketplace';
 import type { SkillDefinition } from '@/types/protocol';
 import type { FC } from 'react';
 
@@ -34,6 +35,8 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
   const [installedSearch, setInstalledSearch] = useState('');
   const [marketplaceSearch, setMarketplaceSearch] = useState('');
   const [installedRefreshToken, setInstalledRefreshToken] = useState(0);
+  const [browseCategory, setBrowseCategory] = useState<BrowseCategory>('trending');
+  const [infoExpanded, setInfoExpanded] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -83,7 +86,7 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContentGlass className="w-[720px] h-[560px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
-        <div className="shrink-0 p-3 pb-2">
+        <div className="shrink-0 p-2 pb-2">
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
@@ -124,17 +127,23 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
           </DialogDescription>
         </div>
 
-        <div className="shrink-0 px-3 pb-2">
-          <div className="inline-flex rounded-xl bg-lg-control p-1">
+        <div className="shrink-0 px-2 pb-2 flex items-center justify-between">
+          <div className="relative inline-grid grid-cols-2 rounded-full bg-foreground/[0.05] p-1">
+            <div
+              className="absolute inset-y-1 left-1 w-[calc((100%-8px)/2)] rounded-full bg-foreground shadow-sm transition-transform duration-200 ease-out"
+              style={{
+                transform: activeTab === 'marketplace' ? 'translateX(100%)' : 'translateX(0)',
+              }}
+            />
             <button
               type="button"
               onClick={() => {
                 setActiveTab('installed');
               }}
               className={cn(
-                'h-8 rounded-lg px-3 text-[12px] font-medium transition-colors',
+                'relative z-10 flex items-center justify-center gap-1.5 rounded-full h-6 px-3 text-[13px] font-medium transition-colors duration-150',
                 activeTab === 'installed'
-                  ? 'bg-control-fill text-foreground shadow-sm'
+                  ? 'text-background'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
@@ -146,15 +155,54 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
                 setActiveTab('marketplace');
               }}
               className={cn(
-                'h-8 rounded-lg px-3 text-[12px] font-medium transition-colors',
+                'relative z-10 flex items-center justify-center gap-1.5 rounded-full h-6 px-3 text-[13px] font-medium transition-colors duration-150',
                 activeTab === 'marketplace'
-                  ? 'bg-control-fill text-foreground shadow-sm'
+                  ? 'text-background'
                   : 'text-muted-foreground hover:text-foreground'
               )}
             >
               Marketplace
             </button>
           </div>
+
+          {activeTab === 'marketplace' && (
+            <div className="relative inline-grid grid-cols-2 rounded-full bg-foreground/[0.05] p-1">
+              <div
+                className="absolute inset-y-1 left-1 w-[calc((100%-8px)/2)] rounded-full bg-foreground shadow-sm transition-transform duration-200 ease-out"
+                style={{
+                  transform: browseCategory === 'top' ? 'translateX(100%)' : 'translateX(0)',
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setBrowseCategory('trending');
+                }}
+                className={cn(
+                  'relative z-10 flex items-center justify-center gap-1.5 rounded-full h-6 px-3 text-[13px] font-medium transition-colors duration-150',
+                  browseCategory === 'trending'
+                    ? 'text-background'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Trending
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setBrowseCategory('top');
+                }}
+                className={cn(
+                  'relative z-10 flex items-center justify-center gap-1.5 rounded-full h-6 px-3 text-[13px] font-medium transition-colors duration-150',
+                  browseCategory === 'top'
+                    ? 'text-background'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Top
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 min-h-0">
@@ -172,6 +220,8 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
             <MarketplacePane
               active={activeTab === 'marketplace'}
               search={marketplaceSearch}
+              browseCategory={browseCategory}
+              onCategoryChange={setBrowseCategory}
               onInstalled={() => {
                 setInstalledRefreshToken((current) => current + 1);
                 void useCommandsStore.getState().refreshSkills();
@@ -180,22 +230,48 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
           </div>
         </div>
 
-        <div className="shrink-0 px-4 pb-3">
+        <div className="shrink-0 px-2 pb-2">
           {activeTab === 'installed' ? (
-            <div className="p-3 rounded-[12px] bg-lg-control text-sm text-muted-foreground/70">
-              <p className="font-medium mb-1 text-foreground/70">How Skills Work</p>
-              <ul className="list-disc list-inside space-y-0.5 text-[12px]">
-                <li>
-                  Project skills live in{' '}
-                  <code className="bg-lg-control-hover px-1 rounded-md">.claude/skills/</code>
-                </li>
-                <li>
-                  Personal skills live in{' '}
-                  <code className="bg-lg-control-hover px-1 rounded-md">~/.claude/skills/</code>
-                </li>
-                <li>Each skill is a SKILL.md file with YAML frontmatter</li>
-                <li>Skills are automatically loaded when matched by triggers</li>
-              </ul>
+            <div className="rounded-[12px] bg-lg-control text-sm text-muted-foreground/70">
+              <div className="flex items-center justify-between p-3 py-2">
+                <p className="font-medium text-[12px] text-foreground/70">How Skills Work</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInfoExpanded((prev) => !prev);
+                  }}
+                  className="rounded-md p-0.5 text-muted-foreground/50 hover:text-foreground/70"
+                  aria-label={infoExpanded ? 'Collapse' : 'Expand'}
+                >
+                  {infoExpanded ? (
+                    <Minimize2 className="h-3 w-3" aria-hidden="true" />
+                  ) : (
+                    <Maximize2 className="h-3 w-3" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+              <div
+                className="grid transition-[grid-template-rows,opacity,filter,padding] duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] motion-reduce:transition-none"
+                style={{
+                  gridTemplateRows: infoExpanded ? '1fr' : '0fr',
+                  opacity: infoExpanded ? 1 : 0,
+                  filter: infoExpanded ? 'blur(0px)' : 'blur(4px)',
+                  paddingBottom: infoExpanded ? 12 : 0,
+                }}
+              >
+                <ul className="list-disc list-inside space-y-0.5 text-[12px] px-3 overflow-hidden min-h-0">
+                  <li>
+                    Project skills live in{' '}
+                    <code className="bg-lg-control-hover px-1 rounded-md">.claude/skills/</code>
+                  </li>
+                  <li>
+                    Personal skills live in{' '}
+                    <code className="bg-lg-control-hover px-1 rounded-md">~/.claude/skills/</code>
+                  </li>
+                  <li>Each skill is a SKILL.md file with YAML frontmatter</li>
+                  <li>Skills are automatically loaded when matched by triggers</li>
+                </ul>
+              </div>
             </div>
           ) : (
             <div className="p-3 rounded-[12px] bg-lg-control text-[12px] text-muted-foreground/70">
