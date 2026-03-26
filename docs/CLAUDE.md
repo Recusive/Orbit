@@ -45,6 +45,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `INSTANT-THEME-SWITCH.md` — Flash-free instant theme switching
 - `LIQUID-GLASS.md` — Liquid glass visual effect system
 - `tauri-plugins.md` — Tauri 2 plugins reference
+- `ENGINE-MIGRATION.md` — Engine migration: replacing agent-bridge + Agent-backend with Codex (Rust-native, in-process). Feature inventory, gap analysis, Tauri integration architecture, build phases.
 
 ## design/ (7 files)
 
@@ -125,7 +126,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `wire-compact-opencode-backend.md` — Wire OpenCode /compact command into frontend (store infra, interception, SSE settlement)
 - `fix-compact-rendering-and-tokens.md` — Fix /compact rendering (CompactIndicator instead of raw markdown) and token count (last-assistant snapshot)
 - `fix-opencode-streaming-performance.md` — Fix OpenCode streaming performance (RAF delta batching, time-gated reveal, ThinkingBlock reuse)
-- `fix-csp-opencode-backend.md` — Fix CSP blocking OpenCode backend in production builds (add `http://127.0.0.1:*` to `connect-src`, contract test, CSP doc update)
+- `fix-csp-opencode-backend.md` — Fix CSP blocking OpenCode backend in production builds (add `http://127.0.0.1:`\* to `connect-src`, contract test, CSP doc update)
 - `unify-opencode-question-widget.md` — Unify OpenCode question tool to use shared QuestionPrompt presenter (shared visuals, backend-specific wrappers, multi-select + custom support)
 - `fix-thinking-content-streaming-order.md` — Fix sequential thinking-before-content streaming (ordered frontier reveal, phase-aware content ceiling, multi-phase interleaving)
 - `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
