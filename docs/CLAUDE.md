@@ -71,28 +71,43 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (14 entries)
+## plans/tracked/todo/ (26 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
+- `GHOSTTY-WEB-TERMINAL-MIGRATION.md` — Ghostty web terminal migration
+- `IMAGE-ATTACHMENT-TILES.md` — Image attachment tiles
+- `OOM-34K-UNTRACKED-FILES.md` — OOM fix for 34k untracked files
+- `OPENCODE-HOOKS-SYSTEM.md` — OpenCode hooks system
+- `OPENCODE-STRUCTURED-LOGGING.md` — OpenCode structured logging
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
+- `ORBIT-CLI-DISTRIBUTION.md` — Orbit CLI distribution
+- `PIERRE-BG-COLOR-AND-LARGE-DIFF-PERF-FIX.md` — Pierre background color and large diff perf fix
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
 - `agent-skills-validator-port.md` — Agent skills validator port
+- `browser-atomic-setframe-fix.md` — Browser atomic setFrame fix
 - `browser-enhancement-12-features.md` — Browser enhancement features
+- `browser-native-nswindow-animation.md` — Browser native NSWindow animation
 - `browser-navigate-verification-fix.md` — Browser navigate verification fix
 - `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
 - `codebase-cleanup-stubs-lsp-breadcrumbs.md` — Codebase cleanup (stubs, LSP, breadcrumbs)
+- `ghost-commit-file-undo.md` — Ghost commit file undo
+- `indexed-fluttering-lollipop.md` — Indexed fluttering lollipop
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `kanban-ticket-board.md` — Kanban ticket board
+- `opencode-plan-mode-e2e.md` — OpenCode plan mode end-to-end
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `terminal-app/` — Orbit Terminal: native macOS app (forghostty + Ratatui TUI). Contains:
   - `ORBIT-CLI-RATATUI-SPEC.md` — **PRIMARY SPEC** — Complete Ratatui CLI spec (Codex fork + orbit-server integration, three-panel layout, "+" inline comments, testing strategy, development phases)
   - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
   - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (39 entries)
+## plans/tracked/done/ (42 entries)
 
+- `INSTANT-DIFF-EXPANSION.md` — Instant diff card expansion with background preparation pipeline (batch Tauri IPC, yielded parseDiffFromFile, Pierre worker highlighting, content-size gating, PierreCapabilitiesContext)
+- `PIERRE-WORKER-FIX-AND-LAZY-VIRTUALIZER.md` — Fix Pierre workers via Blob URL (?worker&inline for WKWebView) + lazy virtualizer demand ref-counting (IntersectionObserver only on large diff expand)
+- `LARGE-DIFF-PERFORMANCE-VIRTUALIZATION.md` — Large diff performance virtualization (Pierre tiered rendering, diff scheduler, hover prefetch, pathological diff tab routing)
 - `GLOBAL-NAVIGATION-HISTORY.md` — Global back/forward navigation history (browser-like history across all modes, Zustand subscriptions, dual-backend support, rich tab snapshots)
 - `fix-works-then-stops-credential-deletion.md` — Fix shell env API key deletion by OAuth (protect `ANTHROPIC_API_KEY` from `startSession()` wipe when OAuth temporarily wins)
 - `production-ready-credentials.md` — Production-ready credential system + startup health checks (connect Settings UI keys to agent-bridge, AES-256-GCM → sidecar flow)
