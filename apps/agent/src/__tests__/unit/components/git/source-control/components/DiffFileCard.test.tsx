@@ -6,11 +6,13 @@ import userEvent from '@testing-library/user-event';
 
 import type { FileItem } from '@/components/git/source-control/types';
 import type { FileDiff } from '@/lib/api';
+import type { ComponentProps } from 'react';
 
 import { DiffFileCard } from '@/components/git/source-control/components/DiffFileCard';
 import { gitFileDiffContent, gitFileDiffStats } from '@/lib/api/git';
 import { diffScheduler } from '@/lib/utils';
 import { clearParsedDiffCache } from '@/lib/utils/pierre-diff-cache';
+import { PierreCapabilitiesContext } from '@/providers/pierre-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useGitStore } from '@/stores/git/git-store';
 
@@ -94,7 +96,11 @@ function createStructuredDiff(additions: number, deletions: number): FileDiff {
   };
 }
 
-function createPierreDiffMetadata(additions: number, deletions: number): unknown {
+function createPierreDiffMetadata(
+  additions: number,
+  deletions: number,
+  unifiedLineCount = additions + deletions
+): unknown {
   return {
     name: 'src/example.ts',
     lang: 'typescript',
@@ -105,21 +111,32 @@ function createPierreDiffMetadata(additions: number, deletions: number): unknown
     deletionLines: [],
     additionsContent: '',
     deletionsContent: '',
+    unifiedLineCount,
   };
 }
 
-function renderCard(diff: FileDiff | undefined): void {
-  render(
-    <DiffFileCard
-      file={createFileItem()}
-      diff={diff}
-      deferredDiffMode={false}
-      isStaged={false}
-      isLoading={false}
-      onAction={() => Promise.resolve(undefined)}
-      onDiscard={vi.fn()}
-      schedulePrefetch={() => () => undefined}
-    />
+function renderCard(
+  diff: FileDiff | undefined,
+  overrides: Partial<ComponentProps<typeof DiffFileCard>> = {},
+  workerPoolAvailable = false
+): ReturnType<typeof render> {
+  return render(
+    <PierreCapabilitiesContext.Provider value={{ workerPoolAvailable }}>
+      <DiffFileCard
+        file={createFileItem()}
+        diff={diff}
+        deferredDiffMode={false}
+        isStaged={false}
+        isLoading={false}
+        virtualizerReady={true}
+        onAction={() => Promise.resolve(undefined)}
+        onDiscard={vi.fn()}
+        schedulePrefetch={() => () => undefined}
+        onVirtualizerNeeded={vi.fn()}
+        onVirtualizerReleased={vi.fn()}
+        {...overrides}
+      />
+    </PierreCapabilitiesContext.Provider>
   );
 }
 
@@ -173,6 +190,25 @@ describe('DiffFileCard', () => {
     expect(props['metrics']).toBeUndefined();
   });
 
+  it('skips SSR preload for small diffs when the worker pool is available', async () => {
+    const user = userEvent.setup();
+    const metadata = createPierreDiffMetadata(30, 10);
+    parseDiffFromFileMock.mockReturnValue(metadata);
+
+    renderCard(createStructuredDiff(30, 10), {}, true);
+
+    await user.click(screen.getByLabelText('Expand diff for example.ts'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pierre-file-diff')).toBeInTheDocument();
+    });
+
+    expect(preloadFileDiffMock).not.toHaveBeenCalled();
+    const props = pierreFileDiffRenderMock.mock.lastCall?.[0] as Record<string, unknown>;
+    expect('prerenderedHTML' in props).toBe(false);
+    expect(props['metrics']).toBeUndefined();
+  });
+
   it('uses the virtualized inline path for large diffs and skips SSR preload', async () => {
     const user = userEvent.setup();
     const metadata = createPierreDiffMetadata(420, 20);
@@ -192,10 +228,134 @@ describe('DiffFileCard', () => {
     expect('prerenderedHTML' in props).toBe(false);
   });
 
+  it('gates large diff rendering until the virtualizer is ready', async () => {
+    const user = userEvent.setup();
+    const onVirtualizerNeeded = vi.fn();
+    const onVirtualizerReleased = vi.fn();
+    const onAction = (): Promise<void> => Promise.resolve(undefined);
+    const onDiscard = vi.fn();
+    const metadata = createPierreDiffMetadata(420, 20);
+    parseDiffFromFileMock.mockReturnValue(metadata);
+
+    const view = renderCard(createStructuredDiff(420, 20), {
+      virtualizerReady: false,
+      onAction,
+      onDiscard,
+      onVirtualizerNeeded,
+      onVirtualizerReleased,
+    });
+
+    await user.click(screen.getByLabelText('Expand diff for example.ts'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Preparing diff…')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('pierre-file-diff')).not.toBeInTheDocument();
+    expect(onVirtualizerNeeded).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <PierreCapabilitiesContext.Provider value={{ workerPoolAvailable: false }}>
+        <DiffFileCard
+          file={createFileItem()}
+          diff={createStructuredDiff(420, 20)}
+          deferredDiffMode={false}
+          isStaged={false}
+          isLoading={false}
+          virtualizerReady={true}
+          onAction={onAction}
+          onDiscard={onDiscard}
+          schedulePrefetch={() => () => undefined}
+          onVirtualizerNeeded={onVirtualizerNeeded}
+          onVirtualizerReleased={onVirtualizerReleased}
+        />
+      </PierreCapabilitiesContext.Provider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pierre-file-diff')).toBeInTheDocument();
+    });
+
+    const props = pierreFileDiffRenderMock.mock.lastCall?.[0] as Record<string, unknown>;
+    expect(props['metrics']).toBeDefined();
+  });
+
+  it('signals virtualizer demand on expand and releases it on collapse', async () => {
+    const user = userEvent.setup();
+    const onVirtualizerNeeded = vi.fn();
+    const onVirtualizerReleased = vi.fn();
+    const metadata = createPierreDiffMetadata(420, 20);
+    parseDiffFromFileMock.mockReturnValue(metadata);
+
+    renderCard(createStructuredDiff(420, 20), {
+      onVirtualizerNeeded,
+      onVirtualizerReleased,
+    });
+
+    await user.click(screen.getByLabelText('Expand diff for example.ts'));
+    await waitFor(() => {
+      expect(onVirtualizerNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByLabelText('Collapse diff for example.ts'));
+    await waitFor(() => {
+      expect(onVirtualizerReleased).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('releases virtualizer demand when the card unmounts', async () => {
+    const user = userEvent.setup();
+    const onVirtualizerNeeded = vi.fn();
+    const onVirtualizerReleased = vi.fn();
+    const metadata = createPierreDiffMetadata(420, 20);
+    parseDiffFromFileMock.mockReturnValue(metadata);
+
+    const view = renderCard(createStructuredDiff(420, 20), {
+      onVirtualizerNeeded,
+      onVirtualizerReleased,
+    });
+
+    await user.click(screen.getByLabelText('Expand diff for example.ts'));
+    await waitFor(() => {
+      expect(onVirtualizerNeeded).toHaveBeenCalledTimes(1);
+    });
+
+    view.unmount();
+
+    expect(onVirtualizerReleased).toHaveBeenCalledTimes(1);
+  });
+
+  it('mounts a prefetched large diff on the virtualized path when ready', async () => {
+    const user = userEvent.setup();
+    const metadata = createPierreDiffMetadata(420, 20);
+    parseDiffFromFileMock.mockReturnValue(metadata);
+
+    renderCard(createStructuredDiff(420, 20), {
+      schedulePrefetch: (start) => {
+        void start();
+        return () => undefined;
+      },
+    });
+
+    await user.hover(screen.getByLabelText('Expand diff for example.ts'));
+    await waitFor(() => {
+      expect(gitFileDiffContentMock).toHaveBeenCalledTimes(1);
+    });
+
+    await user.click(screen.getByLabelText('Expand diff for example.ts'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pierre-file-diff')).toBeInTheDocument();
+    });
+
+    expect(gitFileDiffContentMock).toHaveBeenCalledTimes(1);
+    const props = pierreFileDiffRenderMock.mock.lastCall?.[0] as Record<string, unknown>;
+    expect(props['metrics']).toBeDefined();
+  });
+
   it('routes pathological diffs to the dedicated diff tab flow', async () => {
     const user = userEvent.setup();
     const openFileWithDiff = vi.fn();
-    const metadata = createPierreDiffMetadata(10_500, 250);
+    const metadata = createPierreDiffMetadata(10_500, 250, 10_750);
     parseDiffFromFileMock.mockReturnValue(metadata);
     useFileViewerStore.setState({
       openFileWithDiff,

@@ -565,6 +565,7 @@ pub fn run() {
             git::git_file_at_ref,
             git::git_file_diff_stats,
             git::git_file_diff_content,
+            git::git_batch_file_contents,
             git::git_branch_diff_stats,
             git::git_discard,
             git::git_log,

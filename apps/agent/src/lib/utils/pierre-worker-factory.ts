@@ -1,3 +1,5 @@
+import PierreInlineWorker from '@pierre/diffs/worker/worker-portable.js?worker&inline';
+
 import type { WorkerPoolOptions } from '@pierre/diffs/react';
 
 const DEFAULT_FALLBACK_THREADS = 4;
@@ -15,10 +17,7 @@ function getPierreWorkerPoolSize(): number {
 }
 
 export const PIERRE_WORKER_POOL_OPTIONS: WorkerPoolOptions = {
-  workerFactory: () =>
-    new Worker(new URL('@pierre/diffs/worker/worker.js', import.meta.url), {
-      type: 'module',
-    }),
+  workerFactory: () => new PierreInlineWorker(),
   poolSize: getPierreWorkerPoolSize(),
   totalASTLRUCacheSize: 48,
 };

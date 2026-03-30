@@ -11,15 +11,16 @@ import { Virtuoso } from 'react-virtuoso';
 
 import { DiffFileCard } from './DiffFileCard';
 
-import type { FileItem } from '../types';
+import type { FileItem, VirtualizerDemandCallbacks } from '../types';
 import type { FileDiff } from '@/lib/api';
 
 import { cn } from '@/lib/utils';
 
 type ActiveTab = 'staged' | 'changes';
 
-interface ChangesListProps {
+interface ChangesListProps extends VirtualizerDemandCallbacks {
   scrollParent: HTMLDivElement | null;
+  virtualizerReady: boolean;
   stagedFiles: FileItem[];
   unstagedFiles: FileItem[];
   untrackedDiffSkipped: boolean;
@@ -35,6 +36,7 @@ interface ChangesListProps {
 
 export const ChangesList: React.FC<ChangesListProps> = ({
   scrollParent,
+  virtualizerReady,
   stagedFiles,
   unstagedFiles,
   untrackedDiffSkipped,
@@ -46,6 +48,8 @@ export const ChangesList: React.FC<ChangesListProps> = ({
   onStageAll,
   onUnstageAll,
   onRequestDiscard,
+  onVirtualizerNeeded,
+  onVirtualizerReleased,
 }) => {
   const hasChanges = stagedFiles.length > 0 || unstagedFiles.length > 0;
 
@@ -224,9 +228,12 @@ export const ChangesList: React.FC<ChangesListProps> = ({
                       deferredDiffMode={isDeferredDiffMode}
                       isStaged={isStaged}
                       isLoading={isStaging}
+                      virtualizerReady={virtualizerReady}
                       onAction={activeAction}
                       onDiscard={activeDiscard}
                       schedulePrefetch={schedulePrefetch}
+                      onVirtualizerNeeded={onVirtualizerNeeded}
+                      onVirtualizerReleased={onVirtualizerReleased}
                     />
                   </div>
                 );

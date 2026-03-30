@@ -7,8 +7,9 @@ use std::path::Path;
 
 use orbit_core::{Error, GitBranch, GitCommit, GitStatusResponse, Result};
 use orbit_git::{
-    BlameLine, BranchDiffStats, BranchInfo, DiffScope, FileDiff, FileDiffStats, GitManager,
-    SingleFileContent, WorktreeAddOptions, WorktreeInfo, WorktreeRemoveResult,
+    BatchFileContentResult, BatchFileRequest, BlameLine, BranchDiffStats, BranchInfo, DiffScope,
+    FileDiff, FileDiffStats, GitManager, SingleFileContent, WorktreeAddOptions, WorktreeInfo,
+    WorktreeRemoveResult,
 };
 use tokio::task::spawn_blocking;
 
@@ -175,6 +176,19 @@ pub async fn git_file_diff_content(
     spawn_git(move || {
         orbit_git::get_single_file_content(Path::new(&repo_path), &file, scope, old_path.as_deref())
             .capture("git_file_diff_content")
+    })
+    .await
+}
+
+/// Get the full old/new content for multiple file diffs with one repo open.
+#[tauri::command]
+pub async fn git_batch_file_contents(
+    repo_path: String,
+    files: Vec<BatchFileRequest>,
+) -> Result<Vec<BatchFileContentResult>> {
+    spawn_git(move || {
+        orbit_git::get_batch_file_contents(Path::new(&repo_path), &files)
+            .capture("git_batch_file_contents")
     })
     .await
 }

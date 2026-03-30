@@ -30,6 +30,8 @@ const {
   mockGitStagedDiff,
   mockGitStatus,
   mockGitUnstage,
+  mockCancelDiffPrep,
+  mockStartDiffPrep,
   mockToastError,
   mockToastSuccess,
 } = vi.hoisted(() => ({
@@ -46,6 +48,8 @@ const {
   mockGitStagedDiff: vi.fn<[string], Promise<[]>>(),
   mockGitStatus: vi.fn<[string], Promise<GitStatusResponse>>(),
   mockGitUnstage: vi.fn<[string, string[]], Promise<void>>(),
+  mockCancelDiffPrep: vi.fn(),
+  mockStartDiffPrep: vi.fn<[string, unknown[], number, unknown[], unknown[]], Promise<void>>(),
   mockToastError: vi.fn(),
   mockToastSuccess: vi.fn(),
 }));
@@ -71,6 +75,11 @@ vi.mock('sonner', () => ({
     error: mockToastError,
     success: mockToastSuccess,
   },
+}));
+
+vi.mock('@/lib/utils/diff-prep-service', () => ({
+  cancelDiffPrep: mockCancelDiffPrep,
+  startDiffPrep: mockStartDiffPrep,
 }));
 
 function createMockStatus(overrides: Partial<GitStatus> = {}): GitStatus {
@@ -132,6 +141,7 @@ beforeEach(() => {
   mockGitStagedDiff.mockResolvedValue([]);
   mockGitStatus.mockResolvedValue(createStatusResponse(createMockStatus()));
   mockGitUnstage.mockResolvedValue(undefined);
+  mockStartDiffPrep.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -316,6 +326,7 @@ describe('useSourceControl diff fetching behavior', () => {
 
     expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
     expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+    expect(mockStartDiffPrep).toHaveBeenCalledTimes(1);
   });
 
   it('deduplicates inflight fetches and drains one trailing refetch', async () => {
@@ -374,6 +385,7 @@ describe('useSourceControl diff fetching behavior', () => {
 
     expect(mockGitStagedDiff).toHaveBeenCalledTimes(2);
     expect(mockGitDiffStructured).toHaveBeenCalledTimes(2);
+    expect(mockStartDiffPrep).toHaveBeenCalledTimes(2);
   });
 
   it('does not fetch diffs when the source control tab is hidden', async () => {
@@ -390,6 +402,7 @@ describe('useSourceControl diff fetching behavior', () => {
 
     expect(mockGitStagedDiff).not.toHaveBeenCalled();
     expect(mockGitDiffStructured).not.toHaveBeenCalled();
+    expect(mockStartDiffPrep).not.toHaveBeenCalled();
   });
 
   it('fetches immediately on visibility transition from hidden to visible', async () => {
@@ -412,6 +425,7 @@ describe('useSourceControl diff fetching behavior', () => {
 
     expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
     expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+    expect(mockStartDiffPrep).toHaveBeenCalledTimes(1);
   });
 
   it('runs a single fetch on first visible mount (mount guard prevents double call)', async () => {
@@ -427,5 +441,14 @@ describe('useSourceControl diff fetching behavior', () => {
 
     expect(mockGitStagedDiff).toHaveBeenCalledTimes(1);
     expect(mockGitDiffStructured).toHaveBeenCalledTimes(1);
+    expect(mockStartDiffPrep).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels background diff prep when the hook unmounts', () => {
+    const { unmount } = renderHook(() => useSourceControl(true));
+
+    unmount();
+
+    expect(mockCancelDiffPrep).toHaveBeenCalledTimes(1);
   });
 });

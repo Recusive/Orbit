@@ -17,9 +17,15 @@ interface ParsedDiffCacheIdentity {
   statusFingerprint: string | null;
 }
 
-export const MAX_PARSED_DIFF_CACHE_ENTRIES = 20;
+export const MAX_PARSED_DIFF_CACHE_ENTRIES = 80;
+export const MAX_PARSED_DIFF_CACHE_BYTES = 50_000_000;
 
 const parsedDiffCache = new Map<string, CachedParsedDiff>();
+let totalCachedBytes = 0;
+
+function getCachedEntryBytes(value: CachedParsedDiff): number {
+  return value.oldContent.length + value.newContent.length;
+}
 
 export function getParsedDiffCacheKey({
   repoPath,
@@ -43,11 +49,33 @@ export function getCachedParsedDiff(key: string): CachedParsedDiff | undefined {
 }
 
 export function setCachedParsedDiff(key: string, value: CachedParsedDiff): void {
-  if (parsedDiffCache.has(key)) {
+  const entryBytes = getCachedEntryBytes(value);
+  if (entryBytes > MAX_PARSED_DIFF_CACHE_BYTES) {
+    parsedDiffCache.delete(key);
+    return;
+  }
+
+  const previous = parsedDiffCache.get(key);
+  if (previous) {
+    totalCachedBytes -= getCachedEntryBytes(previous);
     parsedDiffCache.delete(key);
   }
 
+  while (totalCachedBytes + entryBytes > MAX_PARSED_DIFF_CACHE_BYTES && parsedDiffCache.size > 0) {
+    const oldestKey = parsedDiffCache.keys().next().value;
+    if (typeof oldestKey !== 'string') {
+      break;
+    }
+
+    const oldest = parsedDiffCache.get(oldestKey);
+    if (oldest) {
+      totalCachedBytes -= getCachedEntryBytes(oldest);
+    }
+    parsedDiffCache.delete(oldestKey);
+  }
+
   parsedDiffCache.set(key, value);
+  totalCachedBytes += entryBytes;
 
   if (parsedDiffCache.size <= MAX_PARSED_DIFF_CACHE_ENTRIES) {
     return;
@@ -55,12 +83,17 @@ export function setCachedParsedDiff(key: string, value: CachedParsedDiff): void 
 
   const oldestKey = parsedDiffCache.keys().next().value;
   if (typeof oldestKey === 'string') {
+    const oldest = parsedDiffCache.get(oldestKey);
+    if (oldest) {
+      totalCachedBytes -= getCachedEntryBytes(oldest);
+    }
     parsedDiffCache.delete(oldestKey);
   }
 }
 
 export function clearParsedDiffCache(): void {
   parsedDiffCache.clear();
+  totalCachedBytes = 0;
 }
 
 export function getParsedDiffCacheSize(): number {

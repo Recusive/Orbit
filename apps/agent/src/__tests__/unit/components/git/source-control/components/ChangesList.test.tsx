@@ -12,9 +12,12 @@ interface MockDiffFileCardProps {
   deferredDiffMode: boolean;
   isStaged: boolean;
   isLoading: boolean;
+  virtualizerReady: boolean;
   onAction: (path: string) => Promise<void>;
   onDiscard?: ((path: string) => void) | undefined;
   schedulePrefetch: (start: () => Promise<void>) => () => void;
+  onVirtualizerNeeded: () => void;
+  onVirtualizerReleased: () => void;
 }
 
 interface MockVirtuosoProps<TData> {
@@ -83,10 +86,13 @@ function renderChangesList(overrides: Partial<ComponentProps<typeof ChangesList>
   const stagedDiffs = [buildDiff('src/staged.ts')];
   const unstagedDiffs = [buildDiff('src/a.ts'), buildDiff('src/b.ts')];
   const scrollParent = document.createElement('div');
+  const onVirtualizerNeeded = vi.fn();
+  const onVirtualizerReleased = vi.fn();
 
   render(
     <ChangesList
       scrollParent={scrollParent}
+      virtualizerReady={false}
       stagedFiles={stagedFiles}
       unstagedFiles={unstagedFiles}
       untrackedDiffSkipped={false}
@@ -98,6 +104,8 @@ function renderChangesList(overrides: Partial<ComponentProps<typeof ChangesList>
       onStageAll={() => Promise.resolve(undefined)}
       onUnstageAll={() => Promise.resolve(undefined)}
       onRequestDiscard={vi.fn()}
+      onVirtualizerNeeded={onVirtualizerNeeded}
+      onVirtualizerReleased={onVirtualizerReleased}
       {...overrides}
     />
   );
@@ -125,10 +133,15 @@ describe('ChangesList', () => {
   it('passes active tab file props to DiffFileCard items', () => {
     const onStageFile = vi.fn<[string], Promise<void>>().mockResolvedValue(undefined);
     const onRequestDiscard = vi.fn();
+    const onVirtualizerNeeded = vi.fn();
+    const onVirtualizerReleased = vi.fn();
 
     renderChangesList({
       onStageFile,
       onRequestDiscard,
+      onVirtualizerNeeded,
+      onVirtualizerReleased,
+      virtualizerReady: true,
     });
 
     const first = receivedPropsByPath.get('src/a.ts');
@@ -142,6 +155,9 @@ describe('ChangesList', () => {
     expect(first?.diff?.path).toBe('src/a.ts');
     expect(first?.onAction).toBe(onStageFile);
     expect(first?.onDiscard).toBe(onRequestDiscard);
+    expect(first?.virtualizerReady).toBe(true);
+    expect(first?.onVirtualizerNeeded).toBe(onVirtualizerNeeded);
+    expect(first?.onVirtualizerReleased).toBe(onVirtualizerReleased);
     expect(typeof first?.schedulePrefetch).toBe('function');
   });
 

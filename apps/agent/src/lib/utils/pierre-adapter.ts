@@ -60,8 +60,14 @@ export const PIERRE_DIFF_STYLE = {
  * Force background-color directly — bypasses Pierre's CSS variable chain
  * (getHighlighterThemeStyles sets inline --diffs-dark-bg on <pre>, which
  * beats inherited custom properties. Direct background-color !important wins). */
-export const PIERRE_DIFF_UNSAFE_CSS =
-  'pre[data-diffs] { margin: 0; } [data-code] { padding: 0 !important; overflow-x: auto !important; } [data-code]::-webkit-scrollbar { height: 0 !important; }';
+export const PIERRE_DIFF_UNSAFE_CSS = [
+  'pre[data-diffs] { margin: 0; }',
+  '[data-code] { padding: 0 !important; overflow-x: auto !important; }',
+  '[data-code]::-webkit-scrollbar { height: 0 !important; }',
+  // Match expand-button grid column to line-number column width (3ch content + 2ch pad-left + 1ch pad-right + 2px border)
+  '[data-expand-index] [data-separator-wrapper] { grid-template-columns: calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) auto; }',
+  '[data-expand-index] [data-separator-wrapper][data-separator-multi-button] { grid-template-columns: calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) auto; }',
+].join(' ');
 
 // ---------------------------------------------------------------------------
 // Cache Keys

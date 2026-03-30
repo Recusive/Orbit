@@ -9,7 +9,7 @@
 import { Virtualizer as PierreVirtualizerCore } from '@pierre/diffs';
 import { VirtualizerContext } from '@pierre/diffs/react';
 import { AlertCircle, CloudDownload, GitBranch, Loader2, RefreshCw } from 'lucide-react';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { BranchSelector } from './components/BranchSelector';
 import { ChangesList } from './components/ChangesList';
@@ -24,7 +24,7 @@ import { useSourceControl } from './hooks/use-source-control';
 import type { SourceControlTabProps } from './types';
 
 import { useSmoothScroll } from '@/hooks/ui';
-import { cn, diffScheduler } from '@/lib/utils';
+import { cancelDiffPrep, cn, diffScheduler } from '@/lib/utils';
 import { PIERRE_VIRTUALIZER_OVERSCROLL_SIZE } from '@/lib/utils/pierre-adapter';
 import { clearParsedDiffCache } from '@/lib/utils/pierre-diff-cache';
 import { useGitStore } from '@/stores/git/git-store';
@@ -37,6 +37,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null);
   const [pierreVirtualizer, setPierreVirtualizer] = useState<PierreVirtualizerCore | undefined>();
   const pierreVirtualizerRef = useRef<PierreVirtualizerCore | null>(null);
+  const demandCountRef = useRef(0);
   const scrollNodeRef = useRef<HTMLDivElement | null>(null);
   const contentWrapperRef = useRef<HTMLDivElement | null>(null);
   const repoPath = useGitStore((state) => state.repoPath);
@@ -106,23 +107,31 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
   } = useSourceControl(isVisible);
 
   useEffect(() => {
+    cancelDiffPrep();
     diffScheduler.cancelAll();
     clearParsedDiffCache();
   }, [repoPath]);
 
-  useLayoutEffect(() => {
+  const destroyVirtualizer = useCallback((): void => {
+    const instance = pierreVirtualizerRef.current;
+    if (!instance) {
+      return;
+    }
+
+    instance.cleanUp();
+    pierreVirtualizerRef.current = null;
+    setPierreVirtualizer(undefined);
+  }, []);
+
+  const createVirtualizer = useCallback((): boolean => {
     const scrollNode = scrollNodeRef.current;
     const contentNode = contentWrapperRef.current;
 
-    if (pierreVirtualizerRef.current) {
-      pierreVirtualizerRef.current.cleanUp();
-      pierreVirtualizerRef.current = null;
+    if (!scrollNode || !contentNode) {
+      return false;
     }
 
-    if (!scrollNode || !contentNode) {
-      setPierreVirtualizer(undefined);
-      return;
-    }
+    destroyVirtualizer();
 
     const instance = new PierreVirtualizerCore({
       overscrollSize: PIERRE_VIRTUALIZER_OVERSCROLL_SIZE,
@@ -130,13 +139,46 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
     instance.setup(scrollNode, contentNode);
     pierreVirtualizerRef.current = instance;
     setPierreVirtualizer(instance);
+    return true;
+  }, [destroyVirtualizer]);
 
+  const handleVirtualizerNeeded = useCallback((): void => {
+    demandCountRef.current += 1;
+    if (demandCountRef.current === 1) {
+      createVirtualizer();
+    }
+  }, [createVirtualizer]);
+
+  const handleVirtualizerReleased = useCallback((): void => {
+    demandCountRef.current = Math.max(0, demandCountRef.current - 1);
+    if (demandCountRef.current === 0) {
+      destroyVirtualizer();
+    }
+  }, [destroyVirtualizer]);
+
+  useEffect(() => {
+    if (demandCountRef.current === 0) {
+      if (!scrollParent) {
+        destroyVirtualizer();
+      }
+      return;
+    }
+
+    if (!scrollParent) {
+      destroyVirtualizer();
+      return;
+    }
+
+    createVirtualizer();
+  }, [createVirtualizer, destroyVirtualizer, scrollParent]);
+
+  useEffect(() => {
     return (): void => {
-      instance.cleanUp();
+      demandCountRef.current = 0;
+      pierreVirtualizerRef.current?.cleanUp();
       pierreVirtualizerRef.current = null;
-      setPierreVirtualizer(undefined);
     };
-  }, [scrollParent]);
+  }, []);
 
   // Loading state
   if (isLoading && !status) {
@@ -261,6 +303,7 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
           <VirtualizerContext.Provider value={pierreVirtualizer}>
             <ChangesList
               scrollParent={scrollParent}
+              virtualizerReady={pierreVirtualizer !== undefined}
               stagedFiles={stagedFiles}
               unstagedFiles={unstagedFiles}
               untrackedDiffSkipped={untrackedDiffSkipped}
@@ -272,6 +315,8 @@ export const SourceControlTab: React.FC<SourceControlTabProps> = ({
               onStageAll={handleStageAll}
               onUnstageAll={handleUnstageAll}
               onRequestDiscard={handleRequestDiscard}
+              onVirtualizerNeeded={handleVirtualizerNeeded}
+              onVirtualizerReleased={handleVirtualizerReleased}
             />
           </VirtualizerContext.Provider>
         </div>

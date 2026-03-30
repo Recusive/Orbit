@@ -122,15 +122,15 @@ describe('SourceControlTab', () => {
     useGitStore.setState({ repoPath: '/repo' });
   });
 
-  it('creates and cleans up the shared Pierre virtualizer on mount', () => {
+  it('does not create the shared Pierre virtualizer until a large diff requests it', () => {
     const { unmount } = render(<SourceControlTab />);
 
     expect(screen.getByTestId('source-control-scroll')).toBeInTheDocument();
-    expect(screen.getByTestId('changes-list')).toHaveTextContent('context-ready');
-    expect(setupMock).toHaveBeenCalledWith(expect.any(HTMLDivElement), expect.any(HTMLDivElement));
+    expect(screen.getByTestId('changes-list')).toHaveTextContent('context-missing');
+    expect(setupMock).not.toHaveBeenCalled();
 
     unmount();
 
-    expect(cleanUpMock).toHaveBeenCalled();
+    expect(cleanUpMock).not.toHaveBeenCalled();
   });
 });

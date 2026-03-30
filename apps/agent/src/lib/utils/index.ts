@@ -17,6 +17,12 @@ export {
 // Diff utilities
 export { computeSimpleDiff, getLanguageFromPath } from './diff-utils';
 export { createDiffScheduler, diffScheduler } from './diff-scheduler';
+export {
+  cancelDiffPrep,
+  getInflightPromise,
+  getPreparedDiff,
+  startDiffPrep,
+} from './diff-prep-service';
 
 // Image utilities
 export { compressImage, getImageMimeType, isImageFile, isSvgFile } from './image-utils';

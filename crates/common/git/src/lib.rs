@@ -145,6 +145,32 @@ pub struct SingleFileContent {
     pub is_binary: bool,
 }
 
+/// Batch request for multiple single-file content reads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFileRequest {
+    /// File path relative to repository root.
+    pub file: String,
+    /// Diff scope for the file.
+    pub scope: DiffScope,
+    /// Old path for renames/copies.
+    pub old_path: Option<String>,
+}
+
+/// Per-file result for batch content reads.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchFileContentResult {
+    /// File path relative to repository root.
+    pub file: String,
+    /// Diff scope for the file.
+    pub scope: DiffScope,
+    /// File content when the request succeeded.
+    pub content: Option<SingleFileContent>,
+    /// Per-file error when the request failed.
+    pub error: Option<String>,
+}
+
 /// Scope for a single-file diff request.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -899,7 +925,17 @@ pub fn get_single_file_content(
     let repo = open(repo_path)?;
     let relative_file = Path::new(file);
     let relative_old_path = old_path.map(Path::new);
-    let diff = build_single_file_diff(&repo, repo_path, relative_file, scope, relative_old_path)?;
+    extract_single_file_content(&repo, repo_path, relative_file, scope, relative_old_path)
+}
+
+fn extract_single_file_content(
+    repo: &Repository,
+    repo_path: &Path,
+    relative_file: &Path,
+    scope: DiffScope,
+    relative_old_path: Option<&Path>,
+) -> Result<SingleFileContent> {
+    let diff = build_single_file_diff(repo, repo_path, relative_file, scope, relative_old_path)?;
     let delta = first_single_file_delta(&diff);
 
     if delta.as_ref().is_some_and(|entry| entry.is_binary) {
@@ -926,18 +962,18 @@ pub fn get_single_file_content(
                 content: String::new(),
                 is_binary: false,
             },
-            read_text_at_ref(&repo, repo_path, new_side_path, "INDEX")?,
+            read_text_at_ref(repo, repo_path, new_side_path, "INDEX")?,
         ),
         (DiffScope::Staged, Some(Delta::Deleted)) => (
-            read_text_at_ref(&repo, repo_path, old_side_path, "HEAD")?,
+            read_text_at_ref(repo, repo_path, old_side_path, "HEAD")?,
             TextContent {
                 content: String::new(),
                 is_binary: false,
             },
         ),
         (DiffScope::Staged, _) => (
-            read_text_at_ref(&repo, repo_path, old_side_path, "HEAD")?,
-            read_text_at_ref(&repo, repo_path, new_side_path, "INDEX")?,
+            read_text_at_ref(repo, repo_path, old_side_path, "HEAD")?,
+            read_text_at_ref(repo, repo_path, new_side_path, "INDEX")?,
         ),
         (DiffScope::Unstaged, Some(Delta::Untracked)) => (
             TextContent {
@@ -947,14 +983,14 @@ pub fn get_single_file_content(
             read_worktree_text(repo_path, new_side_path)?,
         ),
         (DiffScope::Unstaged, Some(Delta::Deleted)) => (
-            read_text_at_ref(&repo, repo_path, old_side_path, "INDEX")?,
+            read_text_at_ref(repo, repo_path, old_side_path, "INDEX")?,
             TextContent {
                 content: String::new(),
                 is_binary: false,
             },
         ),
         (DiffScope::Unstaged, _) => (
-            read_text_at_ref(&repo, repo_path, old_side_path, "INDEX")?,
+            read_text_at_ref(repo, repo_path, old_side_path, "INDEX")?,
             read_worktree_text(repo_path, new_side_path)?,
         ),
     };
@@ -972,6 +1008,43 @@ pub fn get_single_file_content(
         new_content: new_content.content,
         is_binary: false,
     })
+}
+
+/// Get the full old/new text content for multiple file diffs with a single repo open.
+pub fn get_batch_file_contents(
+    repo_path: &Path,
+    files: &[BatchFileRequest],
+) -> Result<Vec<BatchFileContentResult>> {
+    let repo = open(repo_path)?;
+    let mut results = Vec::with_capacity(files.len());
+
+    for request in files {
+        let relative_file = Path::new(&request.file);
+        let relative_old_path = request.old_path.as_deref().map(Path::new);
+
+        match extract_single_file_content(
+            &repo,
+            repo_path,
+            relative_file,
+            request.scope,
+            relative_old_path,
+        ) {
+            Ok(content) => results.push(BatchFileContentResult {
+                file: request.file.clone(),
+                scope: request.scope,
+                content: Some(content),
+                error: None,
+            }),
+            Err(error) => results.push(BatchFileContentResult {
+                file: request.file.clone(),
+                scope: request.scope,
+                content: None,
+                error: Some(error.to_string()),
+            }),
+        }
+    }
+
+    Ok(results)
 }
 
 /// Get the diff for a specific file.
@@ -2771,6 +2844,62 @@ mod tests {
         assert_eq!(content.old_content, "tracked contents\n");
         assert_eq!(content.new_content, "");
         assert!(!content.is_binary);
+        Ok(())
+    }
+
+    #[test]
+    fn batch_file_contents_returns_per_file_results() -> Result<()> {
+        use std::fs;
+
+        let dir = tempdir().map_err(Error::Io)?;
+        let repo_path = dir.path();
+        let repo = init_test_repo(repo_path)?;
+        drop(repo);
+
+        fs::write(repo_path.join("fresh.txt"), "line one\nline two\n").map_err(Error::Io)?;
+        fs::write(repo_path.join("invalid.txt"), vec![0xff, 0xfe, 0xfd]).map_err(Error::Io)?;
+
+        let results = get_batch_file_contents(
+            repo_path,
+            &[
+                BatchFileRequest {
+                    file: "fresh.txt".to_owned(),
+                    scope: DiffScope::Unstaged,
+                    old_path: None,
+                },
+                BatchFileRequest {
+                    file: "invalid.txt".to_owned(),
+                    scope: DiffScope::Unstaged,
+                    old_path: None,
+                },
+            ],
+        )?;
+
+        assert_eq!(results.len(), 2);
+
+        let valid = results
+            .first()
+            .ok_or_else(|| Error::Git("missing result for fresh.txt".into()))?;
+        assert_eq!(valid.file, "fresh.txt");
+        assert!(valid.error.is_none());
+        let valid_content = valid
+            .content
+            .as_ref()
+            .ok_or_else(|| Error::Git("fresh.txt content should be present".into()))?;
+        assert_eq!(valid_content.old_content, "");
+        assert_eq!(valid_content.new_content, "line one\nline two\n");
+        assert!(!valid_content.is_binary);
+
+        let invalid = results
+            .get(1)
+            .ok_or_else(|| Error::Git("missing result for invalid.txt".into()))?;
+        assert_eq!(invalid.file, "invalid.txt");
+        assert!(invalid.content.is_none());
+        let error = invalid
+            .error
+            .as_ref()
+            .ok_or_else(|| Error::Git("invalid.txt should report a per-file error".into()))?;
+        assert!(error.contains("invalid.txt"));
         Ok(())
     }
 

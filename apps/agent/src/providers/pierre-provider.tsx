@@ -3,7 +3,7 @@ import { preloadHighlighter, registerCustomTheme } from '@pierre/diffs';
 import { WorkerPoolContextProvider } from '@pierre/diffs/react';
 import pierreDarkTheme from '@pierre/theme/themes/pierre-dark.json';
 import pierreLightTheme from '@pierre/theme/themes/pierre-light.json';
-import { useEffect, useMemo, useState } from 'react';
+import { createContext, useEffect, useMemo, useState } from 'react';
 
 import type { SupportedLanguages, ThemeRegistrationResolved } from '@pierre/diffs';
 import type { FC, ReactNode } from 'react';
@@ -27,21 +27,28 @@ const lightBase = pierreLightTheme as unknown as ThemeRegistrationResolved;
 // Orbit themes — sidebar background for all Pierre surfaces.
 // Pierre's worker pool only supports one theme set, so both inline cards
 // and the diff tab use the same editor.background.
-registerCustomTheme('orbit-dark', () =>
-  Promise.resolve({
-    ...darkBase,
-    name: 'orbit-dark',
-    colors: { ...darkBase.colors, 'editor.background': '#232323' },
-  } as ThemeRegistrationResolved)
-);
+// Guard: Pierre's registerCustomTheme is "first write wins" and logs an error
+// on duplicate names. HMR re-evaluates this module, so use a global sentinel
+// that survives module re-evaluation.
+const THEMES_KEY = '__orbit_pierre_themes_registered__' as const;
+if ((globalThis as Record<string, unknown>)[THEMES_KEY] !== true) {
+  (globalThis as Record<string, unknown>)[THEMES_KEY] = true;
+  registerCustomTheme('orbit-dark', () =>
+    Promise.resolve({
+      ...darkBase,
+      name: 'orbit-dark',
+      colors: { ...darkBase.colors, 'editor.background': '#232323' },
+    } as ThemeRegistrationResolved)
+  );
 
-registerCustomTheme('orbit-light', () =>
-  Promise.resolve({
-    ...lightBase,
-    name: 'orbit-light',
-    colors: { ...lightBase.colors, 'editor.background': '#f8f8f8' },
-  } as ThemeRegistrationResolved)
-);
+  registerCustomTheme('orbit-light', () =>
+    Promise.resolve({
+      ...lightBase,
+      name: 'orbit-light',
+      colors: { ...lightBase.colors, 'editor.background': '#f8f8f8' },
+    } as ThemeRegistrationResolved)
+  );
+}
 
 // Diff tab — chat area background (#181818 dark, #ebebeb light)
 
@@ -51,7 +58,14 @@ interface PierreProviderProps {
   readonly children: ReactNode;
 }
 
+interface PierreCapabilities {
+  workerPoolAvailable: boolean;
+}
+
 const logger = createLogger('PierreProvider');
+export const PierreCapabilitiesContext = createContext<PierreCapabilities>({
+  workerPoolAvailable: false,
+});
 
 const PRELOAD_LANGUAGES: SupportedLanguages[] = [
   'text',
@@ -77,6 +91,7 @@ export const PierreProvider: FC<PierreProviderProps> = ({ children }) => {
       langs: PRELOAD_LANGUAGES,
       lineDiffType: 'word' as const,
       tokenizeMaxLineLength: 1000,
+      preferredHighlighter: 'shiki-js' as const,
     }),
     []
   );
@@ -105,8 +120,15 @@ export const PierreProvider: FC<PierreProviderProps> = ({ children }) => {
     setWorkerPoolEnabled(enabled);
 
     if (!enabled) {
-      logger.info('Pierre worker pool unavailable; using main-thread highlighting fallback');
+      logger.warn(
+        'Pierre worker pool unavailable in this WebView; main-thread highlighting active'
+      );
+      return;
     }
+
+    logger.info('Pierre worker pool active', {
+      poolSize: PIERRE_WORKER_POOL_OPTIONS.poolSize,
+    });
   }, []);
 
   useEffect(() => {
@@ -114,15 +136,21 @@ export const PierreProvider: FC<PierreProviderProps> = ({ children }) => {
   }, [repoPath]);
 
   if (!workerPoolEnabled) {
-    return <>{children}</>;
+    return (
+      <PierreCapabilitiesContext.Provider value={{ workerPoolAvailable: false }}>
+        {children}
+      </PierreCapabilitiesContext.Provider>
+    );
   }
 
   return (
-    <WorkerPoolContextProvider
-      poolOptions={PIERRE_WORKER_POOL_OPTIONS}
-      highlighterOptions={highlighterOptions}
-    >
-      {children}
-    </WorkerPoolContextProvider>
+    <PierreCapabilitiesContext.Provider value={{ workerPoolAvailable: true }}>
+      <WorkerPoolContextProvider
+        poolOptions={PIERRE_WORKER_POOL_OPTIONS}
+        highlighterOptions={highlighterOptions}
+      >
+        {children}
+      </WorkerPoolContextProvider>
+    </PierreCapabilitiesContext.Provider>
   );
 };

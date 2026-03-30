@@ -5,6 +5,7 @@ import {
   getCachedParsedDiff,
   getParsedDiffCacheKey,
   getParsedDiffCacheSize,
+  MAX_PARSED_DIFF_CACHE_BYTES,
   MAX_PARSED_DIFF_CACHE_ENTRIES,
   setCachedParsedDiff,
 } from '@/lib/utils/pierre-diff-cache';
@@ -88,5 +89,23 @@ describe('pierre-diff-cache', () => {
 
     expect(getCachedParsedDiff('key-1')).toBeUndefined();
     expect(getCachedParsedDiff('key-0')).toBeDefined();
+  });
+
+  it('evicts entries to stay under the byte limit', () => {
+    const chunk = 'x'.repeat(Math.floor(MAX_PARSED_DIFF_CACHE_BYTES / 2));
+
+    setCachedParsedDiff('key-a', {
+      ...createEntry('a'),
+      oldContent: chunk,
+      newContent: chunk,
+    });
+    setCachedParsedDiff('key-b', {
+      ...createEntry('b'),
+      oldContent: chunk,
+      newContent: chunk,
+    });
+
+    expect(getCachedParsedDiff('key-a')).toBeUndefined();
+    expect(getCachedParsedDiff('key-b')).toBeDefined();
   });
 });

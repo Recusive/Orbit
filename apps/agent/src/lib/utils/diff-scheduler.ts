@@ -135,7 +135,7 @@ function cancelLaneTask<T>(lane: Lane<T>, key: string): void {
 
 export function createDiffScheduler(): DiffScheduler {
   const statsLane = createLane<FileDiffStats>('stats', 8);
-  const contentLane = createLane<SingleFileContent>('content', 2);
+  const contentLane = createLane<SingleFileContent>('content', 4);
 
   return {
     requestStats: (key, fn) => requestFromLane(statsLane, key, fn),

@@ -126,6 +126,19 @@ export interface SingleFileContent {
 
 export type DiffScope = 'staged' | 'unstaged';
 
+export interface BatchFileRequest {
+  file: string;
+  scope: DiffScope;
+  oldPath?: string | null;
+}
+
+export interface BatchFileContentResult {
+  file: string;
+  scope: DiffScope;
+  content: SingleFileContent | null;
+  error: string | null;
+}
+
 export interface BlameLine {
   lineNumber: number;
   commitHash: string;
@@ -236,6 +249,13 @@ export async function gitFileDiffContent(
   oldPath?: string
 ): Promise<SingleFileContent> {
   return invoke<SingleFileContent>('git_file_diff_content', { repoPath, file, scope, oldPath });
+}
+
+export async function gitBatchFileContents(
+  repoPath: string,
+  files: BatchFileRequest[]
+): Promise<BatchFileContentResult[]> {
+  return invoke<BatchFileContentResult[]>('git_batch_file_contents', { repoPath, files });
 }
 
 export async function gitDiscard(repoPath: string, files: string[]): Promise<void> {

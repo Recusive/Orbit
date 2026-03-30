@@ -34,6 +34,12 @@ export interface FileActionHandlers {
   onDiscard: (path: string) => void;
 }
 
+/** Callbacks for DiffFileCard to signal virtualizer demand */
+export interface VirtualizerDemandCallbacks {
+  readonly onVirtualizerNeeded: () => void;
+  readonly onVirtualizerReleased: () => void;
+}
+
 /** Branch information */
 export interface BranchInfo {
   name: string;

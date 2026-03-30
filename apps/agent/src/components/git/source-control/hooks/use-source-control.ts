@@ -31,6 +31,7 @@ import {
   gitStatus,
   gitUnstage,
 } from '@/lib/api';
+import { cancelDiffPrep, startDiffPrep } from '@/lib/utils/diff-prep-service';
 import { useGitStore } from '@/stores/git/git-store';
 
 const logger = createLogger('useSourceControl');
@@ -180,6 +181,31 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
       .then(([staged, unstaged]) => {
         setStagedDiffs(staged);
         setUnstagedDiffs(unstaged);
+
+        const { status: currentStatus, statusRevision } = useGitStore.getState();
+        if (!currentStatus) {
+          return;
+        }
+
+        const filesToPrep = [
+          ...currentStatus.staged.map((entry) => ({
+            path: entry.path,
+            scope: 'staged' as const,
+            oldPath: entry.oldPath,
+          })),
+          ...currentStatus.modified.map((entry) => ({
+            path: entry.path,
+            scope: 'unstaged' as const,
+            oldPath: entry.oldPath,
+          })),
+          ...currentStatus.conflicted.map((entry) => ({
+            path: entry.path,
+            scope: 'unstaged' as const,
+            oldPath: entry.oldPath,
+          })),
+        ];
+
+        void startDiffPrep(repo, filesToPrep, statusRevision, staged, unstaged);
       })
       .catch((error: unknown) => {
         logger.debug('Failed to fetch diffs', { error });
@@ -204,6 +230,12 @@ export function useSourceControl(isVisible = true): UseSourceControlReturn {
       });
     }
   }, [status, repoPath]);
+
+  useEffect(() => {
+    return (): void => {
+      cancelDiffPrep();
+    };
+  }, []);
 
   // Re-fetch diffs on status updates and background polling ticks (when visible).
   useEffect(() => {

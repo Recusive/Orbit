@@ -10,9 +10,9 @@ import { parseDiffFromFile } from '@pierre/diffs';
 import { FileDiff as PierreFileDiff, VirtualizerContext } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
 import { AlertCircle, ChevronDown, ExternalLink, Loader2, Minus, Plus, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { FileItem } from '../types';
+import type { FileItem, VirtualizerDemandCallbacks } from '../types';
 import type { DiffScope, FileDiff, FileDiffStats } from '@/lib/api';
 import type { FileDiffOptions } from '@pierre/diffs';
 import type { FileDiffMetadata } from '@pierre/diffs/react';
@@ -21,7 +21,7 @@ import type { CSSProperties, FC, MouseEvent, TransitionEvent } from 'react';
 import { DiffStat, useIsDarkMode } from '@/components/chat/tools/shared';
 import { FileIcon } from '@/components/files';
 import { gitFileDiffContent, gitFileDiffStats } from '@/lib/api/git';
-import { cn, diffScheduler, GIT_STATUS_STYLES } from '@/lib/utils';
+import { cn, diffScheduler, GIT_STATUS_STYLES, getInflightPromise } from '@/lib/utils';
 import {
   buildGitFileContents,
   getPierreChangedLineCount,
@@ -38,15 +38,17 @@ import {
   getParsedDiffCacheKey,
   setCachedParsedDiff,
 } from '@/lib/utils/pierre-diff-cache';
+import { PierreCapabilitiesContext } from '@/providers/pierre-provider';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useGitStore } from '@/stores/git/git-store';
 
-interface DiffFileCardProps {
+interface DiffFileCardProps extends VirtualizerDemandCallbacks {
   readonly file: FileItem;
   readonly diff: FileDiff | undefined;
   readonly deferredDiffMode: boolean;
   readonly isStaged: boolean;
   readonly isLoading: boolean;
+  readonly virtualizerReady: boolean;
   readonly onAction: (path: string) => Promise<void>;
   readonly onDiscard?: ((path: string) => void) | undefined;
   readonly schedulePrefetch: (start: () => Promise<void>) => () => void;
@@ -123,9 +125,12 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   deferredDiffMode,
   isStaged,
   isLoading,
+  virtualizerReady,
   onAction,
   onDiscard,
   schedulePrefetch,
+  onVirtualizerNeeded,
+  onVirtualizerReleased,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -139,6 +144,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
   const [isOpeningDiffTab, setIsOpeningDiffTab] = useState(false);
 
   const isDarkMode = useIsDarkMode();
+  const { workerPoolAvailable } = useContext(PierreCapabilitiesContext);
   const repoPath = useGitStore((state) => state.repoPath);
   const statusFingerprint = useGitStore((state) => state.statusFingerprint);
   const statusRevision = useGitStore((state) => state.statusRevision);
@@ -146,6 +152,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
 
   const preloadRef = useRef<{ key: string; promise: Promise<PreparedDiff | null> } | null>(null);
   const cancelScheduledRef = useRef<(() => void) | null>(null);
+  const isDemanderRef = useRef(false);
   const latestRequestKeyRef = useRef('');
   const lastStatsRequestKeyRef = useRef<string | null>(null);
 
@@ -266,7 +273,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
 
     setPreloadError(null);
 
-    const shouldPrerender = diffTier === 'small';
+    const shouldPrerender = !workerPoolAvailable && diffTier === 'small';
     const cached = getCachedParsedDiff(parsedCacheKey);
     if (cached) {
       const cachedPromise = hydratePreparedDiff(cached, shouldPrerender, pierreOptions).then(
@@ -282,69 +289,91 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
       return cachedPromise;
     }
 
-    const promise = diffScheduler
-      .requestContent(requestKey, () =>
-        gitFileDiffContent(repoPath, file.path, scope, file.oldPath ?? undefined)
-      )
-      .then(async (content): Promise<PreparedDiff | null> => {
-        if (!content || latestRequestKeyRef.current !== requestKey) {
+    const loadOnDemandDiff = (): Promise<PreparedDiff | null> => {
+      const promise = diffScheduler
+        .requestContent(requestKey, () =>
+          gitFileDiffContent(repoPath, file.path, scope, file.oldPath ?? undefined)
+        )
+        .then(async (content): Promise<PreparedDiff | null> => {
+          if (!content || latestRequestKeyRef.current !== requestKey) {
+            return null;
+          }
+
+          if (content.isBinary) {
+            setIsFallbackBinary(true);
+            return null;
+          }
+
+          setIsFallbackBinary(false);
+
+          const oldFile = buildGitFileContents({
+            repoPath,
+            scope,
+            path: file.path,
+            oldPath: file.oldPath,
+            side: 'old',
+            contents: content.oldContent,
+          });
+          const newFile = buildGitFileContents({
+            repoPath,
+            scope,
+            path: file.path,
+            oldPath: file.oldPath,
+            side: 'new',
+            contents: content.newContent,
+          });
+          const fileDiffMetadata = parseDiffFromFile(oldFile, newFile);
+          const counts = countPierreChanges(fileDiffMetadata);
+          const parsed = {
+            fileDiff: fileDiffMetadata,
+            additions: counts.additions,
+            deletions: counts.deletions,
+            oldContent: content.oldContent,
+            newContent: content.newContent,
+          };
+
+          setCachedParsedDiff(parsedCacheKey, parsed);
+
+          const hydrated = await hydratePreparedDiff(parsed, shouldPrerender, pierreOptions);
+          if (latestRequestKeyRef.current !== requestKey) {
+            return null;
+          }
+
+          return hydrated;
+        })
+        .catch(() => {
+          setPreloadError('Failed to load diff preview.');
           return null;
-        }
-
-        if (content.isBinary) {
-          setIsFallbackBinary(true);
-          return null;
-        }
-
-        setIsFallbackBinary(false);
-
-        const oldFile = buildGitFileContents({
-          repoPath,
-          scope,
-          path: file.path,
-          oldPath: file.oldPath,
-          side: 'old',
-          contents: content.oldContent,
         });
-        const newFile = buildGitFileContents({
-          repoPath,
-          scope,
-          path: file.path,
-          oldPath: file.oldPath,
-          side: 'new',
-          contents: content.newContent,
-        });
-        const fileDiffMetadata = parseDiffFromFile(oldFile, newFile);
-        const counts = countPierreChanges(fileDiffMetadata);
-        const parsed = {
-          fileDiff: fileDiffMetadata,
-          additions: counts.additions,
-          deletions: counts.deletions,
-          oldContent: content.oldContent,
-          newContent: content.newContent,
-        };
 
-        setCachedParsedDiff(parsedCacheKey, parsed);
+      preloadRef.current = { key: requestKey, promise };
+      return promise;
+    };
 
-        const hydrated = await hydratePreparedDiff(
-          parsed,
-          getPierreDiffRenderTier(getPierreChangedLineCount(counts.additions, counts.deletions)) ===
-            'small',
-          pierreOptions
-        );
+    const inflight = getInflightPromise(parsedCacheKey);
+    if (inflight) {
+      const promise = inflight.then(async (result): Promise<PreparedDiff | null> => {
         if (latestRequestKeyRef.current !== requestKey) {
           return null;
         }
 
-        return hydrated;
-      })
-      .catch(() => {
-        setPreloadError('Failed to load diff preview.');
-        return null;
+        if (result) {
+          const hydrated = await hydratePreparedDiff(result, shouldPrerender, pierreOptions);
+          if (latestRequestKeyRef.current !== requestKey) {
+            return null;
+          }
+
+          return hydrated;
+        }
+
+        return loadOnDemandDiff();
       });
 
-    preloadRef.current = { key: requestKey, promise };
-    return promise;
+      preloadRef.current = { key: requestKey, promise };
+      return promise;
+    }
+
+    return loadOnDemandDiff();
   }, [
     diffTier,
     file.oldPath,
@@ -355,6 +384,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     requestKey,
     scope,
     showBinary,
+    workerPoolAvailable,
   ]);
 
   const handleMouseEnter = (): void => {
@@ -468,6 +498,33 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     };
   }, [requestKey]);
 
+  useEffect(() => {
+    const shouldDemand = isExpanded && preparedDiffTier === 'large';
+
+    if (shouldDemand === isDemanderRef.current) {
+      return;
+    }
+
+    isDemanderRef.current = shouldDemand;
+    if (shouldDemand) {
+      onVirtualizerNeeded();
+      return;
+    }
+
+    onVirtualizerReleased();
+  }, [isExpanded, onVirtualizerNeeded, onVirtualizerReleased, preparedDiffTier]);
+
+  useEffect(() => {
+    return (): void => {
+      if (!isDemanderRef.current) {
+        return;
+      }
+
+      isDemanderRef.current = false;
+      onVirtualizerReleased();
+    };
+  }, [onVirtualizerReleased]);
+
   const style = GIT_STATUS_STYLES[file.displayStatus];
 
   const handleToggle = (): void => {
@@ -561,6 +618,11 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
     totalChangedLines >= PATHOLOGICAL_DIFF_THRESHOLD
       ? `Large diff (${totalChangedLines.toLocaleString()} lines changed) — open in diff tab`
       : `Large diff (${PATHOLOGICAL_DIFF_THRESHOLD.toLocaleString()}+ lines) — open in diff tab`;
+  const shouldDelayLargeMount = preparedDiff !== null && isLargeInlineDiff && !virtualizerReady;
+  const prerenderedHtmlProps =
+    !workerPoolAvailable && preparedDiff?.prerenderedHTML
+      ? { prerenderedHTML: preparedDiff.prerenderedHTML }
+      : {};
 
   return (
     <div className="min-w-0 mx-1 overflow-hidden" style={{ borderRadius: 9 }}>
@@ -693,16 +755,17 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
                   Open in diff tab
                 </button>
               </div>
+            ) : shouldDelayLargeMount ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground/60">Preparing diff…</div>
             ) : preparedDiff ? (
               isLargeInlineDiff ? (
                 <PierreFileDiff
+                  key={`virtualized-${String(virtualizerReady)}`}
                   fileDiff={preparedDiff.fileDiff}
                   metrics={PIERRE_VIRTUAL_FILE_METRICS}
                   style={PIERRE_DIFF_STYLE as CSSProperties}
                   options={pierreOptions}
-                  {...(preparedDiff.prerenderedHTML
-                    ? { prerenderedHTML: preparedDiff.prerenderedHTML }
-                    : {})}
+                  {...prerenderedHtmlProps}
                 />
               ) : (
                 <VirtualizerContext.Provider value={undefined}>
@@ -710,9 +773,7 @@ export const DiffFileCard: FC<DiffFileCardProps> = ({
                     fileDiff={preparedDiff.fileDiff}
                     style={PIERRE_DIFF_STYLE as CSSProperties}
                     options={pierreOptions}
-                    {...(preparedDiff.prerenderedHTML
-                      ? { prerenderedHTML: preparedDiff.prerenderedHTML }
-                      : {})}
+                    {...prerenderedHtmlProps}
                   />
                 </VirtualizerContext.Provider>
               )
