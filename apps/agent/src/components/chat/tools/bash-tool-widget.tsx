@@ -126,7 +126,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         )}
       >
         {/* Left: verb + full command + spinner */}
-        <div className="flex items-center gap-2 shrink-0 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-medium text-foreground shrink-0">
             {isRunning ? 'Running' : 'Ran'}
           </span>
