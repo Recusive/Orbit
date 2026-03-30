@@ -26,6 +26,11 @@ const WRAPPER_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
   ? undefined
   : `margin-left ${CONTENT_CARD.transition}`;
 
+/** Single-property transition for the actions bar — mirrors WRAPPER_TRANSITION on the right side */
+const ACTIONS_BAR_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
+  ? undefined
+  : `margin-right ${CONTENT_CARD.transition}`;
+
 interface AppShellProps {
   readonly sidebar: ReactNode;
   readonly resizeHandle: ReactNode;
@@ -35,6 +40,8 @@ interface AppShellProps {
   readonly lastExpandedSidebarWidth: number;
   /** Optional right-side actions bar rendered on the base layer */
   readonly actionsBar?: ReactNode;
+  /** Whether the actions bar wrapper is slid into view (margin-right: 0) or off-screen (-width) */
+  readonly actionsBarOpen?: boolean;
   /** Override the sidebar margin-left transition (e.g., slower for launch sequence reveal) */
   readonly transitionOverride?: string | undefined;
 }
@@ -46,6 +53,7 @@ export const AppShell: FC<AppShellProps> = ({
   sidebarWidth,
   lastExpandedSidebarWidth,
   actionsBar,
+  actionsBarOpen = false,
   transitionOverride,
 }) => {
   // Mirror the activity panel's animation pattern: fixed width, single margin slide.
@@ -80,8 +88,25 @@ export const AppShell: FC<AppShellProps> = ({
       {/* Content card fills remaining space */}
       {children}
 
-      {/* Actions bar — right edge, on the base layer */}
-      {actionsBar}
+      {/* Actions bar — right edge, on the base layer.
+          Uses the same margin-slide pattern as the sidebar: fixed width,
+          negative marginRight hides it, transition slides it in. */}
+      {actionsBar !== undefined ? (
+        <div
+          style={{
+            width: SIDEBAR.iconColumnWidth,
+            marginRight: actionsBarOpen ? 0 : -SIDEBAR.iconColumnWidth,
+            flexShrink: 0,
+            transition:
+              transitionOverride !== undefined
+                ? `margin-right ${transitionOverride}`
+                : ACTIONS_BAR_TRANSITION,
+            overflow: 'hidden',
+          }}
+        >
+          {actionsBar}
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -103,8 +103,10 @@ Use this to find the right file. Read the file directly — no links needed.
   - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
   - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
-## plans/tracked/done/ (42 entries)
+## plans/tracked/done/ (44 entries)
 
+- `SF-SYMBOL-ICON-FLASH-FIX.md` — Fix SF Symbol icon flash on welcome→workspace transition (two-tier cache for sync reads, module-level preload, stable layout wrapper, sync enforcement test)
+- `ACTIONS-BAR-SLIDE-IN-DESYNC-FIX.md` — Fix actions bar slide-in desync (margin-slide wrapper in AppShell, mirrors sidebar pattern, synced with ContentCard transition)
 - `INSTANT-DIFF-EXPANSION.md` — Instant diff card expansion with background preparation pipeline (batch Tauri IPC, yielded parseDiffFromFile, Pierre worker highlighting, content-size gating, PierreCapabilitiesContext)
 - `PIERRE-WORKER-FIX-AND-LAZY-VIRTUALIZER.md` — Fix Pierre workers via Blob URL (?worker&inline for WKWebView) + lazy virtualizer demand ref-counting (IntersectionObserver only on large diff expand)
 - `LARGE-DIFF-PERFORMANCE-VIRTUALIZATION.md` — Large diff performance virtualization (Pierre tiered rendering, diff scheduler, hover prefetch, pathological diff tab routing)

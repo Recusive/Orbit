@@ -65,29 +65,97 @@ interface SFSymbolProps {
 }
 
 /**
- * Module-level cache: avoids re-invoking Tauri for the same symbol.
- * Keyed by "name-size-weight", value is the symbol result (or null on failure).
+ * Two-tier cache for SF Symbols:
+ *
+ * 1. `promiseCache` — stores in-flight Promises for dedup (two components
+ *    mounting the same icon share one IPC call). Evicts on failure.
+ *
+ * 2. `resolvedCache` — stores resolved SFSymbolResult values for synchronous
+ *    reads. useState initializers read this to skip the loading state entirely
+ *    when the symbol was pre-warmed before the component mounted.
  */
-const symbolCache = new Map<string, Promise<SFSymbolResult | null>>();
+const promiseCache = new Map<string, Promise<SFSymbolResult | null>>();
+const resolvedCache = new Map<string, SFSymbolResult>();
+
+function symbolCacheKey(name: string, size: number, weight: SFSymbolWeight): string {
+  return `${name}-${String(size)}-${weight}`;
+}
 
 function fetchSymbol(
   name: string,
   size: number,
   weight: SFSymbolWeight
 ): Promise<SFSymbolResult | null> {
-  const key = `${name}-${String(size)}-${weight}`;
-  const cached = symbolCache.get(key);
+  const key = symbolCacheKey(name, size, weight);
+  const cached = promiseCache.get(key);
   if (cached) return cached;
 
   const promise = invoke<SFSymbolResult>('get_sf_symbol', {
     name,
     pointSize: size,
     weight,
-  }).catch(() => null);
+  })
+    .then((result) => {
+      // Store resolved value for synchronous reads by useState initializers
+      resolvedCache.set(key, result);
+      return result;
+    })
+    .catch(() => {
+      // Evict failed entries so subsequent renders retry instead of
+      // serving a permanently-cached null (e.g. if Tauri backend
+      // wasn't ready during early preload).
+      promiseCache.delete(key);
+      return null;
+    });
 
-  symbolCache.set(key, promise);
+  promiseCache.set(key, promise);
   return promise;
 }
+
+/**
+ * All SF Symbols used in the workspace UI. Add new entries here when
+ * introducing `<SFSymbol>` in any workspace component.
+ *
+ * Enforced by: __tests__/integration/sf-symbol-preload.test.ts
+ */
+export const WORKSPACE_SF_SYMBOLS = [
+  // ContentTopBar + HeaderBar
+  { name: 'sidebar.squares.right', size: 18, weight: 'medium' },
+  { name: 'apple.terminal', size: 18, weight: 'medium' },
+  { name: 'switch.2', size: 18, weight: 'medium' },
+  // ActionsBar mode buttons
+  { name: 'paintpalette', size: 18, weight: 'medium' },
+  { name: 'chevron.left.forwardslash.chevron.right', size: 18, weight: 'medium' },
+  { name: 'command', size: 18, weight: 'medium' },
+  // ContentTopBar + PrimarySidebar navigation
+  { name: 'sidebar.left', size: 18, weight: 'medium' },
+  { name: 'arrow.left', size: 13, weight: 'semibold' },
+  { name: 'arrow.right', size: 13, weight: 'semibold' },
+  // PrimarySidebar actions
+  { name: 'square.and.pencil', size: 18, weight: 'medium' },
+  { name: 'exclamationmark.bubble', size: 18, weight: 'medium' },
+  { name: 'gear', size: 18, weight: 'medium' },
+  // SettingsSidebar
+  { name: 'rectangle.connected.to.line.below', size: 18, weight: 'medium' },
+] as const satisfies readonly { name: string; size?: number; weight?: SFSymbolWeight }[];
+
+/**
+ * Pre-warm the SF Symbol cache by firing Tauri IPC calls early.
+ * Safe on non-macOS — invoke fails, evicts from cache, fallback renders.
+ */
+export function preloadSFSymbols(
+  symbols: readonly { name: string; size?: number; weight?: SFSymbolWeight }[]
+): void {
+  for (const { name, size = 16, weight = 'regular' } of symbols) {
+    void fetchSymbol(name, size, weight);
+  }
+}
+
+// ── Eager preload ──────────────────────────────────────────────────────
+// Fires on module import (before any React render cycle begins).
+// useEffect-based preload is too late — React effects fire child→parent,
+// so SFSymbol component effects would run before the parent's preload.
+preloadSFSymbols(WORKSPACE_SF_SYMBOLS);
 
 export const SFSymbol: FC<SFSymbolProps> = ({
   name,
@@ -98,9 +166,19 @@ export const SFSymbol: FC<SFSymbolProps> = ({
   style,
   'aria-label': ariaLabel,
 }) => {
-  const [state, setState] = useState<SymbolState>({ status: 'loading' });
+  // Check resolved cache synchronously — if preload already completed,
+  // start in 'loaded' state on the very first render (no fallback frame).
+  const [state, setState] = useState<SymbolState>(() => {
+    const key = symbolCacheKey(name, size, weight);
+    const resolved = resolvedCache.get(key);
+    if (resolved) return { status: 'loaded', data: resolved };
+    return { status: 'loading' };
+  });
 
   useEffect(() => {
+    // Already loaded from sync cache — skip the async path
+    if (state.status === 'loaded') return;
+
     let cancelled = false;
 
     void fetchSymbol(name, size, weight).then((data) => {
@@ -111,11 +189,34 @@ export const SFSymbol: FC<SFSymbolProps> = ({
     return (): void => {
       cancelled = true;
     };
-  }, [name, size, weight]);
+  }, [name, size, weight, state.status]);
 
-  // Loading or failed — show fallback if provided, otherwise nothing
+  // Loading or failed — show fallback in a stable-dimension wrapper.
+  // Reserves size × size so the layout doesn't shift when the real icon
+  // arrives (loaded width is proportional to the SF Symbol's natural aspect
+  // ratio — typically close to square but not exact. The ~1-3px horizontal
+  // delta is imperceptible, especially with pre-warming).
   if (state.status !== 'loaded') {
-    return fallback !== undefined ? <>{fallback}</> : null;
+    if (fallback === undefined) return null;
+    return (
+      <div
+        className={className}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: size,
+          height: size,
+          flexShrink: 0,
+          ...style,
+        }}
+        aria-hidden={ariaLabel ? undefined : true}
+        aria-label={ariaLabel}
+        role={ariaLabel ? 'img' : undefined}
+      >
+        {fallback}
+      </div>
+    );
   }
 
   // Scale to fit the requested height, preserving natural aspect ratio

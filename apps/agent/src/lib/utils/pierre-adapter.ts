@@ -64,9 +64,9 @@ export const PIERRE_DIFF_UNSAFE_CSS = [
   'pre[data-diffs] { margin: 0; }',
   '[data-code] { padding: 0 !important; overflow-x: auto !important; }',
   '[data-code]::-webkit-scrollbar { height: 0 !important; }',
-  // Match expand-button grid column to line-number column width (3ch content + 2ch pad-left + 1ch pad-right + 2px border)
-  '[data-expand-index] [data-separator-wrapper] { grid-template-columns: calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) auto; }',
-  '[data-expand-index] [data-separator-wrapper][data-separator-multi-button] { grid-template-columns: calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) calc(var(--diffs-min-number-column-width, 3ch) + 3ch + 2px) auto; }',
+  // Match expand-button grid column to Pierre's computed line-number column width
+  '[data-expand-index] [data-separator-wrapper] { grid-template-columns: var(--diffs-column-number-width, 57px) auto; }',
+  '[data-expand-index] [data-separator-wrapper][data-separator-multi-button] { grid-template-columns: var(--diffs-column-number-width, 57px) var(--diffs-column-number-width, 57px) auto; }',
 ].join(' ');
 
 // ---------------------------------------------------------------------------

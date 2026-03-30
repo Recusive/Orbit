@@ -31,6 +31,7 @@ import { MOCK_ROOT, getMockFileContent } from '@/hooks/agent/use-tauri-mock';
 import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
+import { usePreloadSFSymbols } from '@/hooks/core/use-preload-sf-symbols';
 import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
@@ -374,6 +375,7 @@ const EditorMode: FC = () => {
 const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
   useAutoUpdate(); // Check for app updates on mount + periodic interval
+  usePreloadSFSymbols(); // Pre-warm SF Symbol cache before workspace UI mounts
   useOpencodeLifecycle();
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
@@ -856,7 +858,8 @@ const App: FC = () => {
               resizeHandle={<SidebarResizeHandle />}
               sidebarWidth={effectiveSidebarWidth}
               lastExpandedSidebarWidth={lastExpandedSidebarWidth}
-              actionsBar={rightSidebarOpen && !isWelcome ? <ActionsBar /> : undefined}
+              actionsBar={rightSidebarOpen ? <ActionsBar /> : undefined}
+              actionsBarOpen={rightSidebarOpen ? !isWelcome : false}
               transitionOverride={launchTransitionOverride}
             >
               {/* Main content wrapper — flex column for cards row + full-width terminal.
