@@ -98,6 +98,7 @@ describe('context window resolution', () => {
         yield {
           type: 'assistant',
           message: {
+            content: [],
             usage: {
               input_tokens: 29,
               output_tokens: 4_500,
