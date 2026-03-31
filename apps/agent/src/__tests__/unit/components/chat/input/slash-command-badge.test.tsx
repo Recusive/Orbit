@@ -10,10 +10,6 @@ import { useFileStore } from '@/stores/file/file-store';
 
 let mockSlashCommands: SlashCommand[] = [];
 
-vi.mock('@orbit.build/sdk/v2/client', () => ({
-  createOrbitClient: vi.fn(),
-}));
-
 vi.mock('@/stores/agent', () => {
   const fetchCommands = vi.fn(() => Promise.resolve());
   const fetchSkills = vi.fn(() => Promise.resolve());

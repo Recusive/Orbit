@@ -33,7 +33,6 @@
         "@lucide/lab": "^0.1.2",
         "@milkdown/crepe": "^7.18.0",
         "@milkdown/utils": "^7.18.0",
-        "@orbit.build/sdk": "workspace:*",
         "@orbit/shared-schemas": "workspace:*",
         "@paper-design/shaders-react": "^0.0.71",
         "@pierre/diffs": "1.1.3",
@@ -167,10 +166,6 @@
         "@sentry/react": "^10.0.0",
         "@tauri-apps/api": "^2.0.0",
       },
-    },
-    "packages/orbit-sdk": {
-      "name": "@orbit.build/sdk",
-      "version": "1.2.24-local",
     },
     "packages/shared-schemas": {
       "name": "@orbit/shared-schemas",
@@ -701,8 +696,6 @@
     "@opentelemetry/semantic-conventions": ["@opentelemetry/semantic-conventions@1.39.0", "", {}, "sha512-R5R9tb2AXs2IRLNKLBJDynhkfmx7mX0vi8NkhZb3gUkPWHn6HXk5J8iQ/dql0U3ApfWym4kXXmBDRGO+oeOfjg=="],
 
     "@opentelemetry/sql-common": ["@opentelemetry/sql-common@0.41.2", "", { "dependencies": { "@opentelemetry/core": "^2.0.0" }, "peerDependencies": { "@opentelemetry/api": "^1.1.0" } }, "sha512-4mhWm3Z8z+i508zQJ7r6Xi7y4mmoJpdvH0fZPFRkWrdp5fq7hhZ2HhYokEOLkfqSMgPR4Z9EyB3DBkbKGOqZiQ=="],
-
-    "@orbit.build/sdk": ["@orbit.build/sdk@workspace:packages/orbit-sdk"],
 
     "@orbit/common": ["@orbit/common@workspace:apps/common"],
 

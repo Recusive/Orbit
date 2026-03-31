@@ -90,7 +90,6 @@
     "@lucide/lab": "^0.1.2",
     "@milkdown/crepe": "^7.18.0",
     "@milkdown/utils": "^7.18.0",
-    "@orbit.build/sdk": "workspace:*",
     "@orbit/shared-schemas": "workspace:*",
     "@paper-design/shaders-react": "^0.0.71",
     "@pierre/diffs": "1.1.3",
