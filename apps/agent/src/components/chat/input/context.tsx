@@ -1,22 +1,20 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState } from 'react';
 
-import type { CSSProperties, FC, ReactNode } from 'react';
+import { ContextDetailDialog } from './context-detail-dialog';
+import { formatTokens, getContextProgressStyle } from './context-utils';
+
+import type { ContextTokenUsage } from './context-utils';
+import type { FC, ReactNode } from 'react';
 
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { cn } from '@/lib/utils';
 
-// Token usage from AI SDK
-interface TokenUsage {
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens?: number;
-}
-
 interface ContextData {
   maxTokens: number;
   usedTokens: number;
-  usage: TokenUsage | undefined;
+  usage: ContextTokenUsage | undefined;
   percentage: number;
+  setDetailOpen: (open: boolean) => void;
 }
 
 const ContextContext = createContext<ContextData | null>(null);
@@ -27,14 +25,6 @@ const useContextData = (): ContextData => {
     throw new Error('Context components must be used within a Context provider');
   }
   return context;
-};
-
-// Format token count with K, M, B suffixes
-const formatTokens = (count: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1,
-  }).format(count);
 };
 
 // Filled pie chart SVG component
@@ -96,18 +86,29 @@ const ProgressPie: FC<ProgressPieProps> = ({ percentage, size = 16 }) => {
 interface ContextProps {
   readonly maxTokens: number;
   readonly usedTokens: number;
-  readonly usage?: TokenUsage;
+  readonly usage?: ContextTokenUsage;
   readonly children: ReactNode;
 }
 
 export const Context: FC<ContextProps> = ({ maxTokens, usedTokens, usage, children }) => {
-  const percentage = maxTokens > 0 ? Math.min(100, Math.round((usedTokens / maxTokens) * 100)) : 0;
+  const [detailOpen, setDetailOpen] = useState(false);
+  const percentage = maxTokens > 0 ? Math.min(100, (usedTokens / maxTokens) * 100) : 0;
 
   return (
-    <ContextContext.Provider value={{ maxTokens, usedTokens, usage, percentage }}>
+    <ContextContext.Provider value={{ maxTokens, usedTokens, usage, percentage, setDetailOpen }}>
       <HoverCard openDelay={200} closeDelay={100}>
         {children}
       </HoverCard>
+      {detailOpen ? (
+        <ContextDetailDialog
+          open={detailOpen}
+          onOpenChange={setDetailOpen}
+          maxTokens={maxTokens}
+          usedTokens={usedTokens}
+          percentage={percentage}
+          usage={usage}
+        />
+      ) : null}
     </ContextContext.Provider>
   );
 };
@@ -167,32 +168,12 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
     return <div className={cn('p-3 border-b border-lg-separator', className)}>{children}</div>;
   }
 
-  // Determine progress bar color based on percentage (uses CSS variables from globals.css)
-  const getProgressStyle = (): CSSProperties => {
-    if (percentage >= 80) {
-      return {
-        background: 'var(--gradient-error)',
-        boxShadow: 'var(--gradient-error-glow)',
-      };
-    }
-    if (percentage >= 50) {
-      return {
-        background: 'var(--gradient-warning)',
-        boxShadow: 'var(--gradient-warning-glow)',
-      };
-    }
-    return {
-      background: 'var(--gradient-success)',
-      boxShadow: 'var(--gradient-success-glow)',
-    };
-  };
-
   return (
     <div className={cn('p-3 border-b border-lg-separator', className)}>
       <div className="flex items-center justify-between mb-2">
         <span className="text-sm font-medium tracking-tighter">Context Window</span>
         <span className="text-sm font-medium text-muted-foreground/70 tabular-nums">
-          {percentage}%
+          {Math.round(percentage)}%
         </span>
       </div>
       <div className="flex items-center gap-1.5 text-sm text-muted-foreground/60 tabular-nums">
@@ -204,7 +185,10 @@ export const ContextContentHeader: FC<ContextContentHeaderProps> = ({ children, 
       <div className="mt-2.5 h-2 bg-lg-control rounded-full overflow-hidden shadow-inner">
         <div
           className="h-full w-full origin-left rounded-full transition-transform duration-300 ease-out"
-          style={{ transform: `scaleX(${String(percentage / 100)})`, ...getProgressStyle() }}
+          style={{
+            transform: `scaleX(${String(percentage / 100)})`,
+            ...getContextProgressStyle(percentage),
+          }}
         />
       </div>
     </div>
@@ -240,6 +224,25 @@ export const ContextContentFooter: FC<ContextContentFooterProps> = ({ children, 
   );
 };
 
+export const ContextMoreButton: FC<{ readonly className?: string }> = ({ className }) => {
+  const { setDetailOpen } = useContextData();
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDetailOpen(true);
+      }}
+      className={cn(
+        'flex w-full items-center justify-center rounded-[9px] border border-border/70 bg-background/60 px-3 py-2 text-sm font-medium text-foreground/85 transition-colors duration-150 hover:bg-lg-control-hover',
+        className
+      )}
+    >
+      More details
+    </button>
+  );
+};
+
 // Usage line component
 interface UsageLineProps {
   readonly label: string;
@@ -261,6 +264,13 @@ export const ContextInputUsage: FC<{ readonly className?: string }> = ({ classNa
   const { usage } = useContextData();
   const tokens = usage?.promptTokens ?? 0;
   return <UsageLine label="Input" tokens={tokens} className={className} />;
+};
+
+// Cache usage
+export const ContextCacheUsage: FC<{ readonly className?: string }> = ({ className }) => {
+  const { usage } = useContextData();
+  const tokens = (usage?.cacheReadTokens ?? 0) + (usage?.cacheCreationTokens ?? 0);
+  return <UsageLine label="Cache" tokens={tokens} className={className} />;
 };
 
 // Output usage

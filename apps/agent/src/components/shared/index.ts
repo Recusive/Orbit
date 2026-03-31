@@ -11,4 +11,3 @@ export { ScrambleAsciiPre } from './ScrambleAsciiPre';
 export { SFSymbol, preloadSFSymbols, WORKSPACE_SF_SYMBOLS } from './sf-symbol';
 export type { SFSymbolWeight } from './sf-symbol';
 export { StatusAnnouncer } from './StatusAnnouncer';
-export { HealthIndicator } from './health-indicator';

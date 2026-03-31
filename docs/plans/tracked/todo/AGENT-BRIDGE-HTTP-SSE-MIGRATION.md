@@ -4,11 +4,38 @@
 
 The agent-bridge sidecar (Claude Agent SDK wrapper) communicates with the frontend via stdin/stdout pipes proxied through Rust. Every streaming token crosses 5 serialization boundaries through a Rust process that does zero meaningful processing — it deserializes JSON from the sidecar, clones it, re-serializes it, and emits a Tauri event. This adds ~50-65ms of overhead per first-token delivery and causes Rust to block Tokio threads on crossbeam channel recv.
 
-The OpenCode backend (now removed) proved that HTTP+SSE works in this exact app — the frontend talked directly to a Hono server on localhost, Rust only managed process lifecycle. Claude Desktop uses Electron IPC for the same pattern (SDK in main process, IPC to renderer). Since Tauri's main process is Rust (not Node.js), HTTP+SSE is the closest equivalent.
-
 **Goal:** Remove Rust from the streaming data path. Frontend talks directly to the sidecar via HTTP+SSE. Rust only spawns the sidecar, health-checks it, and monitors for crashes.
 
 **Result:** 5 serialization boundaries → 2. Eliminate the Rust reader thread, stdin mutex, crossbeam channel, and double-serde on every streaming token.
+
+## Why This Is Safe — Rust Layer Audit
+
+Code audit of `session.rs` (805 lines), `bridge.rs` (395 lines), and `lifecycle.rs` (677 lines) confirms the Rust layer is a transparent proxy. Every method follows the same pattern:
+
+```rust
+pub fn set_thinking_mode(&self, ...) -> Result<()> {
+    self.ensure_running()?;                      // check sidecar alive
+    let request = BridgeRequest::SetThinkingMode { .. }; // build enum
+    let bridge = self.bridge.lock();             // lock mutex
+    let response = bridge.send_request(&request)?;       // ser → stdin → wait → deser
+    Self::check_response(response)               // check error string
+}
+```
+
+32 out of 36 commands follow this exact pattern. Zero validation, zero transformation, zero business logic.
+
+| What Rust does                                             | Count          | Needed?                                                                                       |
+| ---------------------------------------------------------- | -------------- | --------------------------------------------------------------------------------------------- |
+| Lock → serialize → pipe → wait → deserialize → check error | 32 methods     | **No** — frontend can HTTP directly                                                           |
+| Same + track session ID in HashSet                         | 2 methods      | **No** — `has_session()` and `get_active_sessions()` have zero callers in the entire codebase |
+| Manage API credentials via macOS Keychain                  | 1 method       | **Yes** — needs native Keychain access                                                        |
+| Spawn sidecar process                                      | 1 function     | **Yes** — needs native process spawn                                                          |
+| Health check (try_wait on child)                           | 1 function     | **Yes** — needs native process API                                                            |
+| Deserialize events → re-serialize → app.emit               | 10 event types | **No** — SSE delivers directly                                                                |
+
+The event callback (`setup_event_callbacks` in `lifecycle.rs`) destructures each `BridgeEvent` variant and re-serializes it into `serde_json::json!({...})` for `app.emit()`. No filtering, no aggregation, no transformation. A photocopier.
+
+**3 things must stay in Rust:** spawn, health check, Keychain credentials. Everything else is provably a no-op proxy.
 
 ---
 

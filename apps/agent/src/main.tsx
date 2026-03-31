@@ -1,6 +1,5 @@
 import { getSentryConfig, REPLAY_OPTIONS } from '@orbit/common/lib';
 import * as Sentry from '@sentry/react';
-import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import '@fontsource-variable/geist-mono';
@@ -149,9 +148,7 @@ const RootErrorFallback: Sentry.FallbackRender = (props) => {
 };
 
 createRoot(rootElement).render(
-  <StrictMode>
-    <Sentry.ErrorBoundary fallback={RootErrorFallback}>
-      <App />
-    </Sentry.ErrorBoundary>
-  </StrictMode>
+  <Sentry.ErrorBoundary fallback={RootErrorFallback}>
+    <App />
+  </Sentry.ErrorBoundary>
 );

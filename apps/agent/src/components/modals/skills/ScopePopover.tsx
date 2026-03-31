@@ -60,9 +60,11 @@ export const ScopePopover: FC<ScopePopoverProps> = ({
           type="button"
           disabled={isInstalling}
           className={cn(
-            'inline-flex h-6 items-center gap-1 rounded-[9px] px-2 text-[11px] font-medium',
-            'bg-foreground text-background hover:bg-foreground/90',
-            'disabled:opacity-60 disabled:cursor-wait'
+            'relative inline-flex h-6 items-center gap-1 rounded-[9px] px-2 text-[11px] font-medium',
+            'bg-[oklch(0.18_0.012_60)] text-white hover:bg-[oklch(0.22_0.012_60)] dark:bg-white dark:text-black dark:hover:bg-white/90',
+            'active:scale-[0.97] transition-[transform,background-color] duration-150',
+            'disabled:opacity-60 disabled:cursor-wait disabled:active:scale-100',
+            'after:absolute after:inset-y-[-8px] after:inset-x-[-4px]'
           )}
         >
           {isInstalling ? (

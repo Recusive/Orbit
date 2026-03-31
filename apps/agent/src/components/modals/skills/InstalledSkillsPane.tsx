@@ -11,6 +11,7 @@ import { useTauri } from '@/hooks/agent/use-tauri';
 import { useSmoothScroll } from '@/hooks/ui';
 import { cn } from '@/lib/utils';
 import { OCTAGON_CLIP, setFaceHover } from '@/lib/utils/facehash-utils';
+import { getSkillColor } from '@/lib/utils/skill-colors';
 
 interface InstalledSkillsPaneProps {
   readonly open: boolean;
@@ -50,11 +51,10 @@ const SkillRow: FC<SkillRowProps> = ({ skill, colorClass, onClick }) => (
   >
     <Facehash
       name={skill.name}
-      size={40}
+      size={28}
       variant="solid"
-      colorClasses={[colorClass]}
       className="shrink-0 text-white dark:text-black"
-      style={{ pointerEvents: 'none', clipPath: OCTAGON_CLIP }}
+      style={{ pointerEvents: 'none', clipPath: OCTAGON_CLIP, backgroundImage: colorClass }}
     />
     <span className="text-[13px] font-medium text-foreground truncate min-w-0 flex-1">
       {skill.name}
@@ -180,9 +180,9 @@ export const InstalledSkillsPane: FC<InstalledSkillsPaneProps> = ({
                   <div className="flex flex-col gap-0.5">
                     {groupSkills.map((skill) => (
                       <SkillRow
-                        key={`${skill.source}-${skill.name}`}
+                        key={skill.filePath ?? `${skill.source}-${skill.name}`}
                         skill={skill}
-                        colorClass={config.facehash}
+                        colorClass={getSkillColor(skill.name, skill.description)}
                         onClick={() => {
                           onSkillSelect(skill);
                         }}

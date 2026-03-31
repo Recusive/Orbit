@@ -8,7 +8,7 @@ Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) demonstrates
 
 **Reference:** `reference/autoresearch/program.md` — the blueprint for the experiment loop.
 
-**Validated by:** 9 expert audits across 3 rounds (systems architect, Rust/Tauri engineer, React/TypeScript engineer), each reading actual source code.
+**Validated by:** 12 expert audits across 4 rounds (systems architect, Rust/Tauri engineer, React/TypeScript engineer, implementer, QA failure analyst), each reading actual source code.
 
 ---
 
@@ -17,8 +17,9 @@ Karpathy's [autoresearch](https://github.com/karpathy/autoresearch) demonstrates
 1. **Observation is external to the system under test.** Files on disk, not middleware inside the app. If the app crashes, the log files still exist.
 2. **Probes run inside the app through the real pipeline.** Not mocked, not isolated — the full SDK → sidecar → Rust → Tauri → store → render path.
 3. **Metrics are objective and automatable.** Pipeline assertions (pass/fail), boundary timing deltas (lower = better), performance counters (long tasks, DOM nodes, RSS).
-4. **Infrastructure is minimal.** ~48 lines of new code, reusing existing `dev_monitor`, `writeFile`, and stress test patterns.
+4. **Infrastructure is ~150-200 lines of new code**, reusing existing `dev_monitor`, stress test patterns, and Tauri APIs.
 5. **The agent is just Claude Code + program.md.** No SDK wrapper, no custom harness. Identical to how autoresearch runs.
+6. **Probes self-terminate the app after writing results.** This makes the launch a foreground process that naturally completes, avoiding background process management issues.
 
 ---
 
@@ -49,16 +50,18 @@ Claude Code:  reads program.md → enters LOOP FOREVER:
 
 ```
 Human writes: docs/autoresearch/program.md (experiment loop instructions)
-Human says:   "read program.md and kick off"
+Human says:   "read docs/autoresearch/program.md and kick off"
 Claude Code:  reads program.md → enters LOOP FOREVER:
   │
   ├─ Write probe: apps/agent/src/stress-tests/probes/<name>.ts
-  ├─ Boot app: VITE_ORBIT_AUTO_PROBE=<name> bunx tauri dev > /tmp/orbit-terminal.log 2>&1 &
-  ├─ Wait: poll for /tmp/orbit-probe-result.json (timeout 2 min)
+  ├─ Clear old results: rm -f $HOME/.orbit-autoresearch/probe-result.json
+  ├─ Run app (foreground, self-terminates after probe):
+  │   VITE_ORBIT_AUTO_PROBE=<name> timeout 180 bunx tauri dev \
+  │     > $HOME/.orbit-autoresearch/terminal.log 2>&1
   ├─ Read 3 files:
-  │   ├─ /tmp/orbit-probe-result.json  → assertions + boundary deltas + perf metrics
-  │   ├─ /tmp/orbit-console.jsonl      → frontend console.log/warn/error
-  │   └─ /tmp/orbit-terminal.log       → Rust logs, sidecar stderr, build errors
+  │   ├─ $HOME/.orbit-autoresearch/probe-result.json  → assertions + deltas + perf
+  │   ├─ $HOME/.orbit-autoresearch/console.jsonl       → frontend logs + errors
+  │   └─ $HOME/.orbit-autoresearch/terminal.log        → Rust logs, sidecar stderr
   │
   ├─ Evaluate:
   │   ├─ Assertions failed? → which boundary? (grep [PERF] for timing)
@@ -67,86 +70,227 @@ Claude Code:  reads program.md → enters LOOP FOREVER:
   │
   ├─ If broken: diagnose → patch → cargo check / bun run typecheck → verify → commit
   ├─ If resilient: log to results.tsv → next hypothesis
-  └─ Every 20 experiments: write progress.md (context management)
+  └─ Every 15 experiments: write progress.md, run /compact (context management)
 ```
 
 - **Files:** `docs/autoresearch/program.md` (instructions), `apps/agent/src/stress-tests/probes/` (probes)
-- **Entry:** Human opens Claude Code in repo, says "read program.md"
-- **Observation:** Three files on disk (external to system under test)
+- **Entry:** Human opens Claude Code in repo, says "read docs/autoresearch/program.md"
+- **Observation:** Three files on disk at `$HOME/.orbit-autoresearch/` (external to system under test, within Tauri ACL scope)
 - **Metrics:** Pipeline assertions (pass/fail), boundary deltas (ms, lower = better), system health (long tasks, FPS, DOM nodes, RSS)
 - **Revert:** `git checkout -- .` (discard uncommitted changes)
+- **App lifecycle:** Probe calls `getCurrentWindow().close()` after writing results → `bunx tauri dev` terminates → agent reads files → next experiment
 
 ### Layer Comparison
 
-| Layer             | Autoresearch                    | Orbit Autoresearch                                       |
-| ----------------- | ------------------------------- | -------------------------------------------------------- |
-| Agent runtime     | Claude Code CLI                 | Claude Code CLI                                          |
-| Instructions      | `program.md`                    | `docs/autoresearch/program.md`                           |
-| Editable scope    | `train.py`                      | Any file (Rust, TS, sidecar)                             |
-| Experiment runner | `uv run train.py > run.log`     | `bunx tauri dev > /tmp/orbit-terminal.log`               |
-| Observation       | `grep val_bpb run.log`          | `cat /tmp/orbit-probe-result.json` + 2 log files         |
-| Metric            | `val_bpb` (float)               | Assertions (bool) + boundary deltas (ms) + perf counters |
-| Revert            | `git reset --hard HEAD~1`       | `git checkout -- .`                                      |
-| Cadence           | ~12/hour (5 min per experiment) | ~3-8/hour (depends on Rust vs TS-only changes)           |
+| Layer             | Autoresearch                       | Orbit Autoresearch                                             |
+| ----------------- | ---------------------------------- | -------------------------------------------------------------- |
+| Agent runtime     | Claude Code CLI                    | Claude Code CLI                                                |
+| Instructions      | `program.md`                       | `docs/autoresearch/program.md`                                 |
+| Editable scope    | `train.py`                         | Any file (Rust, TS, sidecar)                                   |
+| Experiment runner | `uv run train.py > run.log`        | `timeout 180 bunx tauri dev > terminal.log`                    |
+| Observation       | `grep val_bpb run.log`             | `cat probe-result.json` + 2 log files                          |
+| Metric            | `val_bpb` (float)                  | Assertions (bool) + boundary deltas (ms) + perf counters       |
+| Revert            | `git reset --hard HEAD~1`          | `git checkout -- .`                                            |
+| App termination   | Script self-terminates after 5 min | Probe calls `getCurrentWindow().close()` after writing results |
+| Cadence           | ~12/hour (5 min per experiment)    | ~4-6/hour (Rust recompile + probe execution)                   |
 
 ---
 
-## Infrastructure — 5 Pieces (~48 Lines Total)
+## Critical Design Decisions (From Audits)
 
-### Piece 1: Console Capture (~10 lines TS, 0 lines Rust)
+### Output directory: `$HOME/.orbit-autoresearch/` (NOT `/tmp/`)
 
-Intercepts `console.log/warn/error` in dev mode. Flushes to disk via existing `dev_monitor_write_batch` command. No new Rust code needed.
+Tauri's ACL scope is `$HOME/**`. The `writeFile` API enforces `ensure_workspace_paths`. Neither allows `/tmp/`. All probe output MUST go to `$HOME/.orbit-autoresearch/` which is within the existing ACL scope. Additionally, `dev_monitor_write_batch` (which has no workspace check) is used for probe results instead of `writeFile`.
+
+### Foreground execution (NOT background `&`)
+
+Claude Code's Bash tool does not reliably support background processes via `&`. The probe self-terminates the app after writing results, making `bunx tauri dev` a foreground process that naturally completes. Combined with `timeout 180`, this gives a clean lifecycle with no orphaned processes and no PID management.
+
+### No HMR optimization
+
+Vite HMR hot-reloads module code but does NOT re-trigger React `useEffect` hooks. The auto-probe-runner fires once on mount. After HMR, the new probe code is loaded but never executed. Every experiment requires a full app restart. TS-only changes are still faster than Rust changes (~15s vs ~60s recompile) but both need a reboot.
+
+### Context management via `/compact`
+
+Writing `progress.md` to disk does not compress the Claude Code conversation context. After ~15 experiments, context accumulates ~60-90K tokens. The program.md instructs the agent to write `progress.md` AND run `/compact` every 15 experiments. If the session degrades, the human starts a fresh session seeded by `progress.md`.
+
+---
+
+## Infrastructure — 5 Pieces (~150-200 Lines Total)
+
+### Piece 1: Console Capture (~25 lines TS, 0 lines Rust)
+
+Intercepts `console.log/warn/error` in dev mode. Maps to `DevLogEntry` schema. Flushes to disk via existing `dev_monitor_write_batch` command. No new Rust code.
 
 **File:** `apps/agent/src/lib/dev/console-capture.ts` (new)
-**Insertion point:** Called from `tauri-provider.tsx` after `Promise.all(listenerPromises)` completes (~line 818), inside the `!controller.isAborted()` check.
+**Insertion point:** Called from `tauri-provider.tsx` after `Promise.all(listenerPromises)` completes (~line 807), between the `logger.info` call and `initializedRef.current = true` (~line 819).
 **Uses:** Existing `dev_monitor_write_batch` from `src-tauri/src/commands/common/dev_monitor.rs`
-**Output:** `/tmp/orbit-console.jsonl`
+**Output:** `$HOME/.orbit-autoresearch/console.jsonl`
 
-**Startup race mitigation:** Only begin flushing after `bootstrapRuntimeHealth` completes (`tauri-provider.tsx:268`), which is the first successful round-trip to the backend.
+**DevLogEntry field mapping for raw console calls:**
 
-### Piece 2: Auto-Run Trigger (~10 lines TS)
+```typescript
+// console.error("something broke", { detail: "xyz" })
+// maps to:
+{
+  timestamp: Date.now(),
+  severity: "error",
+  category: "console:error",
+  file: "unknown",           // console.* doesn't provide source location
+  title: "something broke",  // first argument stringified
+  details: '{"detail":"xyz"}',  // remaining arguments JSON-stringified
+  context: null,
+  dedupCount: 1,
+}
+```
 
-When `VITE_ORBIT_AUTO_PROBE` env var is set, auto-runs the named probe after session readiness.
+**Startup race mitigation:** The insertion point at line 819 is already after `bootstrapRuntimeHealth` (line 268) and all listener setup, so Tauri IPC is guaranteed ready. No additional guarding needed.
+
+### Piece 2: Auto-Run Trigger + Probe Self-Termination (~35 lines TS)
+
+When `VITE_ORBIT_AUTO_PROBE` env var is set, auto-runs the named probe after session readiness, then exits the app.
 
 **File:** `apps/agent/src/stress-tests/auto-probe-runner.ts` (new)
-**Insertion point:** Wired into `use-chat-messages.ts` inside the `window.__orbit_debug` useEffect (~line 435), following the existing dynamic import pattern.
-**Env var:** Must be `VITE_ORBIT_AUTO_PROBE` (Vite prefix required; value baked at build time).
+**Insertion point:** Wired into `use-chat-messages.ts` inside the `window.__orbit_debug` useEffect.
+
+**Three files need changes (following existing stress test pattern from `stress-tests/CLAUDE.md`):**
+
+1. **Type declaration** — `use-chat-messages.ts:64-87`: Add `runAutoProbe` to `Window['__orbit_debug']` interface. MUST be done before the `satisfies NonNullable<Window['__orbit_debug']>` check at line 549 or TypeScript will reject the build.
+
+2. **Dynamic import** — `use-chat-messages.ts:~540` (inside `debugEntries` object):
+
+   ```typescript
+   runAutoProbe: async (probeName: string) => {
+     const { runAutoProbe } = await import('@/stress-tests/auto-probe-runner');
+     return runAutoProbe(probeName, {
+       handleSend: actions.handleSend,
+       handleRewind: actions.handleRewind,
+       handleStop: actions.handleStop,
+     });
+   },
+   ```
+
+3. **Auto-trigger on mount** — At the end of the useEffect (after `window.__orbit_debug = {...}`):
+   ```typescript
+   const autoProbe = import.meta.env.VITE_ORBIT_AUTO_PROBE;
+   if (typeof autoProbe === 'string' && autoProbe.length > 0) {
+     window.__orbit_debug?.runAutoProbe(autoProbe);
+   }
+   ```
+
+**TypeScript env declaration** — Add to `apps/agent/env.d.ts` or `vite-env.d.ts`:
+
+```typescript
+interface ImportMetaEnv {
+  readonly VITE_ORBIT_AUTO_PROBE?: string;
+}
+```
+
 **Readiness gate:** Wait for `activeSessionId !== null` AND `isAgentRunning === false` with 30-second pre-flight timeout after `system:init`. Copy readiness pattern from `session-stress-test.ts`.
 
-**Critical night-1 risk:** If the probe fires before session init completes, it produces a false-fail timeout that wastes the overnight session. The readiness gate is mandatory.
+**Self-termination:** After writing probe results, the auto-runner terminates the app via the Tauri window API:
 
-### Piece 3: `[PERF]` Boundary Timestamps (~14 lines across 4 files)
+```typescript
+import { getCurrentWindow } from '@tauri-apps/api/window';
+getCurrentWindow().close(); // Closes last window → Tauri process exits
+```
+
+This makes the agent's `bunx tauri dev` call return naturally. Note: `process.exit(0)` does not exist in the browser context, and the DOM `window.close()` is silently ignored in Tauri WebView. Only the Tauri API works.
+
+**Critical night-1 risk:** If the probe fires before session init completes, it produces a false-fail timeout. The readiness gate is mandatory.
+
+### Piece 3: `[PERF]` Boundary Timestamps (~20 lines across 4 files)
 
 Timestamped log lines at each pipeline boundary, correlated by message ID.
 
-| Boundary            | File                                          | Line                                | Log Sink                      |
-| ------------------- | --------------------------------------------- | ----------------------------------- | ----------------------------- |
-| `sidecar_received`  | `agent-bridge/src/agent/core/agent.ts`        | ~1250 (for-await loop)              | stderr → terminal log         |
-| `sidecar_emitted`   | `agent-bridge/src/agent/core/agent.ts`        | stdout emit point                   | stderr → terminal log         |
-| `rust_received`     | `src-tauri/src/agent/bridge.rs`               | ~212 (after `Ok(response)` match)   | `log::info!` → terminal log   |
-| `rust_emitted`      | `src-tauri/src/commands/agent/lifecycle.rs`   | event callback                      | `log::info!` → terminal log   |
-| `frontend_received` | `apps/agent/src/providers/tauri-provider.tsx` | ~282 (after messageId assignment)   | `console.log` → console JSONL |
-| `store_updated`     | `apps/agent/src/stores/chat/chat-store.ts`    | ~100 (inside `appendToLastMessage`) | `console.log` → console JSONL |
+| Boundary            | File                                          | Insertion Point                                                  | Log Sink                      |
+| ------------------- | --------------------------------------------- | ---------------------------------------------------------------- | ----------------------------- |
+| `sidecar_received`  | `agent-bridge/src/agent/core/agent.ts`        | for-await query loop                                             | stderr → terminal log         |
+| `sidecar_emitted`   | `agent-bridge/src/agent/core/agent.ts`        | stdout emit point                                                | stderr → terminal log         |
+| `rust_received`     | `src-tauri/src/agent/bridge.rs`               | line 211, after `Ok(response)`                                   | `log::info!` → terminal log   |
+| `rust_emitted`      | `src-tauri/src/commands/agent/lifecycle.rs`   | inside `setup_event_callbacks` (~line 633)                       | `log::info!` → terminal log   |
+| `frontend_received` | `apps/agent/src/providers/tauri-provider.tsx` | line 282, after messageId assignment                             | `console.log` → console JSONL |
+| `store_updated`     | `apps/agent/src/stores/chat/chat-store.ts`    | line 291 (actual `appendToLastMessage` impl), after `set()` call | `console.log` → console JSONL |
 
 **Format:** `[PERF] <message_id> <boundary_name> <unix_timestamp_ms>`
-**Rust guard:** `#[cfg(debug_assertions)]` or runtime `if cfg!(debug_assertions)` (matching existing pattern in `diagnostics.rs`).
-**Message ID extraction in Rust:** Available after `serde_json::from_str::<BridgeResponse>` succeeds, via `response.as_event()` → `AgentMessage.message_id`.
 
-### Piece 4: RSS Measurement (~12 lines Rust)
+**Rust code (correct pattern — must match on BridgeEvent variant):**
+
+```rust
+// src-tauri/src/agent/bridge.rs, inside reader_thread after line 211:
+#[cfg(debug_assertions)]
+if let Some(crate::agent::protocol::BridgeEvent::AgentMessage { message, .. }) = response.as_event() {
+    if let Some(ref msg_id) = message.message_id {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis();
+        log::info!("[PERF] {msg_id} rust_received {ts}");
+    }
+}
+```
+
+**Frontend logger note:** The `[PERF]` lines use `console.log` directly (not the structured `createLogger`), because they need to be intercepted by the console capture (Piece 1). The structured logger (`createLogger`) also routes through `console.*` internally (`apps/common/src/lib/logger.ts:108,124,139,159`), so either works. Use `console.log` for simplicity and explicitness.
+
+### Piece 4: RSS Measurement (~20 lines Rust)
 
 Tauri command that measures process memory (both Tauri main process and sidecar child).
 
-**File:** `src-tauri/src/commands/common/diagnostics.rs` (add to existing file)
-**Registration:** Add to `generate_handler![]` in `lib.rs` (~line 375-621)
-**Implementation:** `ps -o rss= -p <pid>` via `std::process::Command`. Measure both `std::process::id()` (Tauri) and sidecar child PID (from `AgentBridge.child.id()`).
-**Guard:** Runtime `if !cfg!(debug_assertions)` (matching `sentry_test_capture` pattern in same file).
+**File:** `src-tauri/src/commands/common/diagnostics.rs` — add to existing file
+**Registration:** Add to `generate_handler![]` in `lib.rs`
 
-### Piece 5: Probe Result Writing (~2 lines TS)
+**Required: New accessor on SessionManager** — `bridge` is a private field on `SessionManager` (`session.rs:22`). The RSS command needs the sidecar child PID. Add to `session.rs`:
 
-Probes write structured JSON results to disk.
+```rust
+impl SessionManager {
+    pub fn sidecar_pid(&self) -> Option<u32> {
+        self.bridge.lock().child.as_ref().and_then(|c| c.id())
+    }
+}
+```
 
-**Uses:** Existing `writeFile` from `apps/agent/src/lib/api/files.ts` — already exposed, no new Rust command needed.
-**Output:** `/tmp/orbit-probe-result.json` (atomic: write to `.tmp`, rename)
+**Command implementation:**
+
+```rust
+#[tauri::command]
+pub fn dev_get_process_rss(
+    session_manager: State<'_, Arc<SessionManager>>,
+) -> Result<f64, String> {
+    if !cfg!(debug_assertions) {
+        return Ok(0.0);
+    }
+
+    let main_pid = std::process::id();
+    let sidecar_pid = session_manager.sidecar_pid();
+
+    let mut total_kb: f64 = 0.0;
+    for pid in [Some(main_pid), sidecar_pid].into_iter().flatten() {
+        let output = std::process::Command::new("ps")
+            .args(["-o", "rss=", "-p", &pid.to_string()])
+            .output()
+            .map_err(|e| e.to_string())?;
+        let kb: f64 = String::from_utf8_lossy(&output.stdout)
+            .trim()
+            .parse()
+            .unwrap_or(0.0);
+        total_kb += kb;
+    }
+
+    Ok(total_kb / 1024.0) // Return MB
+}
+```
+
+**Guard:** Runtime `if !cfg!(debug_assertions)` (matching `sentry_test_capture` pattern in `diagnostics.rs`).
+
+### Piece 5: Probe Result Writing (~15 lines TS)
+
+Probes write structured JSON results to disk via `dev_monitor_write_batch`.
+
+**IMPORTANT:** Cannot use `writeFile` from `lib/api/files.ts` — that API calls `ensure_workspace_paths` which blocks writes outside the workspace directory. Use `dev_monitor_write_batch` instead (no workspace check).
+
+**Output:** `$HOME/.orbit-autoresearch/probe-result.json`
+**Write strategy:** Direct write via `dev_monitor_write_batch`. No atomic rename — `fs:allow-rename` may not be in ACL, and the agent polls with `sleep 2` so partial-read risk is negligible. The probe writes the complete JSON in a single `dev_monitor_write_batch` call.
+
 **Result format:** Extends existing `StepResult` from `rewind-mega-stress-test.ts:79-88`
 
 ```typescript
@@ -181,6 +325,13 @@ interface ProbeResult {
 }
 ```
 
+**Probe primitives file** (`apps/agent/src/stress-tests/probe-primitives.ts`, ~50 lines):
+
+- `writeProbeResult(result: ProbeResult)` — writes via `dev_monitor_write_batch` to `$HOME/.orbit-autoresearch/`
+- `startPerfMeasurement()` — returns `{ stop: () => PerfSnapshot }` (PerformanceObserver + rAF counter + DOM node count)
+- `waitForReady(timeout)` — session readiness gate (copied from `session-stress-test.ts`)
+- `exitApp()` — calls `getCurrentWindow().close()` from `@tauri-apps/api/window` to terminate the Tauri app after probe completion
+
 ---
 
 ## Behavioral Contracts to Preserve
@@ -195,117 +346,89 @@ interface ProbeResult {
 ### Contract 2: Existing Stress Tests Continue Working
 
 - **What:** `window.__orbit_debug.runMegaStressTest()` and all existing stress tests remain functional.
-- **Where:** `apps/agent/src/hooks/chat/use-chat-messages.ts:430-500`
+- **Where:** `apps/agent/src/hooks/chat/use-chat-messages.ts:430-549`
 - **Why:** Existing tests are battle-tested; auto-probe is additive, not a replacement.
-- **How:** Auto-probe runner is a new entry in `debugEntries`, wired identically to existing tests.
+- **How:** Auto-probe runner is a new entry in `debugEntries`, wired identically to existing tests. `Window.__orbit_debug` interface updated at lines 64-87 before the `satisfies` check at line 549.
 
 ### Contract 3: No New Dependencies
 
 - **What:** The entire system uses only existing packages and crates.
 - **Where:** `package.json`, `Cargo.toml`
 - **Why:** Zero binary size impact, zero compile time impact.
-- **How:** Uses `dev_monitor_write_batch` (existing), `writeFile` (existing), `console.*` (built-in), `PerformanceObserver` (built-in), `ps` (system tool).
+- **How:** Uses `dev_monitor_write_batch` (existing), `console.*` (built-in), `PerformanceObserver` (built-in), `ps` (system tool).
 
 ### Contract 4: Sidecar Stderr Inherits to Parent
 
 - **What:** Sidecar `[PERF]` lines written to `process.stderr` appear in the terminal log.
 - **Where:** `src-tauri/src/agent/bridge.rs:133` — `stderr(Stdio::inherit())`
-- **Why:** The agent reads `/tmp/orbit-terminal.log` which captures stderr.
+- **Why:** The agent reads `$HOME/.orbit-autoresearch/terminal.log` which captures stderr.
 - **How:** Verified: `Stdio::inherit()` is already set. No change needed.
 
----
+### Contract 5: Output Directory Within Tauri ACL Scope
 
-## Engineering Stages Assessment
-
-| Stage                | Applies? | Notes                                                                                            |
-| -------------------- | -------- | ------------------------------------------------------------------------------------------------ |
-| 1. Data Modeling     | Yes      | `ProbeResult`, `DevLogEntry` (existing), `[PERF]` line format                                    |
-| 2. State Ownership   | N/A      | No new persistent state. Log files are ephemeral (`/tmp/`).                                      |
-| 3. Error Enumeration | Yes      | Probe timeout, build failure, session not ready, sidecar crash                                   |
-| 4. Concurrency       | Partial  | Bridge mutex blocks during active sessions; probes run sequentially                              |
-| 5. Public API        | Yes      | `dev_get_process_rss` command, `window.__orbit_debug.runAutoProbe`                               |
-| 6. Config            | N/A      | Single env var `VITE_ORBIT_AUTO_PROBE`. No settings file changes.                                |
-| 7. Dependencies      | N/A      | Zero new dependencies                                                                            |
-| 8. Top-Down Design   | Yes      | Covered in System Design section above                                                           |
-| 9. Testing           | Partial  | The system tests itself. Manual verification via DevTools console.                               |
-| 10. Migration        | N/A      | No existing state to migrate                                                                     |
-| 11. Performance      | Yes      | `[PERF]` lines are `log::info!` level (no-op in prod). Console capture flushes every 1s.         |
-| 12. Security         | Yes      | `dev_get_process_rss` gated behind `debug_assertions`. No new file system access beyond `/tmp/`. |
-| 13. Integration      | Yes      | Touches bridge.rs reader thread, tauri-provider.tsx, chat-store.ts, lifecycle.rs                 |
-| 14. Convention Audit | Yes      | Follows existing stress test 3-file wiring pattern, `dev_monitor` command pattern                |
-| 16. Alien Code Test  | Yes      | New code must look like it belongs next to existing stress tests and dev_monitor commands        |
+- **What:** All probe output goes to `$HOME/.orbit-autoresearch/`, NOT `/tmp/`.
+- **Where:** Tauri ACL at `src-tauri/capabilities/default.json` — scope is `$HOME/**`
+- **Why:** `/tmp/` resolves to `/private/tmp` on macOS, outside the ACL scope. `writeFile` also enforces `ensure_workspace_paths` (`files.rs:314-338`) which blocks non-workspace paths.
+- **How:** Use `dev_monitor_write_batch` (no workspace check) for all disk writes. Output directory is `$HOME/.orbit-autoresearch/`.
 
 ---
 
 ## Implementation Phases
 
-### Phase 1: Rust Commands (one reboot, done once)
+### Phase 1: Rust Commands + Bridge Logging (one recompile)
 
-**File:** `src-tauri/src/commands/common/diagnostics.rs` — add `dev_get_process_rss`
+**File:** `src-tauri/src/agent/session.rs` — add `sidecar_pid()` accessor
 
 ```rust
-/// Returns process RSS in MB (main process + sidecar).
-/// Dev-only: returns 0.0 in release builds.
-#[tauri::command]
-pub fn dev_get_process_rss(
-    session_manager: State<'_, Arc<SessionManager>>,
-) -> Result<f64, String> {
-    if !cfg!(debug_assertions) {
-        return Ok(0.0);
-    }
-    // Shell out to ps for both PIDs, sum and return MB
+pub fn sidecar_pid(&self) -> Option<u32> {
+    self.bridge.lock().child.as_ref().and_then(|c| c.id())
 }
 ```
 
-**File:** `src-tauri/src/commands/common/mod.rs` — export
-**File:** `src-tauri/src/lib.rs` — register in `generate_handler![]`
+**File:** `src-tauri/src/commands/common/diagnostics.rs` — add `dev_get_process_rss` (see Piece 4 above)
 
-**File:** `src-tauri/src/agent/bridge.rs` — add `[PERF]` logging at ~line 212
+**File:** `src-tauri/src/commands/common/mod.rs` — export new command
 
-```rust
-// Inside reader_thread, after Ok(response) match:
-#[cfg(debug_assertions)]
-if let Some(event) = response.as_event() {
-    if let Some(msg_id) = event.message_id.as_deref() {
-        log::info!("[PERF] {msg_id} rust_received {}", timestamp_ms());
-    }
-}
-```
+**File:** `src-tauri/src/lib.rs` — register `dev_get_process_rss` in `generate_handler![]`
 
-**File:** `src-tauri/src/commands/agent/lifecycle.rs` — add `[PERF]` in event callback
+**File:** `src-tauri/src/agent/bridge.rs` — add `[PERF]` logging at line 211 (see Piece 3 Rust code above). Must match on `BridgeEvent::AgentMessage(msg)`, not call `event.message_id` directly.
 
-**Tests:** `cargo check` (compiles), `cargo clippy` (no warnings)
+**File:** `src-tauri/src/commands/agent/lifecycle.rs` — add `[PERF]` in `setup_event_callbacks` (~line 633)
 
-### Phase 2: Frontend Probe Scaffold (TS-only, HMR after Phase 1)
+**Tests:** `cargo check` (compiles), `cargo clippy --workspace -- -D warnings` (no warnings)
 
-**File:** `apps/agent/src/lib/dev/console-capture.ts` (new, ~10 lines)
+### Phase 2: Frontend Probe Scaffold (requires Phase 1 recompile)
+
+**File:** `apps/agent/src/lib/dev/console-capture.ts` (new, ~25 lines)
 
 - Intercepts `console.log/warn/error`
-- Buffers entries, flushes every 1s via `dev_monitor_write_batch`
-- Only activates when `import.meta.env.DEV && VITE_ORBIT_AUTO_PROBE`
+- Maps to `DevLogEntry` schema (see Piece 1 field mapping)
+- Flushes every 1s via `dev_monitor_write_batch`
+- Only activates when `import.meta.env.DEV`
 
-**File:** `apps/agent/src/stress-tests/auto-probe-runner.ts` (new, ~30 lines)
+**File:** `apps/agent/src/stress-tests/auto-probe-runner.ts` (new, ~35 lines)
 
-- Reads `VITE_ORBIT_AUTO_PROBE` env var
+- Reads `import.meta.env.VITE_ORBIT_AUTO_PROBE`
 - Waits for session readiness (copies pattern from `session-stress-test.ts`)
-- Dynamically imports the named probe
-- Runs it, writes result via `writeFile` to `/tmp/orbit-probe-result.json`
+- Dynamically imports the named probe from `@/stress-tests/probes/<name>`
+- Runs probe, writes result to `$HOME/.orbit-autoresearch/probe-result.json`
+- Self-terminates app after writing results
 
-**File:** `apps/agent/src/stress-tests/probe-primitives.ts` (new, ~40 lines)
+**File:** `apps/agent/src/stress-tests/probe-primitives.ts` (new, ~50 lines)
 
-- `writeProbeResult(result: ProbeResult)` — atomic write (tmp + rename)
-- `startPerfMeasurement()` — returns `{ stop: () => PerfSnapshot }` (PerformanceObserver + rAF counter)
-- `waitForReady(timeout)` — session readiness gate
-- `measureBoundaryDelta(logFile, messageId)` — parses `[PERF]` lines from log
+- `writeProbeResult()`, `startPerfMeasurement()`, `waitForReady()`, `exitApp()`
 
-**File:** `apps/agent/src/hooks/chat/use-chat-messages.ts` — wire auto-probe-runner
+**File:** `apps/agent/env.d.ts` or `vite-env.d.ts` — add `VITE_ORBIT_AUTO_PROBE` declaration
 
-- Add type declaration for `runAutoProbe` to `Window.__orbit_debug`
-- Add dynamic import entry in the dev-mode useEffect (~line 435)
+**File:** `apps/agent/src/hooks/chat/use-chat-messages.ts` — three changes:
 
-**File:** `apps/agent/src/providers/tauri-provider.tsx` — add `[PERF]` at ~line 282 and init console capture
+1. Add `runAutoProbe` to `Window.__orbit_debug` interface (lines 64-87)
+2. Add dynamic import entry in `debugEntries` (after line 540)
+3. Add auto-trigger at end of useEffect (after `window.__orbit_debug` assignment)
 
-**File:** `apps/agent/src/stores/chat/chat-store.ts` — add `[PERF]` inside `appendToLastMessage`
+**File:** `apps/agent/src/providers/tauri-provider.tsx` — add `[PERF]` at line 282 + init console capture at line 819
+
+**File:** `apps/agent/src/stores/chat/chat-store.ts` — add `[PERF]` at line 291 (inside `appendToLastMessage` implementation, after `set()` call)
 
 **Tests:** `bun run typecheck` (no errors), `bun run lint` (zero warnings)
 
@@ -314,13 +437,11 @@ if let Some(event) = response.as_event() {
 **File:** `agent-bridge/src/agent/core/agent.ts` — add `[PERF]` stderr logging
 
 ```typescript
-// At SDK response receipt point:
 process.stderr.write(`[PERF] ${messageId} sidecar_received ${Date.now()}\n`);
-// At event emit point:
 process.stderr.write(`[PERF] ${messageId} sidecar_emitted ${Date.now()}\n`);
 ```
 
-**Rebuild:** `cd agent-bridge && bun run build:sidecar`
+**Rebuild:** `cd agent-bridge && bun run build:sidecar` (NOT `build:dev` — wrong output path per CLAUDE.md)
 **Tests:** `cd agent-bridge && bun run typecheck`
 
 ### Phase 4: First Probe + Program.md
@@ -329,33 +450,23 @@ process.stderr.write(`[PERF] ${messageId} sidecar_emitted ${Date.now()}\n`);
 
 - Establishes baseline: send 3 messages, measure boundary deltas, record perf metrics
 - Uses all probe primitives from Phase 2
+- Self-terminates app after writing results
 
-**File:** `docs/autoresearch/program.md` (new)
+**File:** `docs/autoresearch/program.md` (new) — see Program.md Content section below
 
-- Full experiment loop instructions (the agent's "brain")
-- Setup procedure, probe writing guide, results.tsv format
-- HMR vs reboot decision logic
-- Context management (progress.md every 20 experiments)
-- "NEVER STOP" directive
+**File:** `docs/autoresearch/results.tsv` (created by agent on first run)
 
-**File:** `docs/autoresearch/results.tsv` (new, created by agent on first run)
-
-**Tests:** Manual — run `VITE_ORBIT_AUTO_PROBE=pipeline-baseline bunx tauri dev`, verify result file appears.
+**Tests:** Manual — run `VITE_ORBIT_AUTO_PROBE=pipeline-baseline bunx tauri dev`, verify result file appears at `$HOME/.orbit-autoresearch/probe-result.json`.
 
 ---
 
 ## Phase Dependencies
 
 ```
-Phase 1 (Rust commands + bridge logging)
-    │
-    ├─→ Phase 2 (Frontend scaffold, console capture, auto-runner)
-    │       │
-    │       └─→ Phase 4 (First probe + program.md)
-    │
-    └─→ Phase 3 (Sidecar markers)
-            │
-            └─→ Phase 4
+Phase 1 (Rust commands + bridge logging) ──→ Phase 2 (Frontend scaffold)
+                                          ──→ Phase 3 (Sidecar markers)
+                                                      │
+Phase 2 + Phase 3 ─────────────────────────────────→ Phase 4 (First probe + program.md)
 ```
 
 Phase 1 must complete first (requires Rust recompile).
@@ -364,28 +475,76 @@ Phase 4 requires both 2 and 3.
 
 ---
 
+## Program.md Content (Phase 4 Deliverable)
+
+This is the agent's "brain." It must be complete — an agent reading this document alone must be able to run experiments all night.
+
+### results.tsv Format
+
+```
+commit	probe	assertions_passed	boundary_p50_ms	status	description
+a1b2c3d	pipeline-baseline	5/5	12.3	keep	baseline established
+b2c3d4e	rapid-fire-10	4/5	45.7	fixed	message ordering bug in appendToLastMessage
+c3d4e5f	perf-file-load	3/5	0.0	fixed	CodeMirror not unmounting on file close
+```
+
+Tab-separated. Columns: short commit hash, probe name, assertion pass count, median boundary delta (0.0 for non-pipeline probes), status (`keep`/`fixed`/`crash`/`transient`), description.
+
+### Decision Rules
+
+- **Assertions all pass, no regression:** Log as `keep`, move to next hypothesis.
+- **Assertion fails, reproducible:** Diagnose → patch → verify same probe passes → `git commit` → log as `fixed`.
+- **Assertion fails, not reproducible on retry:** Log as `transient`, move on. Do NOT patch.
+- **`cargo check` fails after patch:** Try to fix the compile error once. If second fix also fails, `git checkout -- .` and move on. Never spend more than 2 attempts on a single compile error.
+- **App crashes (no result file after timeout):** Read terminal log. If obvious bug (typo, missing import), fix and retry. If fundamentally broken, revert and move on.
+
+### Kill Sequence
+
+```bash
+# Kill ALL processes from bunx tauri dev (Vite + Tauri + Rust binary)
+pkill -f "tauri dev" 2>/dev/null || true
+pkill -f "vite" 2>/dev/null || true
+sleep 2
+```
+
+The probe self-terminates, so this is only needed for crashes where the app hangs.
+
+### Transient Failure Handling
+
+If a probe fails with "Timeout" and the terminal log shows OAuth/network errors:
+
+1. Wait 60 seconds
+2. Retry the exact same probe (no code changes)
+3. If retry passes → log as `transient`, continue
+4. If retry fails → log as `transient`, skip, move to next hypothesis
+5. Do NOT patch for transient failures
+
+### Context Management
+
+After every 15 experiments:
+
+1. Write findings summary to `docs/autoresearch/progress.md`
+2. Run `/compact` to compress conversation context
+3. Continue experimenting
+
+If the session becomes unresponsive or reasoning quality degrades, write a final note to `progress.md`: "Context restart needed. Resume from progress.md." The human starts a fresh session.
+
+---
+
 ## Operational Parameters
 
-| Parameter              | Value                                      | Rationale                                 |
-| ---------------------- | ------------------------------------------ | ----------------------------------------- |
-| Experiments per night  | 25-48                                      | 8-12 min/cycle with mixed Rust/TS changes |
-| API cost per night     | ~$1-3                                      | Sonnet with prompt caching                |
-| Probe timeout          | 2 min                                      | Covers 60s boot + 60s probe execution     |
-| Session readiness wait | 30s                                        | Sidecar spawn + OAuth + session init      |
-| Console flush interval | 1s                                         | Balances latency vs overhead              |
-| `[PERF]` log format    | `[PERF] <msgId> <boundary> <timestamp_ms>` | Grep-parsable, correlatable               |
-| Context management     | progress.md every 20 experiments           | Prevents context window overflow          |
-
-## HMR Optimization
-
-For TS-only probe changes (no Rust edits), the agent skips kill/reboot:
-
-- Edit probe `.ts` file → Vite HMR delivers in <1s
-- Probe re-runs automatically (auto-probe-runner detects file change)
-- Per-experiment overhead drops from 60s to <5s
-- Doubles experiment throughput for frontend-focused campaigns
-
-**Decision encoded in program.md:** "Did I edit a Rust file? If yes → kill + restart. If TS only → let HMR handle it."
+| Parameter                | Value                                        | Rationale                                                         |
+| ------------------------ | -------------------------------------------- | ----------------------------------------------------------------- |
+| Experiments per night    | 15-25                                        | ~8-15 min/cycle (Rust recompile + boot + probe + read + diagnose) |
+| API cost per night       | ~$1-3                                        | Sonnet with prompt caching                                        |
+| App timeout              | 180s                                         | Covers ~60s compile + ~60s boot + ~60s probe                      |
+| Session readiness wait   | 30s                                          | Sidecar spawn + OAuth + session init                              |
+| Console flush interval   | 1s                                           | Balances latency vs overhead                                      |
+| `[PERF]` log format      | `[PERF] <msgId> <boundary> <timestamp_ms>`   | Grep-parsable, correlatable                                       |
+| Context management       | Every 15 experiments: progress.md + /compact | Prevents context window overflow                                  |
+| Max compile fix attempts | 2                                            | Prevents repair loops                                             |
+| Transient retry          | 1 retry after 60s wait                       | Distinguishes real bugs from network blips                        |
+| Output directory         | `$HOME/.orbit-autoresearch/`                 | Within Tauri ACL scope (`$HOME/**`)                               |
 
 ---
 
@@ -426,19 +585,21 @@ bun run lint                                   # Zero ESLint warnings
 
 # Phase 3
 cd agent-bridge && bun run typecheck           # Sidecar compiles
+cd agent-bridge && bun run build:sidecar       # Sidecar binary builds
 
-# Phase 4
-VITE_ORBIT_AUTO_PROBE=pipeline-baseline bunx tauri dev  # Probe runs
-cat /tmp/orbit-probe-result.json               # Result file exists with valid JSON
+# Phase 4 — end-to-end
+VITE_ORBIT_AUTO_PROBE=pipeline-baseline timeout 180 bunx tauri dev \
+  > $HOME/.orbit-autoresearch/terminal.log 2>&1
+cat $HOME/.orbit-autoresearch/probe-result.json  # Valid JSON with overall_success
 ```
 
 ### Manual
 
-1. Start app with `VITE_ORBIT_AUTO_PROBE=pipeline-baseline bunx tauri dev > /tmp/orbit-terminal.log 2>&1`
-2. Wait ~90 seconds for boot + probe execution
-3. Verify `/tmp/orbit-probe-result.json` exists with `overall_success: true`
-4. Verify `/tmp/orbit-console.jsonl` has entries
-5. Verify `grep "\[PERF\]" /tmp/orbit-terminal.log` shows boundary timestamps
+1. Start app with `VITE_ORBIT_AUTO_PROBE=pipeline-baseline timeout 180 bunx tauri dev > $HOME/.orbit-autoresearch/terminal.log 2>&1`
+2. Wait ~90 seconds for boot + probe execution + self-termination
+3. Verify `$HOME/.orbit-autoresearch/probe-result.json` exists with `overall_success: true`
+4. Verify `$HOME/.orbit-autoresearch/console.jsonl` has entries
+5. Verify `grep "\[PERF\]" $HOME/.orbit-autoresearch/terminal.log` shows boundary timestamps
 6. Open Claude Code in repo, say "read docs/autoresearch/program.md and kick off"
 7. Observe: agent writes first probe, boots app, reads results, begins experiment loop
 
@@ -446,19 +607,21 @@ cat /tmp/orbit-probe-result.json               # Result file exists with valid J
 
 ## Files Changed Summary
 
-| File                                                      | Action                                         | Phase |
-| --------------------------------------------------------- | ---------------------------------------------- | ----- |
-| `src-tauri/src/commands/common/diagnostics.rs`            | Modify — add `dev_get_process_rss`             | 1     |
-| `src-tauri/src/commands/common/mod.rs`                    | Modify — export new command                    | 1     |
-| `src-tauri/src/lib.rs`                                    | Modify — register in `generate_handler![]`     | 1     |
-| `src-tauri/src/agent/bridge.rs`                           | Modify — add `[PERF]` logging (~line 212)      | 1     |
-| `src-tauri/src/commands/agent/lifecycle.rs`               | Modify — add `[PERF]` in event callback        | 1     |
-| `apps/agent/src/lib/dev/console-capture.ts`               | **New** — console interceptor (~10 lines)      | 2     |
-| `apps/agent/src/stress-tests/auto-probe-runner.ts`        | **New** — auto-run trigger (~30 lines)         | 2     |
-| `apps/agent/src/stress-tests/probe-primitives.ts`         | **New** — shared probe utilities (~40 lines)   | 2     |
-| `apps/agent/src/hooks/chat/use-chat-messages.ts`          | Modify — wire auto-probe to `__orbit_debug`    | 2     |
-| `apps/agent/src/providers/tauri-provider.tsx`             | Modify — `[PERF]` line + console capture init  | 2     |
-| `apps/agent/src/stores/chat/chat-store.ts`                | Modify — `[PERF]` inside `appendToLastMessage` | 2     |
-| `agent-bridge/src/agent/core/agent.ts`                    | Modify — `[PERF]` stderr logging               | 3     |
-| `apps/agent/src/stress-tests/probes/pipeline-baseline.ts` | **New** — first probe                          | 4     |
-| `docs/autoresearch/program.md`                            | **New** — agent instructions                   | 4     |
+| File                                                      | Action                                                    | Phase |
+| --------------------------------------------------------- | --------------------------------------------------------- | ----- |
+| `src-tauri/src/agent/session.rs`                          | Modify — add `sidecar_pid()` accessor                     | 1     |
+| `src-tauri/src/commands/common/diagnostics.rs`            | Modify — add `dev_get_process_rss`                        | 1     |
+| `src-tauri/src/commands/common/mod.rs`                    | Modify — export new command                               | 1     |
+| `src-tauri/src/lib.rs`                                    | Modify — register in `generate_handler![]`                | 1     |
+| `src-tauri/src/agent/bridge.rs`                           | Modify — add `[PERF]` logging (~line 211)                 | 1     |
+| `src-tauri/src/commands/agent/lifecycle.rs`               | Modify — add `[PERF]` in event callback                   | 1     |
+| `apps/agent/src/lib/dev/console-capture.ts`               | **New** — console interceptor + DevLogEntry mapping       | 2     |
+| `apps/agent/src/stress-tests/auto-probe-runner.ts`        | **New** — auto-run trigger + app self-termination         | 2     |
+| `apps/agent/src/stress-tests/probe-primitives.ts`         | **New** — shared probe utilities                          | 2     |
+| `apps/agent/env.d.ts`                                     | Modify — add `VITE_ORBIT_AUTO_PROBE` type                 | 2     |
+| `apps/agent/src/hooks/chat/use-chat-messages.ts`          | Modify — wire auto-probe to `__orbit_debug` (3 changes)   | 2     |
+| `apps/agent/src/providers/tauri-provider.tsx`             | Modify — `[PERF]` line (282) + console capture init (819) | 2     |
+| `apps/agent/src/stores/chat/chat-store.ts`                | Modify — `[PERF]` at line 291 (appendToLastMessage impl)  | 2     |
+| `agent-bridge/src/agent/core/agent.ts`                    | Modify — `[PERF]` stderr logging                          | 3     |
+| `apps/agent/src/stress-tests/probes/pipeline-baseline.ts` | **New** — first probe                                     | 4     |
+| `docs/autoresearch/program.md`                            | **New** — agent instructions (complete content)           | 4     |

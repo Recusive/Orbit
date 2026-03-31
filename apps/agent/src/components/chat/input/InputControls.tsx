@@ -1,16 +1,19 @@
 import { ArrowUp, Image, Square } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
 
-import { EffortLevelButton } from './EffortLevelButton';
+import { EffortLevelSelector } from './EffortLevelSelector';
 import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
 import { INPUT_MODE_LABELS } from './constants';
 import {
   Context,
+  ContextCacheUsage,
   ContextContent,
   ContextContentBody,
+  ContextContentFooter,
   ContextContentHeader,
   ContextInputUsage,
+  ContextMoreButton,
   ContextOutputUsage,
   ContextTrigger,
 } from './context';
@@ -23,6 +26,7 @@ import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useContainerWidth } from '@/hooks/ui';
 import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
+import { getContextUsedTokens } from '@/stores/agent/tool-store';
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
@@ -36,9 +40,8 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   imageInputRef,
   thinkingHoverOpen,
   setThinkingHoverOpen,
-  effortHoverOpen,
-  setEffortHoverOpen,
   onModelChange,
+  onEffortChange,
   cycleInputMode,
   cycleThinkingMode,
   cycleEffortLevel,
@@ -55,7 +58,7 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   const width = useContainerWidth(containerRef);
   const showEffortControl = isAdaptiveModel;
   const showThinkingControl = !isAdaptiveModel;
-  const showCompactMenu = showEffortControl || showThinkingControl;
+  const showCompactMenu = showThinkingControl;
   const shouldShowContext = maxTokens > 0;
   const imageTooltip = 'Attach image';
 
@@ -68,17 +71,26 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   useEffect(() => {
     if (isCompact) {
       setThinkingHoverOpen(false);
-      setEffortHoverOpen(false);
     }
-  }, [isCompact, setThinkingHoverOpen, setEffortHoverOpen]);
+  }, [isCompact, setThinkingHoverOpen]);
 
   return (
-    <div ref={containerRef} className="flex w-full items-center justify-between gap-1 px-1 pb-1">
-      {/* Left Controls - Mode & Model Pickers */}
+    <div
+      ref={containerRef}
+      className="input-controls-container flex w-full items-center justify-between gap-1 px-1 pb-1"
+    >
+      {/* Left Controls - Model / Effort / Mode */}
       <div className="flex items-center gap-0.5">
         {/* Model Picker */}
         <ModelSelector onModelChange={onModelChange} />
-        <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
+        {/* Effort Level Selector — only for adaptive models */}
+        {showEffortControl ? (
+          <>
+            <div aria-hidden="true" className="auto-hide-separator h-4 w-px bg-border/60" />
+            <EffortLevelSelector effortLevel={effortLevel} onEffortChange={onEffortChange} />
+          </>
+        ) : null}
+        <div aria-hidden="true" className="auto-hide-separator h-4 w-px bg-border/60" />
         {/* Mode Picker */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -152,16 +164,8 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         ) : (
           // Expanded mode: all buttons inline
           <>
-            {/* Thinking Mode / Effort Level Button — conditional on model */}
-            {showEffortControl ? (
-              <EffortLevelButton
-                effortLevel={effortLevel}
-                effortHoverOpen={effortHoverOpen}
-                setEffortHoverOpen={setEffortHoverOpen}
-                cycleEffortLevel={cycleEffortLevel}
-                getEffortInfo={getEffortInfo}
-              />
-            ) : showThinkingControl ? (
+            {/* Thinking Mode Button — only for non-adaptive models */}
+            {showThinkingControl ? (
               <ThinkingModeButton
                 thinkingMode={thinkingMode}
                 thinkingHoverOpen={thinkingHoverOpen}
@@ -211,11 +215,13 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
         {shouldShowContext ? (
           <Context
             maxTokens={maxTokens}
-            usedTokens={usage.inputTokens + usage.outputTokens}
+            usedTokens={getContextUsedTokens(usage)}
             usage={{
               promptTokens: usage.inputTokens,
+              cacheReadTokens: usage.cacheReadInputTokens ?? 0,
+              cacheCreationTokens: usage.cacheCreationInputTokens ?? 0,
               completionTokens: usage.outputTokens,
-              totalTokens: usage.inputTokens + usage.outputTokens,
+              totalTokens: getContextUsedTokens(usage) + usage.outputTokens,
             }}
           >
             <ContextTrigger />
@@ -223,8 +229,12 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
               <ContextContentHeader />
               <ContextContentBody>
                 <ContextInputUsage />
+                <ContextCacheUsage />
                 <ContextOutputUsage />
               </ContextContentBody>
+              <ContextContentFooter className="bg-transparent">
+                <ContextMoreButton />
+              </ContextContentFooter>
             </ContextContent>
           </Context>
         ) : null}

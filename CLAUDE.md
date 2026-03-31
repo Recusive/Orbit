@@ -24,6 +24,7 @@
 <doc path="packages/shared-schemas/CLAUDE.md" scope="Zod schemas shared across agent-bridge and all frontend apps"/>
 <doc path="docs/CLAUDE.md" scope="Documentation folder index"/>
 <doc path="apps/agent/src/stress-tests/CLAUDE.md" scope="In-app stress test creation guide"/>
+<doc path="perf-monitor/CLAUDE.md" scope="Safari timeline recording extractor, JSON structure reference, perf pattern guide"/>
 </sub_level_docs>
 
 <project_overview>

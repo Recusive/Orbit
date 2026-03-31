@@ -42,6 +42,7 @@ import type {
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
+import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
 import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
@@ -186,11 +187,23 @@ export function useChatMessages(): UseChatMessagesReturn {
         const conversation = await conversationLoad(sid);
         if (!conversation?.messages) return;
 
-        const processedMessageIds: string[] = [];
+        const processedMessageIds = collectUsageMessageIds(conversation.messages);
+        if (conversation.sessionUsage) {
+          const toolState = useToolStore.getState();
+          toolState.restoreSessionUsage(
+            sid,
+            toContextUsage(conversation.sessionUsage),
+            processedMessageIds.length > 0 ? processedMessageIds : undefined
+          );
+          if (toolState.currentSessionId === sid) {
+            useToolStore.getState().switchSession(sid);
+          }
+          return;
+        }
+
         const cumulativeUsage = conversation.messages.reduce(
           (acc, m) => {
             if (m.usage) {
-              processedMessageIds.push(m.id);
               return {
                 inputTokens: acc.inputTokens + m.usage.inputTokens,
                 outputTokens: acc.outputTokens + m.usage.outputTokens,

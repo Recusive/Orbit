@@ -78,7 +78,10 @@ export const BranchPickerContent: FC<BranchPickerContentProps> = ({
       disablePointerSelection
       className="bg-transparent"
     >
-      <div className="flex items-center px-1 pt-1 pb-0.5">
+      <div
+        className="flex items-center px-1 pt-1 pb-0.5"
+        style={{ '--surface-padding': '4px' } as React.CSSProperties}
+      >
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-muted-foreground/50" />
           <input
@@ -96,7 +99,8 @@ export const BranchPickerContent: FC<BranchPickerContentProps> = ({
               }
             }}
             placeholder="Search branches"
-            className="w-full h-7 rounded-[7px] bg-control-fill pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-control-fill-hover"
+            className="w-full h-7 bg-control-fill pl-7 pr-2.5 text-[12px] outline-none placeholder:text-muted-foreground/40 focus:bg-control-fill-hover"
+            style={{ borderRadius: 'calc(var(--surface-radius) - var(--surface-padding))' }}
             aria-label="Search branches"
           />
         </div>

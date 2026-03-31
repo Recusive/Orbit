@@ -12,6 +12,8 @@ import type { LexicalEditor } from 'lexical';
 export interface UsageData {
   readonly inputTokens: number;
   readonly outputTokens: number;
+  readonly cacheReadInputTokens?: number;
+  readonly cacheCreationInputTokens?: number;
 }
 
 export interface ImageAttachment {
@@ -161,9 +163,8 @@ export interface InputControlsProps {
   readonly imageInputRef: React.RefObject<HTMLInputElement | null>;
   readonly thinkingHoverOpen: boolean;
   readonly setThinkingHoverOpen: (open: boolean) => void;
-  readonly effortHoverOpen: boolean;
-  readonly setEffortHoverOpen: (open: boolean) => void;
   readonly onModelChange: (model: Model) => void;
+  readonly onEffortChange: (level: EffortLevel) => void;
   readonly cycleInputMode: () => void;
   readonly cycleThinkingMode: () => void;
   readonly cycleEffortLevel: () => void;

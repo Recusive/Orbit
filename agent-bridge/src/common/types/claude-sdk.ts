@@ -60,6 +60,8 @@ export interface LocalSDKSystemMessage {
   type: 'system';
   subtype?: string;
   session_id?: string;
+  betas?: string[];
+  model?: string;
 }
 
 export interface LocalSDKAssistantMessage {
@@ -97,6 +99,7 @@ export interface LocalSDKResultMessage {
   total_cost_usd?: number;
   duration_ms?: number;
   structured_output?: unknown;
+  modelUsage?: Record<string, { contextWindow?: number | undefined }>;
 }
 
 export interface LocalSDKStreamEventMessage {

@@ -23,6 +23,3 @@ export * from './browser';
 
 // Git store
 export * from './git';
-
-// Health store
-export * from './health';

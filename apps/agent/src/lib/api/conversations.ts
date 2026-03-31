@@ -65,6 +65,20 @@ export interface TokenUsageDto {
   totalCostUsd?: number;
 }
 
+export interface SessionUsageDto {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadInputTokens?: number;
+  cacheCreationInputTokens?: number;
+  totalCostUsd?: number;
+  lastTurnUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  };
+}
+
 export interface ConversationDto {
   sessionId: string;
   title: string;
@@ -74,8 +88,8 @@ export interface ConversationDto {
   workspacePath?: string;
   worktreePath?: string;
   forkedFrom?: string;
-  /** Authoritative cumulative session usage from SDK `result` event. */
-  sessionUsage?: TokenUsageDto;
+  /** Authoritative cumulative session usage plus optional last-turn snapshot. */
+  sessionUsage?: SessionUsageDto;
 }
 
 export interface ConversationSummaryDto {

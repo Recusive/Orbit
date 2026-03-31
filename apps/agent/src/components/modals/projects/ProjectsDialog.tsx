@@ -22,6 +22,7 @@ import { addRecentProject, conversationList, initializeWorkspace, openFileDialog
 import { toConversationSummaries } from '@/lib/mappers';
 import { cn } from '@/lib/utils';
 import { setFaceHover } from '@/lib/utils/facehash-utils';
+import { getSkillColor } from '@/lib/utils/skill-colors';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -61,9 +62,12 @@ const ProjectTile: FC<ProjectTileProps> = ({ project, onClick }) => (
       name={project.name}
       size={56}
       variant="solid"
-      colorClasses={['bg-avatar-project']}
       className="shrink-0 text-white dark:text-black"
-      style={{ pointerEvents: 'none', clipPath: FOLDER_CLIP }}
+      style={{
+        pointerEvents: 'none',
+        clipPath: FOLDER_CLIP,
+        backgroundImage: getSkillColor(project.name),
+      }}
     />
     <div className="flex flex-col items-center gap-0.5 min-w-0 w-full">
       <span className="text-[13px] font-medium text-foreground truncate max-w-full">

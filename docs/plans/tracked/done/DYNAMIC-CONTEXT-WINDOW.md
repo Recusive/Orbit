@@ -6,7 +6,7 @@ The context window meter in Orbit has two user-visible bugs that compound to mak
 
 ### Issue 1: Wrong context window size
 
-`MODEL_CONTEXT_WINDOWS` in `tool-store.ts:217-221` hardcodes all models at 200k. Opus 4.6 and Sonnet 4.6 are both 1M. Claude Code resolves this via a model-name + beta-flag check (`context-1m-2025-08-07`).
+`MODEL_CONTEXT_WINDOWS` in `tool-store.ts:217-221` hardcodes all models at 200k. Opus 4.6 is 1M on subscription (model ID includes `[1m]` suffix). Sonnet 4.6 is 200k on subscription but 1M with an API key + the `context-1m-2025-08-07` beta flag. Claude Code resolves this dynamically via model-name + beta-flag check.
 
 ### Issue 2: Wrong usage calculation (two independent causes)
 
@@ -79,7 +79,7 @@ Use in: `getContextPercentage()`, `getUsedTokens()`, `restoreSessionUsage()` com
 ```typescript
 const MODEL_CONTEXT_WINDOWS: Record<Model, number> = {
   haiku: 200_000,
-  'claude-sonnet-4-6': 1_000_000,
+  'claude-sonnet-4-6': 200_000, // 1M only with API key + context-1m beta
   'claude-opus-4-6': 1_000_000,
 };
 ```
@@ -404,7 +404,7 @@ Same as previous plan sections 4a–4h, but `setContextWindow` now takes `sessio
 
 **File:** `apps/agent/src/__tests__/unit/stores/agent/tool-store.test.ts`
 
-- Fix `getMaxTokens` expected values: Opus=1M, Sonnet=1M, Haiku=200k
+- Fix `getMaxTokens` expected values: Opus=1M, Sonnet=200k (1M only with beta), Haiku=200k
 - Test `addUsage` REPLACES (not sums) cumulative values
 - Test `addUsage` is session-scoped: background session doesn't overwrite active session
 - Test `getContextPercentage` uses `input + cache` (not output)

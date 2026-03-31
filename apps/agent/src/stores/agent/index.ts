@@ -45,6 +45,10 @@ export {
   useContextPercentage,
   useMaxTokens,
   useUsedTokens,
+  useSessionModel,
+  useSessionTools,
+  useSessionMcpServers,
+  useSessionMetadataState,
   deduplicateAndSortTools,
 } from './tool-store';
 export type {
@@ -53,6 +57,8 @@ export type {
   ToolExecution,
   PermissionRequest,
   ToolState,
+  SessionMcpServer,
+  SessionMetadataState,
 } from './tool-store';
 
 // Auth store

@@ -213,12 +213,35 @@ export interface UsageData {
   totalCostUsd: number;
 }
 
+export interface SessionMcpServer {
+  name: string;
+  status: string;
+}
+
+export type SessionMetadataState = 'live' | 'restored';
+
+interface ContextUsageTotals {
+  inputTokens: number;
+  cacheReadInputTokens?: number | undefined;
+  cacheCreationInputTokens?: number | undefined;
+}
+
+export function getContextUsedTokens(usage: ContextUsageTotals): number {
+  return (
+    usage.inputTokens + (usage.cacheReadInputTokens ?? 0) + (usage.cacheCreationInputTokens ?? 0)
+  );
+}
+
 // Context window sizes by model
 const MODEL_CONTEXT_WINDOWS: Record<Model, number> = {
-  haiku: 200000,
-  'claude-sonnet-4-6': 200000,
-  'claude-opus-4-6': 200000,
+  haiku: 200_000,
+  'claude-sonnet-4-6': 200_000,
+  'claude-opus-4-6': 1_000_000,
 };
+
+function resolveMaxTokens(state: { currentContextWindow: number | null; model: Model }): number {
+  return state.currentContextWindow ?? MODEL_CONTEXT_WINDOWS[state.model];
+}
 
 // Tool status
 export type ToolStatus = 'pending' | 'running' | 'success' | 'error';
@@ -259,6 +282,10 @@ interface CachedSessionData {
   processedIds: string[];
   activeTools: Record<string, ToolExecution>;
   completedTools: ToolExecution[];
+  contextWindow?: number | undefined;
+  sessionModel?: string | undefined;
+  sessionTools?: string[] | undefined;
+  sessionMcpServers?: SessionMcpServer[] | undefined;
 }
 
 export interface ToolState {
@@ -286,14 +313,24 @@ export interface ToolState {
   // Current session ID for usage tracking
   currentSessionId: string | null;
 
-  // Cumulative session usage (from SDK)
+  // Last known context occupancy (per-turn usage) plus cumulative cost.
   sessionUsage: UsageData;
 
-  // Track processed message IDs to avoid double-counting (SDK sends same usage for parallel tools)
+  // Tracks message IDs restored from persisted conversation usage.
+  // Kept so session reloads can preserve which assistant turns contributed usage.
   processedMessageIds: Set<string>;
 
   // Cache of session data per session (plain object for immer compatibility)
   sessionCache: Record<string, CachedSessionData>;
+
+  // Session-specific context window resolved from SDK metadata
+  currentContextWindow: number | null;
+
+  // Session metadata captured from system:init
+  sessionModel: string | null;
+  sessionTools: string[] | null;
+  sessionMcpServers: SessionMcpServer[] | null;
+  sessionMetadataState: SessionMetadataState | null;
 
   // Actions
   setInputMode: (mode: InputMode) => void;
@@ -322,7 +359,15 @@ export interface ToolState {
   mergeToolInputAnswers: (toolName: string, answers: Record<string, string>) => void;
 
   // Usage tracking
+  setContextWindow: (sessionId: string, contextWindow: number) => void;
+  setSessionMetadata: (
+    sessionId: string,
+    model: string | null,
+    tools: string[] | null,
+    mcpServers: SessionMcpServer[] | null
+  ) => void;
   addUsage: (
+    sessionId: string,
     messageId: string,
     usage: {
       input_tokens: number;
@@ -425,6 +470,11 @@ export const useToolStore = create<ToolState>()(
       sessionUsage: { ...initialUsage },
       processedMessageIds: new Set<string>(),
       sessionCache: {},
+      currentContextWindow: null,
+      sessionModel: null,
+      sessionTools: null,
+      sessionMcpServers: null,
+      sessionMetadataState: null,
 
       setInputMode: (mode: InputMode) => {
         set((state) => {
@@ -559,8 +609,62 @@ export const useToolStore = create<ToolState>()(
         });
       },
 
+      setContextWindow: (sessionId: string, contextWindow: number) => {
+        if (contextWindow <= 0) {
+          return;
+        }
+
+        set((state) => {
+          const cached = state.sessionCache[sessionId];
+          if (cached) {
+            state.sessionCache[sessionId] = { ...cached, contextWindow };
+          } else {
+            state.sessionCache[sessionId] = {
+              usage: { ...initialUsage },
+              processedIds: [],
+              activeTools: {},
+              completedTools: [],
+              contextWindow,
+            };
+          }
+
+          if (state.currentSessionId === sessionId) {
+            state.currentContextWindow = contextWindow;
+          }
+        });
+      },
+
+      setSessionMetadata: (
+        sessionId: string,
+        model: string | null,
+        tools: string[] | null,
+        mcpServers: SessionMcpServer[] | null
+      ) => {
+        set((state) => {
+          const cached = state.sessionCache[sessionId];
+          state.sessionCache[sessionId] = {
+            usage: cached?.usage ?? { ...initialUsage },
+            processedIds: cached?.processedIds ?? [],
+            activeTools: cached?.activeTools ?? {},
+            completedTools: cached?.completedTools ?? [],
+            contextWindow: cached?.contextWindow,
+            sessionModel: model ?? undefined,
+            sessionTools: tools !== null ? [...tools] : undefined,
+            sessionMcpServers: mcpServers !== null ? [...mcpServers] : undefined,
+          };
+
+          if (state.currentSessionId === sessionId) {
+            state.sessionModel = model;
+            state.sessionTools = tools !== null ? [...tools] : null;
+            state.sessionMcpServers = mcpServers !== null ? [...mcpServers] : null;
+            state.sessionMetadataState = 'live';
+          }
+        });
+      },
+
       addUsage: (
-        messageId: string,
+        sessionId: string,
+        _messageId: string,
         usage: {
           input_tokens: number;
           output_tokens: number;
@@ -570,20 +674,28 @@ export const useToolStore = create<ToolState>()(
         totalCostUsd?: number
       ) => {
         set((state) => {
-          // SDK sends same usage for all messages with same ID (parallel tool uses)
-          // Only count each message ID once to avoid double-charging
-          if (state.processedMessageIds.has(messageId)) {
-            return;
-          }
-          state.processedMessageIds.add(messageId);
+          const nextUsage: UsageData = {
+            inputTokens: usage.input_tokens,
+            outputTokens: usage.output_tokens,
+            cacheReadInputTokens: usage.cache_read_input_tokens ?? 0,
+            cacheCreationInputTokens: usage.cache_creation_input_tokens ?? 0,
+            totalCostUsd: totalCostUsd ?? 0,
+          };
 
-          // Accumulate usage
-          state.sessionUsage.inputTokens += usage.input_tokens;
-          state.sessionUsage.outputTokens += usage.output_tokens;
-          state.sessionUsage.cacheReadInputTokens += usage.cache_read_input_tokens ?? 0;
-          state.sessionUsage.cacheCreationInputTokens += usage.cache_creation_input_tokens ?? 0;
-          if (totalCostUsd !== undefined) {
-            state.sessionUsage.totalCostUsd += totalCostUsd;
+          const cached = state.sessionCache[sessionId];
+          if (cached) {
+            state.sessionCache[sessionId] = { ...cached, usage: nextUsage };
+          } else if (state.currentSessionId !== sessionId) {
+            state.sessionCache[sessionId] = {
+              usage: nextUsage,
+              processedIds: [],
+              activeTools: {},
+              completedTools: [],
+            };
+          }
+
+          if (state.currentSessionId === sessionId) {
+            state.sessionUsage = nextUsage;
           }
         });
       },
@@ -592,6 +704,26 @@ export const useToolStore = create<ToolState>()(
         set((state) => {
           state.sessionUsage = { ...initialUsage };
           state.processedMessageIds = new Set<string>();
+          state.currentContextWindow = null;
+          state.sessionModel = null;
+          state.sessionTools = null;
+          state.sessionMcpServers = null;
+          state.sessionMetadataState = null;
+
+          if (state.currentSessionId) {
+            const cached = state.sessionCache[state.currentSessionId];
+            if (cached) {
+              state.sessionCache[state.currentSessionId] = {
+                ...cached,
+                usage: { ...initialUsage },
+                processedIds: [],
+                contextWindow: undefined,
+                sessionModel: undefined,
+                sessionTools: undefined,
+                sessionMcpServers: undefined,
+              };
+            }
+          }
         });
       },
 
@@ -623,6 +755,11 @@ export const useToolStore = create<ToolState>()(
               processedIds: Array.from(state.processedMessageIds),
               activeTools: { ...ownedActive },
               completedTools: [...ownedCompleted],
+              contextWindow: state.currentContextWindow ?? undefined,
+              sessionModel: state.sessionModel ?? undefined,
+              sessionTools: state.sessionTools !== null ? [...state.sessionTools] : undefined,
+              sessionMcpServers:
+                state.sessionMcpServers !== null ? [...state.sessionMcpServers] : undefined,
             };
 
             // Stash foreign tools into their respective session caches so they
@@ -660,6 +797,10 @@ export const useToolStore = create<ToolState>()(
                 processedIds: existing?.processedIds ?? [],
                 activeTools: { ...(existing?.activeTools ?? {}), ...group.active },
                 completedTools: [...(existing?.completedTools ?? []), ...group.completed],
+                contextWindow: existing?.contextWindow,
+                sessionModel: existing?.sessionModel,
+                sessionTools: existing?.sessionTools,
+                sessionMcpServers: existing?.sessionMcpServers,
               };
             }
 
@@ -678,18 +819,38 @@ export const useToolStore = create<ToolState>()(
             state.processedMessageIds = new Set(cached.processedIds);
             state.activeTools = { ...cached.activeTools };
             state.completedTools = [...cached.completedTools];
+            state.currentContextWindow = cached.contextWindow ?? null;
+            state.sessionModel = cached.sessionModel ?? null;
+            state.sessionTools = cached.sessionTools ?? null;
+            state.sessionMcpServers = cached.sessionMcpServers ?? null;
+            state.sessionMetadataState =
+              cached.sessionModel !== undefined ||
+              cached.sessionTools !== undefined ||
+              cached.sessionMcpServers !== undefined
+                ? 'restored'
+                : null;
             logger.debug(
               `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, restored ${String(cached.completedTools.length)} from cache`
             );
           } else if (isInitLoad) {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
+            state.currentContextWindow = null;
+            state.sessionModel = null;
+            state.sessionTools = null;
+            state.sessionMcpServers = null;
+            state.sessionMetadataState = null;
             logger.debug(`switchSession: INIT → ${newSessionId} | no cache (initial load)`);
           } else {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
             state.activeTools = {};
             state.completedTools = [];
+            state.currentContextWindow = null;
+            state.sessionModel = null;
+            state.sessionTools = null;
+            state.sessionMcpServers = null;
+            state.sessionMetadataState = null;
             logger.debug(
               `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, RESET (no cache)`
             );
@@ -743,9 +904,8 @@ export const useToolStore = create<ToolState>()(
           // accurate — disk data may lag behind. Only overwrite when disk data
           // is richer (first load from history) or the cache is empty.
           const existingCache = state.sessionCache[sessionId];
-          const existingTotal =
-            (existingCache?.usage.inputTokens ?? 0) + (existingCache?.usage.outputTokens ?? 0);
-          const incomingTotal = usage.inputTokens + usage.outputTokens;
+          const existingTotal = getContextUsedTokens(existingCache?.usage ?? initialUsage);
+          const incomingTotal = getContextUsedTokens(usage);
 
           if (incomingTotal >= existingTotal) {
             state.sessionCache[sessionId] = {
@@ -753,6 +913,10 @@ export const useToolStore = create<ToolState>()(
               processedIds: processedIds ?? existingCache?.processedIds ?? [],
               activeTools: existingCache?.activeTools ?? {},
               completedTools: existingCache?.completedTools ?? [],
+              contextWindow: existingCache?.contextWindow,
+              sessionModel: existingCache?.sessionModel,
+              sessionTools: existingCache?.sessionTools,
+              sessionMcpServers: existingCache?.sessionMcpServers,
             };
           }
 
@@ -760,7 +924,7 @@ export const useToolStore = create<ToolState>()(
           // the incoming data is richer than what we already have (avoids
           // overwriting live-tracked usage with stale disk data).
           if (state.currentSessionId === sessionId) {
-            const liveTotal = state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
+            const liveTotal = getContextUsedTokens(state.sessionUsage);
             if (incomingTotal >= liveTotal) {
               state.sessionUsage = { ...usage };
               if (processedIds) {
@@ -773,20 +937,17 @@ export const useToolStore = create<ToolState>()(
 
       getContextPercentage: () => {
         const state = get();
-        const maxTokens = MODEL_CONTEXT_WINDOWS[state.model];
-        const usedTokens = state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
+        const maxTokens = resolveMaxTokens(state);
+        const usedTokens = getContextUsedTokens(state.sessionUsage);
         return Math.min(100, Math.round((usedTokens / maxTokens) * 100));
       },
 
       getMaxTokens: () => {
         const state = get();
-        return MODEL_CONTEXT_WINDOWS[state.model];
+        return resolveMaxTokens(state);
       },
 
-      getUsedTokens: () => {
-        const state = get();
-        return state.sessionUsage.inputTokens + state.sessionUsage.outputTokens;
-      },
+      getUsedTokens: () => getContextUsedTokens(get().sessionUsage),
 
       // ⚠️  DO NOT use this for rendering — get() returns stale state.
       // See file-level comment. For rendering, use useActiveTools() +
@@ -874,6 +1035,10 @@ export const useToolStore = create<ToolState>()(
               processedIds: existingCache?.processedIds ?? [],
               activeTools: existingCache?.activeTools ?? {},
               completedTools: [...state.completedTools],
+              contextWindow: existingCache?.contextWindow,
+              sessionModel: existingCache?.sessionModel,
+              sessionTools: existingCache?.sessionTools,
+              sessionMcpServers: existingCache?.sessionMcpServers,
             };
           }
           logger.debug(
@@ -912,6 +1077,11 @@ export const useToolStore = create<ToolState>()(
           state.sessionUsage = { ...initialUsage };
           state.processedMessageIds = new Set<string>();
           state.sessionCache = {};
+          state.currentContextWindow = null;
+          state.sessionModel = null;
+          state.sessionTools = null;
+          state.sessionMcpServers = null;
+          state.sessionMetadataState = null;
         });
       },
     })),
@@ -1014,6 +1184,12 @@ export const useContextPercentage = (): number =>
   useToolStore((state) => state.getContextPercentage());
 export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
 export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());
+export const useSessionModel = (): string | null => useToolStore((state) => state.sessionModel);
+export const useSessionTools = (): string[] | null => useToolStore((state) => state.sessionTools);
+export const useSessionMcpServers = (): SessionMcpServer[] | null =>
+  useToolStore((state) => state.sessionMcpServers);
+export const useSessionMetadataState = (): SessionMetadataState | null =>
+  useToolStore((state) => state.sessionMetadataState);
 
 /**
  * @deprecated Do not use for rendering — get() returns stale state in persist(immer(...)).

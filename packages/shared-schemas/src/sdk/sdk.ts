@@ -159,6 +159,7 @@ export const SDKSystemMessageSchema = z.looseObject({
   subtype: z.literal('init'),
   uuid: z.string(),
   session_id: z.string(),
+  betas: z.array(z.string()).optional(),
   apiKeySource: ApiKeySourceSchema,
   cwd: z.string(),
   tools: z.array(z.string()),

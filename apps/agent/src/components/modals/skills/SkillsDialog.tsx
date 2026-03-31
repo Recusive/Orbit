@@ -85,8 +85,11 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContentGlass className="w-[720px] h-[560px] max-h-[85vh] flex flex-col gap-0 p-0 glass-surface [&>.absolute]:hidden">
-        <div className="shrink-0 p-2 pb-2">
+      <DialogContentGlass className="w-[720px] h-[560px] max-h-[85vh] flex flex-col gap-0 p-0 solid-surface surface-lg [&>.absolute]:hidden">
+        <div
+          className="shrink-0 p-1.5 pb-1.5"
+          style={{ '--surface-padding': '6px' } as React.CSSProperties}
+        >
           <div className="relative">
             <Search
               className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50"
@@ -109,11 +112,12 @@ export const SkillsDialog: FC<SkillsDialogProps> = ({ open, onOpenChange }) => {
               spellCheck={false}
               autoComplete="off"
               className={cn(
-                'w-full h-9 rounded-[9px] bg-control-fill pl-9 pr-9 text-sm',
+                'w-full h-9 bg-control-fill pl-9 pr-9 text-sm',
                 'placeholder:text-muted-foreground/40 outline-none',
                 'transition-[background-color] duration-150',
                 'focus:bg-control-fill-hover'
               )}
+              style={{ borderRadius: 'calc(var(--surface-radius) - var(--surface-padding))' }}
             />
             <DialogClose className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 bg-foreground/8 text-muted-foreground/50 transition-all duration-150 hover:bg-destructive-subtle hover:text-destructive-text">
               <X className="h-3 w-3" aria-hidden="true" />

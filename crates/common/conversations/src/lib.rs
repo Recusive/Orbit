@@ -170,6 +170,33 @@ pub struct TokenUsage {
     pub total_cost_usd: Option<f64>,
 }
 
+/// Authoritative session usage loaded from `{sessionId}.usage.json`.
+///
+/// Stores cumulative session totals plus the last assistant turn snapshot used
+/// for the context meter and restore flow.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionUsage {
+    /// Total input tokens consumed across the session.
+    #[serde(default)]
+    pub input_tokens: u32,
+    /// Total output tokens produced across the session.
+    #[serde(default)]
+    pub output_tokens: u32,
+    /// Total tokens read from cache across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_input_tokens: Option<u32>,
+    /// Total tokens written to cache across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_input_tokens: Option<u32>,
+    /// Total cumulative cost in USD across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_cost_usd: Option<f64>,
+    /// Per-turn usage from the last assistant message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn_usage: Option<TokenUsage>,
+}
+
 // ============================================
 // Per-message metadata sidecar (`.metadata.json`)
 // ============================================
@@ -396,7 +423,7 @@ pub struct Conversation {
     /// Read from `{sessionId}.usage.json` sidecar file (written by agent-bridge).
     /// More accurate than summing per-message usage from JSONL (which has stale output_tokens).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session_usage: Option<TokenUsage>,
+    pub session_usage: Option<SessionUsage>,
 }
 
 impl Conversation {
@@ -2188,14 +2215,36 @@ fn extract_usage(value: &serde_json::Value) -> Option<TokenUsage> {
 /// inaccurate `output_tokens` (written at stream-start, never updated).
 ///
 /// `jsonl_path` is the path to the `.jsonl` file; we swap the extension.
-fn read_session_usage(jsonl_path: &Path) -> Option<TokenUsage> {
+fn read_session_usage(jsonl_path: &Path) -> Option<SessionUsage> {
     let usage_path = jsonl_path.with_extension("usage.json");
     let data = fs::read_to_string(&usage_path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&data).ok()?;
 
     let to_u32 = |v: u64| -> u32 { u32::try_from(v).unwrap_or(u32::MAX) };
 
-    Some(TokenUsage {
+    let last_turn_usage = json.get("lastTurnUsage").and_then(|last_turn| {
+        Some(TokenUsage {
+            input_tokens: last_turn
+                .get("inputTokens")
+                .and_then(serde_json::Value::as_u64)
+                .map(to_u32)?,
+            output_tokens: last_turn
+                .get("outputTokens")
+                .and_then(serde_json::Value::as_u64)
+                .map(to_u32)?,
+            cache_read_input_tokens: last_turn
+                .get("cacheReadInputTokens")
+                .and_then(serde_json::Value::as_u64)
+                .map(to_u32),
+            cache_creation_input_tokens: last_turn
+                .get("cacheCreationInputTokens")
+                .and_then(serde_json::Value::as_u64)
+                .map(to_u32),
+            total_cost_usd: None,
+        })
+    });
+
+    Some(SessionUsage {
         input_tokens: json
             .get("inputTokens")
             .and_then(serde_json::Value::as_u64)
@@ -2213,6 +2262,7 @@ fn read_session_usage(jsonl_path: &Path) -> Option<TokenUsage> {
             .and_then(serde_json::Value::as_u64)
             .map(to_u32),
         total_cost_usd: json.get("totalCostUsd").and_then(serde_json::Value::as_f64),
+        last_turn_usage,
     })
 }
 

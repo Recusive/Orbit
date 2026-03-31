@@ -27,7 +27,7 @@ use commands::common::{
 use commands::vault as vault_cmd;
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
-use tauri::{Emitter as _, Manager as _};
+use tauri::Manager as _;
 use tauri_plugin_log::{Target, TargetKind};
 
 /// Log mode for the application.
@@ -259,17 +259,13 @@ pub fn run() {
             credential_bridge.set_api_key(Some(api_key));
         }
     }
-    let preflight_report = core::preflight::run_preflight(&sidecar_path);
     let session_manager = Arc::new(SessionManager::new(
         sidecar_path,
         Arc::clone(&credential_bridge),
     ));
-    let preflight_state = Arc::new(RwLock::new(preflight_report));
-
     // Clone for .manage() before moving into .setup()
     let session_manager_for_state = Arc::clone(&session_manager);
     let credential_bridge_for_state = Arc::clone(&credential_bridge);
-    let preflight_state_for_setup = Arc::clone(&preflight_state);
 
     // Initialize browser window state
     let browser_state = Arc::new(BrowserWindowState::new());
@@ -289,7 +285,6 @@ pub fn run() {
         .manage(conversation_manager)
         .manage(credential_bridge_for_state)
         .manage(session_manager_for_state)
-        .manage(preflight_state)
         .manage(browser_state)
         .manage(browser_result_state)
         .manage(marketplace::MarketplaceCache::new())
@@ -308,7 +303,6 @@ pub fn run() {
         // Setup event callbacks for agent and configure window
         .setup(move |app| {
             agent_cmd::setup_event_callbacks(app.handle(), &session_manager);
-            drop(app.emit("preflight:report", preflight_state_for_setup.read().clone()));
             #[cfg(target_os = "macos")]
             icons::reapply_persisted_icon(app.handle());
             browser::register_browser_large_eval_result_listener(
@@ -550,7 +544,6 @@ pub fn run() {
             diagnostics::check_previous_crash,
             diagnostics::clear_crash_log,
             diagnostics::get_crash_log_path,
-            diagnostics::get_preflight_report,
             diagnostics::sentry_test_capture,
             diagnostics::sentry_test_error,
             // Conversation commands

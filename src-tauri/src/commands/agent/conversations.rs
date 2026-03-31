@@ -9,7 +9,7 @@
 
 use orbit_conversations::{
     Conversation, ConversationManager, ConversationSummary, ImageAttachmentData, Message,
-    MessageRole, ThinkingPhase, TokenUsage, ToolUse,
+    MessageRole, SessionUsage, ThinkingPhase, TokenUsage, ToolUse,
 };
 use orbit_core::Result;
 use tauri::State;
@@ -149,6 +149,43 @@ impl From<TokenUsageDto> for TokenUsage {
             cache_read_input_tokens: dto.cache_read_input_tokens,
             cache_creation_input_tokens: dto.cache_creation_input_tokens,
             total_cost_usd: dto.total_cost_usd,
+        }
+    }
+}
+
+/// Serializable session usage for frontend.
+#[derive(Debug, Clone, Copy, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionUsageDto {
+    /// Total input tokens consumed across the session.
+    #[serde(default)]
+    pub input_tokens: u32,
+    /// Total output tokens produced across the session.
+    #[serde(default)]
+    pub output_tokens: u32,
+    /// Total tokens read from cache across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_read_input_tokens: Option<u32>,
+    /// Total tokens written to cache across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_creation_input_tokens: Option<u32>,
+    /// Total cumulative cost in USD across the session.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_cost_usd: Option<f64>,
+    /// Per-turn usage from the last assistant message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_turn_usage: Option<TokenUsageDto>,
+}
+
+impl From<SessionUsage> for SessionUsageDto {
+    fn from(usage: SessionUsage) -> Self {
+        Self {
+            input_tokens: usage.input_tokens,
+            output_tokens: usage.output_tokens,
+            cache_read_input_tokens: usage.cache_read_input_tokens,
+            cache_creation_input_tokens: usage.cache_creation_input_tokens,
+            total_cost_usd: usage.total_cost_usd,
+            last_turn_usage: usage.last_turn_usage.map(TokenUsageDto::from),
         }
     }
 }
@@ -323,7 +360,7 @@ pub struct ConversationDto {
     /// Authoritative cumulative session usage from SDK `result` event.
     /// More accurate than summing per-message usage from JSONL.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub session_usage: Option<TokenUsageDto>,
+    pub session_usage: Option<SessionUsageDto>,
 }
 
 impl From<Conversation> for ConversationDto {
@@ -337,7 +374,7 @@ impl From<Conversation> for ConversationDto {
             workspace_path: conv.workspace_path,
             worktree_path: conv.worktree_path,
             forked_from: conv.forked_from,
-            session_usage: conv.session_usage.map(TokenUsageDto::from),
+            session_usage: conv.session_usage.map(SessionUsageDto::from),
         }
     }
 }

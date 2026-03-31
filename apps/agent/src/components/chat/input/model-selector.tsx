@@ -69,6 +69,12 @@ interface PopoverPosition {
   side: 'top' | 'bottom';
 }
 
+const MODEL_SHORT_NAMES: Record<string, string> = {
+  haiku: 'H 4.5',
+  'claude-sonnet-4-6': 'S 4.6',
+  'claude-opus-4-6': 'O 4.6',
+};
+
 interface ModelSelectorProps {
   onModelChange?: (model: Model) => void;
 }
@@ -377,7 +383,12 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
         )}
       >
         {selectedModelData ? <selectedModelData.icon /> : null}
-        <span className="text-md font-medium">{selectedModelData?.name ?? 'Select Model'}</span>
+        <span className="model-name-full text-md font-medium">
+          {selectedModelData?.name ?? 'Select Model'}
+        </span>
+        <span className="model-name-short text-md font-medium">
+          {MODEL_SHORT_NAMES[selectedModel] ?? selectedModelData?.name ?? 'Select Model'}
+        </span>
         <ChevronDown
           className={cn(
             'h-3 w-3 text-lg-text-secondary transition-transform duration-150',

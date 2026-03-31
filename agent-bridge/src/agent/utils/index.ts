@@ -6,3 +6,8 @@ export type { ClaudeContentBlock, ImageMediaType, DocumentMediaType } from './co
 
 export { formatToolResult } from './formatter.js';
 export type { ToolResult } from './formatter.js';
+
+export {
+  resolveContextWindowFromInit,
+  resolveContextWindowFromModelUsage,
+} from './context-window.js';

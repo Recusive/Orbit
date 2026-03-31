@@ -32,6 +32,7 @@ import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-hand
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
 import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
+import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { classifyAgentError } from '@/lib/error-classifier';
 import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
@@ -591,6 +592,17 @@ class ChatMessageService {
     // The effective session ID (JSONL filename) is sdkSessionId; the pending title
     // was stored under the original frontend session ID (message.session_id).
     const effectiveId = sdkSessionId ?? message.session_id;
+    if (message.context_window !== undefined) {
+      useToolStore.getState().setContextWindow(effectiveId, message.context_window);
+    }
+    useToolStore
+      .getState()
+      .setSessionMetadata(
+        effectiveId,
+        message.model ?? null,
+        message.tools ?? null,
+        message.mcp_servers ?? null
+      );
     flushPendingTitle(
       effectiveId,
       message.session_id !== effectiveId ? message.session_id : undefined
@@ -718,15 +730,16 @@ class ChatMessageService {
       };
 
       // Persist assistant message to backend
-      const usageDto = message.usage
+      const persistedTurnUsage = message.turn_usage;
+      const usageDto = persistedTurnUsage
         ? {
-            inputTokens: message.usage.input_tokens,
-            outputTokens: message.usage.output_tokens,
-            ...(message.usage.cache_read_input_tokens !== undefined
-              ? { cacheReadInputTokens: message.usage.cache_read_input_tokens }
+            inputTokens: persistedTurnUsage.input_tokens,
+            outputTokens: persistedTurnUsage.output_tokens,
+            ...(persistedTurnUsage.cache_read_input_tokens !== undefined
+              ? { cacheReadInputTokens: persistedTurnUsage.cache_read_input_tokens }
               : {}),
-            ...(message.usage.cache_creation_input_tokens !== undefined
-              ? { cacheCreationInputTokens: message.usage.cache_creation_input_tokens }
+            ...(persistedTurnUsage.cache_creation_input_tokens !== undefined
+              ? { cacheCreationInputTokens: persistedTurnUsage.cache_creation_input_tokens }
               : {}),
             ...(message.total_cost_usd !== undefined
               ? { totalCostUsd: message.total_cost_usd }
@@ -789,21 +802,45 @@ class ChatMessageService {
     }
 
     // Track usage data from SDK
-    if (message.usage) {
+    if (message.context_window !== undefined) {
+      useToolStore.getState().setContextWindow(sid, message.context_window);
+    }
+    if (message.turn_usage) {
       useToolStore.getState().addUsage(
+        sid,
         message.message_id,
         {
-          input_tokens: message.usage.input_tokens,
-          output_tokens: message.usage.output_tokens,
-          ...(message.usage.cache_read_input_tokens !== undefined
-            ? { cache_read_input_tokens: message.usage.cache_read_input_tokens }
+          input_tokens: message.turn_usage.input_tokens,
+          output_tokens: message.turn_usage.output_tokens,
+          ...(message.turn_usage.cache_read_input_tokens !== undefined
+            ? { cache_read_input_tokens: message.turn_usage.cache_read_input_tokens }
             : {}),
-          ...(message.usage.cache_creation_input_tokens !== undefined
-            ? { cache_creation_input_tokens: message.usage.cache_creation_input_tokens }
+          ...(message.turn_usage.cache_creation_input_tokens !== undefined
+            ? { cache_creation_input_tokens: message.turn_usage.cache_creation_input_tokens }
             : {}),
         },
         message.total_cost_usd
       );
+    } else if (message.usage && message.total_cost_usd !== undefined) {
+      const toolState = useToolStore.getState();
+      const currentUsage =
+        toolState.currentSessionId === sid
+          ? toolState.sessionUsage
+          : toolState.sessionCache[sid]?.usage;
+
+      if (currentUsage) {
+        toolState.addUsage(
+          sid,
+          message.message_id,
+          {
+            input_tokens: currentUsage.inputTokens,
+            output_tokens: currentUsage.outputTokens,
+            cache_read_input_tokens: currentUsage.cacheReadInputTokens,
+            cache_creation_input_tokens: currentUsage.cacheCreationInputTokens,
+          },
+          message.total_cost_usd
+        );
+      }
     }
 
     // Mark checkpoint completion (associates checkpoint with the user message)
@@ -1218,13 +1255,14 @@ class ChatMessageService {
 
         // Restore session usage
         if (message.session_usage) {
-          useToolStore.getState().restoreSessionUsage(message.session_id, {
-            inputTokens: message.session_usage.inputTokens,
-            outputTokens: message.session_usage.outputTokens,
-            cacheReadInputTokens: message.session_usage.cacheReadInputTokens ?? 0,
-            cacheCreationInputTokens: message.session_usage.cacheCreationInputTokens ?? 0,
-            totalCostUsd: message.session_usage.totalCostUsd ?? 0,
-          });
+          const processedMessageIds = collectUsageMessageIds(message.messages);
+          useToolStore
+            .getState()
+            .restoreSessionUsage(
+              message.session_id,
+              toContextUsage(message.session_usage),
+              processedMessageIds.length > 0 ? processedMessageIds : undefined
+            );
         } else if (message.messages.length > 0) {
           // Fallback: sum per-message usage from JSONL
           const seenIds = new Set<string>();

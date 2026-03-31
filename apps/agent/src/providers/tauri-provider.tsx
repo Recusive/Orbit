@@ -39,10 +39,8 @@ import {
   onTerminalExit,
   onTerminalForeground,
   onTerminalOutput,
-  getPreflightReport,
   getWorkspacePath,
   buildFileIndex,
-  onPreflightReport,
 } from '@/lib/api';
 import { invoke } from '@/lib/api/core';
 import {
@@ -52,7 +50,6 @@ import {
 } from '@/lib/claude-auth';
 import { classifyAgentError } from '@/lib/error-classifier';
 import { useAuthStore } from '@/stores/agent/auth-store';
-import { useHealthStore } from '@/stores/health';
 import { useUIStore } from '@/stores/ui/ui-store';
 import { WebviewMessageSchema } from '@/types/protocol';
 
@@ -189,7 +186,6 @@ async function bootstrapRuntimeHealth(controller: ListenerAbortController): Prom
   const results = await Promise.allSettled([
     invoke<RetrieveResult>('retrieve_api_key', { provider: 'claude' }),
     invoke<KeychainStatus>('check_claude_keychain'),
-    getPreflightReport(),
     invoke<string | null>('get_preferred_auth_method'),
   ]);
 
@@ -197,8 +193,7 @@ async function bootstrapRuntimeHealth(controller: ListenerAbortController): Prom
 
   const apiKeyResult = results[0];
   const keychainResult = results[1];
-  const preflightResult = results[2];
-  const preferredMethodResult = results[3];
+  const preferredMethodResult = results[2];
 
   const authStore = useAuthStore.getState();
   const preferredMethod =
@@ -221,17 +216,6 @@ async function bootstrapRuntimeHealth(controller: ListenerAbortController): Prom
     keychainStatus,
   });
   applyResolvedClaudeAuthState(authStore, resolved);
-
-  if (preflightResult.status === 'fulfilled') {
-    useHealthStore.getState().setReport(preflightResult.value);
-  } else {
-    logger.warn('Failed to fetch preflight report', {
-      error:
-        preflightResult.reason instanceof Error
-          ? preflightResult.reason.message
-          : String(preflightResult.reason),
-    });
-  }
 }
 
 // ============================================================================
@@ -367,9 +351,13 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                 uuid: crypto.randomUUID(),
                 session_id: sessionId,
                 message_id: messageId,
+                duration_ms: message.durationMs,
+                total_cost_usd: message.totalCostUsd,
                 // Forward SDK stop_reason so the service can distinguish
                 // intermediate tool turns from the final response.
                 result_subtype: message.resultSubtype,
+                context_window: message.contextWindow,
+                model: message.model,
                 // Transform SDK camelCase to protocol snake_case
                 usage: usage
                   ? {
@@ -377,6 +365,14 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                       output_tokens: usage.outputTokens,
                       cache_read_input_tokens: usage.cacheReadInputTokens,
                       cache_creation_input_tokens: usage.cacheCreationInputTokens,
+                    }
+                  : undefined,
+                turn_usage: message.turnUsage
+                  ? {
+                      input_tokens: message.turnUsage.inputTokens,
+                      output_tokens: message.turnUsage.outputTokens,
+                      cache_read_input_tokens: message.turnUsage.cacheReadInputTokens,
+                      cache_creation_input_tokens: message.turnUsage.cacheCreationInputTokens,
                     }
                   : undefined,
               });
@@ -450,6 +446,10 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
             sdk_session_id: event.sdkSessionId,
             is_resumed: event.isResumed,
             is_forked: event.isForked,
+            context_window: event.contextWindow,
+            model: event.model,
+            tools: event.tools,
+            mcp_servers: event.mcpServers,
           });
         })
           .then((unlisten) => {
@@ -650,21 +650,6 @@ export const TauriProvider: FC<TauriProviderProps> = ({ children }) => {
                     },
                   },
           });
-        })
-          .then((unlisten) => {
-            controller.addUnlisten(unlisten);
-          })
-          .catch((err: unknown) => {
-            logger.error(
-              'Listener registration failed',
-              err instanceof Error ? err : new Error(String(err))
-            );
-          })
-      );
-
-      listenerPromises.push(
-        onPreflightReport((report) => {
-          useHealthStore.getState().setReport(report);
         })
           .then((unlisten) => {
             controller.addUnlisten(unlisten);

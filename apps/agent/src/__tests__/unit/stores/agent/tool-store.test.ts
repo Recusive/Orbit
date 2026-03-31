@@ -11,7 +11,7 @@ enableMapSet();
 
 import type { PermissionRequest, UsageData } from '@/stores/agent/tool-store';
 
-import { useToolStore } from '@/stores/agent/tool-store';
+import { getContextUsedTokens, useToolStore } from '@/stores/agent/tool-store';
 
 // Mock Date.now for consistent timestamps
 let mockTime = 1704067200000;
@@ -43,6 +43,24 @@ function createMockPermissionRequest(
 // Helper to reset the store
 function resetStore(): void {
   useToolStore.getState().reset();
+}
+
+function switchToSession(sessionId = 'session-1'): void {
+  useToolStore.getState().switchSession(sessionId);
+}
+
+function addUsageForSession(
+  sessionId: string,
+  messageId: string,
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  },
+  totalCostUsd?: number
+): void {
+  useToolStore.getState().addUsage(sessionId, messageId, usage, totalCostUsd);
 }
 
 describe('tool-store', () => {
@@ -96,6 +114,14 @@ describe('tool-store', () => {
 
     it('should start with empty session cache', () => {
       expect(useToolStore.getState().sessionCache).toEqual({});
+    });
+
+    it('should start with no session metadata', () => {
+      const state = useToolStore.getState();
+      expect(state.sessionModel).toBeNull();
+      expect(state.sessionTools).toBeNull();
+      expect(state.sessionMcpServers).toBeNull();
+      expect(state.sessionMetadataState).toBeNull();
     });
   });
 
@@ -327,10 +353,11 @@ describe('tool-store', () => {
   // ============================================================================
 
   describe('addUsage', () => {
-    it('should accumulate usage', () => {
-      const { addUsage } = useToolStore.getState();
+    it('should replace usage with the latest cumulative SDK totals', () => {
+      switchToSession();
 
-      addUsage(
+      addUsageForSession(
+        'session-1',
         'msg-1',
         {
           input_tokens: 100,
@@ -347,34 +374,48 @@ describe('tool-store', () => {
       expect(usage.cacheReadInputTokens).toBe(20);
       expect(usage.cacheCreationInputTokens).toBe(10);
       expect(usage.totalCostUsd).toBe(0.05);
+
+      addUsageForSession(
+        'session-1',
+        'msg-2',
+        {
+          input_tokens: 300,
+          output_tokens: 120,
+          cache_read_input_tokens: 40,
+          cache_creation_input_tokens: 30,
+        },
+        0.08
+      );
+
+      const updated = useToolStore.getState().sessionUsage;
+      expect(updated.inputTokens).toBe(300);
+      expect(updated.outputTokens).toBe(120);
+      expect(updated.cacheReadInputTokens).toBe(40);
+      expect(updated.cacheCreationInputTokens).toBe(30);
+      expect(updated.totalCostUsd).toBe(0.08);
     });
 
-    it('should not double-count same message ID', () => {
-      const { addUsage } = useToolStore.getState();
+    it("should not let a background session overwrite the viewed session's usage", () => {
+      switchToSession('session-1');
 
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 }); // Duplicate
+      addUsageForSession('session-2', 'msg-1', { input_tokens: 200, output_tokens: 100 });
 
-      const usage = useToolStore.getState().sessionUsage;
-      expect(usage.inputTokens).toBe(100); // Not 200
-      expect(usage.outputTokens).toBe(50); // Not 100
-    });
+      const activeUsage = useToolStore.getState().sessionUsage;
+      expect(activeUsage.inputTokens).toBe(0);
+      expect(activeUsage.outputTokens).toBe(0);
+      expect(useToolStore.getState().sessionCache['session-2']?.usage.inputTokens).toBe(200);
 
-    it('should count different message IDs', () => {
-      const { addUsage } = useToolStore.getState();
+      useToolStore.getState().switchSession('session-2');
 
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
-      addUsage('msg-2', { input_tokens: 100, output_tokens: 50 });
-
-      const usage = useToolStore.getState().sessionUsage;
-      expect(usage.inputTokens).toBe(200);
-      expect(usage.outputTokens).toBe(100);
+      const restored = useToolStore.getState().sessionUsage;
+      expect(restored.inputTokens).toBe(200);
+      expect(restored.outputTokens).toBe(100);
     });
 
     it('should handle missing optional cache fields', () => {
-      const { addUsage } = useToolStore.getState();
+      switchToSession();
 
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
+      addUsageForSession('session-1', 'msg-1', { input_tokens: 100, output_tokens: 50 });
 
       const usage = useToolStore.getState().sessionUsage;
       expect(usage.cacheReadInputTokens).toBe(0);
@@ -383,71 +424,114 @@ describe('tool-store', () => {
   });
 
   describe('resetUsage', () => {
-    it('should reset usage to zero', () => {
-      const { addUsage, resetUsage } = useToolStore.getState();
-
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
-      resetUsage();
+    it('should reset usage to zero and clear the active session metadata', () => {
+      switchToSession();
+      useToolStore.getState().setContextWindow('session-1', 1_000_000);
+      useToolStore
+        .getState()
+        .setSessionMetadata(
+          'session-1',
+          'claude-opus-4-6',
+          ['Read'],
+          [{ name: 'figma', status: 'connected' }]
+        );
+      addUsageForSession('session-1', 'msg-1', { input_tokens: 100, output_tokens: 50 });
+      useToolStore.getState().resetUsage();
 
       const usage = useToolStore.getState().sessionUsage;
       expect(usage.inputTokens).toBe(0);
       expect(usage.outputTokens).toBe(0);
       expect(usage.totalCostUsd).toBe(0);
+      expect(useToolStore.getState().currentContextWindow).toBeNull();
+      expect(useToolStore.getState().sessionModel).toBeNull();
+      expect(useToolStore.getState().sessionTools).toBeNull();
+      expect(useToolStore.getState().sessionMcpServers).toBeNull();
+      expect(useToolStore.getState().sessionMetadataState).toBeNull();
     });
 
-    it('should clear processed message IDs', () => {
-      const { addUsage, resetUsage } = useToolStore.getState();
+    it('should clear processed message IDs restored from history', () => {
+      switchToSession();
+      useToolStore.getState().restoreSessionUsage(
+        'session-1',
+        {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadInputTokens: 0,
+          cacheCreationInputTokens: 0,
+          totalCostUsd: 0,
+        },
+        ['msg-1']
+      );
 
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
-      resetUsage();
+      expect(useToolStore.getState().processedMessageIds.size).toBe(1);
 
-      // Should be able to add same ID again
-      addUsage('msg-1', { input_tokens: 200, output_tokens: 100 });
+      useToolStore.getState().resetUsage();
 
-      expect(useToolStore.getState().sessionUsage.inputTokens).toBe(200);
+      expect(useToolStore.getState().processedMessageIds.size).toBe(0);
     });
   });
 
   describe('switchSession', () => {
-    it('should cache current session and reset for new session', () => {
-      const { addUsage, switchSession, startTool } = useToolStore.getState();
+    it('should cache the current session and reset usage, tools, and context window for a new one', () => {
+      const { startTool } = useToolStore.getState();
 
-      // Set up session 1
-      switchSession('session-1');
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
+      switchToSession('session-1');
+      useToolStore.getState().setContextWindow('session-1', 500_000);
+      addUsageForSession('session-1', 'msg-1', { input_tokens: 100, output_tokens: 50 });
       startTool('tool-1', 'msg-1', 'bash', createMockToolInput());
 
-      // Switch to session 2
-      switchSession('session-2');
+      useToolStore.getState().switchSession('session-2');
 
       // Session 2 should start fresh
       expect(useToolStore.getState().sessionUsage.inputTokens).toBe(0);
       expect(useToolStore.getState().activeTools).toEqual({});
+      expect(useToolStore.getState().currentContextWindow).toBeNull();
     });
 
-    it('should restore cached session data', () => {
-      const { addUsage, switchSession } = useToolStore.getState();
+    it('should restore cached session data including the resolved context window', () => {
+      switchToSession('session-1');
+      useToolStore.getState().setContextWindow('session-1', 500_000);
+      addUsageForSession('session-1', 'msg-1', { input_tokens: 100, output_tokens: 50 });
 
-      // Set up session 1
-      switchSession('session-1');
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
+      useToolStore.getState().switchSession('session-2');
+      useToolStore.getState().setContextWindow('session-2', 250_000);
+      addUsageForSession('session-2', 'msg-2', { input_tokens: 200, output_tokens: 100 });
 
-      // Switch to session 2
-      switchSession('session-2');
-      addUsage('msg-2', { input_tokens: 200, output_tokens: 100 });
-
-      // Switch back to session 1
-      switchSession('session-1');
+      useToolStore.getState().switchSession('session-1');
 
       // Should restore session 1 data
       expect(useToolStore.getState().sessionUsage.inputTokens).toBe(100);
       expect(useToolStore.getState().sessionUsage.outputTokens).toBe(50);
+      expect(useToolStore.getState().currentContextWindow).toBe(500000);
+    });
+
+    it('should cache and restore session metadata as restored state', () => {
+      switchToSession('session-1');
+      useToolStore
+        .getState()
+        .setSessionMetadata(
+          'session-1',
+          'claude-opus-4-6',
+          ['Read', 'Write'],
+          [{ name: 'figma', status: 'connected' }]
+        );
+
+      expect(useToolStore.getState().sessionMetadataState).toBe('live');
+
+      useToolStore.getState().switchSession('session-2');
+      useToolStore.getState().switchSession('session-1');
+
+      const state = useToolStore.getState();
+      expect(state.sessionModel).toBe('claude-opus-4-6');
+      expect(state.sessionTools).toEqual(['Read', 'Write']);
+      expect(state.sessionMcpServers).toEqual([{ name: 'figma', status: 'connected' }]);
+      expect(state.sessionMetadataState).toBe('restored');
     });
   });
 
   describe('restoreSessionUsage', () => {
     it('should restore usage for a session', () => {
-      const { restoreSessionUsage, switchSession } = useToolStore.getState();
+      const { restoreSessionUsage } = useToolStore.getState();
 
       const usage: UsageData = {
         inputTokens: 500,
@@ -460,7 +544,7 @@ describe('tool-store', () => {
       restoreSessionUsage('session-1', usage, ['msg-1', 'msg-2']);
 
       // Switch to the session to verify
-      switchSession('session-1');
+      switchToSession('session-1');
 
       const currentUsage = useToolStore.getState().sessionUsage;
       expect(currentUsage.inputTokens).toBe(500);
@@ -468,9 +552,9 @@ describe('tool-store', () => {
     });
 
     it('should update active session if it matches', () => {
-      const { switchSession, restoreSessionUsage } = useToolStore.getState();
+      const { restoreSessionUsage } = useToolStore.getState();
 
-      switchSession('session-1');
+      switchToSession('session-1');
 
       const usage: UsageData = {
         inputTokens: 500,
@@ -484,6 +568,31 @@ describe('tool-store', () => {
 
       expect(useToolStore.getState().sessionUsage.inputTokens).toBe(500);
     });
+
+    it('should compare restored usage using input and cache tokens, not output tokens', () => {
+      switchToSession('session-1');
+
+      useToolStore.getState().restoreSessionUsage('session-1', {
+        inputTokens: 100,
+        outputTokens: 1_000,
+        cacheReadInputTokens: 50,
+        cacheCreationInputTokens: 0,
+        totalCostUsd: 0,
+      });
+
+      useToolStore.getState().restoreSessionUsage('session-1', {
+        inputTokens: 120,
+        outputTokens: 10,
+        cacheReadInputTokens: 40,
+        cacheCreationInputTokens: 0,
+        totalCostUsd: 0,
+      });
+
+      const usage = useToolStore.getState().sessionUsage;
+      expect(usage.inputTokens).toBe(120);
+      expect(usage.outputTokens).toBe(10);
+      expect(usage.cacheReadInputTokens).toBe(40);
+    });
   });
 
   // ============================================================================
@@ -491,19 +600,30 @@ describe('tool-store', () => {
   // ============================================================================
 
   describe('getContextPercentage', () => {
-    it('should calculate context percentage', () => {
-      const { addUsage, getContextPercentage } = useToolStore.getState();
-
-      // 200k context for all models
-      addUsage('msg-1', { input_tokens: 50000, output_tokens: 50000 }); // 100k total
+    it('should calculate context percentage from input and cache tokens only', () => {
+      const { getContextPercentage, setModel } = useToolStore.getState();
+      switchToSession();
+      setModel('haiku');
+      addUsageForSession('session-1', 'msg-1', {
+        input_tokens: 50_000,
+        output_tokens: 50_000,
+        cache_read_input_tokens: 25_000,
+        cache_creation_input_tokens: 25_000,
+      });
 
       expect(getContextPercentage()).toBe(50);
     });
 
     it('should cap at 100%', () => {
-      const { addUsage, getContextPercentage } = useToolStore.getState();
+      const { getContextPercentage, setModel } = useToolStore.getState();
+      switchToSession();
+      setModel('haiku');
 
-      addUsage('msg-1', { input_tokens: 150000, output_tokens: 100000 }); // 250k > 200k
+      addUsageForSession('session-1', 'msg-1', {
+        input_tokens: 150_000,
+        output_tokens: 100_000,
+        cache_read_input_tokens: 75_000,
+      });
 
       expect(getContextPercentage()).toBe(100);
     });
@@ -516,7 +636,7 @@ describe('tool-store', () => {
   });
 
   describe('getMaxTokens', () => {
-    it('should return 200k for all models', () => {
+    it('should return model-specific defaults', () => {
       const { getMaxTokens, setModel } = useToolStore.getState();
 
       expect(getMaxTokens()).toBe(200000);
@@ -525,17 +645,41 @@ describe('tool-store', () => {
       expect(getMaxTokens()).toBe(200000);
 
       setModel('claude-opus-4-6');
-      expect(getMaxTokens()).toBe(200000);
+      expect(getMaxTokens()).toBe(1000000);
+    });
+
+    it('should prefer the session-specific context window when one is resolved', () => {
+      switchToSession();
+      useToolStore.getState().setContextWindow('session-1', 400_000);
+
+      expect(useToolStore.getState().getMaxTokens()).toBe(400000);
     });
   });
 
   describe('getUsedTokens', () => {
-    it('should return sum of input and output tokens', () => {
-      const { addUsage, getUsedTokens } = useToolStore.getState();
+    it('should exclude output tokens and include cache tokens', () => {
+      switchToSession();
 
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
+      addUsageForSession('session-1', 'msg-1', {
+        input_tokens: 100,
+        output_tokens: 50,
+        cache_read_input_tokens: 20,
+        cache_creation_input_tokens: 10,
+      });
 
-      expect(getUsedTokens()).toBe(150);
+      expect(useToolStore.getState().getUsedTokens()).toBe(130);
+    });
+  });
+
+  describe('getContextUsedTokens', () => {
+    it('should count input and cache tokens but ignore output tokens', () => {
+      expect(
+        getContextUsedTokens({
+          inputTokens: 29,
+          cacheReadInputTokens: 243_000,
+          cacheCreationInputTokens: 3_100,
+        })
+      ).toBe(246129);
     });
   });
 
@@ -665,7 +809,7 @@ describe('tool-store', () => {
       setModel('claude-opus-4-6');
       switchSession('session-1');
       startTool('tool-1', 'msg-1', 'bash', createMockToolInput());
-      addUsage('msg-1', { input_tokens: 100, output_tokens: 50 });
+      addUsage('session-1', 'msg-1', { input_tokens: 100, output_tokens: 50 });
       addPermissionRequest(createMockPermissionRequest('req-1'));
 
       // Reset
@@ -681,6 +825,10 @@ describe('tool-store', () => {
       expect(state.currentSessionId).toBeNull();
       expect(state.sessionUsage.inputTokens).toBe(0);
       expect(state.sessionCache).toEqual({});
+      expect(state.sessionModel).toBeNull();
+      expect(state.sessionTools).toBeNull();
+      expect(state.sessionMcpServers).toBeNull();
+      expect(state.sessionMetadataState).toBeNull();
     });
   });
 

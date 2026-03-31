@@ -87,7 +87,7 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'apple-tooltip z-50 overflow-hidden rounded-[9px] text-[11px] font-[510] leading-[13px]',
+        'apple-tooltip z-50 overflow-hidden rounded-[6px] text-[11px] font-[510] leading-[13px]',
         // Enter: zoom 97% → 100% + fade (matched to HoverCard & DropdownMenu)
         'animate-in fade-in-0 zoom-in-[0.97]',
         // Exit: reverse

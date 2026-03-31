@@ -8,6 +8,7 @@ import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 import { OCTAGON_CLIP, setFaceHover } from '@/lib/utils/facehash-utils';
+import { getSkillColor } from '@/lib/utils/skill-colors';
 
 interface MarketplaceSkillCardProps {
   readonly skill: MarketplaceSkill;
@@ -42,8 +43,11 @@ export const MarketplaceSkillCard: FC<MarketplaceSkillCardProps> = ({
       setFaceHover(e, false);
     }}
     className={cn(
-      'rounded-xl border border-border/50 bg-control-fill/35 p-3',
-      'hover:bg-control-fill/60 transition-colors'
+      'rounded-xl bg-control-fill dark:bg-control-fill/35 p-3',
+      'hover:bg-control-fill-hover dark:hover:bg-control-fill/60',
+      'shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_1px_2px_-1px_rgba(0,0,0,0.06),0_2px_4px_0_rgba(0,0,0,0.04)]',
+      'dark:shadow-[0_0_0_1px_rgba(255,255,255,0.06)]',
+      'transition-[background-color,box-shadow] duration-150'
     )}
   >
     <div className="mb-3 flex items-start justify-between gap-2">
@@ -52,9 +56,12 @@ export const MarketplaceSkillCard: FC<MarketplaceSkillCardProps> = ({
           name={skill.name}
           size={36}
           variant="solid"
-          colorClasses={['bg-avatar-system']}
           className="shrink-0 text-white dark:text-black"
-          style={{ pointerEvents: 'none', clipPath: OCTAGON_CLIP }}
+          style={{
+            pointerEvents: 'none',
+            clipPath: OCTAGON_CLIP,
+            backgroundImage: getSkillColor(skill.name),
+          }}
         />
         <div className="min-w-0">
           <p className="truncate text-[13px] font-semibold text-foreground">{skill.name}</p>

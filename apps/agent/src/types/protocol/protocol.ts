@@ -1026,10 +1026,12 @@ export const SystemInitSchema = z
     sdk_session_id: z.string().optional(),
     is_resumed: z.boolean().optional(),
     is_forked: z.boolean().optional(),
+    context_window: z.number().optional(),
     // SDK fields (optional for flexibility)
     cwd: z.string().optional(),
     model: z.string().optional(),
     tools: z.array(z.string()).optional(),
+    mcp_servers: z.array(z.object({ name: z.string(), status: z.string() })).optional(),
   })
   .strict();
 
@@ -1079,7 +1081,18 @@ export const AgentCompleteSchema = z
      *  e.g. "success" / "error_max_turns" / "error_during_execution".
      *  Not the Anthropic API stop_reason ("end_turn", "tool_use", etc.). */
     result_subtype: z.string().optional(),
+    context_window: z.number().optional(),
+    model: z.string().optional(),
     usage: z
+      .object({
+        input_tokens: z.number(),
+        output_tokens: z.number(),
+        cache_read_input_tokens: z.number().optional(),
+        cache_creation_input_tokens: z.number().optional(),
+      })
+      .strict()
+      .optional(),
+    turn_usage: z
       .object({
         input_tokens: z.number(),
         output_tokens: z.number(),
@@ -1488,6 +1501,24 @@ const PersistedTokenUsageSchema = z
   })
   .strict();
 
+export const SessionUsageSchema = z
+  .object({
+    inputTokens: z.number(),
+    outputTokens: z.number(),
+    cacheReadInputTokens: z.number().optional(),
+    cacheCreationInputTokens: z.number().optional(),
+    totalCostUsd: z.number().optional(),
+    lastTurnUsage: z
+      .object({
+        inputTokens: z.number(),
+        outputTokens: z.number(),
+        cacheReadInputTokens: z.number().optional(),
+        cacheCreationInputTokens: z.number().optional(),
+      })
+      .optional(),
+  })
+  .strip();
+
 // Message schema for conversation:loaded (matches Rust MessageDto)
 // Uses transform to handle backwards compatibility with old data that may have
 // 'timestamp' instead of 'createdAt', or missing fields
@@ -1543,7 +1574,7 @@ export const ConversationLoadedSchema = z
     // Authoritative cumulative session usage from the SDK `result` event,
     // persisted by agent-bridge to a .usage.json sidecar file.
     // When present, more accurate than summing per-message JSONL usage.
-    session_usage: PersistedTokenUsageSchema.optional(),
+    session_usage: SessionUsageSchema.optional(),
   })
   // NOTE: Using .strip() instead of .strict() to gracefully handle future backend fields.
   // Stripped fields are silently dropped — acceptable for forward compatibility.

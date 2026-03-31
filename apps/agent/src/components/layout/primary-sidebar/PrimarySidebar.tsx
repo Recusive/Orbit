@@ -64,6 +64,7 @@ import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
+import { getSkillColor } from '@/lib/utils/skill-colors';
 import { getConversationUiBridge } from '@/services/conversations';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
@@ -727,9 +728,8 @@ export const PrimarySidebar: FC = () => {
                     name={project.name}
                     size={24}
                     variant="solid"
-                    colorClasses={['bg-avatar-project']}
                     className="rounded-md shrink-0 text-white dark:text-black"
-                    style={{ pointerEvents: 'none' }}
+                    style={{ pointerEvents: 'none', backgroundImage: getSkillColor(project.name) }}
                   />
                   <div className="flex flex-col min-w-0 flex-1">
                     <span className="text-sm font-medium text-foreground truncate">

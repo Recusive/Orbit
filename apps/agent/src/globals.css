@@ -1949,24 +1949,79 @@ html:not(.dark) .glass-popover::after {
    Wrapped in @layer components so Tailwind utilities (rounded-*, etc.)
    can override defaults. */
 @layer components {
-  .glass-surface {
-    background: var(--glass-popover-bg);
-    border: 1px solid var(--border-menu);
-    border-radius: 9px;
-    box-shadow: var(--orbit-shadow-menu);
-    -webkit-backdrop-filter: blur(4px);
-    backdrop-filter: blur(4px);
+  /* ── Surface Design System ───────────────────────────────
+     Surfaces come in sizes: sm (popovers), md (default), lg (dialogs).
+     Each size sets --surface-radius and --surface-padding.
+     Children use .surface-inset for concentric inner radius:
+       inner radius = surface-radius − surface-padding
+     Reference: jakub.kr/writing/details-that-make-interfaces-feel-better */
+
+  /* ── Shadow-as-border tokens ──────────────────────────────
+     Three-layer shadow: ring (1px border feel) + lift + ambient depth.
+     Shadows adapt to any background; solid borders don't.
+     Reference: jakub.kr/writing/details-that-make-interfaces-feel-better */
+
+  /* Base shared styles for all surfaces */
+  .glass-surface,
+  .solid-surface {
+    --surface-radius: 14px;
+    --surface-padding: 8px;
+    --surface-shadow:
+      0px 2px 8px 0px rgba(0, 0, 0, 0.06),
+      0px 8px 24px 0px rgba(0, 0, 0, 0.04);
+    --surface-shadow-up:
+      0px -2px 8px 0px rgba(0, 0, 0, 0.06),
+      0px -8px 24px 0px rgba(0, 0, 0, 0.04);
+
+    border: none;
+    border-radius: var(--surface-radius);
+    box-shadow: var(--surface-shadow);
   }
 
-  /* Directional shadow — Radix sets data-side on popover/dropdown/context-menu content */
-  .glass-surface[data-side='top'] {
-    box-shadow: var(--orbit-shadow-menu-up);
+  html.dark .glass-surface,
+  html.dark .solid-surface {
+    --surface-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
+    --surface-shadow-up: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  /* Size variants — apply alongside glass-surface or solid-surface */
+  .surface-sm { --surface-radius: 10px; --surface-padding: 4px; }
+  .surface-md { --surface-radius: 14px; --surface-padding: 8px; }
+  .surface-lg { --surface-radius: 20px; --surface-padding: 8px; }
+
+  /* Glass: semi-transparent + backdrop blur */
+  .glass-surface {
+    background: var(--glass-popover-bg);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
   }
 
   html.dark .glass-surface {
     -webkit-backdrop-filter: blur(24px);
     backdrop-filter: blur(24px);
   }
+
+  /* Solid: opaque background, no blur */
+  .solid-surface {
+    background: var(--chat-area);
+  }
+
+  html.dark .solid-surface {
+    background: var(--sidebar);
+  }
+
+  /* Directional shadow — Radix sets data-side on popover/dropdown/context-menu content */
+  .glass-surface[data-side='top'],
+  .solid-surface[data-side='top'] {
+    box-shadow: var(--surface-shadow-up);
+  }
+}
+
+/* Concentric inner radius — apply to children inside a glass-surface or solid-surface.
+   Computes: border-radius = surface-radius − surface-padding.
+   Override --surface-padding on the element or any ancestor to adjust. */
+.surface-inset {
+  border-radius: calc(var(--surface-radius) - var(--surface-padding));
 }
 
 /* ── Frosted Input Container ────────────────────────────
@@ -2465,16 +2520,43 @@ html.dark .liquid-glass-textarea:focus {
 .apple-tooltip {
   padding: 3px 8px 3px;
   background: var(--chat-area);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.08);
+  border: none;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.08),
+    0px 2px 6px rgba(0, 0, 0, 0.06),
+    0px 6px 16px rgba(0, 0, 0, 0.04);
   color: #4D4D4D;
 }
 
 html.dark .apple-tooltip {
   background: oklch(23% 0 0);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.3);
+  border: none;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.10),
+    0px 2px 8px rgba(0, 0, 0, 0.45),
+    0px 8px 24px rgba(0, 0, 0, 0.35);
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* ── Input controls: compact model name ─────────────────────────────── */
+.input-controls-container {
+  container-type: inline-size;
+  container-name: input-controls;
+}
+.model-name-short { display: none; }
+@container input-controls (max-width: 370px) {
+  .model-name-full { display: none; }
+  .model-name-short { display: inline; }
+}
+
+/* ── Apple-style separator ─────────────────────────────────────────── */
+/* Hides when the element before or after it is hovered */
+.auto-hide-separator {
+  transition: opacity 150ms;
+}
+:hover + .auto-hide-separator,
+.auto-hide-separator:has(+ :hover) {
+  opacity: 0;
 }
 
 /* ── Welcome Page Entrance ──────────────────────────────────────────── */

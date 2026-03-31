@@ -84,10 +84,18 @@ export interface AgentMessage {
     cacheReadInputTokens?: number;
     cacheCreationInputTokens?: number;
   };
+  turnUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  };
   totalCostUsd?: number;
   durationMs?: number;
   structuredOutput?: unknown;
   resultSubtype?: string;
+  contextWindow?: number;
+  model?: string;
 }
 
 export interface PermissionRequestEvent {
@@ -102,6 +110,10 @@ export interface SessionInitEvent {
   sdkSessionId: string;
   isResumed: boolean;
   isForked: boolean;
+  contextWindow?: number;
+  model?: string;
+  tools?: string[];
+  mcpServers?: { name: string; status: string }[];
 }
 
 export interface ModeChangedEvent {

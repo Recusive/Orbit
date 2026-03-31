@@ -533,15 +533,28 @@ fn emit_permission_request(app: &AppHandle, request: &PermissionRequest) {
 
 /// Emit session init event
 fn emit_session_init(app: &AppHandle, init_event: &SessionInitEvent) {
-    drop(app.emit(
-        "agent:session_init",
-        serde_json::json!({
-            "sessionId": init_event.session_id,
-            "sdkSessionId": init_event.sdk_session_id,
-            "isResumed": init_event.is_resumed,
-            "isForked": init_event.is_forked,
-        }),
-    ));
+    let mut payload = serde_json::json!({
+        "sessionId": init_event.session_id,
+        "sdkSessionId": init_event.sdk_session_id,
+        "isResumed": init_event.is_resumed,
+        "isForked": init_event.is_forked,
+    });
+    if let Some(obj) = payload.as_object_mut() {
+        if let Some(context_window) = init_event.context_window {
+            drop(obj.insert("contextWindow".into(), serde_json::json!(context_window)));
+        }
+        if let Some(model) = &init_event.model {
+            drop(obj.insert("model".into(), serde_json::json!(model)));
+        }
+        if let Some(tools) = &init_event.tools {
+            drop(obj.insert("tools".into(), serde_json::json!(tools)));
+        }
+        if let Some(mcp_servers) = &init_event.mcp_servers {
+            drop(obj.insert("mcpServers".into(), serde_json::json!(mcp_servers)));
+        }
+    }
+
+    drop(app.emit("agent:session_init", payload));
 }
 
 /// Emit plan mode changed event

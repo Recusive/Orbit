@@ -1,8 +1,7 @@
 import type React from 'react';
 
-/** Octagon clip-path used for skill and marketplace avatars. */
-export const OCTAGON_CLIP =
-  'polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%)';
+/** Rounded square clip-path used for skill and marketplace avatars. */
+export const OCTAGON_CLIP = 'inset(0 round 22%)';
 
 /** Neutral face transform used for hover focus. */
 export const REST_FLAT = 'rotateX(0deg) rotateY(0deg) translateZ(12px)';

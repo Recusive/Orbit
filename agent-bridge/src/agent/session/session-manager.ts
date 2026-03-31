@@ -20,6 +20,10 @@ import { Disposable, Emitter } from '../../common/events/events.js';
 import { createLogger } from '../../common/logging/logger.js';
 import { createIOSMcpServer } from '../../ios/index.js';
 import { OrbitAgent } from '../core/agent.js';
+import {
+  resolveContextWindowFromInit,
+  resolveContextWindowFromModelUsage,
+} from '../utils/context-window.js';
 
 import { getStorageDirPath, getStoredSessionsSnapshot } from './session-storage.js';
 
@@ -152,6 +156,15 @@ export interface AgentMessage {
   durationMs?: number;
   structuredOutput?: unknown;
   resultSubtype?: string;
+  /** Per-turn usage from the last assistant message. */
+  turnUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  };
+  contextWindow?: number;
+  model?: string;
 }
 
 /**
@@ -182,6 +195,10 @@ export interface SessionInitEvent {
   sdkSessionId: string;
   isResumed: boolean;
   isForked: boolean;
+  contextWindow?: number;
+  model?: string;
+  tools?: string[];
+  mcpServers?: { name: string; status: string }[];
 }
 
 /**
@@ -299,6 +316,10 @@ interface SDKSystemMessage {
   type: 'system';
   subtype?: string;
   session_id?: string;
+  betas?: string[];
+  model?: string;
+  tools?: string[];
+  mcp_servers?: { name: string; status: string }[];
 }
 
 interface SDKStreamEventMessage {
@@ -315,6 +336,12 @@ interface SDKAssistantMessage {
   session_id?: string;
   message?: {
     content?: ContentBlock[];
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number | null;
+      cache_creation_input_tokens?: number | null;
+    };
   };
   parent_tool_use_id?: string | null;
 }
@@ -339,6 +366,7 @@ interface SDKResultMessage {
   total_cost_usd?: number;
   duration_ms?: number;
   structured_output?: unknown;
+  modelUsage?: Record<string, { contextWindow?: number | undefined }>;
 }
 
 type SDKMessage =
@@ -422,7 +450,13 @@ function persistSessionUsage(
     cacheReadInputTokens?: number;
     cacheCreationInputTokens?: number;
   },
-  totalCostUsd?: number
+  totalCostUsd?: number,
+  turnUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+  }
 ): void {
   const projectDir = path.join(os.homedir(), '.claude', 'projects', encodeWorkspacePath(cwd));
   const usagePath = path.join(projectDir, `${sdkSessionId}.usage.json`);
@@ -433,6 +467,15 @@ function persistSessionUsage(
     cacheReadInputTokens: usage.cacheReadInputTokens ?? 0,
     cacheCreationInputTokens: usage.cacheCreationInputTokens ?? 0,
     totalCostUsd: totalCostUsd ?? 0,
+    lastTurnUsage:
+      turnUsage !== undefined
+        ? {
+            inputTokens: turnUsage.inputTokens,
+            outputTokens: turnUsage.outputTokens,
+            cacheReadInputTokens: turnUsage.cacheReadInputTokens ?? 0,
+            cacheCreationInputTokens: turnUsage.cacheCreationInputTokens ?? 0,
+          }
+        : undefined,
   };
 
   // Fire-and-forget async write — non-critical, live usage still works without it
@@ -938,6 +981,15 @@ export class SessionManager extends Disposable {
   private pendingDisplayNames = new Map<string, string>();
   private browserToolUnsubscribers = new Map<string, () => void>();
   private readonly iosService?: IOSService;
+  private lastAssistantUsage = new Map<
+    string,
+    {
+      input_tokens: number;
+      output_tokens: number;
+      cache_read_input_tokens: number;
+      cache_creation_input_tokens: number;
+    }
+  >();
 
   // Track the current turn ID per session (our OWN stable ID, not SDK's uuid)
   // The SDK sends different UUIDs for each message (stream_event, assistant, etc.)
@@ -1007,6 +1059,7 @@ export class SessionManager extends Disposable {
     rekey(this.pendingDisplayNames);
     rekey(this.browserToolUnsubscribers);
     rekey(this.currentTurnId);
+    rekey(this.lastAssistantUsage);
 
     if (this.sessionInitFired.has(oldId)) {
       this.sessionInitFired.delete(oldId);
@@ -1323,11 +1376,19 @@ export class SessionManager extends Disposable {
                 isResumed: false,
                 isForked: false,
               };
+              const resolvedContextWindow = resolveContextWindowFromInit(
+                sdkMessage.model,
+                sdkMessage.betas
+              );
               this._onSessionInit.fire({
                 sessionId: orbitSessionId,
                 sdkSessionId,
                 isResumed: resumeState.isResumed,
                 isForked: resumeState.isForked,
+                contextWindow: resolvedContextWindow,
+                model: sdkMessage.model,
+                tools: sdkMessage.tools,
+                mcpServers: sdkMessage.mcp_servers,
               });
 
               // Post-fork cleanup: runs only when this session was created by forkSessionAt.
@@ -1460,6 +1521,16 @@ export class SessionManager extends Disposable {
 
           // Handle assistant messages
           if (sdkMessage.type === 'assistant') {
+            const assistantUsage = sdkMessage.message?.usage;
+            if (assistantUsage) {
+              this.lastAssistantUsage.set(sessionId, {
+                input_tokens: assistantUsage.input_tokens ?? 0,
+                output_tokens: assistantUsage.output_tokens ?? 0,
+                cache_read_input_tokens: assistantUsage.cache_read_input_tokens ?? 0,
+                cache_creation_input_tokens: assistantUsage.cache_creation_input_tokens ?? 0,
+              });
+            }
+
             const content = sdkMessage.message?.content;
             if (content === undefined) continue;
 
@@ -1732,6 +1803,17 @@ export class SessionManager extends Disposable {
             // Clear turn start time tracking
             this.turnStartTimes.delete(sessionId);
 
+            const savedTurnUsage = this.lastAssistantUsage.get(sessionId);
+            const turnUsage =
+              savedTurnUsage !== undefined
+                ? {
+                    inputTokens: savedTurnUsage.input_tokens,
+                    outputTokens: savedTurnUsage.output_tokens,
+                    cacheReadInputTokens: savedTurnUsage.cache_read_input_tokens,
+                    cacheCreationInputTokens: savedTurnUsage.cache_creation_input_tokens,
+                  }
+                : undefined;
+
             this._onAgentMessage.fire({
               sessionId,
               message: {
@@ -1754,6 +1836,12 @@ export class SessionManager extends Disposable {
                 durationMs: resultMsg.duration_ms,
                 structuredOutput: resultMsg.structured_output,
                 resultSubtype: resultMsg.subtype,
+                turnUsage,
+                contextWindow: resolveContextWindowFromModelUsage(
+                  resultMsg.modelUsage,
+                  agent.getModel()
+                ),
+                model: agent.getModel(),
               },
             });
 
@@ -1769,7 +1857,8 @@ export class SessionManager extends Disposable {
                   cacheReadInputTokens: resultMsg.usage.cache_read_input_tokens,
                   cacheCreationInputTokens: resultMsg.usage.cache_creation_input_tokens,
                 },
-                resultMsg.total_cost_usd
+                resultMsg.total_cost_usd,
+                turnUsage
               );
             }
 
@@ -1777,6 +1866,8 @@ export class SessionManager extends Disposable {
             textWasStreamed = false;
             thinkingWasStreamed = false;
             this.currentTurnId.delete(sessionId);
+            // NOTE: Do NOT delete lastAssistantUsage here — intermediate result events
+            // during multi-tool turns need it. The next assistant message overwrites it.
           }
         }
       } catch (error) {
@@ -1870,6 +1961,7 @@ export class SessionManager extends Disposable {
     this.sessionInitFired.delete(sessionId);
     this.pendingDisplayNames.delete(sessionId);
     this.currentTurnId.delete(sessionId);
+    this.lastAssistantUsage.delete(sessionId);
 
     if (stopError !== undefined) {
       if (stopError instanceof Error) {
