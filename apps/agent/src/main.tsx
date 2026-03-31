@@ -4,7 +4,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import '@fontsource-variable/geist-mono';
-import '@xyflow/react/dist/style.css';
 import './globals.css';
 import App from './App';
 
@@ -18,7 +17,7 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
 
 // Initialize Sentry before rendering using shared config for consistency
 // This ensures release naming, privacy settings, and sampling rates match
-// Canvas and Editor apps which also use getSentryConfig
+// Editor app also uses getSentryConfig
 //
 // PERF: In development, skip replay and browser tracing integrations.
 // Replay captures DOM mutations (heavy with frequent streaming updates) and
@@ -67,6 +66,11 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
 document.addEventListener('contextmenu', (e) => {
   e.preventDefault();
 });
+
+// One-time cleanup: remove stale backend selection from pre-removal era
+if (localStorage.getItem('orbit-backend-mode') !== null) {
+  localStorage.removeItem('orbit-backend-mode');
+}
 
 const rootElement = document.getElementById('root');
 

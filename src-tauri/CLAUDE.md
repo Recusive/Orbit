@@ -88,13 +88,6 @@ src-tauri/
     │   │   ├── lifecycle.rs      # Session create/delete/message
     │   │   ├── ai.rs             # AI operations (stub)
     │   │   └── conversations.rs  # Chat persistence
-    │   ├── canvas/               # Canvas UI Builder
-    │   │   ├── lifecycle.rs      # Canvas sessions
-    │   │   ├── setup.rs          # Directory init
-    │   │   ├── download.rs       # Component download
-    │   │   ├── preview.rs        # Vite server
-    │   │   ├── save.rs           # Export components
-    │   │   └── tests.rs          # Serialization tests
     │   └── editor/               # Editor-specific (stub)
     │       └── mod.rs
     │
@@ -167,7 +160,6 @@ The agent bridge manages a **Node.js sidecar process** for Claude SDK integratio
 Commands use `#[tauri::command]` macro. Function names map directly to frontend:
 
 - `agent_create_session` → `invoke('agent_create_session')`
-- `canvas_download_component` → `invoke('canvas_download_component')`
 
 ### Common Commands (`commands/common/`)
 
@@ -235,28 +227,6 @@ Commands use `#[tauri::command]` macro. Function names map directly to frontend:
 - `conversation_delete`, `conversation_update_title`
 - `conversation_add_message`, `conversation_fork`
 
-### Canvas Commands (`commands/canvas/`)
-
-**Setup** (`setup.rs`):
-
-- `canvas_check_setup`, `canvas_initialize_directories`
-- `canvas_get_orbit_path`, `canvas_get_registry`, `canvas_save_registry`
-
-**Components** (`download.rs`):
-
-- `canvas_download_component`, `canvas_download_utils`
-- `canvas_download_all_components`
-
-**Preview** (`preview.rs`):
-
-- `canvas_setup_preview_server`, `canvas_install_preview_deps`
-- `canvas_start_preview_server`, `canvas_stop_preview_server`
-- `canvas_preview_server_status`
-
-**Export** (`save.rs`):
-
-- `canvas_save_custom_component`, `canvas_export_component`
-
 ---
 
 ## Protocol Types (`agent/protocol.rs`)
@@ -298,7 +268,6 @@ pub struct AgentMessage {
 - Agents: `ListAgents`, `GetAgent`, `CreateAgent`, `UpdateAgent`, `DeleteAgent`
 - Commands: `ListCommands`, `GetCommand`, `CreateCommand`, `UpdateCommand`, `DeleteCommand`
 - Advanced: `ForkSession`, `RewindFiles`, `GenerateAgentDefinition`
-- Canvas: `CanvasCreateSession`, `CanvasSendMessage`, `CanvasToolResponse`
 
 ### Bridge Events (Sidecar → Rust, async)
 
@@ -307,7 +276,6 @@ pub struct AgentMessage {
 - `SessionInit` - Session started/resumed/forked
 - `Checkpoint` - Savepoint created
 - `PlanModeChanged`, `AcceptModeChanged`
-- `CanvasMessage`, `CanvasToolRequest`, `CanvasError`
 - `BrowserToolRequest`
 - `Ready` - Sidecar initialized
 
@@ -323,7 +291,6 @@ In `lib.rs`, Tauri `.manage()` registers shared state accessible to commands:
 .manage(session_manager)         // Arc<SessionManager>
 .manage(browser_state)           // EmbeddedBrowserState
 .manage(browser_result_state)    // BrowserResultState
-.manage(PreviewServerState)      // Canvas preview server
 ```
 
 Access in commands via `State<'_, T>`:
@@ -661,7 +628,6 @@ The Tauri backend uses **Cargo test** for Rust unit and integration tests.
 cargo test                  # Run all Rust tests
 cargo test --workspace      # All workspace crates
 cargo test -p orbit-git     # Specific crate
-cargo test canvas           # Tests matching "canvas"
 
 # With output
 cargo test -- --nocapture   # Show println! output
@@ -672,7 +638,7 @@ cargo test -- --nocapture   # Show println! output
 Tests are located alongside the code they test:
 
 ```rust
-// src-tauri/src/commands/canvas/tests.rs
+// src-tauri/src/commands/common/tests.rs
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -39,11 +39,8 @@ export type {
   GenerateAgentDefinitionRequest,
   GenerateCommandDefinitionRequest,
   ShutdownRequest,
-  CanvasCreateSessionRequest,
-  CanvasDeleteSessionRequest,
-  CanvasSendMessageRequest,
-  CanvasInterruptRequest,
-  CanvasToolResponseRequest,
+  McpToolRequest,
+  McpToolResponse,
   // Response types
   BridgeResponse,
   BridgeCommandResponse,
@@ -67,9 +64,8 @@ export type {
   ErrorEvent,
   ReadyEvent,
   CheckpointEvent,
-  CanvasMessageEvent,
-  CanvasToolRequestEvent,
-  CanvasErrorEvent,
+  BrowserToolRequestEvent,
+  AuthErrorEvent,
 } from './protocol.js';
 
 // Schemas

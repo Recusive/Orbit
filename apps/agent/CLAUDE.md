@@ -101,8 +101,7 @@ apps/agent/src/
 │   │   └── message.ts          # WebviewMessage, ExtensionMessage
 │   ├── agent/                  # Agent, conversation, context types
 │   ├── file/                   # File, diff types
-│   ├── ui/                     # UI state types
-│   └── canvas/                 # Canvas integration types
+│   └── ui/                     # UI state types
 │
 └── lib/
     ├── api/                    # Tauri invoke wrappers by domain

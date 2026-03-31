@@ -16,7 +16,7 @@ interface NavGroup {
 
 export const NAV_GROUPS: readonly NavGroup[] = [
   { label: 'General', ids: ['general', 'appearance', 'account', 'changelog'] },
-  { label: 'Agent', ids: ['backend', 'agent', 'providers', 'subagents', 'commands'] },
+  { label: 'Agent', ids: ['agent', 'subagents', 'commands'] },
   { label: 'Features', ids: ['editor', 'browser', 'git', 'shortcuts', 'notifications', 'tabs'] },
 ] as const;
 

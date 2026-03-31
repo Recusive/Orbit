@@ -6,13 +6,10 @@
 pub mod agent;
 pub mod commands;
 pub mod core;
-/// OpenCode backend process management.
-pub mod opencode;
 pub mod utils;
 
 use std::env;
 use std::path::PathBuf;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use orbit_search::FileIndex;
@@ -22,25 +19,14 @@ use agent::{CredentialBridge, SessionManager};
 use commands::agent::lifecycle as agent_cmd;
 use commands::agent::{ai, conversations, marketplace};
 use commands::browser::{self, BrowserResultState, BrowserWindowState};
-use commands::canvas::download as canvas_download;
-use commands::canvas::lifecycle as canvas_cmd;
-use commands::canvas::persist as canvas_persist;
-use commands::canvas::preview as canvas_preview;
-use commands::canvas::save as canvas_save;
-use commands::canvas::setup as canvas_setup;
-use commands::canvas::transform as canvas_transform;
-use commands::canvas::PreviewServerState;
 use commands::common::{
     credentials, dev_monitor, diagnostics, files, git, icons, image_cache, lsp, providers,
     search::{self, FileIndexState},
     settings, sf_symbols, terminal, window, workspace,
 };
-use commands::opencode::lifecycle as opencode_cmd;
 use commands::vault as vault_cmd;
-use opencode::process::{resolve_opencode_binary_path, OpenCodeProcessState};
 use orbit_conversations::ConversationManager;
 use orbit_settings::SettingsManager;
-use tauri::async_runtime::block_on;
 use tauri::{Emitter as _, Manager as _};
 use tauri_plugin_log::{Target, TargetKind};
 
@@ -296,13 +282,6 @@ pub fn run() {
 
     // Initialize file index state (empty until workspace is opened)
     let file_index_state: FileIndexState = Arc::new(RwLock::new(Option::<FileIndex>::None));
-    let opencode_binary_path = match resolve_opencode_binary_path() {
-        Ok(path) => Some(path),
-        Err(error) => {
-            log::warn!("{error}");
-            None
-        },
-    };
 
     let result = tauri::Builder::default()
         // Managed state
@@ -313,8 +292,6 @@ pub fn run() {
         .manage(preflight_state)
         .manage(browser_state)
         .manage(browser_result_state)
-        .manage(PreviewServerState::new())
-        .manage(OpenCodeProcessState::new(opencode_binary_path))
         .manage(marketplace::MarketplaceCache::new())
         .manage(file_index_state)
         // Plugins
@@ -442,49 +419,6 @@ pub fn run() {
             agent_cmd::agent_generate_command_definition,
             agent_cmd::agent_enhance_bug_report,
             agent_cmd::agent_generate_title,
-            // Canvas session commands
-            canvas_cmd::canvas_create_session,
-            canvas_cmd::canvas_delete_session,
-            canvas_cmd::canvas_send_message,
-            canvas_cmd::canvas_interrupt,
-            canvas_cmd::canvas_tool_response,
-            // Canvas setup commands
-            canvas_setup::canvas_get_orbit_path,
-            canvas_setup::canvas_check_setup,
-            canvas_setup::canvas_initialize_directories,
-            canvas_setup::canvas_mark_ready,
-            canvas_setup::canvas_reset_setup,
-            canvas_setup::canvas_get_registry,
-            canvas_setup::canvas_save_registry,
-            // Canvas error recovery commands
-            canvas_setup::canvas_check_port_available,
-            canvas_setup::canvas_get_download_state,
-            canvas_setup::canvas_resume_download,
-            // Canvas download commands
-            canvas_download::canvas_download_component,
-            canvas_download::canvas_download_utils,
-            canvas_download::canvas_download_all_components,
-            // Canvas preview commands
-            canvas_preview::canvas_setup_preview_server,
-            canvas_preview::canvas_install_preview_deps,
-            canvas_preview::canvas_start_preview_server,
-            canvas_preview::canvas_stop_preview_server,
-            canvas_preview::canvas_preview_server_status,
-            // Canvas save/export commands
-            canvas_save::canvas_save_custom_component,
-            canvas_save::canvas_export_component,
-            // Canvas persist commands
-            canvas_persist::canvas_read_component_source,
-            canvas_persist::canvas_write_component_source,
-            canvas_persist::canvas_restore_backup,
-            canvas_persist::canvas_list_backups,
-            canvas_persist::canvas_get_file_hash,
-            canvas_persist::canvas_get_component_path,
-            canvas_persist::canvas_get_globals_path,
-            canvas_persist::canvas_read_file,
-            canvas_persist::canvas_write_file,
-            // Canvas transform commands
-            canvas_transform::canvas_persist_styles,
             // Vault commands
             vault_cmd::operations::vault_check_initialized,
             vault_cmd::operations::vault_initialize,
@@ -655,9 +589,6 @@ pub fn run() {
             browser::browser_ensure_runtime,
             browser::browser_get_url,
             browser::browser_get_title,
-            opencode_cmd::opencode_start,
-            opencode_cmd::opencode_stop,
-            opencode_cmd::opencode_status,
             browser::browser_js_callback,
             browser::browser_eval_async,
             browser::browser_wait_for_selector,
@@ -702,19 +633,6 @@ pub fn run() {
                 if let Err(e) = state.shutdown() {
                     log::error!("Failed to shut down agent bridge on exit: {e}");
                 }
-
-                let oc_state = app.state::<OpenCodeProcessState>();
-                let port_value = oc_state.port.lock().take();
-                if let Some(port) = port_value {
-                    block_on(async {
-                        opencode::process::request_dispose(port).await;
-                    });
-                }
-                let child_value = oc_state.process.lock().take();
-                if let Some(mut child) = child_value {
-                    opencode::process::graceful_terminate(&mut child);
-                }
-                oc_state.healthy.store(false, Ordering::SeqCst);
             }
         }),
         Err(e) => log::error!("Error building Tauri application: {e}"),

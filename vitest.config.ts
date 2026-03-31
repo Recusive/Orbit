@@ -8,7 +8,6 @@ import { defineConfig } from 'vitest/config';
  *
  * This configuration supports testing across all frontend apps:
  * - apps/agent (main AI chat interface)
- * - apps/Canvas-UI-Builder (visual component builder)
  * - apps/editor (code editor - stub)
  * - apps/common (shared utilities)
  *
@@ -45,10 +44,8 @@ export default defineConfig({
     // File Patterns
     // =========================================================================
 
-    // Include test files from all frontend apps
     include: [
       'apps/agent/src/**/*.{test,spec}.{ts,tsx}',
-      'apps/Canvas-UI-Builder/src/**/*.{test,spec}.{ts,tsx}',
       'apps/editor/src/**/*.{test,spec}.{ts,tsx}',
       'apps/common/src/**/*.{test,spec}.{ts,tsx}',
     ],
@@ -70,10 +67,8 @@ export default defineConfig({
       reporter: ['text', 'json', 'html'],
       reportsDirectory: './coverage',
 
-      // Include source files from all apps
       include: [
         'apps/agent/src/**/*.{ts,tsx}',
-        'apps/Canvas-UI-Builder/src/**/*.{ts,tsx}',
         'apps/editor/src/**/*.{ts,tsx}',
         'apps/common/src/**/*.{ts,tsx}',
       ],
@@ -122,7 +117,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './apps/agent/src'),
-      '@canvas': path.resolve(__dirname, './apps/Canvas-UI-Builder/src'),
       '@editor': path.resolve(__dirname, './apps/editor/src'),
       '@orbit.build/sdk/v2/client': path.resolve(
         __dirname,

@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useRef } from 'react';
 
-import { OcAgentSurface } from './OcAgentSurface';
-
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
 
@@ -18,7 +16,6 @@ import {
   useSessionUsage,
   useMaxTokens,
 } from '@/stores/agent/tool-store';
-import { useActiveBackend } from '@/stores/backend';
 import {
   useIsConversationTransitioning,
   useIsLoadingConversation,
@@ -217,12 +214,6 @@ const ClaudeEditorSurface: FC = () => {
 };
 
 export const BackendChatSurface: FC<BackendChatSurfaceProps> = ({ surface }) => {
-  const activeBackend = useActiveBackend();
-
-  if (activeBackend === 'opencode') {
-    return <OcAgentSurface />;
-  }
-
   if (surface === 'agent') {
     return <ClaudeAgentSurface />;
   }

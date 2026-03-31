@@ -26,7 +26,7 @@ export type DemoStep =
   | { action: 'wait'; ms: number }
   | { action: 'togglePanel'; panel: PanelAction; state?: 'open' | 'closed' }
   | { action: 'openFile'; path: string }
-  | { action: 'switchTab'; tab: 'agent' | 'editor' | 'canvas' }
+  | { action: 'switchTab'; tab: 'agent' | 'editor' }
   | { action: 'scroll'; target: string; direction: 'up' | 'down'; amount: number }
   | { action: 'highlight'; target: string; duration?: number }
   | { action: 'terminalType'; text: string; charDelay?: number }

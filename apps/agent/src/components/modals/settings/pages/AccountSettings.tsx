@@ -18,7 +18,6 @@ import {
 } from '@/lib/claude-auth';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/agent';
-import { useActiveBackend } from '@/stores/backend';
 
 const logger = createLogger('AccountSettings');
 
@@ -130,7 +129,6 @@ function dotColor(expiresAtMs: number | null, hasCredentials: boolean): string {
 // ---------------------------------------------------------------------------
 
 export const AccountSettings: FC = () => {
-  const activeBackend = useActiveBackend();
   const credentialType = useAuthStore((state) => state.credentialType);
 
   // OAuth status
@@ -420,115 +418,111 @@ export const AccountSettings: FC = () => {
         Choose your preferred Claude authentication method
       </SectionHeader>
 
-      {activeBackend !== 'opencode' ? (
-        <div className="space-y-3">
-          <div role="radiogroup" aria-label="Claude authentication method" className="space-y-2">
-            {[
-              {
-                id: 'oauth',
-                title: 'OAuth',
-                description: 'Use Claude Code credentials from your local sign-in',
-                status: connectionLabel,
-                connected: isConnected,
-              },
-              {
-                id: 'apikey',
-                title: 'API Key',
-                description: 'Use a stored Anthropic API key from Settings',
-                status: apiKeyConfigured ? 'Configured' : 'Not configured',
-                connected: apiKeyConfigured,
-              },
-            ].map((option) => {
-              const isSelected = selectedMethod === option.id;
-              const isPreferred = preferredMethod === option.id;
+      <div className="space-y-3">
+        <div role="radiogroup" aria-label="Claude authentication method" className="space-y-2">
+          {[
+            {
+              id: 'oauth',
+              title: 'OAuth',
+              description: 'Use Claude Code credentials from your local sign-in',
+              status: connectionLabel,
+              connected: isConnected,
+            },
+            {
+              id: 'apikey',
+              title: 'API Key',
+              description: 'Use a stored Anthropic API key from Settings',
+              status: apiKeyConfigured ? 'Configured' : 'Not configured',
+              connected: apiKeyConfigured,
+            },
+          ].map((option) => {
+            const isSelected = selectedMethod === option.id;
+            const isPreferred = preferredMethod === option.id;
 
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={isSelected}
-                  disabled={isSwitching}
-                  onClick={() => {
-                    void handleMethodChange(option.id as Exclude<PreferredAuthMethod, null>);
-                  }}
+            return (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                disabled={isSwitching}
+                onClick={() => {
+                  void handleMethodChange(option.id as Exclude<PreferredAuthMethod, null>);
+                }}
+                className={cn(
+                  'group flex min-h-11 w-full items-start gap-3.5 rounded-xl px-4 py-3.5 text-left transition-colors disabled:opacity-60',
+                  isSelected ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/3'
+                )}
+              >
+                <div
                   className={cn(
-                    'group flex min-h-11 w-full items-start gap-3.5 rounded-xl px-4 py-3.5 text-left transition-colors disabled:opacity-60',
-                    isSelected ? 'bg-foreground/[0.06]' : 'hover:bg-foreground/3'
+                    'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+                    isSelected
+                      ? 'border-primary bg-primary'
+                      : 'border-muted-foreground/30 group-hover:border-muted-foreground/50'
                   )}
                 >
-                  <div
-                    className={cn(
-                      'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors',
-                      isSelected
-                        ? 'border-primary bg-primary'
-                        : 'border-muted-foreground/30 group-hover:border-muted-foreground/50'
-                    )}
-                  >
-                    {isSelected ? (
-                      <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-                    ) : null}
-                  </div>
+                  {isSelected ? (
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                  ) : null}
+                </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[13px] font-medium text-foreground">
-                        {option.title}
-                      </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-medium text-foreground">{option.title}</span>
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
+                        option.connected
+                          ? 'bg-success-muted text-success'
+                          : 'bg-muted-foreground/10 text-muted-foreground'
+                      )}
+                    >
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium leading-none',
-                          option.connected
-                            ? 'bg-success-muted text-success'
-                            : 'bg-muted-foreground/10 text-muted-foreground'
+                          'h-1.5 w-1.5 rounded-full',
+                          option.id === 'oauth'
+                            ? dotColor(keychainStatus?.expiresAt ?? null, isConnected)
+                            : option.connected
+                              ? 'bg-success'
+                              : 'bg-muted-foreground/40'
                         )}
-                      >
-                        <span
-                          className={cn(
-                            'h-1.5 w-1.5 rounded-full',
-                            option.id === 'oauth'
-                              ? dotColor(keychainStatus?.expiresAt ?? null, isConnected)
-                              : option.connected
-                                ? 'bg-success'
-                                : 'bg-muted-foreground/40'
-                          )}
-                        />
-                        {option.status}
-                      </span>
-                    </div>
-                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                      {option.description}
+                      />
+                      {option.status}
                     </span>
-                    {usingNote !== null && isPreferred ? (
-                      <span className="mt-2 block text-[11px] text-muted-foreground">
-                        {usingNote}
-                      </span>
-                    ) : null}
                   </div>
-
-                  {isPreferred ? (
-                    <span className="shrink-0 inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-medium text-success">
-                      Preferred
-                    </span>
-                  ) : isSelected ? (
-                    <span className="shrink-0 inline-flex items-center rounded-full bg-muted-foreground/10 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                      Current
+                  <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                    {option.description}
+                  </span>
+                  {usingNote !== null && isPreferred ? (
+                    <span className="mt-2 block text-[11px] text-muted-foreground">
+                      {usingNote}
                     </span>
                   ) : null}
-                </button>
-              );
-            })}
-          </div>
+                </div>
 
-          {showLegacyHint ? (
-            <p className="text-sm text-muted-foreground">
-              No preferred method is saved yet. Picking one makes Claude startup behavior explicit.
-            </p>
-          ) : null}
-
-          {methodError !== null ? <p className="text-sm text-destructive">{methodError}</p> : null}
+                {isPreferred ? (
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-success/15 px-2.5 py-0.5 text-[11px] font-medium text-success">
+                    Preferred
+                  </span>
+                ) : isSelected ? (
+                  <span className="shrink-0 inline-flex items-center rounded-full bg-muted-foreground/10 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Current
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
         </div>
-      ) : null}
+
+        {showLegacyHint ? (
+          <p className="text-sm text-muted-foreground">
+            No preferred method is saved yet. Picking one makes Claude startup behavior explicit.
+          </p>
+        ) : null}
+
+        {methodError !== null ? <p className="text-sm text-destructive">{methodError}</p> : null}
+      </div>
 
       <SectionDivider />
 

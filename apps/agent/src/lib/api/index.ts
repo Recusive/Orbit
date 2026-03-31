@@ -41,8 +41,5 @@ export * from './window';
 // Browser operations (embedded Chromium + CDP)
 export * from './browser';
 
-// OpenCode backend lifecycle
-export * from './opencode';
-
 // Marketplace operations
 export * from './marketplace';

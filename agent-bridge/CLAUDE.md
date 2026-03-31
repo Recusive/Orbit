@@ -15,12 +15,12 @@ The agent-bridge is a **TypeScript sidecar process** that bridges the Rust/Tauri
 │                              ▼                                   │
 │  ┌───────────────────────────────────────────────────────────┐  │
 │  │                    Agent Bridge (Bun)                      │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐    │  │
-│  │  │ SessionMgr  │  │ CanvasMgr   │  │ BrowserToolMgr  │    │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └───────┬─────────┘    │  │
-│  │         │                │                 │               │  │
-│  │         └────────────────┼─────────────────┘               │  │
-│  │                          ▼                                 │  │
+│  │  ┌─────────────┐  ┌─────────────────┐                      │  │
+│  │  │ SessionMgr  │  │ BrowserToolMgr  │                      │  │
+│  │  └──────┬──────┘  └───────┬─────────┘                      │  │
+│  │         │                 │                                │  │
+│  │         └─────────────────┘                                │  │
+│  │                   ▼                                        │  │
 │  │  ┌───────────────────────────────────────────────────────┐│  │
 │  │  │              Claude Agent SDK                         ││  │
 │  │  │  - Session management                                 ││  │
@@ -93,15 +93,6 @@ agent-bridge/
 │   │       ├── content.ts           # Content block processing
 │   │       └── formatter.ts         # Message formatting
 │   │
-│   ├── canvas/                  # Canvas UI Builder AI agent
-│   │   ├── core/
-│   │   │   └── canvas-agent.ts      # Canvas session management
-│   │   ├── mcp/                     # MCP server for canvas tools
-│   │   ├── orchestrator/            # Multi-agent orchestration
-│   │   ├── prompts/                 # Canvas system prompts
-│   │   ├── session/                 # Canvas session handling
-│   │   └── types/                   # Canvas-specific types
-│   │
 │   ├── browser/                 # Browser automation MCP bridge
 │   │   ├── browser-mcp-server.ts    # MCP server for browser tools
 │   │   ├── browser-tool-bridge.ts   # Tool execution bridge
@@ -123,7 +114,6 @@ agent-bridge/
 │       ├── file-rewind.test.ts      # SDK checkpoint/restore tests
 │       ├── conversation-rewind.test.ts # Context rewind tests
 │       ├── combined-rewind.test.ts  # Full rewind flow tests
-│       ├── canvas-e2e.test.ts       # Canvas end-to-end tests
 │       └── ...
 │
 ├── dist/                        # Build output (JS bundle)
@@ -160,8 +150,6 @@ Rust → stdin  → [BridgeRequest]  → Handle → stdout → [BridgeResponse] 
 | `fork_session`          | Create session branch/checkpoint     |
 | `list_agents`           | List custom agent definitions        |
 | `create_agent`          | Create custom agent                  |
-| `canvas:create_session` | Create canvas AI session             |
-| `canvas:send_message`   | Send message with canvas state       |
 | `browser:tool_response` | Return browser tool execution result |
 
 ### Response Types (Bridge → Rust)
@@ -187,8 +175,6 @@ Rust → stdin  → [BridgeRequest]  → Handle → stdout → [BridgeResponse] 
 | `session_init`         | Session ready with SDK ID           |
 | `checkpoint`           | File checkpoint created             |
 | `plan_mode_changed`    | Plan mode toggled                   |
-| `canvas:message`       | Canvas agent response               |
-| `canvas:tool_request`  | Canvas tool needs execution         |
 | `browser:tool_request` | Browser tool needs execution        |
 
 ## Key Concepts
@@ -215,16 +201,6 @@ The SDK tracks file modifications for rewind:
 1. **Enable:** `CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING=1` (set in index.ts)
 2. **Track:** Each user message UUID becomes a checkpoint ID
 3. **Rewind:** `rewind_files` request restores files to checkpoint state
-
-### Canvas Integration
-
-Canvas sessions use MCP (Model Context Protocol) for tool execution:
-
-```text
-Canvas Agent → MCP Tool Request → canvas:tool_request event → Frontend
-Frontend     → Executes tool   → canvas:tool_response       → Bridge
-Bridge       → Returns result  → Continue generation
-```
 
 ### Browser Automation
 
@@ -283,7 +259,6 @@ Tests auto-skip in CI/GitHub Actions.
 | `file-rewind.test.ts`         | SDK checkpoint/restore functionality |
 | `conversation-rewind.test.ts` | Conversation context formatting      |
 | `combined-rewind.test.ts`     | Full rewind flow integration         |
-| `canvas-e2e.test.ts`          | Canvas agent end-to-end flow         |
 | `text-event-batcher.test.ts`  | Text batching utility                |
 
 ## SDK Type Workaround (ESLint vs TypeScript)
@@ -311,13 +286,11 @@ for await (const rawMessage of this.currentQuery) {
 
 ### Affected Files
 
-| File                                           | Role                                 |
-| ---------------------------------------------- | ------------------------------------ |
-| `src/common/types/claude-sdk.ts`               | Source of truth for mirror types     |
-| `src/agent/core/agent.ts`                      | Main agent — heaviest usage          |
-| `src/agent/session/session-manager.ts`         | Session management — typed narrowing |
-| `src/canvas/core/canvas-agent.ts`              | Canvas agent — same pattern          |
-| `src/canvas/orchestrator/agents/base-agent.ts` | Base agent — same pattern            |
+| File                                   | Role                                 |
+| -------------------------------------- | ------------------------------------ |
+| `src/common/types/claude-sdk.ts`       | Source of truth for mirror types     |
+| `src/agent/core/agent.ts`              | Main agent — heaviest usage          |
+| `src/agent/session/session-manager.ts` | Session management — typed narrowing |
 
 ### Proper Fix
 
@@ -353,14 +326,11 @@ it('should analyze intent', () => {
 });
 
 // ✅ GOOD - Real integration test
-it('should route simple requests to fast path via real session', async () => {
-  const manager = new CanvasSessionManager();
+it('should create and use a real agent session', async () => {
+  const manager = new SessionManager();
   await manager.createSession('test-session', { model: 'claude-sonnet-4-20250514' });
-  const intentAnalyzer = manager['intentAnalyzer'];
-  const state: CanvasState = { nodes: [], edges: [] };
-  const snapshot = manager['convertToSnapshot'](state);
-  const analysis = intentAnalyzer.analyze('Create a button', snapshot);
-  expect(analysis.useFastPath).toBe(true);
+  const session = manager.getSession('test-session');
+  expect(session).toBeDefined();
   await manager.deleteSession('test-session');
 });
 ```

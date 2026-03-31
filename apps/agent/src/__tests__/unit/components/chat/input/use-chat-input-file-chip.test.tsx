@@ -17,9 +17,7 @@ vi.mock('@/lib/utils/image-utils', () => ({
 }));
 
 import { useChatInput } from '@/components/chat/input/use-chat-input';
-import { useBackendStore } from '@/stores/backend/backend-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
-import { useOcProviderStore } from '@/stores/opencode';
 
 vi.mock('@/stores/agent', () => {
   const fetchCommands = vi.fn(() => Promise.resolve());
@@ -77,32 +75,6 @@ function createOptions(overrides: Partial<UseChatInputOptions> = {}): UseChatInp
 describe('useChatInput pending file chips', () => {
   beforeEach(() => {
     usePendingContextStore.setState({ pending: [] });
-    useBackendStore.setState({ activeBackend: 'claude' });
-    useOcProviderStore.getState().clear();
-    useOcProviderStore.setState({
-      providers: [
-        {
-          id: 'ollama',
-          name: 'Ollama',
-          env: [],
-          models: {
-            vision: {
-              id: 'vision',
-              name: 'Vision',
-              supportsImageInput: true,
-            },
-            text: {
-              id: 'text',
-              name: 'Text',
-              supportsImageInput: false,
-            },
-          },
-        },
-      ],
-      selectedProviderId: 'ollama',
-      selectedModelId: 'vision',
-      selectedAgent: 'build',
-    });
     mockCompressImage.mockClear();
     vi.clearAllMocks();
   });
@@ -209,8 +181,7 @@ describe('useChatInput pending file chips', () => {
     );
   });
 
-  it('cycles OpenCode agent mode on Shift+Tab', () => {
-    useBackendStore.setState({ activeBackend: 'opencode' });
+  it('cycles input mode on Shift+Tab', () => {
     const onModeChange = vi.fn();
     const { result } = renderHook(() => useChatInput(createOptions({ onModeChange })));
 
@@ -218,52 +189,7 @@ describe('useChatInput pending file chips', () => {
       result.current.handleShiftTab();
     });
 
-    expect(onModeChange).not.toHaveBeenCalled();
-    expect(useOcProviderStore.getState().selectedAgent).toBe('plan');
-  });
-
-  it('wraps OpenCode agent mode from explore back to build on Shift+Tab', () => {
-    useBackendStore.setState({ activeBackend: 'opencode' });
-    useOcProviderStore.setState({ selectedAgent: 'explore' });
-    const { result } = renderHook(() => useChatInput(createOptions()));
-
-    act(() => {
-      result.current.handleShiftTab();
-    });
-
-    expect(useOcProviderStore.getState().selectedAgent).toBe('build');
-  });
-
-  it('clears attached images when the active OpenCode model switches to unsupported', async () => {
-    useBackendStore.setState({ activeBackend: 'opencode' });
-    const { result } = renderHook(() => useChatInput(createOptions()));
-
-    await attachImage(result);
-
-    act(() => {
-      useOcProviderStore.setState({ selectedModelId: 'text' });
-    });
-
-    await waitFor(() => {
-      expect(result.current.attachedContext).toEqual([]);
-    });
-  });
-
-  it('does not clear Claude image chips when switching into an unsupported OpenCode backend', async () => {
-    const { result } = renderHook(() => useChatInput(createOptions()));
-
-    await attachImage(result);
-
-    act(() => {
-      useOcProviderStore.setState({ selectedModelId: 'text' });
-      useBackendStore.setState({ activeBackend: 'opencode' });
-    });
-
-    await waitFor(() => {
-      expect(result.current.attachedContext).toEqual(
-        expect.arrayContaining([expect.objectContaining({ type: 'image', name: 'test.png' })])
-      );
-    });
+    expect(onModeChange).toHaveBeenCalledWith('plan');
   });
 
   it('sends image-only messages without requiring text input', async () => {

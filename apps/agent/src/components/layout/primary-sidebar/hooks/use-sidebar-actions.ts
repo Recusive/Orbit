@@ -13,7 +13,6 @@ import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
 import { getConversationUiBridge } from '@/services/conversations';
 import { clearSessionTitleState } from '@/services/session';
 import { useToolStore } from '@/stores/agent/tool-store';
-import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -97,9 +96,8 @@ export const useSidebarActions = ({
   const setCreateWorktreeDialogOpen = useUIStore((s) => s.setCreateWorktreeDialogOpen);
   const setEditingConversationId = useUIStore((s) => s.setEditingConversationId);
   const closeSecondarySurface = useUIStore((s) => s.closeSecondarySurface);
-  const activeBackend = useActiveBackend();
   const repoRootPath = useUIStore((s) => s.repoRootPath);
-  const bridge = getConversationUiBridge(activeBackend);
+  const bridge = getConversationUiBridge();
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -346,26 +344,22 @@ export const useSidebarActions = ({
   const handleDeleteConversation = useCallback(
     async (sessionId: string): Promise<void> => {
       try {
-        if (activeBackend === 'claude') {
-          removeConversation(sessionId);
-        }
+        removeConversation(sessionId);
 
         await bridge.remove(sessionId);
         setDeleteDialogOpen(false);
         setConversationToDelete(null);
 
-        if (activeBackend === 'claude') {
-          useToolStore.getState().clearSessionTools(sessionId);
-          useFileStore.getState().clearSessionFiles(sessionId);
-          clearSessionTitleState(sessionId);
-        }
+        useToolStore.getState().clearSessionTools(sessionId);
+        useFileStore.getState().clearSessionFiles(sessionId);
+        clearSessionTitleState(sessionId);
         toast.success('Conversation deleted');
       } catch (err) {
         logger.error('Failed to delete conversation', err);
         toast.error('Failed to delete conversation');
       }
     },
-    [activeBackend, bridge, removeConversation]
+    [bridge, removeConversation]
   );
 
   // Open delete confirmation dialog

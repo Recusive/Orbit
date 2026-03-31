@@ -149,13 +149,6 @@ export const HeaderBar: FC<HeaderBarProps> = ({ className, transparent = false }
               setActiveTab('editor');
             }}
           />
-          <TabButton
-            label="Canvas"
-            active={activeTab === 'canvas'}
-            onClick={(): void => {
-              setActiveTab('canvas');
-            }}
-          />
         </div>
       ) : (
         <div />

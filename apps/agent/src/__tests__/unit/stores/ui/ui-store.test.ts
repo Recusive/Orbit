@@ -767,9 +767,6 @@ describe('ui-store', () => {
       it('should set active header tab', () => {
         const { setActiveTab } = useUIStore.getState();
 
-        setActiveTab('canvas');
-        expect(useUIStore.getState().activeTab).toBe('canvas');
-
         setActiveTab('editor');
         expect(useUIStore.getState().activeTab).toBe('editor');
 
@@ -835,11 +832,11 @@ describe('ui-store', () => {
       });
 
       it('should preserve the current section when no section is provided', () => {
-        useUIStore.setState({ settingsSection: 'providers' });
+        useUIStore.setState({ settingsSection: 'appearance' });
 
         useUIStore.getState().openSettings();
 
-        expect(useUIStore.getState().settingsSection).toBe('providers');
+        expect(useUIStore.getState().settingsSection).toBe('appearance');
       });
 
       it('should close vault and expand a collapsed sidebar', () => {

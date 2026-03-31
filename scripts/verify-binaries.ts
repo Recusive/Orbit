@@ -13,7 +13,6 @@ const BINARY_DIR = path.join(process.cwd(), 'src-tauri', 'binaries');
 const BINARY_SPECS: BinarySpec[] = [
   { baseName: 'agent-bridge', required: true },
   { baseName: 'claude', required: true },
-  { baseName: 'orbit-server', required: false },
 ];
 
 function parseTargetTriple(): string {

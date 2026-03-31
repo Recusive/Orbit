@@ -8,11 +8,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./hooks": "./src/hooks/index.ts",
-    "./hooks/canvas": "./src/hooks/canvas/index.ts",
     "./lib": "./src/lib/index.ts",
     "./testing": "./src/testing/tauri-mocks.ts",
     "./types": "./src/types/index.ts",
-    "./types/canvas": "./src/types/canvas.ts",
     "./utils": "./src/utils/index.ts"
   },
   "scripts": {

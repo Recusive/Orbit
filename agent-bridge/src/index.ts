@@ -58,7 +58,6 @@ import {
   saveSessionInitMapping,
   touchSession,
 } from './agent/session/session-storage.js';
-import { CanvasSessionManager } from './canvas/index.js';
 import { ClaudeCredentials } from './common/auth/credentials.js';
 import { createLogger } from './common/logging/logger.js';
 import { canEnableIOS } from './ios/ios-service.js';
@@ -144,7 +143,6 @@ async function main(): Promise<void> {
 
   // Create session managers
   const sessionManager = new SessionManager({ iosService });
-  const canvasSessionManager = new CanvasSessionManager();
 
   // Wire up agent session event handlers
   sessionManager.onAgentMessage((data) => {
@@ -259,37 +257,6 @@ async function main(): Promise<void> {
     });
   });
 
-  // Wire up canvas session event handlers
-  canvasSessionManager.onMessage((data) => {
-    sendEvent({
-      type: 'canvas:message',
-      sessionId: data.sessionId,
-      message: data.message,
-    });
-  });
-
-  canvasSessionManager.onToolRequest((data) => {
-    sendEvent({
-      type: 'canvas:tool_request',
-      sessionId: data.sessionId,
-      request: data.request,
-    });
-  });
-
-  canvasSessionManager.onError((data) => {
-    // Capture canvas errors to Sentry using the centralized error handler
-    captureAgentError(data.error, {
-      sessionId: data.sessionId,
-      source: 'canvas_session_manager',
-    });
-
-    sendEvent({
-      type: 'canvas:error',
-      sessionId: data.sessionId,
-      error: data.error.message,
-    });
-  });
-
   // Handle incoming requests from stdin
   const rl = readline.createInterface({
     input: process.stdin,
@@ -340,23 +307,21 @@ async function main(): Promise<void> {
 
     logger.info({ requestType: request.type }, 'Received request');
 
-    handleRequest(request, sessionManager, canvasSessionManager, iosService).catch(
-      (error: unknown) => {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
-        // Capture request handler errors to Sentry
-        const handlerError = error instanceof Error ? error : new Error(errorMessage);
-        captureAgentError(handlerError, {
-          source: 'request_handler',
-          extra: { requestType: request.type },
-        });
-        sendResponse({
-          type: 'error',
-          requestType: request.type,
-          error: errorMessage,
-        });
-      }
-    );
+    handleRequest(request, sessionManager, iosService).catch((error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error({ requestType: request.type, error: errorMessage }, 'Error handling request');
+      // Capture request handler errors to Sentry
+      const handlerError = error instanceof Error ? error : new Error(errorMessage);
+      captureAgentError(handlerError, {
+        source: 'request_handler',
+        extra: { requestType: request.type },
+      });
+      sendResponse({
+        type: 'error',
+        requestType: request.type,
+        error: errorMessage,
+      });
+    });
   });
 
   /**
@@ -377,11 +342,6 @@ async function main(): Promise<void> {
     } catch (e) {
       logger.error({ error: e }, 'sessionManager.shutdownAsync() failed');
       sessionManager.dispose();
-    }
-    try {
-      canvasSessionManager.dispose();
-    } catch (e) {
-      logger.error({ error: e }, 'canvasSessionManager.dispose() failed');
     }
     try {
       await iosService?.dispose();
@@ -431,7 +391,6 @@ async function main(): Promise<void> {
 async function handleRequest(
   request: BridgeRequest,
   sessionManager: SessionManager,
-  canvasSessionManager: CanvasSessionManager,
   iosService?: IOSService
 ): Promise<void> {
   switch (request.type) {
@@ -720,37 +679,6 @@ async function handleRequest(
       break;
     }
 
-    // Canvas Operations
-    case 'canvas:create_session': {
-      await canvasSessionManager.createSession(request.sessionId, request.config);
-      sendResponse({ type: 'success', requestType: request.type });
-      break;
-    }
-
-    case 'canvas:delete_session': {
-      await canvasSessionManager.deleteSession(request.sessionId);
-      sendResponse({ type: 'success', requestType: request.type });
-      break;
-    }
-
-    case 'canvas:send_message': {
-      await canvasSessionManager.sendMessage(request.sessionId, request.message, request.state);
-      sendResponse({ type: 'success', requestType: request.type });
-      break;
-    }
-
-    case 'canvas:interrupt': {
-      await canvasSessionManager.interrupt(request.sessionId);
-      sendResponse({ type: 'success', requestType: request.type });
-      break;
-    }
-
-    case 'canvas:tool_response': {
-      canvasSessionManager.handleToolResponse(request.sessionId, request.response);
-      sendResponse({ type: 'success', requestType: request.type });
-      break;
-    }
-
     case 'browser:tool_response': {
       sessionManager.handleBrowserToolResponse(request.sessionId, request.response);
       sendResponse({ type: 'success', requestType: request.type });
@@ -766,7 +694,6 @@ async function handleRequest(
         logger.error({ error }, 'sessionManager.shutdownAsync() failed during shutdown request');
         sessionManager.dispose();
       }
-      canvasSessionManager.dispose();
       await iosService?.dispose().catch((error: unknown) => {
         logger.error({ error }, 'iosService.dispose() failed during shutdown request');
       });

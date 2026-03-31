@@ -4,9 +4,7 @@ import type { NavigationSnapshot } from './apply-snapshot';
 import type { ViewedFile } from '@/stores/file/file-viewer-store';
 
 import { getConversationUiBridge } from '@/services/conversations';
-import { useBackendStore } from '@/stores/backend';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
-import { useOcSessionStore } from '@/stores/opencode';
 import { useNavigationStore } from '@/stores/ui/navigation-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -180,23 +178,6 @@ export function initNavigationTracker(): void {
         state.activeTabPath !== prevState.activeTabPath ||
         !fileTabsEqual(state.openTabs, prevState.openTabs)
       ) {
-        debouncedCapture();
-      }
-    })
-  );
-
-  cleanupFns.push(
-    useOcSessionStore.subscribe((state, prevState) => {
-      if (state.activeSessionId !== prevState.activeSessionId) {
-        debouncedCapture();
-      }
-    })
-  );
-
-  cleanupFns.push(
-    useBackendStore.subscribe((state, prevState) => {
-      if (state.activeBackend !== prevState.activeBackend) {
-        useNavigationStore.getState().clearHistory();
         debouncedCapture();
       }
     })

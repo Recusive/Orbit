@@ -2,7 +2,7 @@ import { startTransition } from 'react';
 
 import { claudeConversationRepo } from './claude-conversation-repo';
 
-import type { ConversationListContext, ConversationUiBridge } from '@/types/backend';
+import type { ConversationListContext, ConversationUiBridge } from './types';
 
 import { applyManualSessionTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
@@ -80,6 +80,7 @@ export const claudeUiBridge: ConversationUiBridge = {
 
   async rename(sessionId, title): Promise<void> {
     await applyManualSessionTitle(sessionId, title);
+    await claudeConversationRepo.updateTitle(sessionId, title);
   },
 
   async remove(sessionId): Promise<void> {

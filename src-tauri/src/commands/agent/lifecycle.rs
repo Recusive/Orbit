@@ -503,7 +503,7 @@ pub async fn agent_generate_command_definition(
 // ============================================================================
 
 use crate::agent::protocol::{
-    AgentMessage, BridgeEvent, McpToolRequest, PermissionRequest, SDKMessage, SerializableError,
+    AgentMessage, BridgeEvent, McpToolRequest, PermissionRequest, SerializableError,
     SessionInitEvent,
 };
 
@@ -599,28 +599,6 @@ fn emit_compact_complete(app: &AppHandle, session_id: &str) {
     ));
 }
 
-/// Emit canvas message event
-fn emit_canvas_message(app: &AppHandle, session_id: &str, message: &SDKMessage) {
-    drop(app.emit(
-        "canvas:message",
-        serde_json::json!({
-            "sessionId": session_id,
-            "message": message,
-        }),
-    ));
-}
-
-/// Emit canvas tool request event
-fn emit_canvas_tool_request(app: &AppHandle, session_id: &str, request: &McpToolRequest) {
-    drop(app.emit(
-        "canvas:tool_request",
-        serde_json::json!({
-            "sessionId": session_id,
-            "request": request,
-        }),
-    ));
-}
-
 /// Emit browser tool request event
 fn emit_browser_tool_request(app: &AppHandle, session_id: &str, request: &McpToolRequest) {
     drop(app.emit(
@@ -628,17 +606,6 @@ fn emit_browser_tool_request(app: &AppHandle, session_id: &str, request: &McpToo
         serde_json::json!({
             "sessionId": session_id,
             "request": request,
-        }),
-    ));
-}
-
-/// Emit canvas error event
-fn emit_canvas_error(app: &AppHandle, session_id: &str, error: &str) {
-    drop(app.emit(
-        "canvas:error",
-        serde_json::json!({
-            "sessionId": session_id,
-            "error": error,
         }),
     ));
 }
@@ -695,17 +662,6 @@ pub fn setup_event_callbacks(app: &AppHandle, session_manager: &Arc<SessionManag
         } => emit_checkpoint(&app_handle, &session_id, &checkpoint_id),
         BridgeEvent::CompactComplete { session_id } => {
             emit_compact_complete(&app_handle, &session_id);
-        },
-        BridgeEvent::CanvasMessage {
-            session_id,
-            message,
-        } => emit_canvas_message(&app_handle, &session_id, &message),
-        BridgeEvent::CanvasToolRequest {
-            session_id,
-            request,
-        } => emit_canvas_tool_request(&app_handle, &session_id, &request),
-        BridgeEvent::CanvasError { session_id, error } => {
-            emit_canvas_error(&app_handle, &session_id, &error);
         },
         BridgeEvent::BrowserToolRequest {
             session_id,

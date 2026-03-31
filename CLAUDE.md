@@ -17,11 +17,8 @@
 
 <sub_level_docs note="Each major directory has its own CLAUDE.md with detailed, area-specific guidance">
 <doc path="apps/agent/CLAUDE.md" scope="Agent app stores, protocol types, CSS, testing, hooks, tool widgets"/>
-<doc path="apps/Canvas-UI-Builder/CLAUDE.md" scope="Canvas setup, preview server, inspector, component registry"/>
-<doc path="apps/common/CLAUDE.md" scope="Shared frontend code: logger, cn(), Tauri test mocks, canvas hooks"/>
+<doc path="apps/common/CLAUDE.md" scope="Shared frontend code: logger, cn(), Tauri test mocks"/>
 <doc path="agent-bridge/CLAUDE.md" scope="SDK sidecar, IPC protocol, SDK type workaround, testing philosophy"/>
-<doc path="Agent-backend/CLAUDE.md" scope="OpenCode engine: CLI, API server, agents, tools, sessions, provider integration"/>
-<doc path="Agent-backend/learnings.md" scope="TUI debugging, SolidJS gotchas, architecture notes, server logging"/>
 <doc path="src-tauri/CLAUDE.md" scope="Rust backend, Tauri commands, agent bridge, managed state, ACL"/>
 <doc path="crates/common/CLAUDE.md" scope="11 Rust crates: core, fs, terminal, git, conversations, settings, search, lsp, sf-symbols, ai (stub), syntax (stub)"/>
 <doc path="packages/shared-schemas/CLAUDE.md" scope="Zod schemas shared across agent-bridge and all frontend apps"/>
@@ -30,11 +27,9 @@
 </sub_level_docs>
 
 <project_overview>
-Orbit is a modern AI-powered code editor built with Tauri 2 (Rust backend) and React 19 (TypeScript frontend). It's a monorepo containing three frontend apps (Orbit Agent, Orbit Canvas, Orbit Editor) that share a common Rust backend.
+Orbit is a modern AI-powered code editor built with Tauri 2 (Rust backend) and React 19 (TypeScript frontend). It's a monorepo with the Orbit Agent app as the primary frontend, sharing a common Rust backend.
 
-The project has a **dual-backend architecture**: the React frontend can run against either the **Claude backend** (agent-bridge sidecar using Claude Agent SDK) or the **OpenCode backend** (Agent-backend engine, an OpenCode fork). The frontend adapter layer (`apps/agent/src/types/backend/`) abstracts away the differences so both backends present a unified chat experience.
-
-Orbit also ships a standalone product: **Orbit CLI** — a terminal-native AI coding agent forked from OpenCode (`Agent-backend/packages/opencode/`). The CLI runs independently of the Tauri desktop app and powers the three-tier product line: CLI (`orbit`) → Orbit Terminal (native macOS, planned) → Orbit Editor (Tauri IDE).
+The frontend communicates with Claude via the **agent-bridge sidecar** (Bun-compiled Claude Agent SDK wrapper). Orbit is a Claude-only product — do not recreate multi-backend adapter abstractions.
 </project_overview>
 
 <technology_stack>
@@ -54,14 +49,6 @@ Orbit also ships a standalone product: **Orbit CLI** — a terminal-native AI co
 <item>portable-pty for terminal emulation</item>
 <item>Tree-sitter for syntax parsing (planned)</item>
 </backend>
-<engine note="Agent-backend (OpenCode fork)">
-<item>TypeScript + Bun monorepo (Turbo-orchestrated)</item>
-<item>Hono API server with SSE streaming</item>
-<item>AI SDK multi-provider support (Anthropic, OpenAI, Google, Azure, etc.)</item>
-<item>SQLite via Drizzle ORM for session/message storage</item>
-<item>SolidJS + opentui for TUI (terminal UI)</item>
-<item>Built as standalone binary via Bun --compile</item>
-</engine>
 </technology_stack>
 
 <package_manager_policy importance="critical">
@@ -109,8 +96,6 @@ Orbit/
 │   │   │   └── providers/          # Context providers
 │   │   └── index.html
 │   │
-│   ├── Canvas-UI-Builder/          # Canvas UI Builder app (see its CLAUDE.md)
-│   │
 │   └── editor/                     # Editor app (stub)
 │       └── src/
 │
@@ -147,36 +132,14 @@ Orbit/
 │   │   │   │   ├── agent.rs
 │   │   │   │   ├── ai.rs
 │   │   │   │   └── conversations.rs
-│   │   │   ├── canvas/             # Canvas UI Builder commands
-│   │   │   │   ├── setup.rs        # ~/.orbit/canvas directory management
-│   │   │   │   ├── download.rs     # Download shadcn components
-│   │   │   │   ├── save.rs         # Save/export customized components
-│   │   │   │   ├── preview.rs      # Vite preview server lifecycle
-│   │   │   │   └── tests.rs        # Type serialization tests
 │   │   │   └── editor/             # Editor commands (stub)
 │   │   ├── agent/                  # Agent bridge (Rust side)
 │   │   ├── lib.rs
 │   │   └── main.rs
 │   └── tauri.conf.json
 │
-├── Agent-backend/                  # OpenCode engine fork (Orbit CLI + server backend)
-│   ├── packages/
-│   │   ├── opencode/               # Engine core: CLI, API server, agents, tools, sessions
-│   │   │   ├── src/
-│   │   │   │   ├── agent/          # Agent definitions and prompts
-│   │   │   │   ├── provider/       # LLM provider integration (AI SDK)
-│   │   │   │   ├── tool/           # Built-in tools (bash, edit, read, write, etc.)
-│   │   │   │   ├── server/         # Hono API server with routes
-│   │   │   │   ├── session/        # Conversation session management
-│   │   │   │   ├── mcp/            # Model Context Protocol
-│   │   │   │   ├── cli/cmd/tui/    # Terminal UI (SolidJS + opentui)
-│   │   │   │   ├── storage/        # Drizzle ORM + SQLite
-│   │   │   │   └── permission/     # Tool permission system
-│   │   │   └── script/build.ts     # Standalone binary builder
-│   │   ├── sdk/js/                 # Auto-generated TypeScript SDK client
-│   │   ├── plugin/                 # Plugin SDK (@orbit.build/plugin)
-│   │   └── util/                   # Shared utilities
-│   └── learnings.md                # Debugging reference and architecture notes
+├── reference/                      # Non-compiled reference material
+│   └── preserved-oc-components/    # Preserved OpenCode UI components for reuse
 │
 ├── Cargo.toml                      # Rust workspace root
 ├── package.json                    # Bun workspace root (workspaces defined here)
@@ -236,25 +199,16 @@ Orbit/
     <command name="bun run knip:watch" description="Watch mode for continuous dead code detection"/>
   </category>
 
-  <category name="Agent-backend (OpenCode Engine)">
-    <command name="cd Agent-backend/packages/opencode &amp;&amp; bun dev" description="Run CLI/TUI in development mode"/>
-    <command name="cd Agent-backend/packages/opencode &amp;&amp; bun dev serve" description="Run headless API server (port 4096)"/>
-    <command name="cd Agent-backend &amp;&amp; bun turbo typecheck" description="Type check all Agent-backend packages"/>
-    <command name="cd Agent-backend/packages/opencode &amp;&amp; bun test --timeout 30000" description="Run engine tests"/>
-    <command name="bun run build:opencode" description="Build orbit-server binary (cached models)"/>
-    <command name="bun run build:opencode:full" description="Build orbit-server binary (fresh models.dev)"/>
-  </category>
 </commands>
 
 <testing_architecture>
 Different parts of the codebase use different test runners optimized for their runtime:
 
-| Layer         | Location                                                 | Test Runner    | Command                                                          | Config             |
-| ------------- | -------------------------------------------------------- | -------------- | ---------------------------------------------------------------- | ------------------ |
-| Frontend Apps | `apps/agent/`, `apps/Canvas-UI-Builder/`, `apps/editor/` | **Vitest**     | `bun run test`                                                   | `vitest.config.ts` |
-| Agent Bridge  | `agent-bridge/`                                          | **Bun Test**   | `cd agent-bridge && bun test`                                    | Native Bun         |
-| Agent-backend | `Agent-backend/packages/opencode/`                       | **Bun Test**   | `cd Agent-backend/packages/opencode && bun test --timeout 30000` | Native Bun         |
-| Rust Backend  | `crates/`, `src-tauri/`                                  | **Cargo Test** | `cargo test`                                                     | `Cargo.toml`       |
+| Layer         | Location                      | Test Runner    | Command                       | Config             |
+| ------------- | ----------------------------- | -------------- | ----------------------------- | ------------------ |
+| Frontend Apps | `apps/agent/`, `apps/editor/` | **Vitest**     | `bun run test`                | `vitest.config.ts` |
+| Agent Bridge  | `agent-bridge/`               | **Bun Test**   | `cd agent-bridge && bun test` | Native Bun         |
+| Rust Backend  | `crates/`, `src-tauri/`       | **Cargo Test** | `cargo test`                  | `Cargo.toml`       |
 
 <frontend_test_setup>
 Vitest + jsdom. Test files: `apps/*/src/**/*.test.{ts,tsx}`. ESLint has relaxed `no-unsafe-*` rules for test files (Vitest 4 + ESLint projectService incompatibility). See `eslint.config.ts`.
@@ -285,7 +239,6 @@ Starts everything: Vite (5176) + Tauri + Rust
 <change type="Rust" location="src-tauri/" behavior="Auto-rebuilds, restarts app"/>
 <change type="Rust crates" location="crates/" behavior="Auto-rebuilds, restarts app"/>
 <change type="agent-bridge" location="agent-bridge/" behavior="Manual rebuild required"/>
-<change type="Agent-backend" location="Agent-backend/" behavior="Manual rebuild required: bun run build:opencode, then restart Tauri"/>
 </hot_reload_behavior>
 
 <agent_bridge_sidecar importance="high">
@@ -452,7 +405,7 @@ This project includes AI coding assistant skills adapted from Vercel's agent-ski
 </module_organization_patterns>
 
 <dead_code_analysis tool="knip" config="knip.config.ts">
-Knip scans for unused files, dependencies, and exports. Key: `apps/agent`, `apps/Canvas-UI-Builder`, `apps/editor` are NOT real Bun workspaces — they share root `package.json`. Only `apps/common`, `packages/shared-schemas`, and `agent-bridge` are real workspaces.
+Knip scans for unused files, dependencies, and exports. Key: `apps/agent`, `apps/editor` are NOT real Bun workspaces — they share root `package.json`. Only `apps/common`, `packages/shared-schemas`, and `agent-bridge` are real workspaces.
 <known_exceptions>CSS-only deps (tailwindcss, tw-animate-css), @orbit/common (tsconfig alias), agent-bridge (excluded).</known_exceptions>
 </dead_code_analysis>
 
@@ -498,114 +451,9 @@ ReDoS in UriTemplate class. No patch available. Low practical risk (local sideca
 
 <css_architecture importance="high">
 Unified color system: `apps/agent/src/globals.css` is the SINGLE SOURCE OF TRUTH for all colors (oklch).
-Canvas imports agent's globals — NEVER define :root color variables in canvas globals.css.
 To add new colors: add to agent globals.css (both :root and html.dark), add Tailwind @theme mapping.
-<reference>See apps/agent/CLAUDE.md "CSS & Styling" for color values and apps/Canvas-UI-Builder/CLAUDE.md for canvas-specific notes.</reference>
+<reference>See apps/agent/CLAUDE.md "CSS & Styling" for color values.</reference>
 </css_architecture>
-
-<canvas_ui_builder>
-Visual component customization tool (browse, customize, export shadcn/ui components).
-Three-panel layout: Left Sidebar (component library) | Preview Panel (live Vite preview) | Inspector Panel (props editor).
-First-run setup via CanvasSetupWizard initializes ~/.orbit/canvas/ with shadcn components + Vite preview server.
-Rust commands in src-tauri/src/commands/canvas/. Frontend in apps/Canvas-UI-Builder/src/.
-<reference>See apps/Canvas-UI-Builder/CLAUDE.md for full details.</reference>
-</canvas_ui_builder>
-
-<backend_adapter_system importance="high">
-The frontend supports two interchangeable AI backends via a typed adapter layer.
-
-<capability_comparison>
-| Feature | Claude Backend | OpenCode Backend |
-| -------------------- | ----------------- | ----------------- |
-| Rewind | fork (JSONL) | revert (SQLite) |
-| Plan Mode | yes | yes |
-| Accept Mode | yes | no |
-| Thinking Mode | yes | no |
-| Effort Level | yes | no |
-| Model Selector | claude-models | provider-models |
-| Title Generation | agent-bridge | server-side |
-| Storage | JSONL files | SQLite |
-| Worktree Isolation | yes | no |
-| Session Sharing | no | yes |
-| Subagents | yes | yes |
-</capability_comparison>
-
-<switching_backends>
-Users switch backends in Settings. The `BackendStore` persists the choice. When switching to OpenCode, Tauri spawns the `orbit-server` sidecar binary (port 4096-4196) and the frontend connects via HTTP + SSE. The adapter layer ensures all UI components (chat, sidebar, tools) work identically regardless of backend.
-</switching_backends>
-
-<key_files>
-<file path="apps/agent/src/types/backend/adapter.ts" purpose="BackendId type, capability definitions"/>
-<file path="apps/agent/src/types/backend/conversation-repository.ts" purpose="Storage-agnostic conversation interface"/>
-<file path="apps/agent/src/types/backend/conversation-ui-bridge.ts" purpose="UI-level conversation operations"/>
-<file path="apps/agent/src/stores/backend/backend-store.ts" purpose="Active backend state (persisted)"/>
-<file path="apps/agent/src/hooks/chat/use-oc-chat-adapter.ts" purpose="OpenCode message → Orbit ChatMessage transform"/>
-<file path="apps/agent/src/services/opencode/" purpose="OpenCode client, SSE manager, session service"/>
-<file path="apps/agent/src/stores/opencode/" purpose="OpenCode-specific stores (session, message, permission)"/>
-</key_files>
-</backend_adapter_system>
-
-<orbit_cli importance="high">
-Orbit CLI is a standalone AI coding agent — an OpenCode fork living at `Agent-backend/packages/opencode/`.
-
-<product_tiers>
-| Tier | Product | Description | Status |
-| ---------------- | ---------------- | ------------------------------------------------------ | ------------ |
-| CLI | **Orbit CLI** | Terminal-native agent (`orbit` binary) | **Active** |
-| Terminal App | Orbit Terminal | Native macOS app (Ghostty fork + OpenCode TUI) | **Planned** |
-| Desktop IDE | Orbit Editor | Tauri desktop app (this monorepo) | **Active** |
-</product_tiers>
-
-<philosophy>
-"The agent IS the product, not the UI. With agents doing the work, the UI doesn't matter — what matters is the work getting done." Same engine, three shells.
-</philosophy>
-
-<binary_names>
-The OpenCode engine has been partially rebranded to Orbit:
-
-- CLI binary: dual entry points `opencode` and `orbit` in package.json
-- Tauri sidecar: built as `orbit-server-{target-triple}` (e.g., `orbit-server-aarch64-apple-darwin`)
-- Data directory: `~/.local/share/orbit/` (server mode) or `~/.local/share/opencode/` (standalone CLI)
-- Log files: `~/.local/share/orbit/log/` (Tauri-spawned) or `~/.local/share/opencode/log/` (standalone)
-  </binary_names>
-
-<npm_packages>
-Two packages are published to npm under the `@orbit.build` scope (account: `orbit-ai`, npmjs.com):
-
-| Package               | Version | Purpose                                                            |
-| --------------------- | ------- | ------------------------------------------------------------------ |
-| `@orbit.build/sdk`    | 0.0.5   | Auto-generated API client (typed fetch wrapper, zero runtime deps) |
-| `@orbit.build/plugin` | 0.0.5   | Plugin extension API (TypeScript types + Zod tool factory)         |
-
-The engine writes `@orbit.build/plugin` into user `.orbit/package.json` files and runs `bun install`. Both must exist on npm for user installs to work. SDK must be published before plugin (dependency). License: UNLICENSED (proprietary). See `docs/development/NPM-PUBLISH-GUIDE.md` for publish workflow.
-</npm_packages>
-
-<tauri_integration>
-The build script (`scripts/build-opencode.ts`) compiles the engine to a standalone binary and copies it to `src-tauri/binaries/orbit-server-{target-triple}`. Tauri spawns it as a sidecar process:
-
-1. Scans TCP ports 4096-4196 for availability
-2. Starts `orbit-server serve --port {port}`
-3. Health-checks `GET http://127.0.0.1:{port}/global/health` (40 retries, 250ms apart)
-4. Frontend connects via HTTP API + SSE for streaming
-
-Rust files: `src-tauri/src/opencode/process.rs` (lifecycle), `src-tauri/src/commands/opencode/lifecycle.rs` (Tauri commands)
-</tauri_integration>
-
-<code_quality_note>
-Agent-backend has significantly looser code quality than the main Orbit codebase: no ESLint, 136 `any` usages, 20 `@ts-ignore`, `console.log` throughout. `noUncheckedIndexedAccess` is disabled. Treat as a separate quality tier — don't apply Orbit's strict rules when working in Agent-backend. See `Agent-backend/CLAUDE.md` for full details.
-</code_quality_note>
-
-<debugging_reference>
-See `Agent-backend/learnings.md` for:
-
-- TUI debug logging (`bun dev --print-logs 2>>/tmp/opencode-debug.log`)
-- Server log locations and grep patterns
-- SolidJS reactivity gotchas (Dynamic subtree recreation, createMemo scope)
-- Message streaming architecture
-- Provider URL resolution chain
-- Prompt loop exit conditions
-  </debugging_reference>
-  </orbit_cli>
 
 <feature_documentation location="docs/">
 <index file="docs/CLAUDE.md" rule="When adding, removing, or moving files in docs/, update docs/CLAUDE.md to keep the index in sync."/>
@@ -617,11 +465,11 @@ See `Agent-backend/learnings.md` for:
 <plan_tracking importance="critical">
 Plans live in `docs/plans/` with this structure:
 
-| Folder            | Purpose                                                                                                                                                                                                |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `tracked/todo/`   | Plans queued for implementation                                                                                                                                                                        |
-| `tracked/done/`   | Completed plans                                                                                                                                                                                        |
-| `others/<topic>/` | Uncategorized plans grouped by topic (browser, canvas, vault, file-system, diffs-and-code, sessions, worktree, ui-and-animations, skills-marketplace, agent, architecture, auth, navigation, feedback) |
+| Folder            | Purpose                                                                                                                                                                                                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `tracked/todo/`   | Plans queued for implementation                                                                                                                                                                              |
+| `tracked/done/`   | Completed plans                                                                                                                                                                                              |
+| `others/<topic>/` | Uncategorized plans grouped by topic (browser, vault, file-system, diffs-and-code, sessions, worktree, ui-and-animations, skills-marketplace, agent, architecture, auth, navigation, feedback, terminal-app) |
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If the user confirms (or says the plan is done/shipped/complete), move the plan file from its current location to `docs/plans/tracked/done/` and update `docs/CLAUDE.md` index accordingly. If the user doesn't respond to the prompt, move it anyway — default to marking done after successful implementation.
 </plan_tracking>
@@ -646,15 +494,13 @@ Search SDK docs whenever working on agent-bridge, SDK integration, permissions, 
 
 <changelog>
   <period date="March 2026">
-    <entry>Backend adapter system - Dual-backend architecture (Claude + OpenCode) with typed capability layer</entry>
-    <entry>Agent-backend integration - OpenCode engine fork as Tauri sidecar (orbit-server binary)</entry>
-    <entry>Orbit CLI - Standalone AI coding agent product (OpenCode fork, three-tier product line)</entry>
+    <entry>Removed OpenCode backend, Canvas UI Builder, and dual-backend adapter system — Orbit is now Claude-only</entry>
+    <entry>Preserved OpenCode UI components in reference/preserved-oc-components/ for future reuse</entry>
   </period>
   <period date="February 2026">
     <entry>Knip dead code analysis - Fixed config for non-standard monorepo workspace structure</entry>
   </period>
   <period date="January 2026">
-    <entry>Canvas UI Builder - Visual component builder with shadcn/ui (Rust backend + React frontend)</entry>
     <entry>Agent Skills - Vercel's react-best-practices and web-design-guidelines</entry>
     <entry>Embedded browser - WebKit via Tauri multiwebview</entry>
     <entry>pnpm to Bun migration</entry>

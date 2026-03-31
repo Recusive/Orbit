@@ -21,10 +21,6 @@ vi.hoisted(() => {
   });
 });
 
-vi.mock('@canvas/CanvasApp', () => ({
-  CanvasApp: () => <div data-testid="canvas-mode" />,
-}));
-
 vi.mock('@editor/EditorApp', () => ({
   EditorApp: () => <div data-testid="editor-mode" />,
 }));
@@ -147,12 +143,6 @@ vi.mock('@/hooks/core/use-crash-check', () => ({
   }),
 }));
 
-vi.mock('@/hooks/opencode/use-opencode-lifecycle', () => ({
-  useOpencodeLifecycle: (): void => {
-    /* noop */
-  },
-}));
-
 vi.mock('@/hooks/ui/use-fullscreen', () => ({
   useFullscreen: () => false,
 }));
@@ -219,15 +209,5 @@ describe('App settings surface', () => {
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
     expect(screen.getByTestId('editor-mode')).toBeInTheDocument();
     expect(useUIStore.getState().activeTab).toBe('editor');
-  });
-
-  it('renders the settings page over canvas mode without switching tabs', async () => {
-    useUIStore.setState({ activeTab: 'canvas' });
-
-    render(<App />);
-
-    expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
-    expect(screen.getByTestId('canvas-mode')).toBeInTheDocument();
-    expect(useUIStore.getState().activeTab).toBe('canvas');
   });
 });

@@ -148,23 +148,4 @@ describe('Claude /compact backward compatibility', () => {
 
     expect(useChatStore.getState().activeCompactions['claude-session']).toBeUndefined();
   });
-
-  it('does not settle OpenCode compactions on agent:compact_complete', async () => {
-    useChatStore.getState().markCompacting('oc-session', {
-      backend: 'opencode',
-      messageId: 'user-message',
-      status: 'pending',
-    });
-
-    act(() => {
-      chatMessageService.handleMessage(makeCompactComplete('oc-session'));
-    });
-    await vi.advanceTimersByTimeAsync(500);
-
-    expect(useChatStore.getState().activeCompactions['oc-session']).toEqual({
-      backend: 'opencode',
-      messageId: 'user-message',
-      status: 'pending',
-    });
-  });
 });

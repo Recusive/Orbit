@@ -1,7 +1,5 @@
 import { captureSnapshot, destroyNavigationTracker, initNavigationTracker } from '@/lib/navigation';
-import { useBackendStore } from '@/stores/backend';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
-import { useOcSessionStore } from '@/stores/opencode';
 import { useNavigationStore } from '@/stores/ui/navigation-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -31,19 +29,6 @@ function resetStores(): void {
     pendingGoto: null,
     wordWrap: false,
   });
-  useBackendStore.setState({
-    activeBackend: 'claude',
-    opencodePort: null,
-    opencodeHealthy: false,
-    switchingBackend: false,
-  });
-  useOcSessionStore.setState({
-    sessions: {},
-    activeSessionId: null,
-    sessionStatuses: {},
-    sessionErrors: {},
-    pendingSendSessions: {},
-  });
   useNavigationStore.setState(useNavigationStore.getInitialState(), true);
 }
 
@@ -65,7 +50,7 @@ describe('navigation-tracker', () => {
     mockGetActiveSessionId.mockReturnValue('session-42');
     useUIStore.setState({
       workspacePath: '/workspace',
-      activeTab: 'canvas',
+      activeTab: 'editor',
       settingsOpen: true,
       settingsSection: 'appearance',
       terminalPosition: 'chat',
@@ -105,7 +90,7 @@ describe('navigation-tracker', () => {
     });
 
     expect(captureSnapshot()).toMatchObject({
-      activeTab: 'canvas',
+      activeTab: 'editor',
       settingsOpen: true,
       settingsSection: 'appearance',
       terminalPosition: 'chat',
@@ -140,24 +125,5 @@ describe('navigation-tracker', () => {
     expect(state.history[2]?.openTabs).toEqual([
       { path: '/workspace/app.ts', viewMode: 'file', fileType: 'text' },
     ]);
-  });
-
-  it('treats backend changes as history boundaries and reseeds after the switch', () => {
-    useUIStore.setState({ workspacePath: '/workspace' });
-
-    initNavigationTracker();
-    vi.advanceTimersByTime(300);
-
-    useUIStore.getState().setActiveTab('editor');
-    vi.advanceTimersByTime(300);
-    expect(useNavigationStore.getState().history).toHaveLength(2);
-
-    useBackendStore.getState().setBackend('opencode');
-    vi.advanceTimersByTime(300);
-
-    const state = useNavigationStore.getState();
-    expect(state.history).toHaveLength(1);
-    expect(state.currentIndex).toBe(0);
-    expect(state.history[0]?.activeTab).toBe('editor');
   });
 });

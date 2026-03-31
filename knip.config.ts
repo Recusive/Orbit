@@ -3,7 +3,7 @@ import type { KnipConfig } from 'knip';
 /**
  * Knip configuration for Orbit monorepo
  *
- * Key structural insight: apps/agent, apps/Canvas-UI-Builder, and apps/editor
+ * Key structural insight: apps/agent and apps/editor
  * are NOT real workspaces (no package.json). They live under the root workspace
  * and share root dependencies. Only apps/common, packages/shared-schemas, and
  * agent-bridge are real Bun workspaces.
@@ -17,19 +17,17 @@ import type { KnipConfig } from 'knip';
 const config: KnipConfig = {
   workspaces: {
     // ── Root workspace ────────────────────────────────────────────────────
-    // apps/agent, apps/Canvas-UI-Builder, apps/editor don't have their own
+    // apps/agent and apps/editor don't have their own
     // package.json, so we include their source files in the root workspace.
     // This lets knip trace their imports against root package.json deps.
     '.': {
       entry: [
         // App entry points (these start the dependency graph)
         'apps/agent/src/main.tsx',
-        'apps/Canvas-UI-Builder/src/main.tsx',
         'apps/editor/src/main.tsx',
       ],
       project: [
         'apps/agent/src/**/*.{ts,tsx}',
-        'apps/Canvas-UI-Builder/src/**/*.{ts,tsx}',
         'apps/editor/src/**/*.{ts,tsx}',
         'vite-plugins/**/*.ts',
         'scripts/**/*.ts',
@@ -38,7 +36,6 @@ const config: KnipConfig = {
       // Without this, `@orbit/common` imports appear as "unlisted dependencies".
       paths: {
         '@/*': ['apps/agent/src/*'],
-        '@canvas/*': ['apps/Canvas-UI-Builder/src/*'],
         '@editor/*': ['apps/editor/src/*'],
         '@orbit/common': ['apps/common/src/index.ts'],
         '@orbit/common/*': ['apps/common/src/*'],

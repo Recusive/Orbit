@@ -80,7 +80,7 @@ export type ActivityTab = 'file' | 'source' | 'browser';
 export type BottomPanelTab = 'terminal' | 'problems';
 
 // Header tabs (main app view)
-export type HeaderTab = 'agent' | 'editor' | 'canvas';
+export type HeaderTab = 'agent' | 'editor';
 
 interface UIState {
   // Container dimensions (from VS Code editor layout)

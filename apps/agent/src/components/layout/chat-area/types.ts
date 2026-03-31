@@ -2,7 +2,6 @@ import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { PermissionRequest, UsageData } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
-import type { OcQuestionAnswer, OcQuestionRequest } from '@/types/opencode';
 import type {
   EffortLevel,
   InputMode,
@@ -29,8 +28,6 @@ export interface ChatContentProps {
   readonly queuedMessage: QueuedMessage | null;
   /** Pending permission requests */
   readonly pendingPermissions: readonly PermissionRequest[];
-  /** Pending OpenCode question requests */
-  readonly questions?: readonly OcQuestionRequest[];
   /** Current input mode */
   readonly inputMode: InputMode;
   /** Current thinking mode */
@@ -65,8 +62,6 @@ export interface ChatContentProps {
     answers?: Record<string, string>
   ) => void;
   readonly onPermissionDeny: (requestId: string) => void;
-  readonly onQuestionReply?: (requestId: string, answers: OcQuestionAnswer[]) => Promise<void>;
-  readonly onQuestionReject?: (requestId: string) => Promise<void>;
   /** Optional controls rendered above ChatInput */
   readonly extraControls?: React.ReactNode;
 }

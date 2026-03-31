@@ -12,7 +12,6 @@ import { AskUserQuestionModal } from './ask-user-question-modal';
 import { ContextChips } from './context-chips';
 import { LexicalChatEditor } from './lexical';
 import { MentionPopover } from './mention-popover';
-import { OcQuestionModal } from './oc-question-modal';
 import { SlashCommandPopover } from './slash-command-popover';
 import { useChatInput } from './use-chat-input';
 
@@ -37,11 +36,8 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   usage,
   maxTokens,
   permissions = [],
-  questions,
   onPermissionApprove,
   onPermissionDeny,
-  onQuestionReply,
-  onQuestionReject,
   onSend,
   onStop,
   onModeChange,
@@ -116,9 +112,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 
   // The active AskUserQuestion request (only one at a time — the first)
   const activeAskQuestion = askUserQuestions[0];
-  const activeOcQuestion =
-    questions !== undefined && questions.length > 0 ? questions[0] : undefined;
-  const isQuestionOverlayActive = activeAskQuestion !== undefined || activeOcQuestion !== undefined;
+  const isQuestionOverlayActive = activeAskQuestion !== undefined;
 
   // Build known command names for multi-command highlighting.
   // Includes popover-selected command (explicit state, flicker-free) + all known commands from store.
@@ -199,14 +193,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
             request={activeAskQuestion}
             onApprove={onPermissionApprove}
             onDeny={onPermissionDeny}
-          />
-        ) : activeOcQuestion !== undefined &&
-          onQuestionReply !== undefined &&
-          onQuestionReject !== undefined ? (
-          <OcQuestionModal
-            question={activeOcQuestion}
-            onReply={onQuestionReply}
-            onReject={onQuestionReject}
           />
         ) : (
           <>

@@ -25,12 +25,12 @@ function createCompaction(
 }
 
 function getBaseCompaction(): {
-  backend: 'opencode' | 'claude';
+  backend: 'claude';
   messageId: string;
   status: 'pending' | 'timed_out';
 } {
   return {
-    backend: 'opencode',
+    backend: 'claude',
     messageId: 'message-1',
     status: 'pending',
   };
@@ -143,28 +143,17 @@ describe('ChatStore per-session compaction state', () => {
     });
   });
 
-  it('clears compactions for only the requested backend', () => {
-    useChatStore
-      .getState()
-      .markCompacting(
-        'session-1',
-        createCompaction({ backend: 'opencode', messageId: 'message-1' })
-      );
+  it('clears compactions for the claude backend', () => {
     useChatStore
       .getState()
       .markCompacting('session-2', createCompaction({ backend: 'claude', messageId: 'message-2' }));
     useChatStore
       .getState()
-      .markCompacting(
-        'session-3',
-        createCompaction({ backend: 'opencode', messageId: 'message-3' })
-      );
+      .markCompacting('session-3', createCompaction({ backend: 'claude', messageId: 'message-3' }));
 
-    useChatStore.getState().clearCompactionsByBackend('opencode');
+    useChatStore.getState().clearCompactionsByBackend('claude');
 
-    expect(useChatStore.getState().activeCompactions).toEqual({
-      'session-2': createCompaction({ backend: 'claude', messageId: 'message-2' }),
-    });
+    expect(useChatStore.getState().activeCompactions).toEqual({});
   });
 
   it('keeps a newer compaction intact when an older timeout fires later', () => {

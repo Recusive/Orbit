@@ -2,7 +2,6 @@ import { fireEvent, render, screen } from '@testing-library/react';
 
 import type { ChatInputProps, UseChatInputReturn } from '@/components/chat/input/types';
 import type { PermissionRequest } from '@/stores/agent/tool-store';
-import type { OcQuestionRequest } from '@/types/opencode';
 import type { ReactNode } from 'react';
 
 const mockUseChatInput = vi.fn<() => UseChatInputReturn>();
@@ -35,10 +34,6 @@ vi.mock('@/components/chat/input/slash-command-popover', () => ({
 
 vi.mock('@/components/chat/input/ask-user-question-modal', () => ({
   AskUserQuestionModal: () => <div data-testid="ask-user-question-modal" />,
-}));
-
-vi.mock('@/components/chat/input/oc-question-modal', () => ({
-  OcQuestionModal: () => <div data-testid="oc-question-modal" />,
 }));
 
 vi.mock('@/components/browser', () => ({
@@ -124,8 +119,6 @@ function createProps(overrides: Partial<ChatInputProps> = {}): ChatInputProps {
     permissions: [],
     onPermissionApprove: vi.fn(),
     onPermissionDeny: vi.fn(),
-    onQuestionReply: vi.fn().mockResolvedValue(undefined),
-    onQuestionReject: vi.fn().mockResolvedValue(undefined),
     onSend: vi.fn(),
     onStop: vi.fn(),
     onModeChange: vi.fn(),
@@ -144,23 +137,6 @@ function createPermission(overrides: Partial<PermissionRequest> = {}): Permissio
     toolInput: {},
     createdAt: Date.now(),
     supportsAlwaysAllow: true,
-    ...overrides,
-  };
-}
-
-function createQuestion(overrides: Partial<OcQuestionRequest> = {}): OcQuestionRequest {
-  return {
-    id: 'question-1',
-    sessionID: 'session-1',
-    questions: [
-      {
-        header: 'Header',
-        question: 'Need extra input',
-        options: [{ label: 'Option A', description: 'A' }],
-        multiple: false,
-        custom: true,
-      },
-    ],
     ...overrides,
   };
 }
@@ -193,22 +169,35 @@ describe('ChatInput question shortcut suppression', () => {
     expect(onPermissionDeny).toHaveBeenCalledWith('permission-1');
   });
 
-  it('suppresses regular permission shortcuts while an OpenCode question overlay is active', () => {
+  it('suppresses regular permission shortcuts while an AskUserQuestion overlay is active', () => {
     const onPermissionApprove = vi.fn();
     const onPermissionDeny = vi.fn();
 
     render(
       <ChatInput
         {...createProps({
-          permissions: [createPermission()],
-          questions: [createQuestion()],
+          permissions: [
+            createPermission(),
+            createPermission({
+              requestId: 'question-permission',
+              toolName: 'AskUserQuestion',
+              toolInput: {
+                questions: [
+                  {
+                    question: 'Need extra input',
+                    options: [{ label: 'Option A', description: 'A' }],
+                  },
+                ],
+              },
+            }),
+          ],
           onPermissionApprove,
           onPermissionDeny,
         })}
       />
     );
 
-    expect(screen.getByTestId('oc-question-modal')).toBeInTheDocument();
+    expect(screen.getByTestId('ask-user-question-modal')).toBeInTheDocument();
 
     fireEvent.keyDown(document, { key: 'Enter' });
     fireEvent.keyDown(document, { key: 'Escape' });
@@ -220,8 +209,21 @@ describe('ChatInput question shortcut suppression', () => {
   it('restores permission shortcuts after the question overlay is cleared', () => {
     const onPermissionApprove = vi.fn();
     const props = createProps({
-      permissions: [createPermission()],
-      questions: [createQuestion()],
+      permissions: [
+        createPermission(),
+        createPermission({
+          requestId: 'question-permission',
+          toolName: 'AskUserQuestion',
+          toolInput: {
+            questions: [
+              {
+                question: 'Need extra input',
+                options: [{ label: 'Option A', description: 'A' }],
+              },
+            ],
+          },
+        }),
+      ],
       onPermissionApprove,
     });
 

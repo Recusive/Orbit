@@ -4,17 +4,15 @@
 
 ## Overview
 
-Shared frontend utilities used by all apps (agent, Canvas-UI-Builder, editor). This is a **real Bun workspace package** (`@orbit/common`) with explicit exports — not just a directory.
+Shared frontend utilities used by all apps (agent, editor). This is a **real Bun workspace package** (`@orbit/common`) with explicit exports — not just a directory.
 
 ## Exports
 
-| Path                         | Exports                                                                            | Used By                                                            |
-| ---------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `@orbit/common/lib`          | `createLogger`, `Logger`, log levels                                               | **Everywhere** — stores, hooks, components, services, stress tests |
-| `@orbit/common/utils`        | `cn()` (clsx + tailwind-merge)                                                     | Any component with conditional class names                         |
-| `@orbit/common/testing`      | `createMockInvoke()`, `mockTauriCommand()`, `resetTauriMocks()`                    | Vitest test setup (`vitest.setup.ts`)                              |
-| `@orbit/common/hooks/canvas` | `useCanvas()`                                                                      | Canvas-UI-Builder app (Tauri canvas agent integration)             |
-| `@orbit/common/types/canvas` | `CanvasPositionSchema`, `CanvasNodeTypeSchema`, `PageLayoutSchema`, viewport enums | Canvas types and Zod schemas                                       |
+| Path                    | Exports                                                         | Used By                                                            |
+| ----------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `@orbit/common/lib`     | `createLogger`, `Logger`, log levels                            | **Everywhere** — stores, hooks, components, services, stress tests |
+| `@orbit/common/utils`   | `cn()` (clsx + tailwind-merge)                                  | Any component with conditional class names                         |
+| `@orbit/common/testing` | `createMockInvoke()`, `mockTauriCommand()`, `resetTauriMocks()` | Vitest test setup (`vitest.setup.ts`)                              |
 
 ## Logger
 

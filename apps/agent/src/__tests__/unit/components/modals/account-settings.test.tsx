@@ -20,7 +20,6 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 import { AccountSettings } from '@/components/modals/settings/pages/AccountSettings';
 import { useAuthStore } from '@/stores/agent/auth-store';
-import { useBackendStore } from '@/stores/backend';
 
 interface MockState {
   preferredMethod: 'oauth' | 'apikey' | null;
@@ -64,12 +63,6 @@ const mockState: MockState = {
 
 function resetStores(): void {
   useAuthStore.setState(useAuthStore.getInitialState(), true);
-  useBackendStore.setState({
-    activeBackend: 'claude',
-    opencodePort: null,
-    opencodeHealthy: false,
-    switchingBackend: false,
-  });
 }
 
 function renderAccountSettings(): void {
@@ -172,21 +165,5 @@ describe('AccountSettings', () => {
     await waitFor(() => {
       expect(mockInvoke).toHaveBeenCalledWith('set_preferred_auth_method', { method: 'apikey' });
     });
-  });
-
-  it('hides the auth method picker when the OpenCode backend is active', async () => {
-    useBackendStore.setState({
-      activeBackend: 'opencode',
-      opencodePort: 4173,
-      opencodeHealthy: true,
-      switchingBackend: false,
-    });
-
-    renderAccountSettings();
-    await waitFor(() => {
-      expect(mockInvoke).toHaveBeenCalledWith('get_preferred_auth_method');
-    });
-
-    expect(screen.queryByRole('radiogroup', { name: /Claude authentication method/i })).toBeNull();
   });
 });

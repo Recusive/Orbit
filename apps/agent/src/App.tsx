@@ -1,4 +1,3 @@
-import { CanvasApp } from '@canvas/CanvasApp';
 import { EditorApp } from '@editor/EditorApp';
 import { EditorChatPanel } from '@editor/components/EditorChatPanel';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
@@ -32,7 +31,6 @@ import { useBrowser } from '@/hooks/browser/use-browser';
 import { useAutoUpdate } from '@/hooks/core/use-auto-update';
 import { useCrashCheck } from '@/hooks/core/use-crash-check';
 import { usePreloadSFSymbols } from '@/hooks/core/use-preload-sf-symbols';
-import { useOpencodeLifecycle } from '@/hooks/opencode/use-opencode-lifecycle';
 import { useFullscreen } from '@/hooks/ui/use-fullscreen';
 import { useTrafficLights } from '@/hooks/ui/use-traffic-lights';
 import { destroyNavigationTracker, initNavigationTracker } from '@/lib/navigation';
@@ -203,14 +201,12 @@ function applyDemoView(view: string, scenario: string): (() => void) | undefined
  */
 interface MountedTabsState {
   agent: boolean;
-  canvas: boolean;
   editor: boolean;
 }
 
 function useMountedTabs(activeTab: HeaderTab): MountedTabsState {
   const [mounted, setMounted] = useState<MountedTabsState>(() => ({
     agent: activeTab === 'agent',
-    canvas: activeTab === 'canvas',
     editor: activeTab === 'editor',
   }));
 
@@ -233,7 +229,6 @@ function useMountedTabs(activeTab: HeaderTab): MountedTabsState {
 /** Display labels for each mode - hoisted to avoid recreation on each render */
 const MODE_LABELS: Record<HeaderTab, string> = {
   agent: 'Agent',
-  canvas: 'Canvas',
   editor: 'Editor',
 } as const;
 
@@ -359,13 +354,6 @@ const AgentMode: FC = () => {
 };
 
 /**
- * Canvas mode - design canvas powered by CanvasApp
- */
-const CanvasMode: FC = () => {
-  return <CanvasApp />;
-};
-
-/**
  * Editor mode - VS Code-style code editor with AI chat sidebar
  */
 const EditorMode: FC = () => {
@@ -376,7 +364,6 @@ const App: FC = () => {
   useBrowser(); // Handle browser messages from Tauri backend
   useAutoUpdate(); // Check for app updates on mount + periodic interval
   usePreloadSFSymbols(); // Pre-warm SF Symbol cache before workspace UI mounts
-  useOpencodeLifecycle();
   const { hasCrash, crashLog, dismiss, acknowledge } = useCrashCheck();
   const [crashDialogOpen, setCrashDialogOpen] = useState(true);
 
@@ -466,7 +453,7 @@ const App: FC = () => {
       }
 
       const tabParam = params.get('tab');
-      if (tabParam === 'agent' || tabParam === 'editor' || tabParam === 'canvas') {
+      if (tabParam === 'agent' || tabParam === 'editor') {
         uiStore.setActiveTab(tabParam);
       }
 
@@ -954,27 +941,6 @@ const App: FC = () => {
                                   )}
                                 >
                                   <AgentMode />
-                                </ErrorBoundary>
-                              </div>
-                            ) : null}
-                            {/* Canvas mode - mounted on first visit, kept alive */}
-                            {mounted.canvas ? (
-                              <div
-                                className="h-full w-full"
-                                style={
-                                  activeTab === 'canvas' ? STYLE_DISPLAY_BLOCK : STYLE_DISPLAY_NONE
-                                }
-                              >
-                                <ErrorBoundary
-                                  fallback={(error, reset) => (
-                                    <ModeErrorFallback
-                                      mode="canvas"
-                                      error={error}
-                                      onReset={reset}
-                                    />
-                                  )}
-                                >
-                                  <CanvasMode />
                                 </ErrorBoundary>
                               </div>
                             ) : null}

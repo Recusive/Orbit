@@ -32,7 +32,6 @@ export const ChatContent: FC<ChatContentProps> = ({
   sessionId,
   queuedMessage,
   pendingPermissions,
-  questions,
   inputMode,
   thinkingMode,
   effortLevel,
@@ -51,8 +50,6 @@ export const ChatContent: FC<ChatContentProps> = ({
   onModelChange,
   onPermissionApprove,
   onPermissionDeny,
-  onQuestionReply,
-  onQuestionReject,
   extraControls,
 }) => {
   const vaultOpen = useVaultOpen();
@@ -75,9 +72,6 @@ export const ChatContent: FC<ChatContentProps> = ({
     onThinkingModeChange,
     onEffortChange: onEffortLevelChange,
     onModelChange,
-    ...(questions !== undefined ? { questions } : {}),
-    ...(onQuestionReply !== undefined ? { onQuestionReply } : {}),
-    ...(onQuestionReject !== undefined ? { onQuestionReject } : {}),
   } as const;
 
   return (

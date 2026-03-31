@@ -31,7 +31,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md` — Container-level blur reveal for sidebar view switches: skeleton hold timer, key-based remount, GPU compositing lesson
 - `OVERFLOW-CLIP-VS-HIDDEN.md` — overflow-clip over overflow-hidden for layout containers: prevents scrollIntoView from shifting ContentCard
 
-## architecture/ (12 files)
+## architecture/ (11 files)
 
 - `AUTO-UPDATE.md` — Auto-update pipeline (Tauri updater, signing, CI, Orbit-Release public repo)
 - `TECH-STACK.md` — Complete technology overview
@@ -45,7 +45,6 @@ Use this to find the right file. Read the file directly — no links needed.
 - `INSTANT-THEME-SWITCH.md` — Flash-free instant theme switching
 - `LIQUID-GLASS.md` — Liquid glass visual effect system
 - `tauri-plugins.md` — Tauri 2 plugins reference
-- `ENGINE-MIGRATION.md` — Engine migration: replacing agent-bridge + Agent-backend with Codex (Rust-native, in-process). Feature inventory, gap analysis, Tauri integration architecture, build phases.
 
 ## design/ (7 files)
 
@@ -57,10 +56,9 @@ Use this to find the right file. Read the file directly — no links needed.
 - `COLOR-SYSTEM-REFACTOR.md` — File-by-file color refactor plan (patterns A-J, semantic tokens, verification)
 - `DEAD-CSS-REMOVAL-PLAN.md` — Dead CSS removal plan
 
-## development/ (7 files)
+## development/ (6 files)
 
 - `DEVELOPMENT.md` — Development workflow and setup
-- `NPM-PUBLISH-GUIDE.md` — Publishing @orbit.build/sdk and @orbit.build/plugin to npm (account, 2FA, versioning, troubleshooting)
 - `RELEASE-GUIDE.md` — How to tag, build, and ship a new version (step-by-step)
 - `TROUBLESHOOTING.md` — Common issues and solutions
 - `CI-CD-GUIDE.md` — GitHub Actions CI/CD pipeline
@@ -71,17 +69,14 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (26 entries)
+## plans/tracked/todo/ (20 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `GHOSTTY-WEB-TERMINAL-MIGRATION.md` — Ghostty web terminal migration
 - `IMAGE-ATTACHMENT-TILES.md` — Image attachment tiles
 - `OOM-34K-UNTRACKED-FILES.md` — OOM fix for 34k untracked files
-- `OPENCODE-HOOKS-SYSTEM.md` — OpenCode hooks system
-- `OPENCODE-STRUCTURED-LOGGING.md` — OpenCode structured logging
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
-- `ORBIT-CLI-DISTRIBUTION.md` — Orbit CLI distribution
 - `PIERRE-BG-COLOR-AND-LARGE-DIFF-PERF-FIX.md` — Pierre background color and large diff perf fix
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
 - `USER-PROFILE-SYSTEM-PLAN.md` — User profile system
@@ -92,16 +87,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `browser-navigate-verification-fix.md` — Browser navigate verification fix
 - `browser-reload-url-bar-fix.md` — Browser reload URL bar fix
 - `codebase-cleanup-stubs-lsp-breadcrumbs.md` — Codebase cleanup (stubs, LSP, breadcrumbs)
-- `ghost-commit-file-undo.md` — Ghost commit file undo
 - `indexed-fluttering-lollipop.md` — Indexed fluttering lollipop
 - `ios-runtime-backend-completion.md` — iOS runtime backend completion
 - `kanban-ticket-board.md` — Kanban ticket board
-- `opencode-plan-mode-e2e.md` — OpenCode plan mode end-to-end
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
-- `terminal-app/` — Orbit Terminal: native macOS app (forghostty + Ratatui TUI). Contains:
-  - `ORBIT-CLI-RATATUI-SPEC.md` — **PRIMARY SPEC** — Complete Ratatui CLI spec (Codex fork + orbit-server integration, three-panel layout, "+" inline comments, testing strategy, development phases)
-  - `orbit-terminal-design.md` — Superseded design (SwiftUI sidebar approach)
-  - `orbit-terminal-plan.md` — Superseded plan (SwiftUI implementation tasks)
 
 ## plans/tracked/done/ (44 entries)
 
@@ -161,7 +150,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `architecture/` — Auto-update, multi-window, production readiness, Rust migration, xterm performance
 - `auth/` — OAuth token recovery, stale token fix
 - `browser/` — Screenshot file, agent integration, CSP transport, tools fix
-- `canvas/` — Rust transform, style editing, design token explorer
+- `terminal-app/` — Archived Orbit Terminal plans (engine removed, product on hold)
 - `diffs-and-code/` — Diff performance, diffcard expansion, image preview, line annotations, markdown preview, Pierre diffs
 - `feedback/` — Linear feedback integration
 - `file-system/` — File store refactor, fuzzy search, drag-drop, DS_Store, explorer fixes, git status dots
@@ -182,14 +171,12 @@ Use this to find the right file. Read the file directly — no links needed.
 - `AUDIT-REPORT-2026-01-07.md` — Pre-production code audit
 - `codebase-health.json` — Automated health metrics
 
-## reference/ (6 files)
+## reference/ (4 files)
 
 - `Agent SDK reference - TypeScript.md` — Claude Agent SDK reference
 - `CLAUDE-CODE-REWIND-SYSTEM.md` — Claude Code CLI rewind system (binary analysis, JSONL format, tree model, checkpointing)
 - `codex-cli-guide.md` — OpenAI Codex CLI usage guide
 - `PENCIL-CANVAS-ARCHITECTURE.md` — Pencil design editor architecture (dual-canvas rendering, scene graph, AI streaming generation via MCP)
-- `System-Prompt.xml` — System prompt template
-- `canvas-rebuild-prompt.md` — Canvas rebuild prompt context
 
 ## skills/ (3 files)
 
@@ -203,7 +190,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## strategy/ (1 file)
 
-- `ROADMAP.md` — Product roadmap: three-product vision (CLI, Desktop, Terminal), Codex engine migration phases, feature roadmap, competitive positioning
+- `ROADMAP.md` — Product roadmap, feature roadmap, competitive positioning
 
 ## Conventions
 

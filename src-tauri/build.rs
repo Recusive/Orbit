@@ -38,6 +38,5 @@ fn main() {
     let binary_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
     warn_if_missing(&binary_dir, "agent-bridge", true);
     warn_if_missing(&binary_dir, "claude", true);
-    warn_if_missing(&binary_dir, "orbit-server", false);
     tauri_build::build();
 }

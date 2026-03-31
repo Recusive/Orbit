@@ -6,8 +6,6 @@
 import { ModelSchema, CommandScopeSchema, DecisionSchema } from '@orbit/shared-schemas';
 import { z } from 'zod';
 
-import type { CanvasEdge, CanvasNode } from '../canvas/types/types.js';
-
 // Re-export shared schemas
 export {
   ModelSchema,
@@ -514,36 +512,6 @@ export const ShutdownRequestSchema = z
   .strict();
 export type ShutdownRequest = z.infer<typeof ShutdownRequestSchema>;
 
-// ============================================================================
-// Canvas Schemas
-// ============================================================================
-
-export const CanvasSessionConfigSchema = z
-  .object({
-    sessionId: z.string().optional(),
-    cwd: z.string().optional(),
-    model: z.string().optional(),
-    thinkingEnabled: z.boolean().optional(),
-    planModeEnabled: z.boolean().optional(),
-  })
-  .strict();
-export type CanvasSessionConfig = z.infer<typeof CanvasSessionConfigSchema>;
-
-export const CanvasStateSchema = z
-  .object({
-    // ReactFlow nodes/edges — validated with z.custom to ensure each element is
-    // a non-null object while preserving CanvasNode/CanvasEdge TypeScript types.
-    // Full type definitions live in canvas/types/types.ts; the protocol layer
-    // does loose boundary validation without coupling to ReactFlow internals.
-    // (Code review: Opus cycle 3, issue #9)
-    nodes: z.array(z.custom<CanvasNode>((val) => typeof val === 'object' && val !== null)),
-    edges: z.array(z.custom<CanvasEdge>((val) => typeof val === 'object' && val !== null)),
-    selectedNodeId: z.string().nullable().optional(),
-    selectedNodeType: z.enum(['sandpack', 'page']).optional(),
-  })
-  .strict();
-export type CanvasState = z.infer<typeof CanvasStateSchema>;
-
 export const McpToolResponseSchema = z
   .object({
     requestId: z.string(),
@@ -553,54 +521,6 @@ export const McpToolResponseSchema = z
   })
   .strict();
 export type McpToolResponse = z.infer<typeof McpToolResponseSchema>;
-
-// ============================================================================
-// Canvas Request Schemas
-// ============================================================================
-
-export const CanvasCreateSessionRequestSchema = z
-  .object({
-    type: z.literal('canvas:create_session'),
-    sessionId: z.string(),
-    config: CanvasSessionConfigSchema.optional(),
-  })
-  .strict();
-export type CanvasCreateSessionRequest = z.infer<typeof CanvasCreateSessionRequestSchema>;
-
-export const CanvasDeleteSessionRequestSchema = z
-  .object({
-    type: z.literal('canvas:delete_session'),
-    sessionId: z.string(),
-  })
-  .strict();
-export type CanvasDeleteSessionRequest = z.infer<typeof CanvasDeleteSessionRequestSchema>;
-
-export const CanvasSendMessageRequestSchema = z
-  .object({
-    type: z.literal('canvas:send_message'),
-    sessionId: z.string(),
-    message: z.string(),
-    state: CanvasStateSchema,
-  })
-  .strict();
-export type CanvasSendMessageRequest = z.infer<typeof CanvasSendMessageRequestSchema>;
-
-export const CanvasInterruptRequestSchema = z
-  .object({
-    type: z.literal('canvas:interrupt'),
-    sessionId: z.string(),
-  })
-  .strict();
-export type CanvasInterruptRequest = z.infer<typeof CanvasInterruptRequestSchema>;
-
-export const CanvasToolResponseRequestSchema = z
-  .object({
-    type: z.literal('canvas:tool_response'),
-    sessionId: z.string(),
-    response: McpToolResponseSchema,
-  })
-  .strict();
-export type CanvasToolResponseRequest = z.infer<typeof CanvasToolResponseRequestSchema>;
 
 export const BrowserToolResponseRequestSchema = z
   .object({
@@ -650,11 +570,6 @@ export const BridgeRequestSchema = z.discriminatedUnion('type', [
   EnhanceBugReportRequestSchema,
   GenerateTitleRequestSchema,
   ShutdownRequestSchema,
-  CanvasCreateSessionRequestSchema,
-  CanvasDeleteSessionRequestSchema,
-  CanvasSendMessageRequestSchema,
-  CanvasInterruptRequestSchema,
-  CanvasToolResponseRequestSchema,
   BrowserToolResponseRequestSchema,
 ]);
 export type BridgeRequest = z.infer<typeof BridgeRequestSchema>;

@@ -42,7 +42,6 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./apps/agent/src/*"],
-      "@canvas/*": ["./apps/Canvas-UI-Builder/src/*"],
       "@editor/*": ["./apps/editor/src/*"],
       "@orbit.build/sdk": ["./packages/orbit-sdk/src/v2/index.d.ts"],
       "@orbit.build/sdk/v2": ["./packages/orbit-sdk/src/v2/index.d.ts"],

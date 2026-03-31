@@ -65,10 +65,8 @@ import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, initializeWorkspace, openFileDialog } from '@/lib/api';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import { getConversationUiBridge } from '@/services/conversations';
-import { useActiveBackend } from '@/stores/backend';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
-import { useOcActiveSessionId } from '@/stores/opencode';
 import { useCanGoBack, useCanGoForward, useNavigationStore } from '@/stores/ui';
 import {
   useUIStore,
@@ -110,7 +108,6 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
-  const activeBackend = useActiveBackend();
 
   // Track whether the scrollable area can scroll further down.
   // The bottom fade mask is only applied when there's more content below,
@@ -216,9 +213,7 @@ export const PrimarySidebar: FC = () => {
   const workspacePath = useWorkspacePath();
   const conversations = useConversationList();
   const claudeActiveConversationId = useActiveConversationId();
-  const ocActiveConversationId = useOcActiveSessionId();
-  const activeConversationId =
-    activeBackend === 'claude' ? claudeActiveConversationId : ocActiveConversationId;
+  const activeConversationId = claudeActiveConversationId;
   const worktrees = useWorktrees();
   const activeWorktreePath = useActiveWorktreePath();
   const createWorktreeDialogOpen = useCreateWorktreeDialogOpen();
@@ -329,7 +324,7 @@ export const PrimarySidebar: FC = () => {
         await addRecentProject(path);
         useUIStore.getState().initializeWorkspace(path);
         setRootPath(path);
-        await getConversationUiBridge(activeBackend).hydrateWorkspace({
+        await getConversationUiBridge().hydrateWorkspace({
           workspacePath: path,
           worktreePath: null,
         });
@@ -337,7 +332,7 @@ export const PrimarySidebar: FC = () => {
         logger.error('Failed to open project', err);
       }
     },
-    [activeBackend, setRootPath]
+    [setRootPath]
   );
 
   const handleOpenProject = useCallback(async (): Promise<void> => {

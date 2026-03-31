@@ -1,9 +1,5 @@
-import { IconHammer2 } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconHammer2';
-import { IconMap } from '@central-icons-react/round-outlined-radius-1-stroke-2/IconMap';
-import { ArrowUp, Image, Square, Telescope } from 'lucide-react';
+import { ArrowUp, Image, Square } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
-
-import { OcModelSelector, OcThinkingSelector } from '../oc-control-bar';
 
 import { EffortLevelButton } from './EffortLevelButton';
 import { MoreActionsMenu } from './MoreActionsMenu';
@@ -27,30 +23,6 @@ import { Kbd } from '@/components/ui/kbd';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useContainerWidth } from '@/hooks/ui';
 import { cn, INPUT_CONTROLS, TRANSITION_CLASSES } from '@/lib/utils';
-import { useActiveBackend } from '@/stores/backend';
-import { useOcProviderStore, useOcSelectedModelSupportsImageInput } from '@/stores/opencode';
-import { getCapabilities } from '@/types/backend';
-
-type OcAgent = 'build' | 'plan' | 'explore';
-
-function formatOcAgent(agent: OcAgent): string {
-  return agent.charAt(0).toUpperCase() + agent.slice(1);
-}
-
-function getNextOcAgent(agent: OcAgent): OcAgent {
-  return agent === 'build' ? 'plan' : agent === 'plan' ? 'explore' : 'build';
-}
-
-function getOcAgentTextClass(agent: OcAgent): string {
-  switch (agent) {
-    case 'build':
-      return 'text-primary hover:text-primary hover:bg-primary/10';
-    case 'plan':
-      return 'text-mode-plan hover:text-mode-plan hover:bg-mode-plan/10';
-    case 'explore':
-      return 'text-[#d85ba8] hover:text-[#d85ba8] hover:bg-[#d85ba8]/10';
-  }
-}
 
 export const InputControls: FC<InputControlsProps> = memo(function InputControls({
   inputMode,
@@ -78,39 +50,14 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   getActiveDots,
   getEffortInfo,
 }) {
-  const activeBackend = useActiveBackend();
-  const capabilities = getCapabilities(activeBackend);
-  const ocSupportsImages = useOcSelectedModelSupportsImageInput();
-  const ocAgent = useOcProviderStore((state) => state.selectedAgent);
-  const setOcAgent = useOcProviderStore((state) => state.setSelectedAgent);
-  const ocProviders = useOcProviderStore((state) => state.providers);
-  const ocProviderId = useOcProviderStore((state) => state.selectedProviderId);
-  const ocModelId = useOcProviderStore((state) => state.selectedModelId);
   const isAdaptiveModel = model === 'claude-opus-4-6' || model === 'claude-sonnet-4-6';
   const containerRef = useRef<HTMLDivElement>(null);
   const width = useContainerWidth(containerRef);
-  const showModePicker = activeBackend === 'claude';
-  const showOcAgentPicker = activeBackend === 'opencode';
-  const showOcModelSelector = activeBackend === 'opencode';
-  const ocProvider = ocProviders.find((item) => item.id === ocProviderId) ?? ocProviders[0];
-  const ocModel = ocProvider
-    ? ((ocModelId ? ocProvider.models[ocModelId] : undefined) ??
-      Object.values(ocProvider.models)[0])
-    : undefined;
-  const showOcThinkingSelector =
-    activeBackend === 'opencode' && Object.keys(ocModel?.variants ?? {}).length > 0;
-  const showModelSelector = capabilities.modelSelector === 'claude-models';
-  const showOcModelSeparator = showOcAgentPicker && showOcModelSelector;
-  const showOcThinkingSeparator = showOcAgentPicker && showOcThinkingSelector;
-  const showEffortControl = capabilities.effortLevel && isAdaptiveModel;
-  const showThinkingControl = capabilities.thinkingMode && !isAdaptiveModel;
+  const showEffortControl = isAdaptiveModel;
+  const showThinkingControl = !isAdaptiveModel;
   const showCompactMenu = showEffortControl || showThinkingControl;
   const shouldShowContext = maxTokens > 0;
-  const supportsImages = activeBackend === 'opencode' ? ocSupportsImages : true;
-  const imageTooltip = supportsImages ? 'Attach image' : "This model doesn't support images";
-  const cycleOcAgent = (): void => {
-    setOcAgent(getNextOcAgent(ocAgent));
-  };
+  const imageTooltip = 'Attach image';
 
   // Width is 0 before first measurement; avoid entering compact mode prematurely
   const hasMeasured = width > 0;
@@ -130,79 +77,34 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
       {/* Left Controls - Mode & Model Pickers */}
       <div className="flex items-center gap-0.5">
         {/* Model Picker */}
-        {showModelSelector ? <ModelSelector onModelChange={onModelChange} /> : null}
-        {showModePicker && showModelSelector ? (
-          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
-        ) : null}
+        <ModelSelector onModelChange={onModelChange} />
+        <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
         {/* Mode Picker */}
-        {showModePicker ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={cycleInputMode}
-                aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
-                className={cn(
-                  `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
-                  inputMode === 'default' &&
-                    'bg-transparent text-muted-foreground hover:bg-lg-control-hover hover:text-foreground',
-                  inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
-                  inputMode === 'accept' &&
-                    'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
-                )}
-              >
-                <span className="text-md font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="flex items-center gap-1.5">
-              <span className="leading-none">Input mode</span>
-              <Kbd className="h-[18px] !text-[11px] px-1.5 rounded-[5px] border-transparent bg-white/5 text-inherit">
-                Shift + Tab
-              </Kbd>
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
-        {showOcModelSelector ? <OcModelSelector /> : null}
-        {showOcModelSeparator ? (
-          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
-        ) : null}
-        {showOcThinkingSelector ? <OcThinkingSelector /> : null}
-        {showOcThinkingSeparator ? (
-          <div aria-hidden="true" className="mx-1 h-4 w-px bg-border/60" />
-        ) : null}
-        {showOcAgentPicker ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={cycleOcAgent}
-                aria-label={`Agent mode: ${formatOcAgent(ocAgent)}. Click to change.`}
-                className={cn(
-                  `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
-                  'bg-transparent',
-                  getOcAgentTextClass(ocAgent),
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                )}
-              >
-                {ocAgent === 'build' ? (
-                  <IconHammer2 size={14} aria-hidden="true" />
-                ) : ocAgent === 'plan' ? (
-                  <IconMap size={14} aria-hidden="true" />
-                ) : (
-                  <Telescope className="h-3.5 w-3.5" aria-hidden="true" />
-                )}
-                <span className="max-w-[120px] truncate text-md font-medium">
-                  {formatOcAgent(ocAgent)}
-                </span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent className="flex items-center gap-1.5">
-              <span className="leading-none">Agent mode</span>
-              <Kbd className="h-[18px] !text-[11px] px-1.5 rounded-[5px] border-transparent bg-white/5 text-inherit">
-                Shift + Tab
-              </Kbd>
-            </TooltipContent>
-          </Tooltip>
-        ) : null}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={cycleInputMode}
+              aria-label={`Input mode: ${INPUT_MODE_LABELS[inputMode]}. Click to change.`}
+              className={cn(
+                `h-7 px-2.5 flex items-center gap-1.5 rounded-full ${TRANSITION_CLASSES.button}`,
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50',
+                inputMode === 'default' &&
+                  'bg-transparent text-muted-foreground hover:bg-lg-control-hover hover:text-foreground',
+                inputMode === 'plan' && 'bg-mode-plan/10 text-mode-plan hover:bg-mode-plan/20',
+                inputMode === 'accept' &&
+                  'bg-mode-accept/10 text-mode-accept hover:bg-mode-accept/20'
+              )}
+            >
+              <span className="text-md font-medium">{INPUT_MODE_LABELS[inputMode]}</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent className="flex items-center gap-1.5">
+            <span className="leading-none">Input mode</span>
+            <Kbd className="h-[18px] !text-[11px] px-1.5 rounded-[5px] border-transparent bg-white/5 text-inherit">
+              Shift + Tab
+            </Kbd>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Right Controls - Action Buttons */}
@@ -230,17 +132,13 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 <span className="inline-flex">
                   <button
                     onClick={handleImageClick}
-                    disabled={!supportsImages}
                     aria-label="Attach image"
                     className={cn(
                       'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                      supportsImages
-                        ? 'bg-transparent text-muted-foreground/70'
-                        : 'bg-transparent text-muted-foreground/30 cursor-not-allowed',
-                      supportsImages && TRANSITION_CLASSES.button,
-                      supportsImages &&
-                        'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                      supportsImages && 'active:scale-95',
+                      'bg-transparent text-muted-foreground/70',
+                      TRANSITION_CLASSES.button,
+                      'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
+                      'active:scale-95',
                       'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                     )}
                   >
@@ -280,17 +178,13 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 <span className="inline-flex">
                   <button
                     onClick={handleImageClick}
-                    disabled={!supportsImages}
                     aria-label="Attach image"
                     className={cn(
                       'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                      supportsImages
-                        ? 'bg-transparent text-muted-foreground/70'
-                        : 'bg-transparent text-muted-foreground/30 cursor-not-allowed',
-                      supportsImages && TRANSITION_CLASSES.button,
-                      supportsImages &&
-                        'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                      supportsImages && 'active:scale-95',
+                      'bg-transparent text-muted-foreground/70',
+                      TRANSITION_CLASSES.button,
+                      'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
+                      'active:scale-95',
                       'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
                     )}
                   >

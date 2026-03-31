@@ -56,12 +56,8 @@ export interface MockInvokeFn {
  * @example
  * ```typescript
  * const mockInvoke = createMockInvoke({
- *   'canvas_check_setup': {
- *     initialized: true,
- *     orbit_path: '/test/.orbit/canvas',
- *     component_count: 25,
- *   },
- *   'canvas_download_component': new Error('Network error'),
+ *   'read_file': 'file contents',
+ *   'git_status': { branch: 'main', ahead: 0, behind: 0 },
  * });
  *
  * // Use in test
@@ -139,17 +135,6 @@ export function resetTauriMocks(): void {
  */
 export const mockResponses = {
   /**
-   * Create a mock canvas setup response
-   */
-  canvasSetup: (overrides: Partial<CanvasSetupResponse> = {}): CanvasSetupResponse => ({
-    initialized: false,
-    orbit_path: '/mock/home/.orbit/canvas',
-    component_count: 0,
-    preview_ready: false,
-    ...overrides,
-  }),
-
-  /**
    * Create a mock git status response
    */
   gitStatus: (overrides: Partial<GitStatusResponse> = {}): GitStatusResponse => ({
@@ -187,16 +172,6 @@ export const mockResponses = {
 };
 
 // =============================================================================
-// Response Types (for type safety)
-// =============================================================================
-
-export interface CanvasSetupResponse {
-  readonly initialized: boolean;
-  readonly orbit_path: string;
-  readonly component_count: number;
-  readonly preview_ready: boolean;
-}
-
 export interface GitStatusResponse {
   readonly branch: string;
   readonly ahead: number;

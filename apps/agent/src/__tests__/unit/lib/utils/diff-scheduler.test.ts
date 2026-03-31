@@ -60,9 +60,9 @@ describe('diff-scheduler', () => {
     await Promise.all(promises);
   });
 
-  it('enforces the content lane concurrency limit at 2', async () => {
+  it('enforces the content lane concurrency limit at 4', async () => {
     const scheduler = createDiffScheduler();
-    const deferreds = Array.from({ length: 3 }, () =>
+    const deferreds = Array.from({ length: 5 }, () =>
       createDeferred<{ oldContent: string; newContent: string; isBinary: boolean }>()
     );
     let started = 0;
@@ -74,16 +74,21 @@ describe('diff-scheduler', () => {
       })
     );
 
-    expect(started).toBe(2);
+    expect(started).toBe(4);
 
-    deferreds[0]?.resolve({ oldContent: '', newContent: 'a', isBinary: false });
-    deferreds[1]?.resolve({ oldContent: '', newContent: 'b', isBinary: false });
-    await Promise.all(promises.slice(0, 2));
+    for (const [index, deferred] of deferreds.slice(0, 4).entries()) {
+      deferred.resolve({
+        oldContent: '',
+        newContent: String.fromCharCode('a'.charCodeAt(0) + index),
+        isBinary: false,
+      });
+    }
+    await Promise.all(promises.slice(0, 4));
     await Promise.resolve();
 
-    expect(started).toBe(3);
+    expect(started).toBe(5);
 
-    deferreds[2]?.resolve({ oldContent: '', newContent: 'c', isBinary: false });
+    deferreds[4]?.resolve({ oldContent: '', newContent: 'e', isBinary: false });
     await Promise.all(promises);
   });
 

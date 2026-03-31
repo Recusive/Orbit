@@ -4,15 +4,7 @@
  * NOTE: Icon column width comes from @/lib/utils/constants.
  * To change actions bar width, update SIDEBAR.iconColumnWidth in constants.ts.
  */
-import {
-  CircleAlert,
-  Code,
-  FileCode,
-  GitBranch,
-  Globe,
-  MessageSquare,
-  Palette,
-} from 'lucide-react';
+import { CircleAlert, Code, FileCode, GitBranch, Globe, MessageSquare } from 'lucide-react';
 
 import type { ActivityTab, HeaderTab } from '@/stores/ui/ui-store';
 import type { FC, ReactNode } from 'react';
@@ -163,14 +155,6 @@ export const ActionsBar: FC = () => {
 
       {/* Mode switcher — pinned to bottom, above disclaimer */}
       <div className="shrink-0 flex flex-col items-center py-1 gap-1">
-        <ModeButton
-          id="canvas"
-          label="Canvas"
-          sfSymbol="paintpalette"
-          fallback={<Palette className="h-5 w-5" />}
-          disabled
-          tooltipOverride="Canvas coming soon"
-        />
         <ModeButton
           id="editor"
           label="Editor"

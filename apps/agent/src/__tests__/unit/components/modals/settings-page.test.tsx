@@ -6,7 +6,6 @@ import { useUIStore } from '@/stores/ui/ui-store';
 vi.mock('@/components/modals/settings/pages', () => ({
   SETTINGS_PAGE_COMPONENTS: {
     agent: () => <div data-testid="settings-agent-page">Agent Settings</div>,
-    providers: () => <div data-testid="settings-providers-page">Providers Settings</div>,
   },
 }));
 
@@ -22,11 +21,11 @@ describe('SettingsPage', () => {
   });
 
   it('renders the active settings section', () => {
-    useUIStore.setState({ settingsSection: 'providers', settingsOpen: true });
+    useUIStore.setState({ settingsSection: 'agent', settingsOpen: true });
 
     render(<SettingsPage />);
 
-    expect(screen.getByTestId('settings-providers-page')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-agent-page')).toBeInTheDocument();
   });
 
   it('closes settings on Escape when no settings child dialog is open', () => {

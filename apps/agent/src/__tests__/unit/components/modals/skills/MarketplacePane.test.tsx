@@ -128,7 +128,7 @@ describe('MarketplacePane', () => {
     expect(screen.getByText('Marketplace requires the desktop app')).toBeInTheDocument();
   });
 
-  it('shows pill toggle with Trending selected by default when search is empty', async () => {
+  it('shows browse results when search is empty', async () => {
     render(
       <MarketplacePane
         active
@@ -143,8 +143,6 @@ describe('MarketplacePane', () => {
       expect(mockBrowseMarketplaceSkills).toHaveBeenCalledWith('trending');
     });
 
-    expect(screen.getByRole('button', { name: 'Trending' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Top' })).toBeInTheDocument();
     expect(screen.getByText('react-skill')).toBeInTheDocument();
   });
 
@@ -171,14 +169,11 @@ describe('MarketplacePane', () => {
     await waitFor(() => {
       expect(mockSearchMarketplaceSkills).toHaveBeenCalledWith('react', 50);
     });
-    expect(screen.queryByRole('button', { name: 'Trending' })).not.toBeInTheDocument();
     expect(screen.getByText('search-skill')).toBeInTheDocument();
   });
 
-  it('switches to Top category and renders cached data instantly when switching back', async () => {
-    const user = userEvent.setup();
-
-    render(
+  it('renders the requested browse category and updates on prop changes', async () => {
+    const { rerender } = render(
       <MarketplacePane
         active
         search=""
@@ -192,13 +187,31 @@ describe('MarketplacePane', () => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Top' }));
+    rerender(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="top"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
+
     await waitFor(() => {
       expect(mockBrowseMarketplaceSkills).toHaveBeenCalledWith('top');
     });
     expect(screen.getByText('top-skill')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Trending' }));
+    rerender(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="trending"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
+
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
@@ -263,8 +276,7 @@ describe('MarketplacePane', () => {
     expect(screen.queryByText('search-skill')).not.toBeInTheDocument();
   });
 
-  it('calls loadBrowse on retry when not searching', async () => {
-    const user = userEvent.setup();
+  it('recovers browse results after an initial browse failure', async () => {
     mockBrowseMarketplaceSkills
       .mockRejectedValueOnce(new Error('browse failed'))
       .mockResolvedValueOnce([trendingSkill]);
@@ -279,11 +291,6 @@ describe('MarketplacePane', () => {
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('browse failed')).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
     await waitFor(() => {
       expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
@@ -330,10 +337,9 @@ describe('MarketplacePane', () => {
   });
 
   it('shows category-aware empty state for browse mode', async () => {
-    const user = userEvent.setup();
     mockBrowseMarketplaceSkills.mockResolvedValue([]);
 
-    render(
+    const { rerender } = render(
       <MarketplacePane
         active
         search=""
@@ -347,7 +353,16 @@ describe('MarketplacePane', () => {
       expect(screen.getByText("Couldn't load trending skills")).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Top' }));
+    rerender(
+      <MarketplacePane
+        active
+        search=""
+        browseCategory="top"
+        onCategoryChange={vi.fn()}
+        onInstalled={mockOnInstalled}
+      />
+    );
+
     await waitFor(() => {
       expect(screen.getByText("Couldn't load top skills")).toBeInTheDocument();
     });
@@ -367,7 +382,7 @@ describe('MarketplacePane', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Trending' })).toBeInTheDocument();
+      expect(screen.getByText('react-skill')).toBeInTheDocument();
     });
 
     await act(async () => {

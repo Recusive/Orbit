@@ -5,9 +5,9 @@
 use super::bridge::{AgentBridge, BridgeError, EventCallback, Result};
 use super::credential_bridge::CredentialBridge;
 use super::protocol::{
-    AttachmentContentBlock, BridgeRequest, CanvasSessionConfig, CanvasState, CommandResponse,
-    CommandScope, ForkSessionOptions, ForkSessionResult, McpToolResponse, Model,
-    PermissionResponse, SessionConfig, SkillDefinition, SlashCommandDefinition, SubagentDefinition,
+    AttachmentContentBlock, BridgeRequest, CommandResponse, CommandScope, ForkSessionOptions,
+    ForkSessionResult, McpToolResponse, Model, PermissionResponse, SessionConfig, SkillDefinition,
+    SlashCommandDefinition, SubagentDefinition,
 };
 use parking_lot::Mutex;
 use std::collections::HashSet;
@@ -771,90 +771,6 @@ impl SessionManager {
         let response = bridge.send_request(&request)?;
         Self::check_response_command(response)?
             .ok_or_else(|| BridgeError::SidecarError("Generation returned null".to_owned()))
-    }
-
-    // ========================================================================
-    // Canvas Operations
-    // ========================================================================
-
-    /// Create a new canvas session
-    pub fn canvas_create_session(
-        &self,
-        session_id: &str,
-        config: Option<CanvasSessionConfig>,
-    ) -> Result<()> {
-        self.ensure_running()?;
-
-        let request = BridgeRequest::CanvasCreateSession {
-            session_id: session_id.to_owned(),
-            config,
-        };
-
-        let bridge = self.bridge.lock();
-        let response = bridge.send_request(&request)?;
-        Self::check_response(response)
-    }
-
-    /// Delete a canvas session
-    pub fn canvas_delete_session(&self, session_id: &str) -> Result<()> {
-        let request = BridgeRequest::CanvasDeleteSession {
-            session_id: session_id.to_owned(),
-        };
-
-        let mut bridge = self.bridge.lock();
-        if bridge.is_running() {
-            let response = bridge.send_request(&request)?;
-            Self::check_response(response)?;
-        }
-        Ok(())
-    }
-
-    /// Send a message to a canvas session with current canvas state
-    pub fn canvas_send_message(
-        &self,
-        session_id: &str,
-        message: &str,
-        state: CanvasState,
-    ) -> Result<()> {
-        self.ensure_running()?;
-
-        let request = BridgeRequest::CanvasSendMessage {
-            session_id: session_id.to_owned(),
-            message: message.to_owned(),
-            state,
-        };
-
-        let bridge = self.bridge.lock();
-        let response = bridge.send_request(&request)?;
-        Self::check_response(response)
-    }
-
-    /// Interrupt a canvas session
-    pub fn canvas_interrupt(&self, session_id: &str) -> Result<()> {
-        let request = BridgeRequest::CanvasInterrupt {
-            session_id: session_id.to_owned(),
-        };
-
-        let mut bridge = self.bridge.lock();
-        if bridge.is_running() {
-            let response = bridge.send_request(&request)?;
-            Self::check_response(response)?;
-        }
-        Ok(())
-    }
-
-    /// Send a tool response back to a canvas session
-    pub fn canvas_tool_response(&self, session_id: &str, response: McpToolResponse) -> Result<()> {
-        self.ensure_running()?;
-
-        let request = BridgeRequest::CanvasToolResponse {
-            session_id: session_id.to_owned(),
-            response,
-        };
-
-        let bridge = self.bridge.lock();
-        let resp = bridge.send_request(&request)?;
-        Self::check_response(resp)
     }
 
     /// Send a tool response back to a browser MCP session

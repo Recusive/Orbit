@@ -124,7 +124,6 @@ export const WORKSPACE_SF_SYMBOLS = [
   { name: 'apple.terminal', size: 18, weight: 'medium' },
   { name: 'switch.2', size: 18, weight: 'medium' },
   // ActionsBar mode buttons
-  { name: 'paintpalette', size: 18, weight: 'medium' },
   { name: 'chevron.left.forwardslash.chevron.right', size: 18, weight: 'medium' },
   { name: 'command', size: 18, weight: 'medium' },
   // ContentTopBar + PrimarySidebar navigation
@@ -135,8 +134,6 @@ export const WORKSPACE_SF_SYMBOLS = [
   { name: 'square.and.pencil', size: 18, weight: 'medium' },
   { name: 'exclamationmark.bubble', size: 18, weight: 'medium' },
   { name: 'gear', size: 18, weight: 'medium' },
-  // SettingsSidebar
-  { name: 'rectangle.connected.to.line.below', size: 18, weight: 'medium' },
 ] as const satisfies readonly { name: string; size?: number; weight?: SFSymbolWeight }[];
 
 /**

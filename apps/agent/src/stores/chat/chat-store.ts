@@ -62,7 +62,7 @@ export interface ChatSessionData {
 }
 
 export interface ActiveCompaction {
-  backend: 'opencode' | 'claude';
+  backend: 'claude';
   messageId: string;
   status: 'pending' | 'timed_out';
 }
@@ -123,7 +123,7 @@ export interface ChatStoreState {
   markCompacting: (sessionId: string, compaction: ActiveCompaction) => void;
   markCompactionTimedOut: (sessionId: string, messageId: string) => void;
   settleCompaction: (sessionId: string) => void;
-  clearCompactionsByBackend: (backend: ActiveCompaction['backend']) => void;
+  clearCompactionsByBackend: (_backend: ActiveCompaction['backend']) => void;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -540,12 +540,11 @@ export const useChatStore = create<ChatStoreState>()(
         });
       },
 
-      clearCompactionsByBackend: (backend: ActiveCompaction['backend']): void => {
+      clearCompactionsByBackend: (_backend: ActiveCompaction['backend']): void => {
         set((draft) => {
-          for (const [sessionId, entry] of Object.entries(draft.activeCompactions)) {
-            if (entry.backend === backend) {
-              Reflect.deleteProperty(draft.activeCompactions, sessionId);
-            }
+          void _backend;
+          for (const sessionId of Object.keys(draft.activeCompactions)) {
+            Reflect.deleteProperty(draft.activeCompactions, sessionId);
           }
         });
       },

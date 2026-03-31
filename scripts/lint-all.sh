@@ -159,10 +159,6 @@ if [ "$RUST_ONLY" = false ]; then
   bun run typecheck
   print_success "Agent TypeScript OK"
 
-  print_step "apps/Canvas-UI-Builder..."
-  bun run canvas:typecheck
-  print_success "Canvas TypeScript OK"
-
   print_subheader "Shared Libraries"
 
   print_step "apps/common..."
@@ -187,7 +183,7 @@ if [ "$RUST_ONLY" = false ]; then
   print_header "ESLINT (All Frontend Code)"
   section_start
 
-  print_step "Linting 8 paths: apps/*/src, agent-bridge/src, packages/*, scripts/, vite-plugins/, vitest.setup.ts..."
+    print_step "Linting 7 paths: apps/*/src, agent-bridge/src, packages/*, scripts/, vite-plugins/, vitest.setup.ts..."
   if [ "$FIX_MODE" = true ]; then
     bun run lint:fix
     print_success "ESLint OK (fixes applied)"
@@ -245,9 +241,6 @@ if [ "$RUST_ONLY" = false ]; then
     bun run build:frontend
     print_success "Agent build OK"
 
-    print_step "Building apps/Canvas-UI-Builder..."
-    bun run canvas:build
-    print_success "Canvas build OK"
   else
     print_skip "Frontend builds"
   fi

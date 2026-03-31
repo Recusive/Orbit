@@ -32,7 +32,6 @@ vi.mock('@/components/chat/messages/feedback-dialog', () => ({
 }));
 
 import { MessageItem } from '@/components/chat/messages/MessageItem';
-import { useBackendStore } from '@/stores/backend/backend-store';
 
 function makeAssistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -77,7 +76,6 @@ function renderMessageItem(overrides: Partial<MessageItemProps> = {}): ReturnTyp
 describe('MessageItem action bar visibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useBackendStore.setState({ activeBackend: 'claude' });
   });
 
   it('hides actions for the active last message while agent is running', () => {
@@ -105,21 +103,6 @@ describe('MessageItem action bar visibility', () => {
     });
 
     expect(screen.getByTestId('message-actions')).toBeInTheDocument();
-  });
-
-  it('keeps rewind enabled for the latest OpenCode assistant response', () => {
-    useBackendStore.setState({ activeBackend: 'opencode' });
-
-    renderMessageItem({
-      isAgentRunning: false,
-      isLastAssistantMessage: true,
-      message: makeAssistantMessage({ parentUuid: 'user-1' }),
-    });
-
-    expect(mockMessageActions).toHaveBeenCalledWith(
-      expect.objectContaining({ rewindDisabled: false, showRewind: true }),
-      undefined
-    );
   });
 
   it('renders slash commands in user bubbles as plain blue text, not inline code badges', () => {

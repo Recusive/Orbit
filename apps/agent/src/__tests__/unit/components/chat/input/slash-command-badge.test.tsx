@@ -5,15 +5,10 @@ import type { SlashCommand, UseChatInputOptions } from '@/components/chat/input/
 
 import { readEditorText, setEditorText } from '@/components/chat/input/lexical';
 import { useChatInput } from '@/components/chat/input/use-chat-input';
-import { useBackendStore } from '@/stores/backend/backend-store';
 import { usePendingContextStore } from '@/stores/chat/pending-context-store';
 import { useFileStore } from '@/stores/file/file-store';
 
 let mockSlashCommands: SlashCommand[] = [];
-let mockSelectedAgent: 'build' | 'plan' | 'explore' = 'build';
-const mockSetSelectedAgent = vi.fn((agent: 'build' | 'plan' | 'explore') => {
-  mockSelectedAgent = agent;
-});
 
 vi.mock('@orbit.build/sdk/v2/client', () => ({
   createOrbitClient: vi.fn(),
@@ -57,24 +52,6 @@ vi.mock('@/stores/browser/browser-store', () => {
   };
 });
 
-vi.mock('@/stores/opencode', () => ({
-  useOcProviderStore: (
-    selector: (state: {
-      selectedAgent: 'build' | 'plan' | 'explore';
-      selectedProviderId: string | null;
-      selectedModelId: string | null;
-      setSelectedAgent: (agent: 'build' | 'plan' | 'explore') => void;
-    }) => unknown
-  ): unknown =>
-    selector({
-      selectedAgent: mockSelectedAgent,
-      selectedProviderId: null,
-      selectedModelId: null,
-      setSelectedAgent: mockSetSelectedAgent,
-    }),
-  useOcSelectedModelSupportsImageInput: (): boolean => true,
-}));
-
 vi.mock('@/components/chat/input/slash-command-popover', () => ({
   getFilteredCommandsCount: (): number => 0,
   getCommandAtIndex: (): null => null,
@@ -109,10 +86,7 @@ describe('slash command highlighting in useChatInput', () => {
       { name: 'planner', description: 'Planning skill', kind: 'skill' },
     ];
     usePendingContextStore.setState({ pending: [] });
-    useBackendStore.setState({ activeBackend: 'claude' });
     useFileStore.setState({ rootPath: null });
-    mockSelectedAgent = 'build';
-    mockSetSelectedAgent.mockClear();
     vi.clearAllMocks();
   });
 

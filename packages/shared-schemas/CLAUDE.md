@@ -35,11 +35,10 @@ All schemas are re-exported from `src/index.ts`.
 
 ## Consumers
 
-| Consumer                   | What it uses                                               |
-| -------------------------- | ---------------------------------------------------------- |
-| **agent-bridge**           | SDK schemas for message validation, model/thinking schemas |
-| **apps/agent**             | Settings schemas, file schemas, agent phase/status         |
-| **apps/Canvas-UI-Builder** | Agent schemas for canvas AI integration                    |
+| Consumer         | What it uses                                               |
+| ---------------- | ---------------------------------------------------------- |
+| **agent-bridge** | SDK schemas for message validation, model/thinking schemas |
+| **apps/agent**   | Settings schemas, file schemas, agent phase/status         |
 
 ## Adding a New Schema
 

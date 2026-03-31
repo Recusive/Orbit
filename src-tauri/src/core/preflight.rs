@@ -7,7 +7,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::common::{credentials, providers};
-use crate::opencode::process::resolve_opencode_binary_path;
 
 /// High-level status for the full preflight report and each individual check.
 #[non_exhaustive]
@@ -359,33 +358,6 @@ pub fn run_preflight(sidecar_path: &Path) -> PreflightReport {
             details: Some("The sidecar build also bundles the Claude CLI.".to_owned()),
         },
     ));
-
-    let orbit_server_path = resolve_opencode_binary_path().ok();
-    if let Some(path) = orbit_server_path.as_deref() {
-        checks.push(binary_check(
-            "orbit_server",
-            "Orbit Server",
-            path,
-            false,
-            RecoveryAction {
-                label: "Run bun run build:opencode".to_owned(),
-                details: None,
-            },
-        ));
-    } else {
-        checks.push(PreflightCheck {
-            id: "orbit_server".to_owned(),
-            category: CheckCategory::Binary,
-            status: CheckStatus::Warn,
-            label: "Orbit Server".to_owned(),
-            message: "Orbit Server binary is missing.".to_owned(),
-            details: Some("OpenCode features will stay unavailable until it is built.".to_owned()),
-            recovery: Some(RecoveryAction {
-                label: "Run bun run build:opencode".to_owned(),
-                details: None,
-            }),
-        });
-    }
 
     checks.push(credential_check());
     checks.push(home_check());

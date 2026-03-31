@@ -1,4 +1,4 @@
-import type { ConversationRepository, ConversationSummary } from '@/types/backend';
+import type { ConversationRepository, ConversationSummary } from './types';
 
 import {
   handleConversationCreate,

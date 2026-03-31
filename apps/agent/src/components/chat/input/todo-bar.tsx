@@ -17,9 +17,7 @@ import type { FC, ReactElement } from 'react';
 
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, cn } from '@/lib/utils';
 import { useToolStore } from '@/stores/agent/tool-store';
-import { useActiveBackend } from '@/stores/backend';
 import { useActiveSessionId } from '@/stores/chat';
-import { useOcActiveSessionId } from '@/stores/opencode';
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -151,10 +149,7 @@ const EXPAND_TRANSITION_NONE = { duration: 0 };
 export const TodoBar: FC = memo(function TodoBar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
-  const activeBackend = useActiveBackend();
-  const claudeSessionId = useActiveSessionId();
-  const ocSessionId = useOcActiveSessionId();
-  const sessionId = activeBackend === 'claude' ? claudeSessionId : ocSessionId;
+  const sessionId = useActiveSessionId();
 
   // Subscribe to ToolStore — useShallow prevents rerenders from unrelated mutations
   const { activeTools, completedTools } = useToolStore(
@@ -178,13 +173,8 @@ export const TodoBar: FC = memo(function TodoBar() {
       return null;
     }
 
-    const matchesSession = (tool: ToolExecution): boolean => {
-      if (activeBackend === 'claude') {
-        return tool.sessionId === undefined || tool.sessionId === sessionId;
-      }
-
-      return tool.sessionId === sessionId;
-    };
+    const matchesSession = (tool: ToolExecution): boolean =>
+      tool.sessionId === undefined || tool.sessionId === sessionId;
 
     let latestActive: ToolExecution | null = null;
     let latestCompleted: ToolExecution | null = null;
@@ -216,7 +206,7 @@ export const TodoBar: FC = memo(function TodoBar() {
       todos: parseTodos(todosInput),
       isRunning: latest.status === 'running' || latest.status === 'pending',
     };
-  }, [activeBackend, activeTools, completedTools, sessionId]);
+  }, [activeTools, completedTools, sessionId]);
 
   // Don't render when there are no todos
   if (todoData === null || todoData.todos.length === 0) return null;

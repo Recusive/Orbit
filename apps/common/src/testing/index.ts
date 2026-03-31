@@ -12,7 +12,6 @@
 export { createMockInvoke, mockResponses, mockTauriCommand, resetTauriMocks } from './tauri-mocks';
 
 export type {
-  CanvasSetupResponse,
   FileEntryResponse,
   GitStatusResponse,
   MockInvokeFn,

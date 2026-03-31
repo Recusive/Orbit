@@ -70,7 +70,7 @@
     "active": true,
     "targets": "all",
     "createUpdaterArtifacts": true,
-    "externalBin": ["binaries/agent-bridge", "binaries/claude", "binaries/orbit-server"],
+    "externalBin": ["binaries/agent-bridge", "binaries/claude"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns"],
     "category": "DeveloperTool",
     "shortDescription": "Modern AI-powered code editor",
