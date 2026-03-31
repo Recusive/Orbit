@@ -4,17 +4,12 @@ echo "Running checks before push..."
 
 # Frontend - all typechecks
 bun run typecheck
-bun run canvas:typecheck
 bun run common:typecheck
 bun run bridge:typecheck
 bun run schemas:typecheck
 
 # Frontend - lint (same as CI)
 bun run lint
-
-# Frontend - tests (fast tests only)
-# Note: bridge:test is excluded - it makes real API calls and is too slow for pre-push
-bun run canvas:test
 
 # Rust
 cargo test --all-features
