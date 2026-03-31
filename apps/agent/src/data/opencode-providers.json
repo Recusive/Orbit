@@ -1,7 +1,7 @@
 {
   "version": 1,
   "sourceSnapshot": "scripts/opencode-models-cache/api.json",
-  "providerCount": 104,
+  "providerCount": 105,
   "providers": [
     {
       "id": "302ai",
@@ -418,7 +418,7 @@
         "AWS_REGION",
         "AWS_SECRET_ACCESS_KEY"
       ],
-      "modelCount": 84,
+      "modelCount": 87,
       "npm": "@ai-sdk/amazon-bedrock",
       "featuredModels": [
         {
@@ -1021,7 +1021,7 @@
           "attachment": true
         },
         {
-          "id": "anthropic/claude-3-5-haiku",
+          "id": "anthropic/claude-3.5-haiku",
           "name": "Claude Haiku 3.5 (latest)",
           "reasoning": false,
           "attachment": true
@@ -1147,7 +1147,7 @@
       "id": "cortecs",
       "name": "Cortecs",
       "env": ["CORTECS_API_KEY"],
-      "modelCount": 23,
+      "modelCount": 28,
       "api": "https://api.cortecs.ai/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -1158,10 +1158,34 @@
           "attachment": true
         },
         {
+          "id": "claude-haiku-4-5",
+          "name": "Claude Haiku 4.5",
+          "reasoning": true,
+          "attachment": true
+        },
+        {
+          "id": "claude-opus4-5",
+          "name": "Claude Opus 4.5",
+          "reasoning": true,
+          "attachment": true
+        },
+        {
+          "id": "claude-opus4-6",
+          "name": "Claude Opus 4.6",
+          "reasoning": true,
+          "attachment": true
+        },
+        {
           "id": "claude-sonnet-4",
           "name": "Claude Sonnet 4",
           "reasoning": false,
           "attachment": false
+        },
+        {
+          "id": "claude-4-6-sonnet",
+          "name": "Claude Sonnet 4.6",
+          "reasoning": true,
+          "attachment": true
         },
         {
           "id": "deepseek-v3-0324",
@@ -1173,30 +1197,6 @@
           "id": "devstral-2512",
           "name": "Devstral 2 2512",
           "reasoning": false,
-          "attachment": false
-        },
-        {
-          "id": "devstral-small-2512",
-          "name": "Devstral Small 2 2512",
-          "reasoning": false,
-          "attachment": false
-        },
-        {
-          "id": "gemini-2.5-pro",
-          "name": "Gemini 2.5 Pro",
-          "reasoning": false,
-          "attachment": false
-        },
-        {
-          "id": "glm-4.5",
-          "name": "GLM 4.5",
-          "reasoning": true,
-          "attachment": false
-        },
-        {
-          "id": "glm-4.5-air",
-          "name": "GLM 4.5 Air",
-          "reasoning": true,
           "attachment": false
         }
       ]
@@ -1399,7 +1399,7 @@
       "id": "fastrouter",
       "name": "FastRouter",
       "env": ["FASTROUTER_API_KEY"],
-      "modelCount": 14,
+      "modelCount": 15,
       "api": "https://go.fastrouter.ai/api/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -1434,6 +1434,12 @@
           "attachment": true
         },
         {
+          "id": "z-ai/glm-5",
+          "name": "GLM-5",
+          "reasoning": true,
+          "attachment": false
+        },
+        {
           "id": "openai/gpt-oss-120b",
           "name": "GPT OSS 120B",
           "reasoning": true,
@@ -1444,12 +1450,6 @@
           "name": "GPT OSS 20B",
           "reasoning": true,
           "attachment": false
-        },
-        {
-          "id": "openai/gpt-4.1",
-          "name": "GPT-4.1",
-          "reasoning": false,
-          "attachment": true
         }
       ]
     },
@@ -1457,7 +1457,7 @@
       "id": "fireworks-ai",
       "name": "Fireworks AI",
       "env": ["FIREWORKS_API_KEY"],
-      "modelCount": 13,
+      "modelCount": 14,
       "api": "https://api.fireworks.ai/inference/v1/",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -1741,8 +1741,8 @@
       "id": "gitlab",
       "name": "GitLab Duo",
       "env": ["GITLAB_TOKEN"],
-      "modelCount": 10,
-      "npm": "@gitlab/gitlab-ai-provider",
+      "modelCount": 14,
+      "npm": "gitlab-ai-provider",
       "featuredModels": [
         {
           "id": "duo-chat-haiku-4-5",
@@ -1798,7 +1798,7 @@
       "id": "google",
       "name": "Google",
       "env": ["GEMINI_API_KEY", "GOOGLE_GENERATIVE_AI_API_KEY"],
-      "modelCount": 30,
+      "modelCount": 35,
       "npm": "@ai-sdk/google",
       "featuredModels": [
         {
@@ -1855,9 +1855,27 @@
       "id": "groq",
       "name": "Groq",
       "env": ["GROQ_API_KEY"],
-      "modelCount": 17,
+      "modelCount": 27,
       "npm": "@ai-sdk/groq",
       "featuredModels": [
+        {
+          "id": "allam-2-7b",
+          "name": "ALLaM-2-7b",
+          "reasoning": false,
+          "attachment": false
+        },
+        {
+          "id": "groq/compound",
+          "name": "Compound",
+          "reasoning": true,
+          "attachment": false
+        },
+        {
+          "id": "groq/compound-mini",
+          "name": "Compound Mini",
+          "reasoning": true,
+          "attachment": false
+        },
         {
           "id": "deepseek-r1-distill-llama-70b",
           "name": "DeepSeek R1 Distill Llama 70B",
@@ -1887,26 +1905,6 @@
         {
           "id": "moonshotai/kimi-k2-instruct",
           "name": "Kimi K2 Instruct",
-          "reasoning": false,
-          "attachment": false,
-          "status": "deprecated"
-        },
-        {
-          "id": "moonshotai/kimi-k2-instruct-0905",
-          "name": "Kimi K2 Instruct 0905",
-          "reasoning": false,
-          "attachment": false
-        },
-        {
-          "id": "llama3-70b-8192",
-          "name": "Llama 3 70B",
-          "reasoning": false,
-          "attachment": false,
-          "status": "deprecated"
-        },
-        {
-          "id": "llama3-8b-8192",
-          "name": "Llama 3 8B",
           "reasoning": false,
           "attachment": false,
           "status": "deprecated"
@@ -2444,6 +2442,66 @@
       ]
     },
     {
+      "id": "llmgateway",
+      "name": "LLM Gateway",
+      "env": ["LLMGATEWAY_API_KEY"],
+      "modelCount": 203,
+      "api": "https://api.llmgateway.io/v1",
+      "npm": "@ai-sdk/openai-compatible",
+      "featuredModels": [
+        {
+          "id": "auto",
+          "name": "Auto Route",
+          "reasoning": false,
+          "attachment": true
+        },
+        {
+          "id": "claude-3-haiku",
+          "name": "Claude 3 Haiku",
+          "reasoning": false,
+          "attachment": true
+        },
+        {
+          "id": "claude-3-haiku-20240307",
+          "name": "Claude 3 Haiku (2024-03-07)",
+          "reasoning": false,
+          "attachment": true
+        },
+        {
+          "id": "claude-3-opus",
+          "name": "Claude 3 Opus",
+          "reasoning": false,
+          "attachment": true
+        },
+        {
+          "id": "claude-3-5-haiku",
+          "name": "Claude 3.5 Haiku",
+          "reasoning": false,
+          "attachment": false,
+          "status": "deprecated"
+        },
+        {
+          "id": "claude-3-5-sonnet",
+          "name": "Claude 3.5 Sonnet",
+          "reasoning": false,
+          "attachment": false
+        },
+        {
+          "id": "claude-3-5-sonnet-20241022",
+          "name": "Claude 3.5 Sonnet (2024-10-22)",
+          "reasoning": false,
+          "attachment": false,
+          "status": "deprecated"
+        },
+        {
+          "id": "claude-3-7-sonnet",
+          "name": "Claude 3.7 Sonnet",
+          "reasoning": true,
+          "attachment": false
+        }
+      ]
+    },
+    {
       "id": "lmstudio",
       "name": "LMStudio",
       "env": ["LMSTUDIO_API_KEY"],
@@ -2739,7 +2797,7 @@
       "id": "mistral",
       "name": "Mistral",
       "env": ["MISTRAL_API_KEY"],
-      "modelCount": 26,
+      "modelCount": 27,
       "npm": "@ai-sdk/mistral",
       "featuredModels": [
         {
@@ -2990,7 +3048,7 @@
       "id": "nano-gpt",
       "name": "NanoGPT",
       "env": ["NANO_GPT_API_KEY"],
-      "modelCount": 516,
+      "modelCount": 519,
       "api": "https://nano-gpt.com/api/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -3186,7 +3244,7 @@
       "id": "nvidia",
       "name": "Nvidia",
       "env": ["NVIDIA_API_KEY"],
-      "modelCount": 73,
+      "modelCount": 74,
       "api": "https://integrate.api.nvidia.com/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -3302,7 +3360,7 @@
       "id": "openai",
       "name": "OpenAI",
       "env": ["OPENAI_API_KEY"],
-      "modelCount": 46,
+      "modelCount": 47,
       "npm": "@ai-sdk/openai",
       "featuredModels": [
         {
@@ -3393,7 +3451,7 @@
       "id": "opencode",
       "name": "OpenCode Zen",
       "env": ["OPENCODE_API_KEY"],
-      "modelCount": 47,
+      "modelCount": 48,
       "api": "https://opencode.ai/zen/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -3451,16 +3509,10 @@
       "id": "openrouter",
       "name": "OpenRouter",
       "env": ["OPENROUTER_API_KEY"],
-      "modelCount": 201,
+      "modelCount": 166,
       "api": "https://openrouter.ai/api/v1",
       "npm": "@openrouter/ai-sdk-provider",
       "featuredModels": [
-        {
-          "id": "openrouter/aurora-alpha",
-          "name": "Aurora Alpha",
-          "reasoning": true,
-          "attachment": false
-        },
         {
           "id": "anthropic/claude-3.5-haiku",
           "name": "Claude Haiku 3.5",
@@ -3500,6 +3552,12 @@
         {
           "id": "anthropic/claude-3.7-sonnet",
           "name": "Claude Sonnet 3.7",
+          "reasoning": true,
+          "attachment": true
+        },
+        {
+          "id": "anthropic/claude-sonnet-4",
+          "name": "Claude Sonnet 4",
           "reasoning": true,
           "attachment": true
         }
@@ -3658,7 +3716,7 @@
       "id": "poe",
       "name": "Poe",
       "env": ["POE_API_KEY"],
-      "modelCount": 120,
+      "modelCount": 124,
       "api": "https://api.poe.com/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -4045,7 +4103,7 @@
       "id": "siliconflow",
       "name": "SiliconFlow",
       "env": ["SILICONFLOW_API_KEY"],
-      "modelCount": 70,
+      "modelCount": 71,
       "api": "https://api.siliconflow.com/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -4537,6 +4595,12 @@
       "npm": "venice-ai-sdk-provider",
       "featuredModels": [
         {
+          "id": "aion-labs.aion-2-0",
+          "name": "Aion 2.0",
+          "reasoning": false,
+          "attachment": false
+        },
+        {
           "id": "claude-opus-45",
           "name": "Claude Opus 4.5",
           "reasoning": true,
@@ -4573,12 +4637,6 @@
           "attachment": true
         },
         {
-          "id": "gemini-3-pro-preview",
-          "name": "Gemini 3 Pro Preview",
-          "reasoning": true,
-          "attachment": true
-        },
-        {
           "id": "gemini-3-1-pro-preview",
           "name": "Gemini 3.1 Pro Preview",
           "reasoning": true,
@@ -4590,7 +4648,7 @@
       "id": "vercel",
       "name": "Vercel AI Gateway",
       "env": ["AI_GATEWAY_API_KEY"],
-      "modelCount": 220,
+      "modelCount": 227,
       "npm": "@ai-sdk/gateway",
       "featuredModels": [
         {
@@ -4761,7 +4819,7 @@
       "id": "vivgrid",
       "name": "Vivgrid",
       "env": ["VIVGRID_API_KEY"],
-      "modelCount": 8,
+      "modelCount": 9,
       "api": "https://api.vivgrid.com/v1",
       "npm": "@ai-sdk/openai",
       "featuredModels": [
@@ -4772,14 +4830,14 @@
           "attachment": false
         },
         {
-          "id": "gemini-3-flash-preview",
-          "name": "Gemini 3 Flash Preview",
+          "id": "gemini-3.1-flash-lite-preview",
+          "name": "Gemini 3.1 Flash Lite Preview",
           "reasoning": true,
           "attachment": true
         },
         {
-          "id": "gemini-3-pro-preview",
-          "name": "Gemini 3 Pro Preview",
+          "id": "gemini-3.1-pro-preview",
+          "name": "Gemini 3.1 Pro Preview",
           "reasoning": true,
           "attachment": true
         },
@@ -4819,22 +4877,10 @@
       "id": "vultr",
       "name": "Vultr",
       "env": ["VULTR_API_KEY"],
-      "modelCount": 10,
+      "modelCount": 4,
       "api": "https://api.vultrinference.com/v1",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
-        {
-          "id": "DeepSeek-R1-Distill-Llama-70B",
-          "name": "DeepSeek R1 Distill Llama 70B",
-          "reasoning": true,
-          "attachment": false
-        },
-        {
-          "id": "DeepSeek-R1-Distill-Qwen-32B",
-          "name": "DeepSeek R1 Distill Qwen 32B",
-          "reasoning": true,
-          "attachment": false
-        },
         {
           "id": "DeepSeek-V3.2",
           "name": "DeepSeek V3.2",
@@ -4848,20 +4894,8 @@
           "attachment": false
         },
         {
-          "id": "gpt-oss-120b",
-          "name": "GPT OSS 120B",
-          "reasoning": false,
-          "attachment": false
-        },
-        {
           "id": "Kimi-K2.5",
           "name": "Kimi K2 Instruct",
-          "reasoning": false,
-          "attachment": false
-        },
-        {
-          "id": "Llama-3_1-Nemotron-Ultra-253B-v1",
-          "name": "Llama 3.1 Nemotron Ultra 253B v1",
           "reasoning": false,
           "attachment": false
         },
@@ -5020,7 +5054,7 @@
       "id": "zai",
       "name": "Z.AI",
       "env": ["ZHIPU_API_KEY"],
-      "modelCount": 10,
+      "modelCount": 11,
       "api": "https://api.z.ai/api/paas/v4",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -5078,7 +5112,7 @@
       "id": "zai-coding-plan",
       "name": "Z.AI Coding Plan",
       "env": ["ZHIPU_API_KEY"],
-      "modelCount": 11,
+      "modelCount": 12,
       "api": "https://api.z.ai/api/coding/paas/v4",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -5136,19 +5170,13 @@
       "id": "zenmux",
       "name": "ZenMux",
       "env": ["ZENMUX_API_KEY"],
-      "modelCount": 69,
-      "api": "https://zenmux.ai/api/anthropic/v1",
-      "npm": "@ai-sdk/anthropic",
+      "modelCount": 85,
+      "api": "https://zenmux.ai/api/v1",
+      "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
         {
           "id": "anthropic/claude-3.5-haiku",
           "name": "Claude 3.5 Haiku",
-          "reasoning": false,
-          "attachment": true
-        },
-        {
-          "id": "anthropic/claude-3.5-sonnet",
-          "name": "Claude 3.5 Sonnet (Retiring Soon)",
           "reasoning": false,
           "attachment": true
         },
@@ -5187,6 +5215,12 @@
           "name": "Claude Opus 4.6",
           "reasoning": true,
           "attachment": true
+        },
+        {
+          "id": "anthropic/claude-sonnet-4",
+          "name": "Claude Sonnet 4",
+          "reasoning": true,
+          "attachment": true
         }
       ]
     },
@@ -5194,7 +5228,7 @@
       "id": "zhipuai",
       "name": "Zhipu AI",
       "env": ["ZHIPU_API_KEY"],
-      "modelCount": 9,
+      "modelCount": 10,
       "api": "https://open.bigmodel.cn/api/paas/v4",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [
@@ -5252,7 +5286,7 @@
       "id": "zhipuai-coding-plan",
       "name": "Zhipu AI Coding Plan",
       "env": ["ZHIPU_API_KEY"],
-      "modelCount": 10,
+      "modelCount": 13,
       "api": "https://open.bigmodel.cn/api/coding/paas/v4",
       "npm": "@ai-sdk/openai-compatible",
       "featuredModels": [

@@ -138,7 +138,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         )}
       >
         {/* Left: label + filename, badges, spinner, diff */}
-        <div className="flex items-center gap-2 shrink-0 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-medium text-foreground">
             {isRunning ? 'Editing' : 'Edited'}
           </span>

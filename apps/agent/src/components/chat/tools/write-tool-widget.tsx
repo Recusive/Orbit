@@ -135,7 +135,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
         )}
       >
         {/* Left: label + filename, badges, spinner, diff, chevron */}
-        <div className="flex items-center gap-2 shrink-0 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           <span className="text-base font-medium text-foreground">
             {isRunning ? 'Creating' : 'Created'}
           </span>
