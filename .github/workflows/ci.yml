@@ -48,7 +48,7 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run lint
 
-  # Vitest tests for all frontend apps (agent, canvas, editor, common)
+  # Vitest tests for all frontend apps (agent, editor, common)
   vitest:
     name: Vitest (All Frontend)
     runs-on: ubuntu-latest
@@ -125,47 +125,6 @@ jobs:
       - run: bun run schemas:typecheck
 
   # ============================================
-  # Frontend - Canvas (TypeScript/React + Bun)
-  # ============================================
-  canvas-typecheck:
-    name: TypeScript (Canvas)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: bun install --frozen-lockfile
-      - run: bun run canvas:typecheck
-
-  canvas-build:
-    name: Build (Canvas)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - run: bun install --frozen-lockfile
-      - run: bun run canvas:build
-
-      # Only upload artifacts on main branch to save storage
-      - name: Upload build
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist-canvas-${{ github.sha }}
-          path: dist/canvas/
-          retention-days: 3
-
-  # ============================================
   # Agent Bridge (TypeScript/Bun Sidecar)
   # ============================================
   bridge-typecheck:
@@ -224,7 +183,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -247,7 +205,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -268,7 +225,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@stable
       - name: Install cargo-deny
@@ -291,7 +247,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -314,7 +269,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -335,7 +289,6 @@ jobs:
           mkdir -p src-tauri/binaries
           touch src-tauri/binaries/agent-bridge-x86_64-unknown-linux-gnu
           touch src-tauri/binaries/claude-x86_64-unknown-linux-gnu
-          touch src-tauri/binaries/orbit-server-x86_64-unknown-linux-gnu
           chmod +x src-tauri/binaries/*
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2
@@ -483,8 +436,6 @@ jobs:
         build,
         common-typecheck,
         schemas-typecheck,
-        canvas-typecheck,
-        canvas-build,
         bridge-typecheck,
         bridge-test,
         rust-fmt,
@@ -503,8 +454,6 @@ jobs:
           agent="${{ needs.typecheck.result }} ${{ needs.lint.result }} ${{ needs.build.result }}"
           # Common/Schemas checks
           shared="${{ needs.common-typecheck.result }} ${{ needs.schemas-typecheck.result }}"
-          # Canvas frontend checks
-          canvas="${{ needs.canvas-typecheck.result }} ${{ needs.canvas-build.result }}"
           # Bridge checks
           bridge="${{ needs.bridge-typecheck.result }}"
           # Rust checks (required)
@@ -515,7 +464,7 @@ jobs:
           bridge_test_result="${{ needs.bridge-test.result }}"
           machete_result="${{ needs.rust-machete.result }}"
 
-          for result in $agent $shared $canvas $bridge $rust; do
+          for result in $agent $shared $bridge $rust; do
             if [[ "$result" != "success" ]]; then
               echo "[FAIL] CI failed"
               exit 1
