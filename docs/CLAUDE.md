@@ -69,7 +69,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (20 entries)
+## plans/tracked/todo/ (19 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
@@ -92,8 +92,9 @@ Use this to find the right file. Read the file directly — no links needed.
 - `kanban-ticket-board.md` — Kanban ticket board
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 
-## plans/tracked/done/ (44 entries)
+## plans/tracked/done/ (45 entries)
 
+- `remove-opencode-canvas-cleanup.md` — Remove Agent-backend, OpenCode engine, Canvas UI Builder. Orbit is now Claude-only. Preserved 5 OpenCode UI components in reference/.
 - `SF-SYMBOL-ICON-FLASH-FIX.md` — Fix SF Symbol icon flash on welcome→workspace transition (two-tier cache for sync reads, module-level preload, stable layout wrapper, sync enforcement test)
 - `ACTIONS-BAR-SLIDE-IN-DESYNC-FIX.md` — Fix actions bar slide-in desync (margin-slide wrapper in AppShell, mirrors sidebar pattern, synced with ContentCard transition)
 - `INSTANT-DIFF-EXPANSION.md` — Instant diff card expansion with background preparation pipeline (batch Tauri IPC, yielded parseDiffFromFile, Pierre worker highlighting, content-size gating, PierreCapabilitiesContext)
