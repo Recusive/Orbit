@@ -45,6 +45,7 @@ export const CodeSearchToolWidget: FC<CodeSearchToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Code Search output' : 'Expand Code Search output'}
         aria-expanded={isExpanded}

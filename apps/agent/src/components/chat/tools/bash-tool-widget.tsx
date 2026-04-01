@@ -118,6 +118,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row like Read widget */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
         aria-expanded={isExpanded}

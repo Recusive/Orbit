@@ -125,6 +125,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Todo output' : 'Expand Todo output'}
         aria-expanded={isExpanded}

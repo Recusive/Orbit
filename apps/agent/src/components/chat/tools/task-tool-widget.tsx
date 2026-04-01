@@ -94,6 +94,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
         aria-expanded={isExpanded}

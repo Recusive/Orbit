@@ -128,6 +128,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={
           isExpanded ? `Collapse Edit output for ${fileName}` : `Expand Edit output for ${fileName}`

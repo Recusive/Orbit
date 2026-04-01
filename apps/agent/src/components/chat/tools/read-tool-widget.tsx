@@ -43,6 +43,7 @@ export const ReadToolWidget: FC<ReadToolWidgetProps> = ({
 
   return (
     <button
+      type="button"
       onClick={handleFileClick}
       title={filePath}
       className={cn(

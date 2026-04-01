@@ -121,6 +121,7 @@ export const GrepToolWidget: FC<GrepToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Grep output' : 'Expand Grep output'}
         aria-expanded={isExpanded}

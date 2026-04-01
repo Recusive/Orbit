@@ -51,6 +51,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Web Fetch output' : 'Expand Web Fetch output'}
         aria-expanded={isExpanded}

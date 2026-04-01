@@ -115,6 +115,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsible header */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse question details' : 'Expand question details'}
         aria-expanded={isExpanded}

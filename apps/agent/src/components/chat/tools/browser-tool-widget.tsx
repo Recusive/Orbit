@@ -174,6 +174,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsed header — "Browser" */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}

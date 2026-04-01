@@ -65,6 +65,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row with plan-mode accent */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Plan output' : 'Expand Plan output'}
         aria-expanded={isExpanded}

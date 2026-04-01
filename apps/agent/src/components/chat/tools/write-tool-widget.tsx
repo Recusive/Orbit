@@ -123,6 +123,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row, full-width click target */}
       <button
+        type="button"
         onClick={toggleExpanded}
         aria-label={
           isExpanded
