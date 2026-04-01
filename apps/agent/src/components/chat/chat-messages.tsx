@@ -38,6 +38,10 @@ import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import { deduplicateAndSortTools, useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
 
+/** Constant empty array — prevents a new [] allocation per no-tool message
+ *  on every Virtuoso item re-render (e.g., container resize). */
+const EMPTY_TOOLS: ToolExecution[] = [];
+
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly isAgentRunning: boolean;
@@ -68,17 +72,29 @@ const CHAT_MAX_WIDTH_STYLE = {
   maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
 };
 
+/** Item wrapper style — max-width + CSS layout containment.
+ *  `contain: layout style` creates an independent formatting context per message,
+ *  so the browser can skip re-validating sibling layout when container width changes
+ *  (panel resize). Does NOT include `paint` — that breaks WKWebView text selection. */
+const ITEM_WRAPPER_STYLE = {
+  maxWidth: `var(${CHAT_WIDTH_VAR.primary}, ${String(CHAT_WIDTH.primary)}px)`,
+  contain: 'layout style' as const,
+};
+
+/** Stable style for the VirtuosoMessageList scroller. */
+const LIST_STYLE = { scrollbarGutter: 'stable both-edges' as const };
+
 const MessageItemContent: VirtuosoItemContent<ChatMessage, MessageListContext> = ({
   data: message,
   index,
   context,
 }) => {
-  const tools = context.toolsByMessageId.get(message.id) ?? [];
+  const tools = context.toolsByMessageId.get(message.id) ?? EMPTY_TOOLS;
 
   return (
     <div
       className={`mx-auto px-4 mb-3${index === 0 ? ' pt-4' : ''}${index === context.messageCount - 1 ? ' pb-8' : ''}`}
-      style={CHAT_MAX_WIDTH_STYLE}
+      style={ITEM_WRAPPER_STYLE}
     >
       <MessageItem
         message={message}
@@ -324,6 +340,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const sessionKey = sessionId ?? '';
 
+  // Stable key function — avoids creating a new closure on each render.
+  // Virtuoso compares the function reference; a new ref can force item re-renders.
+  const computeItemKey = useCallback(
+    ({ index }: { index: number }): string => `${sessionKey}:${String(index)}`,
+    [sessionKey]
+  );
+
   // Clear consumed scroll intent
   useEffect(() => {
     if (scrollIntent !== null && sessionId !== undefined) {
@@ -370,12 +393,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             ref={listRef}
             data={messageListData}
             context={messageListContext}
-            computeItemKey={({ index }) => `${sessionKey}:${String(index)}`}
+            computeItemKey={computeItemKey}
             ItemContent={MessageItemContent}
             increaseViewportBy={10000}
             shortSizeAlign="top"
             className="flex-1 overflow-x-hidden overscroll-y-contain"
-            style={{ scrollbarGutter: 'stable both-edges' }}
+            style={LIST_STYLE}
           />
         </VirtuosoMessageListLicense>
 
