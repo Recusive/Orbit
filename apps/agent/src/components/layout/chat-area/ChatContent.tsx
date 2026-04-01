@@ -94,18 +94,10 @@ export const ChatContent: FC<ChatContentProps> = ({
         /* Vault page: Note tiles grid */
         <VaultPage />
       ) : isEmptyState ? (
-        /* Empty state: Input positioned above center */
-        <div
-          className="flex-1 flex flex-col justify-center"
-          style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }}
-        >
-          {extraControls}
-          <ChatInput {...inputProps} />
-        </div>
+        /* Empty state: spacer pushes input (rendered below) above center */
+        <div className="flex-1" style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }} />
       ) : (
-        /* Normal layout: Virtuoso fills remaining space, input sits below.
-           Input is a flex sibling so it doesn't overlap the message list.
-           No footer spacer needed — the list's scroll bottom IS the visual bottom. */
+        /* Normal layout: Virtuoso fills remaining space, input sits below as sibling. */
         <div className="flex-1 flex flex-col min-h-0">
           <ChatMessages
             messages={messages}
@@ -118,13 +110,19 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-          <div className="shrink-0 pb-2 px-0">
-            <TodoBar />
-            {extraControls}
-            <ChatInput {...inputProps} />
-          </div>
         </div>
       )}
+
+      {/* ChatInput rendered ONCE outside the ternary — never unmounts during
+          session switches. visibility:visible overrides the parent's
+          visibility:hidden so the input stays visible during transitions. */}
+      {!vaultOpen ? (
+        <div className="shrink-0 pb-2 px-0" style={{ visibility: 'visible' }}>
+          <TodoBar />
+          {extraControls}
+          <ChatInput {...inputProps} />
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -373,7 +373,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     setAnimatingMessageIds(new Set());
-    prevMessageCount.current = 0;
+    // Set to current message count (not 0) so the heuristic fallback
+    // doesn't misread the cached data as "new appends" on the next render.
+    prevMessageCount.current = messagesRef.current.length;
     prevSessionIdRef.current = sessionId;
   }, [sessionId]);
 
@@ -395,8 +397,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <ToolWidgetSessionContext.Provider value={sessionKey}>
       <div className="flex-1 flex flex-col min-h-0">
-        {/* TODO: Add a production Virtuoso Message List license key before shipping. */}
-        <VirtuosoMessageListLicense licenseKey="">
+        <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
           <VirtuosoMessageList<ChatMessage, MessageListContext>
             ref={listRef}
             data={messageListData}

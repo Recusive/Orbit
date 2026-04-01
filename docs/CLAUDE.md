@@ -94,7 +94,6 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `TUI-CLI/ORBIT-TUI-RATATUI.md` — Orbit TUI (Ratatui): extract agent-bridge crate, port Codex TUI widgets, build CLI chat interface
 - `AGENT-BRIDGE-HTTP-SSE-MIGRATION.md` — Replace stdin/stdout Rust proxy with HTTP+SSE direct frontend↔sidecar communication (5→2 serialization boundaries)
-- `fix-activity-panel-overflow-on-sidebar-open.md` — Fix activity panel pushed off-screen when sidebar opens (reactive width clamp via useEffect)
 
 ## plans/tracked/done/ (49 entries)
 
@@ -147,6 +146,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `FIX-OPENCODE-IMAGE-ATTACHMENTS.md` — Fix image attachments not sent to OpenCode backend (wire ImageAttachment → FilePartInput through adapter layer, widen SDK overlay)
 - `DISABLE-IMAGE-BUTTON-UNSUPPORTED-MODELS.md` — Disable image button when model doesn't support images (derive supportsImageInput from modalities/attachment, backend-gated UI, chip cleanup, send-time guard)
 - `fix-base64-leak-image-dialog.md` — Fix base64 data leaking into DOM via image src attributes (SafeImage component converts data: URLs to opaque blob: URLs across all four rendering surfaces)
+- `fix-activity-panel-overflow-on-sidebar-open.md` — Fix activity panel pushed off-screen when sidebar opens (CSS max-width clamp, decision record: 4 failed JS approaches)
 - `FIX-IMAGE-BUTTON-TYPE-MISMATCH.md` — Fix image button enabled for all models (schema-data divergence: migrate to capabilities-based model schema, make supportsImageInput required)
 - `STRICT-TYPING-LINT-CLEANUP.md` — Strict typing and lint suppression cleanup (6-phase: config consolidation, Rust allow→expect, LSP audit, TS fixes, Agent-backend targeted, test standardization)
 - `auth-method-picker.md` — Auth method picker for Claude backend (radio-card selector in Account Settings, Rust preference persistence, bootstrap respect)

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
@@ -87,12 +87,29 @@ const ClaudeAgentSurface: FC = () => {
     window.dispatchEvent(new CustomEvent('focusChatInput'));
   }, []);
 
+  // Deferred skeleton: only show after 200ms of transitioning.
+  // With VirtuosoMessageList, most chat switches complete in <100ms.
+  // Showing the skeleton immediately caused a visible flash on fast transitions.
+  const [showSkeleton, setShowSkeleton] = useState(false);
+  useEffect(() => {
+    if (!isTransitioning) {
+      setShowSkeleton(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setShowSkeleton(true);
+    }, 200);
+    return (): void => {
+      clearTimeout(timer);
+    };
+  }, [isTransitioning]);
+
   return (
     <div
       className="relative flex-1 flex flex-col min-w-0 overflow-hidden bg-chat-area"
       style={{ contain: 'layout style paint' }}
     >
-      {isTransitioning ? (
+      {showSkeleton ? (
         <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none pt-4">
           <ChatSkeleton />
         </div>
