@@ -262,8 +262,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // The library handles all auto-scroll internally via these modifiers.
   // With no Footer content, isAtBottom (4px threshold) works correctly.
   const messageListData = useMemo((): DataWithScrollModifier<ChatMessage> => {
+    // Empty data guard — the library's binary search crashes when scroll
+    // modifiers (item-location, items-change, auto-scroll-to-bottom) target
+    // items in an empty array: "Failed binary finding record, searched for 0".
+    // This happens during session transitions when messages briefly becomes [].
+    if (messages.length === 0) {
+      return { data: messages };
+    }
+
     // Explicit intent from service layer (setMessages callers)
-    if (scrollIntent !== null && messages.length > 0) {
+    if (scrollIntent !== null) {
       switch (scrollIntent) {
         case 'history-load':
           return {
