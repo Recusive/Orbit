@@ -75,8 +75,10 @@ const DiffStatsButton: FC = () => {
     <Tooltip>
       <TooltipTrigger asChild>
         <button
+          type="button"
           data-tauri-drag-region={false}
           onClick={handleClick}
+          aria-label={tooltipText}
           className={cn(
             'flex items-center h-6 rounded-md overflow-hidden',
             'text-[11px] font-medium tabular-nums',
