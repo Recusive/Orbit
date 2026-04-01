@@ -79,7 +79,7 @@ const PREFERS_REDUCED_MOTION =
 /** Wallpaper fade transition — hoisted to module level (rendering-hoist-jsx) */
 const WALLPAPER_TRANSITION = `opacity ${String(LAUNCH_SEQUENCE.wallpaperFadeDuration)}ms ${LAUNCH_SEQUENCE.wallpaperEasing}`;
 
-/** Activity panel slide transition — margin reclaims space, transform moves it off-screen */
+/** Activity panel slide transition — margin reclaims space, width capped by CSS max-width */
 const ACTIVITY_TRANSITION: string | undefined = PREFERS_REDUCED_MOTION
   ? undefined
   : `margin-right ${CONTENT_CARD.transition}`;
@@ -385,6 +385,7 @@ const App: FC = () => {
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen);
   const reviewPanelOpen = useUIStore((s) => s.reviewPanelOpen);
   const reviewPanelWidth = useUIStore((s) => s.reviewPanelWidth);
+  const setReviewPanelWidth = useUIStore((s) => s.setReviewPanelWidth);
 
   // ── Launch sequence state ──────────────────────────────────────────────
   const launchPhase = useLaunchSequenceStore((s) => s.phase);
@@ -542,6 +543,17 @@ const App: FC = () => {
       if (rightSidebarOpen) requiredWidth += SIDEBAR.iconColumnWidth;
 
       if (window.innerWidth < requiredWidth) {
+        // Shrink the activity panel first so we only collapse the sidebar when
+        // the current viewport truly cannot support both panels.
+        if (activityPanelOpen) {
+          let maxActivity =
+            window.innerWidth - leftSidebarWidth - CHAT_PANEL.MIN_WIDTH - CONTENT_CARD.gap;
+          if (rightSidebarOpen) maxActivity -= SIDEBAR.iconColumnWidth;
+          if (maxActivity >= PANEL_SIZES.review.min && reviewPanelWidth > maxActivity) {
+            setReviewPanelWidth(maxActivity);
+            return;
+          }
+        }
         collapseLeftSidebar();
       }
     };
@@ -550,7 +562,7 @@ const App: FC = () => {
     return (): void => {
       window.removeEventListener('resize', handleResize);
     };
-  }, [collapseLeftSidebar, hasWorkspace, isDemo]);
+  }, [collapseLeftSidebar, hasWorkspace, isDemo, setReviewPanelWidth]);
 
   useEffect(() => {
     if (!hasWorkspace) {
@@ -678,10 +690,15 @@ const App: FC = () => {
   const activityWrapperStyle = useMemo(
     (): CSSProperties => ({
       width: reviewPanelWidth,
+      // CSS-driven width cap: the browser enforces this every frame as the cardsRow
+      // resizes (sidebar toggle/drag, window resize, actions bar). No JS clamping
+      // needed — the layout engine handles it natively, just like the chat column's
+      // flex:1 + minWidth. The 404px = CHAT_PANEL.MIN_WIDTH (400) + CONTENT_CARD.gap (4).
+      maxWidth: `calc(100% - ${String(CHAT_PANEL.MIN_WIDTH + CONTENT_CARD.gap)}px)`,
       marginRight: activityOpen ? 0 : -reviewPanelWidth,
       flexShrink: 0,
       // marginRight alone drives both the slide and space-reclaim — the parent's
-      // overflow-hidden clips the panel as it moves past the edge. This keeps the
+      // overflow-clip clips the panel as it moves past the edge. This keeps the
       // activity card and chat area edges perfectly in sync (no gap/flash).
       transition: ACTIVITY_TRANSITION,
     }),
@@ -806,6 +823,7 @@ const App: FC = () => {
   // activityWrapperRef targets the activity column for direct DOM width updates.
   const cardsRowRef = useRef<HTMLDivElement>(null);
   const activityWrapperRef = useRef<HTMLDivElement>(null);
+  const [cardsRowWidth, setCardsRowWidth] = useState(0);
 
   // ResizeHandle calls onDrag → sets style.width directly at 60fps, no re-renders.
   // Store commit happens once on mouseup.
@@ -825,6 +843,84 @@ const App: FC = () => {
     if (!row) return PANEL_SIZES.review.default;
     return row.clientWidth - CHAT_PANEL.MIN_WIDTH - CONTENT_CARD.gap;
   }, []);
+
+  // Observe the cards row width directly so activity-panel clamping reacts to
+  // sidebar toggle/drag, right-sidebar changes, and onboarding mount timing.
+  useEffect(() => {
+    const row = cardsRowRef.current;
+    if (!row) return;
+
+    setCardsRowWidth(row.getBoundingClientRect().width);
+
+    let rafId: number | null = null;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        setCardsRowWidth(entry.contentRect.width);
+      });
+    });
+
+    observer.observe(row);
+    return (): void => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [hasCompletedOnboarding, isDemo]);
+
+  /**
+   * Responsive activity-panel layout guard.
+   *
+   * [warning] TESTED: This clamp/fallback path is covered by integration tests.
+   *     If you modify this, run: `bun test`
+   *     Test file: `apps/agent/src/__tests__/integration/app-activity-panel-layout.test.tsx`
+   */
+  const enforceImpossibleLayoutFallback = useCallback((): void => {
+    const state = useUIStore.getState();
+
+    if (state.leftSidebarWidth > SIDEBAR.collapsed) {
+      state.collapseLeftSidebar();
+      return;
+    }
+
+    if (state.rightSidebarOpen) {
+      state.toggleRightSidebar();
+      return;
+    }
+
+    if (state.activeTab !== 'editor' && state.reviewPanelOpen) {
+      state.toggleReviewPanel();
+    }
+  }, []);
+
+  // ── Observer-based clamp (fallback for extreme viewports) ───────────────
+  // CSS max-width handles normal clamping. This JS fallback handles the case
+  // where even the activity panel's minimum (300px) + chat minimum (400px)
+  // can't fit — triggers the impossible-layout cascade (collapse sidebar,
+  // close right sidebar, close review panel).
+  const clampActivityToRow = useCallback((): void => {
+    if (!activityOpen || cardsRowWidth <= 0) return;
+
+    const maxWidth = cardsRowWidth - CHAT_PANEL.MIN_WIDTH - CONTENT_CARD.gap;
+
+    // CSS max-width handles normal clamping — the store keeps the user's
+    // preferred width so the panel restores when space returns (sidebar closes).
+    // JS only intervenes when even the minimum (300px) can't fit.
+    if (maxWidth >= PANEL_SIZES.review.min) return;
+
+    const { reviewPanelWidth } = useUIStore.getState();
+    if (reviewPanelWidth > PANEL_SIZES.review.min) {
+      setReviewPanelWidth(PANEL_SIZES.review.min);
+    }
+    enforceImpossibleLayoutFallback();
+  }, [activityOpen, cardsRowWidth, enforceImpossibleLayoutFallback, setReviewPanelWidth]);
+
+  useEffect(() => {
+    clampActivityToRow();
+  }, [clampActivityToRow]);
 
   // Show onboarding flow if user hasn't completed it yet (skip in demo mode)
   if (!hasCompletedOnboarding && !isDemo) {

@@ -1,0 +1,12 @@
+diff --git a/dist/index.js b/dist/index.js
+index a83b64f51776dae67813c92c4c9699bfa66ca06f..a253907b90b971e8f0d422044d73a9df1fba50aa 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -149,6 +149,7 @@ function On(e) {
+   return !T(t) && t.lvl === e.lvl ? O(t, { r: O(e, { l: t.r }) }) : e;
+ }
+ function wt(e, t, n, o = 0) {
++  if (e.length === 0) return -1;
+   let i = e.length - 1;
+   for (; o <= i; ) {
+     const s = Math.floor((o + i) / 2), l = e[s], r = n(l, t);

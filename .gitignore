@@ -79,6 +79,9 @@ reference/
 reviews/
 audits/
 
+# Nightshift worktrees (local only)
+docs/Nightshift/worktree-*/
+
 # Personal prompts and notes (local only)
 Prompt and Info/
 

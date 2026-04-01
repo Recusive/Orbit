@@ -30,6 +30,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `INSTANT-HOVER-SIDEBAR-LISTS.md` — Instant hover for all list items: removed backdrop-blur, bg transitions, and transition-all (Frequency Principle)
 - `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md` — Container-level blur reveal for sidebar view switches: skeleton hold timer, key-based remount, GPU compositing lesson
 - `OVERFLOW-CLIP-VS-HIDDEN.md` — overflow-clip over overflow-hidden for layout containers: prevents scrollIntoView from shifting ContentCard
+- `ACTIVITY-PANEL-CSS-MAXWIDTH-CLAMP.md` — CSS max-width with calc(100%) over JS clamping for activity panel overflow (4 failed JS attempts, WKWebView reflow/transition quirks)
 
 ## architecture/ (11 files)
 

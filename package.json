@@ -189,5 +189,8 @@
     "@codemirror/state": "^6.5.4",
     "@codemirror/view": "^6.39.13",
     "shiki": "^3.22.0"
+  },
+  "patchedDependencies": {
+    "@virtuoso.dev/message-list@1.16.2": "patches/@virtuoso.dev%2Fmessage-list@1.16.2.patch"
   }
 }

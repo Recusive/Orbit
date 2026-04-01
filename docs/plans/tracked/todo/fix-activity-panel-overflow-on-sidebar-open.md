@@ -16,19 +16,45 @@ Root cause: `reviewPanelWidth` is only clamped at drag-time (`getActivityMax` in
 const setReviewPanelWidth = useUIStore((s) => s.setReviewPanelWidth);
 ```
 
-### 2. Observe cards row width via `useContainerWidth`
+### 2. Observe cards row width via local ResizeObserver
 
 **File:** `apps/agent/src/App.tsx` — after `cardsRowRef` declaration (~line 807)
 
-Use the existing `useContainerWidth` hook (RAF-debounced `ResizeObserver`) to track the actual cards row width. This reacts to sidebar toggle, sidebar drag (DOM-only until mouseup), right sidebar toggle, and window resize through a single source of truth — no timeouts, no store-event dependency arrays.
+Track the actual cards row width with a local `ResizeObserver`. This reacts to sidebar toggle, sidebar drag (DOM-only until mouseup), right sidebar toggle, and window resize through a single source of truth.
+
+**Why not `useContainerWidth`:** That hook attaches its observer once on mount. `App.tsx` returns early to `<OnboardingFlow />` before `cardsRowRef` mounts, so the ref is `null` on first effect run. Because the hook depends only on the stable `ref` object, it never retries. A local observer with `hasCompletedOnboarding` in the dependency array re-runs when onboarding completes and the cards row actually mounts.
 
 ```typescript
-import { useContainerWidth } from '@/hooks/ui/use-container-width';
+const [cardsRowWidth, setCardsRowWidth] = useState(0);
 
-// Observed width of the cards row — drives the activity panel clamp.
+// Observe the cards row width — drives the activity panel clamp.
 // ResizeObserver fires on any cause: sidebar toggle/drag, right sidebar,
-// window resize. RAF-debounced so rapid changes coalesce into one update.
-const cardsRowWidth = useContainerWidth(cardsRowRef);
+// window resize. Re-attaches after onboarding completes (ref becomes non-null).
+useEffect(() => {
+  const row = cardsRowRef.current;
+  if (!row) return;
+
+  setCardsRowWidth(row.getBoundingClientRect().width);
+
+  let rafId: number | null = null;
+  const observer = new ResizeObserver((entries) => {
+    const entry = entries[0];
+    if (!entry) return;
+
+    // RAF-debounce: coalesce rapid resize events into one update per frame
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      setCardsRowWidth(entry.contentRect.width);
+    });
+  });
+
+  observer.observe(row);
+  return (): void => {
+    if (rafId !== null) cancelAnimationFrame(rafId);
+    observer.disconnect();
+  };
+}, [hasCompletedOnboarding, isDemo]);
 ```
 
 ### 3. Add reactive clamp effect driven by observed row width
@@ -127,8 +153,8 @@ if (window.innerWidth < requiredWidth) {
 
 ## Files modified
 
-| File                     | Change                                                                                                  |
-| ------------------------ | ------------------------------------------------------------------------------------------------------- |
+| File                     | Change                                                                                                     |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | `apps/agent/src/App.tsx` | Add selector (~L387), observe row width, add clamp effect + fallback (~L828), improve handleResize (~L544) |
 
 ## Edge cases to verify
@@ -140,6 +166,7 @@ if (window.innerWidth < requiredWidth) {
 5. **Editor mode.** `activityOpen` includes `activeTab === 'editor'` (always-on activity column). Sidebar toggle should clamp identically. Fallback step 3 skips closing the review panel in editor mode.
 6. **Demo mode formula.** `activityOpen` uses `!isWelcome` while `handleResize` uses `hasWorkspace || isDemo`. These are equivalent (`isWelcome = !hasWorkspace && !isDemo`) but worth confirming they don't diverge.
 7. **Browser/demo below 704px.** Fallback chain steps 2–3 fire: close right sidebar → close review panel. Editor mode below 704px accepts overflow (not a supported viewport).
+8. **First-launch onboarding → workspace.** Complete onboarding without reloading. The local observer re-attaches because `hasCompletedOnboarding` is in the dependency array. Verify `cardsRowWidth` updates correctly after the cards row mounts.
 
 ## Verification
 
@@ -160,19 +187,28 @@ if (window.innerWidth < requiredWidth) {
 
 **Audited**: 2026-04-01 | **Verdict**: Approve with changes (applied above) | **Report**: `reviews/audit-plan.md`
 
-Changes applied from audit (3 rounds):
+Changes applied from audit (4 rounds):
 
 **Round 1** — CSS transition timing + missing fallbacks:
+
 - Identified `row.clientWidth` stale read during sidebar `margin-left` transition
 - Added `collapseLeftSidebar()` fallback when `maxWidth < PANEL_SIZES.review.min`
 
 **Round 2** — Observer-driven architecture:
-- Replaced store-event-driven effect + 220ms timeout with `useContainerWidth(cardsRowRef)` observer
+
+- Replaced store-event-driven effect + 220ms timeout with observer-driven row width
 - Added `enforceImpossibleLayoutFallback` for viewports below 704px
 - Sidebar drag now covered (ResizeObserver fires on DOM width changes, not just store updates)
 
 **Round 3** — Runtime scope + lint compliance:
+
 - Split verification by runtime (desktop Tauri minWidth:800 vs browser/demo)
 - Documented editor-mode `<704px` as unsupported viewport (accepted overflow)
 - Wrapped `enforceImpossibleLayoutFallback` in `useCallback` for ESLint exhaustive-deps
-- Added `enforceImpossibleLayoutFallback` to `clampActivityToRow` dependency array
+
+**Round 4** — Late-mounted ref fix:
+
+- Replaced `useContainerWidth(cardsRowRef)` with local ResizeObserver in App.tsx
+- `useContainerWidth` only attaches once (stable ref dep) — fails when `cardsRowRef.current` is null during onboarding early return
+- Local observer uses `[hasCompletedOnboarding, isDemo]` deps so it re-attaches when the cards row mounts
+- Added onboarding→workspace transition edge case
