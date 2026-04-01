@@ -1,5 +1,5 @@
 import { Check, ClockFading, Copy, Rewind } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import type { FC, ReactNode } from 'react';
 
@@ -26,30 +26,40 @@ function formatDuration(ms: number): string {
   return seconds > 0 ? `${String(minutes)}m ${String(seconds)}s` : `${String(minutes)}m`;
 }
 
+const ICON_BUTTON_CLASSES =
+  'h-6 w-6 flex items-center justify-center rounded-[9px] bg-transparent text-muted-foreground/70 transition-[background-color,color] duration-150 hover:bg-lg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+
 interface ActionButtonProps {
   readonly label: string;
   readonly className?: string | undefined;
   readonly disabled?: boolean;
+  /** When false, renders a plain button without the Radix Tooltip tree.
+   *  This avoids ~12 Radix components per button for invisible action bars
+   *  (the bar is opacity:0 when the message isn't hovered). */
+  readonly withTooltip?: boolean;
   readonly onClick?: (() => void) | undefined;
   readonly children: ReactNode;
 }
 
-const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onClick, children }) => {
-  const iconButtonClasses =
-    'h-6 w-6 flex items-center justify-center rounded-[9px] bg-transparent text-muted-foreground/70 transition-[background-color,color] duration-150 hover:bg-lg-control-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50';
+const ActionButton: FC<ActionButtonProps> = ({ label, className, disabled, onClick, children, withTooltip = true }) => {
+  const button = (
+    <button
+      type="button"
+      className={cn(ICON_BUTTON_CLASSES, className)}
+      aria-label={label}
+      title={withTooltip ? undefined : label}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+
+  if (!withTooltip) return button;
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>
-        <button
-          className={cn(iconButtonClasses, className)}
-          aria-label={label}
-          onClick={disabled ? undefined : onClick}
-          disabled={disabled}
-        >
-          {children}
-        </button>
-      </TooltipTrigger>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
       <TooltipContent side="top" sideOffset={4}>
         {label}
       </TooltipContent>
@@ -91,17 +101,23 @@ export const MessageActions: FC<MessageActionsProps> = ({
     }, 2000);
   };
 
+  // Stable style objects — avoid recreating on every render.
+  const containerStyle = useMemo(
+    () => ({
+      opacity: isHovered ? 1 : 0,
+      transition: 'opacity 150ms ease-out',
+      willChange: 'opacity' as const,
+    }),
+    [isHovered]
+  );
+
   return (
     <div
       className="mt-3 flex items-center justify-between"
-      style={{
-        opacity: isHovered ? 1 : 0,
-        transition: 'opacity 150ms ease-out',
-        willChange: 'opacity',
-      }}
+      style={containerStyle}
     >
       <div className="flex items-center gap-1">
-        <ActionButton label={copied ? 'Copied!' : 'Copy'} onClick={handleCopy}>
+        <ActionButton label={copied ? 'Copied!' : 'Copy'} onClick={handleCopy} withTooltip={isHovered}>
           {copied ? (
             <Check className="h-3 w-3" aria-hidden="true" />
           ) : (
@@ -110,6 +126,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
         </ActionButton>
         <ActionButton
           label="Report"
+          withTooltip={isHovered}
           onClick={() => {
             onDislike?.();
           }}
@@ -125,6 +142,7 @@ export const MessageActions: FC<MessageActionsProps> = ({
                 : undefined
             }
             disabled={rewindDisabled}
+            withTooltip={isHovered}
             onClick={onRewind}
           >
             <Rewind className="h-3.5 w-3.5" aria-hidden="true" />
