@@ -156,7 +156,12 @@ function loadImage(file: File): Promise<HTMLImageElement> {
 
     const reader = new FileReader();
     reader.onload = (e): void => {
-      img.src = e.target?.result as string;
+      const result = e.target?.result;
+      if (typeof result !== 'string') {
+        reject(new Error('FileReader did not produce a data URL string'));
+        return;
+      }
+      img.src = result;
     };
     reader.onerror = (): void => {
       reject(new Error('Failed to read file'));
