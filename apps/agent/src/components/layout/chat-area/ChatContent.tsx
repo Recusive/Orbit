@@ -103,10 +103,10 @@ export const ChatContent: FC<ChatContentProps> = ({
           <ChatInput {...inputProps} />
         </div>
       ) : (
-        /* Normal layout: Messages fill the space, input overlays the bottom.
-           The input is absolutely positioned so messages scroll behind it,
-           creating a frosted-glass blur effect via backdrop-filter. */
-        <div className="flex-1 flex flex-col relative min-h-0">
+        /* Normal layout: Virtuoso fills remaining space, input sits below.
+           Input is a flex sibling so it doesn't overlap the message list.
+           No footer spacer needed — the list's scroll bottom IS the visual bottom. */
+        <div className="flex-1 flex flex-col min-h-0">
           <ChatMessages
             messages={messages}
             isAgentRunning={isAgentRunning}
@@ -118,8 +118,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-          {/* Floating input container — transparent with soft fade at top */}
-          <div className="absolute bottom-0 inset-x-0 z-20 pb-2 chat-input-frost">
+          <div className="shrink-0 pb-2 px-0">
             <TodoBar />
             {extraControls}
             <ChatInput {...inputProps} />

@@ -1,11 +1,15 @@
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 import { z } from 'zod';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -45,6 +49,7 @@ function parseTaskOutput(output: string): string {
 }
 
 interface TaskToolWidgetProps {
+  readonly toolId: string;
   readonly description: string;
   readonly prompt: string;
   readonly subagentType: string;
@@ -69,6 +74,7 @@ function truncatePrompt(prompt: string, maxLength = 200): string {
 }
 
 export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
+  toolId,
   prompt,
   subagentType,
   model,
@@ -77,7 +83,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   success,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -88,9 +94,7 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Task output' : 'Expand Task output'}
         aria-expanded={isExpanded}
         className={cn(

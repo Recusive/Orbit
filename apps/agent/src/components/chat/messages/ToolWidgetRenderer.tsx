@@ -78,6 +78,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       if (filePath.includes('/.claude/plans/') || filePath.includes('\\.claude\\plans\\')) {
         return (
           <PlanToolWidget
+            toolId={tool.id}
             filePath={filePath}
             content={content}
             isRunning={statusProps.isRunning}
@@ -89,6 +90,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
 
       return (
         <WriteToolWidget
+          toolId={tool.id}
           filePath={filePath}
           content={content}
           isRunning={statusProps.isRunning}
@@ -101,6 +103,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'edit':
       return (
         <EditToolWidget
+          toolId={tool.id}
           filePath={getStringInput(tool, 'file_path', 'unknown')}
           oldString={getStringInput(tool, 'old_string', '')}
           newString={getStringInput(tool, 'new_string', '')}
@@ -114,6 +117,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       if (hasEditShape(tool)) {
         return (
           <EditToolWidget
+            toolId={tool.id}
             filePath={getStringInput(tool, 'file_path', 'unknown')}
             oldString={getStringInput(tool, 'old_string', '')}
             newString={getStringInput(tool, 'new_string', '')}
@@ -125,6 +129,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       }
       return (
         <GenericToolWidget
+          toolId={tool.id}
           toolName={tool.toolName}
           toolInput={tool.toolInput}
           toolOutput={tool.toolOutput}
@@ -147,6 +152,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'bash':
       return (
         <BashToolWidget
+          toolId={tool.id}
           command={getStringInput(tool, 'command', '')}
           description={getStringInput(tool, 'description', '')}
           output={statusProps.output}
@@ -158,6 +164,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'glob':
       return (
         <GlobToolWidget
+          toolId={tool.id}
           pattern={getStringInput(tool, 'pattern', '*')}
           path={getStringInput(tool, 'path', '') || undefined}
           output={statusProps.output}
@@ -170,6 +177,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'grep':
       return (
         <GrepToolWidget
+          toolId={tool.id}
           pattern={getStringInput(tool, 'pattern', '')}
           path={getStringInput(tool, 'path', '') || undefined}
           outputMode={getStringInput(tool, 'output_mode', '') || undefined}
@@ -191,6 +199,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'websearch':
       return (
         <WebSearchToolWidget
+          toolId={tool.id}
           query={getStringInput(tool, 'query', '')}
           output={statusProps.output}
           isRunning={statusProps.isRunning}
@@ -202,6 +211,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'webfetch':
       return (
         <WebFetchToolWidget
+          toolId={tool.id}
           url={getStringInput(tool, 'url', '')}
           prompt={getStringInput(tool, 'prompt', '')}
           output={statusProps.output}
@@ -214,6 +224,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'codesearch':
       return (
         <CodeSearchToolWidget
+          toolId={tool.id}
           query={getStringInput(tool, 'query', '')}
           output={statusProps.output}
           isRunning={statusProps.isRunning}
@@ -224,6 +235,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
     case 'task':
       return (
         <TaskToolWidget
+          toolId={tool.id}
           description={getStringInput(tool, 'description', '')}
           prompt={getStringInput(tool, 'prompt', '')}
           subagentType={getStringInput(tool, 'subagent_type', 'general-purpose')}
@@ -248,6 +260,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
           : undefined;
       return (
         <AskUserQuestionWidget
+          toolId={tool.id}
           questions={rawQuestions}
           answers={answers}
           isRunning={statusProps.isRunning}
@@ -276,6 +289,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       if (isBrowserTool(tool.toolName)) {
         return (
           <BrowserToolWidget
+            toolId={tool.id}
             toolName={tool.toolName}
             toolInput={tool.toolInput}
             isRunning={statusProps.isRunning}
@@ -286,6 +300,7 @@ export const ToolWidgetRenderer: FC<ToolWidgetRendererProps> = ({
       }
       return (
         <GenericToolWidget
+          toolId={tool.id}
           toolName={tool.toolName}
           toolInput={tool.toolInput}
           toolOutput={tool.toolOutput}

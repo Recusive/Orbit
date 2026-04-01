@@ -92,6 +92,7 @@ export interface MessageItemProps {
   readonly isAgentRunning: boolean;
   /** Whether to animate this message sliding in (for newly sent messages) */
   readonly animate?: boolean | undefined;
+  readonly onAnimationComplete?: ((messageId: string) => void) | undefined;
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
   readonly onOpenUrl: (url: string) => void;

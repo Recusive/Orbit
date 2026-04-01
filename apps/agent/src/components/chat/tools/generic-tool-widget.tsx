@@ -1,14 +1,20 @@
 import { ChevronRight, Loader2, Wrench, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
 import { cn, formatMcpToolName } from '@/lib/utils';
 
 interface GenericToolWidgetProps {
+  readonly toolId: string;
   readonly toolName: string;
   readonly toolInput: Record<string, unknown>;
   readonly toolOutput?: unknown;
@@ -42,13 +48,14 @@ function formatToolName(toolName: string): string {
 }
 
 export const GenericToolWidget: FC<GenericToolWidgetProps> = ({
+  toolId,
   toolName,
   toolInput,
   toolOutput,
   isRunning = false,
   success,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const title = useMemo(() => formatToolName(toolName), [toolName]);
@@ -59,9 +66,7 @@ export const GenericToolWidget: FC<GenericToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       <button
         type="button"
-        onClick={() => {
-          setIsExpanded((state) => !state);
-        }}
+        onClick={toggleExpanded}
         aria-expanded={isExpanded}
         aria-label={isExpanded ? `Collapse ${title} output` : `Expand ${title} output`}
         className={cn(

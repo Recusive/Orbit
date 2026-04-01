@@ -1,10 +1,14 @@
 import { ChevronRight, Code, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -17,6 +21,7 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 const CONTROLS_CONFIG = { table: false } as const;
 
 interface CodeSearchToolWidgetProps {
+  readonly toolId: string;
   readonly query: string;
   readonly output?: string | undefined;
   readonly isRunning?: boolean;
@@ -24,12 +29,13 @@ interface CodeSearchToolWidgetProps {
 }
 
 export const CodeSearchToolWidget: FC<CodeSearchToolWidgetProps> = ({
+  toolId,
   query,
   output,
   isRunning = false,
   success,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -39,9 +45,7 @@ export const CodeSearchToolWidget: FC<CodeSearchToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Code Search output' : 'Expand Code Search output'}
         aria-expanded={isExpanded}
         className={cn(

@@ -10,15 +10,20 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
 interface BrowserToolWidgetProps {
+  readonly toolId: string;
   /** Raw tool name from SDK (may be MCP-prefixed like mcp__orbit-browser__browser_open) */
   readonly toolName: string;
   readonly toolInput: Record<string, unknown>;
@@ -149,6 +154,7 @@ function getStepLabel(
 }
 
 export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
+  toolId,
   toolName,
   toolInput,
   isRunning = false,
@@ -156,7 +162,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
   onOpenUrl,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -168,9 +174,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsed header — "Browser" */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Browser output' : 'Expand Browser output'}
         aria-expanded={isExpanded}
         className={cn(

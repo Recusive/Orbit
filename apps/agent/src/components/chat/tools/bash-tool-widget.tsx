@@ -7,6 +7,7 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
 
@@ -15,6 +16,7 @@ import type { FC } from 'react';
 import { cn } from '@/lib/utils';
 
 interface BashToolWidgetProps {
+  readonly toolId: string;
   readonly command: string;
   readonly description?: string | undefined;
   readonly output?: string | undefined;
@@ -23,6 +25,7 @@ interface BashToolWidgetProps {
 }
 
 export const BashToolWidget: FC<BashToolWidgetProps> = ({
+  toolId,
   command,
   description,
   output,
@@ -33,7 +36,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
   const [highlightedOutput, setHighlightedOutput] = useState<string>('');
 
@@ -115,9 +118,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row like Read widget */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Bash output' : 'Expand Bash output'}
         aria-expanded={isExpanded}
         className={cn(

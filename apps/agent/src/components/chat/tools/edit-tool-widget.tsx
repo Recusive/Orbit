@@ -9,6 +9,7 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
 
@@ -24,6 +25,7 @@ import {
 } from '@/lib/utils/pierre-adapter';
 
 interface EditToolWidgetProps {
+  readonly toolId: string;
   readonly filePath: string;
   readonly oldString: string;
   readonly newString: string;
@@ -33,6 +35,7 @@ interface EditToolWidgetProps {
 }
 
 export const EditToolWidget: FC<EditToolWidgetProps> = ({
+  toolId,
   filePath,
   oldString,
   newString,
@@ -41,7 +44,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   onOpenFile,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
@@ -125,9 +128,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={
           isExpanded ? `Collapse Edit output for ${fileName}` : `Expand Edit output for ${fileName}`
         }

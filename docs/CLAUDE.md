@@ -69,7 +69,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (23 entries)
+## plans/tracked/todo/ (21 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
@@ -93,9 +93,12 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `TUI-CLI/ORBIT-TUI-RATATUI.md` — Orbit TUI (Ratatui): extract agent-bridge crate, port Codex TUI widgets, build CLI chat interface
 - `AGENT-BRIDGE-HTTP-SSE-MIGRATION.md` — Replace stdin/stdout Rust proxy with HTTP+SSE direct frontend↔sidecar communication (5→2 serialization boundaries)
+- `fix-activity-panel-overflow-on-sidebar-open.md` — Fix activity panel pushed off-screen when sidebar opens (reactive width clamp via useEffect)
 
-## plans/tracked/done/ (47 entries)
+## plans/tracked/done/ (49 entries)
 
+- `virtualize-chat-react-virtuoso.md` — Virtualize chat with react-virtuoso (original plan, superseded by VirtuosoMessageList migration)
+- `virtuoso-message-list-migration.md` — Migrate to VirtuosoMessageList: purpose-built chat virtualization with built-in auto-scroll, velocity wheel damping, WKWebView scroll fixes
 - `DYNAMIC-CONTEXT-WINDOW.md` — Fix context window meter: hardcoded 200k defaults (Opus=1M), session-scoped context window from SDK modelUsage + system:init beta flag resolution
 - `FIX-CONTEXT-METER-AND-DETAIL-DIALOG.md` — Fix context meter usage source: per-turn from assistant messages (not cumulative result), correct formula (input+cache, no output), context detail dialog with session metadata
 - `remove-opencode-canvas-cleanup.md` — Remove Agent-backend, OpenCode engine, Canvas UI Builder. Orbit is now Claude-only. Preserved 5 OpenCode UI components in reference/.

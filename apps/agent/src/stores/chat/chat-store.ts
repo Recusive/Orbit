@@ -55,10 +55,13 @@ export interface PendingMessage {
   skills?: string[] | undefined;
 }
 
+export type ScrollIntent = 'history-load' | 'compact-reload' | 'rewind';
+
 export interface ChatSessionData {
   messages: ChatMessage[];
   isAgentRunning: boolean;
   isStopPending: boolean;
+  scrollIntent?: ScrollIntent | null;
 }
 
 export interface ActiveCompaction {
@@ -96,7 +99,8 @@ export interface ChatStoreState {
   getOrCreateSession: (id: string) => ChatSessionData;
   setActiveSession: (id: string) => void;
   clearActiveSession: () => void;
-  setMessages: (id: string, msgs: ChatMessage[]) => void;
+  setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null) => void;
+  clearScrollIntent: (id: string) => void;
   appendToLastMessage: (id: string, messageId: string, content: string) => void;
   appendThinking: (id: string, messageId: string, thinking: string) => void;
   addMessage: (id: string, msg: ChatMessage) => void;
@@ -147,6 +151,7 @@ function createEmptySession(): ChatSessionData {
     messages: [],
     isAgentRunning: false,
     isStopPending: false,
+    scrollIntent: null,
   };
 }
 
@@ -278,13 +283,23 @@ export const useChatStore = create<ChatStoreState>()(
         });
       },
 
-      setMessages: (id: string, msgs: ChatMessage[]): void => {
+      setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null): void => {
         set((draft) => {
           if (!draft.sessions[id]) {
             draft.sessions[id] = createEmptySession();
             touchLru(draft.lruOrder, id);
           }
           draft.sessions[id].messages = msgs;
+          draft.sessions[id].scrollIntent = scrollIntent ?? null;
+        });
+      },
+
+      clearScrollIntent: (id: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.scrollIntent = null;
+          }
         });
       },
 

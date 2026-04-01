@@ -124,9 +124,17 @@ class ResizeObserverMock {
     this.callback = callback;
   }
 
-  observe(): void {
-    // Immediately call with empty entries to simulate initial observation
-    this.callback([], this);
+  observe(target: Element): void {
+    // Supply a minimal valid entry so ResizeObserver consumers that expect
+    // contentRect / box sizes do not crash in tests.
+    const entry = {
+      target,
+      contentRect: target.getBoundingClientRect(),
+      borderBoxSize: [{ blockSize: 0, inlineSize: 0 }],
+      contentBoxSize: [{ blockSize: 0, inlineSize: 0 }],
+      devicePixelContentBoxSize: [{ blockSize: 0, inlineSize: 0 }],
+    } as ResizeObserverEntry;
+    this.callback([entry], this);
   }
 
   unobserve(): void {

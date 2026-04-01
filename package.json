@@ -120,6 +120,7 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-updater": "^2.10.0",
+    "@virtuoso.dev/message-list": "^1.16.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-search": "0.16.0",
     "@xterm/addon-web-links": "^0.12.0",

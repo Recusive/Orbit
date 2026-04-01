@@ -9,6 +9,7 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
 
@@ -24,6 +25,7 @@ import {
 } from '@/lib/utils/pierre-adapter';
 
 interface WriteToolWidgetProps {
+  readonly toolId: string;
   readonly filePath: string;
   readonly content: string;
   readonly isRunning?: boolean;
@@ -32,6 +34,7 @@ interface WriteToolWidgetProps {
 }
 
 export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
+  toolId,
   filePath,
   content,
   isRunning = false,
@@ -39,7 +42,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   onOpenFile,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
@@ -120,9 +123,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row, full-width click target */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={
           isExpanded
             ? `Collapse Write output for ${fileName}`

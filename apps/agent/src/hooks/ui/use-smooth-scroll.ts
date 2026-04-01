@@ -39,6 +39,9 @@ interface SmoothScrollOptions {
  *   0.08 = very controlled (500ms to settle)
  *   0.12 = balanced (350ms to settle)
  *   0.18 = responsive (250ms to settle)
+ *
+ * Deprecated for virtualized surfaces. Prefer native scrolling unless a
+ * standalone panel explicitly needs wheel damping.
  */
 export function useSmoothScroll(
   dampingOrOptions?: number | SmoothScrollOptions

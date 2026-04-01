@@ -18,31 +18,33 @@ const HoverCardContent = React.forwardRef<
   React.ComponentRef<typeof HoverCardPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof HoverCardPrimitive.Content>
 >(({ className, align = 'center', sideOffset = 4, style, ...props }, ref) => (
-  <HoverCardPrimitive.Content
-    ref={ref}
-    align={align}
-    sideOffset={sideOffset}
-    className={cn(
-      'z-50 w-64 glass-surface p-4 text-popover-foreground outline-none',
-      // Transform origin from Radix - scales from where it connects to trigger
-      'origin-[--radix-hover-card-content-transform-origin]',
-      // Enter animation: subtle scale + fade + directional slide
-      'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97]',
-      // Exit animation: reverse of enter
-      'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97]',
-      // Directional slides based on which side the popover appears
-      'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
-      'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
-      className
-    )}
-    style={{
-      // Custom timing for smoother, more responsive feel
-      animationDuration: POPOVER_ANIMATION.duration,
-      animationTimingFunction: POPOVER_ANIMATION.easing,
-      ...style,
-    }}
-    {...props}
-  />
+  <HoverCardPrimitive.Portal>
+    <HoverCardPrimitive.Content
+      ref={ref}
+      align={align}
+      sideOffset={sideOffset}
+      className={cn(
+        'z-50 w-64 glass-surface p-4 text-popover-foreground outline-none',
+        // Transform origin from Radix - scales from where it connects to trigger
+        'origin-[--radix-hover-card-content-transform-origin]',
+        // Enter animation: subtle scale + fade + directional slide
+        'data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-[0.97]',
+        // Exit animation: reverse of enter
+        'data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-[0.97]',
+        // Directional slides based on which side the popover appears
+        'data-[side=bottom]:slide-in-from-top-1 data-[side=left]:slide-in-from-right-1',
+        'data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1',
+        className
+      )}
+      style={{
+        // Custom timing for smoother, more responsive feel
+        animationDuration: POPOVER_ANIMATION.duration,
+        animationTimingFunction: POPOVER_ANIMATION.easing,
+        ...style,
+      }}
+      {...props}
+    />
+  </HoverCardPrimitive.Portal>
 ));
 HoverCardContent.displayName = HoverCardPrimitive.Content.displayName;
 

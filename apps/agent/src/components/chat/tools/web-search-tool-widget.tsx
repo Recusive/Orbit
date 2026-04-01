@@ -1,15 +1,20 @@
 import { ChevronRight, Globe, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 import { z } from 'zod';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
 interface WebSearchToolWidgetProps {
+  readonly toolId: string;
   readonly query: string;
   readonly output?: string | undefined;
   readonly isRunning?: boolean;
@@ -91,6 +96,7 @@ function getHostname(url: string): string {
 }
 
 export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
+  toolId,
   query,
   output,
   isRunning = false,
@@ -98,7 +104,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
   onOpenUrl,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -111,9 +117,7 @@ export const WebSearchToolWidget: FC<WebSearchToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Web Search output' : 'Expand Web Search output'}
         aria-expanded={isExpanded}
         className={cn(

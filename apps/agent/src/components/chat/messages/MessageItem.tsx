@@ -65,7 +65,7 @@ const REMARK_PLUGINS = [remarkGfm];
 // changed. This caused a massive DOM restructuring (removing hundreds of spans
 // in one frame), creating a visible flash/glitch at the end of streaming.
 // Keeping the spans avoids the restructuring. The extra DOM weight is negligible
-// since the virtualizer limits to ~15 messages in the DOM.
+// relative to the cost of tearing down and rebuilding the markdown tree.
 const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
@@ -97,11 +97,20 @@ const FlowTokenSegment: FC<{
 
 /** Collapsible user message bubble — clamps long content behind a "Show more" toggle. */
 const UserMessageBubble: FC<{
+  readonly messageId: string;
   readonly content: string;
   readonly animate: boolean | undefined;
+  readonly onAnimationComplete?: ((messageId: string) => void) | undefined;
   readonly onOpenFile?: (path: string) => void;
   readonly attachedFiles?: string[] | undefined;
-}> = memo(function UserMessageBubble({ content, animate, onOpenFile, attachedFiles }) {
+}> = memo(function UserMessageBubble({
+  messageId,
+  content,
+  animate,
+  onAnimationComplete,
+  onOpenFile,
+  attachedFiles,
+}) {
   const contentRef = useRef<HTMLParagraphElement>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -199,6 +208,7 @@ const UserMessageBubble: FC<{
         // it on style recalculations triggered by sibling content changes
         // (thinking→text transition, tool widgets appearing, etc.)
         e.currentTarget.style.animation = 'none';
+        onAnimationComplete?.(messageId);
       }}
     >
       {/* Content area with optional height clamp + mask fade when collapsed */}
@@ -244,6 +254,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   isLastMessage,
   isAgentRunning,
   animate,
+  onAnimationComplete,
   onRewind,
   onOpenFile,
   onOpenUrl,
@@ -362,8 +373,10 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           <div className="flex flex-col items-end gap-1 pb-3">
             {message.displayedContent.trim().length > 0 ? (
               <UserMessageBubble
+                messageId={message.id}
                 content={message.displayedContent}
                 animate={animate}
+                onAnimationComplete={onAnimationComplete}
                 onOpenFile={onOpenFile}
                 attachedFiles={message.attachedFiles}
               />

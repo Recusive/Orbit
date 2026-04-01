@@ -1022,7 +1022,7 @@ class ChatMessageService {
         .map((m) => mapPersistedMessage({ ...m, role: m.role as 'user' | 'assistant' }));
 
       // Replace messages in store — full swap, no merge
-      useChatStore.getState().setMessages(sessionId, newMessages);
+      useChatStore.getState().setMessages(sessionId, newMessages, 'compact-reload');
       logger.info(
         `Compact reload: replaced ${String(newMessages.length)} messages for ${sessionId}`
       );
@@ -1303,7 +1303,7 @@ class ChatMessageService {
         }
 
         // Write messages to store
-        useChatStore.getState().setMessages(message.session_id, newMessages);
+        useChatStore.getState().setMessages(message.session_id, newMessages, 'history-load');
 
         // Count messages with tools for diagnostic logging
         const messagesWithTools = message.messages.filter(
@@ -1382,7 +1382,7 @@ class ChatMessageService {
     }
 
     const targetSessionId = isSameSession ? message.session_id : message.new_session_id;
-    useChatStore.getState().setMessages(targetSessionId, rewoundMessages);
+    useChatStore.getState().setMessages(targetSessionId, rewoundMessages, 'rewind');
 
     // Set rewind fork point
     if (rewoundMessages.length > 0) {

@@ -7,11 +7,15 @@
  */
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -29,6 +33,7 @@ const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
 
 interface PlanToolWidgetProps {
+  readonly toolId: string;
   readonly filePath: string;
   readonly content: string;
   readonly isRunning?: boolean;
@@ -37,13 +42,14 @@ interface PlanToolWidgetProps {
 }
 
 export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
+  toolId,
   filePath,
   content,
   isRunning = false,
   success,
   onOpenFile,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // Plans start expanded
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId, true);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -59,9 +65,7 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row with plan-mode accent */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Plan output' : 'Expand Plan output'}
         aria-expanded={isExpanded}
         className={cn(

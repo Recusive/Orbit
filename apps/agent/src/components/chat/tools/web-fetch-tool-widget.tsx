@@ -1,14 +1,19 @@
 import { ChevronRight, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
 interface WebFetchToolWidgetProps {
+  readonly toolId: string;
   readonly url: string;
   readonly prompt: string;
   readonly output?: string | undefined;
@@ -26,6 +31,7 @@ function getHostname(url: string): string {
 }
 
 export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
+  toolId,
   url,
   prompt,
   output,
@@ -34,7 +40,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
   onOpenUrl,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -45,9 +51,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Web Fetch output' : 'Expand Web Fetch output'}
         aria-expanded={isExpanded}
         className={cn(

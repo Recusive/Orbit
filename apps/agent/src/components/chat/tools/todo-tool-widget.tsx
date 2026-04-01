@@ -1,8 +1,12 @@
 import { CheckCircle2, ChevronRight, Circle, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC, ReactElement } from 'react';
 
@@ -15,6 +19,7 @@ interface TodoItem {
 }
 
 interface TodoToolWidgetProps {
+  readonly toolId: string;
   readonly todos?: unknown[] | undefined;
   readonly isRunning?: boolean;
   readonly success?: boolean | undefined;
@@ -99,12 +104,13 @@ function StatusIcon({ status }: { readonly status: TodoItem['status'] }): ReactE
 }
 
 export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
+  toolId,
   todos: rawTodos,
   isRunning = false,
   success,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
 
@@ -119,9 +125,7 @@ export const TodoToolWidget: FC<TodoToolWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Header — flat inline row */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse Todo output' : 'Expand Todo output'}
         aria-expanded={isExpanded}
         className={cn(

@@ -12,9 +12,13 @@
  */
 import { ChevronRight, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useState } from 'react';
 
-import { TOOL_EXPAND_ENTER, TOOL_EXPAND_EXIT, TOOL_EXPAND_TRANSITION_NONE } from './shared';
+import {
+  TOOL_EXPAND_ENTER,
+  TOOL_EXPAND_EXIT,
+  TOOL_EXPAND_TRANSITION_NONE,
+  useToolWidgetExpanded,
+} from './shared';
 
 import type { FC } from 'react';
 
@@ -26,6 +30,7 @@ interface QuestionAnswer {
 }
 
 interface AskUserQuestionWidgetProps {
+  readonly toolId: string;
   readonly questions: readonly Record<string, unknown>[];
   readonly answers?: Readonly<Record<string, string>> | undefined;
   readonly isRunning: boolean;
@@ -78,6 +83,7 @@ function extractQuestions(questions: readonly Record<string, unknown>[]): string
 }
 
 export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
+  toolId,
   questions,
   answers: injectedAnswers,
   isRunning,
@@ -85,7 +91,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
   output,
 }) => {
   // Always start collapsed — user expands manually if they want the full view
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const shouldReduceMotion = useReducedMotion();
 
   const isFailed = success === false;
@@ -109,9 +115,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
       {/* Collapsible header */}
       <button
-        onClick={() => {
-          setIsExpanded(!isExpanded);
-        }}
+        onClick={toggleExpanded}
         aria-label={isExpanded ? 'Collapse question details' : 'Expand question details'}
         aria-expanded={isExpanded}
         className={cn(
