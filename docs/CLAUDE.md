@@ -22,7 +22,7 @@ Use this to find the right file. Read the file directly — no links needed.
 | `changelog/`            | Release notes per version            | What shipped in each version     |
 | `orbitweb/`             | Marketing site context               | Orbitweb-specific (read-only)    |
 
-## decisions/ (6 files)
+## decisions/ (7 files)
 
 - `BROWSER-WINDOW-CORNER-RADIUS.md` — Why native CALayer rounding is needed for the embedded browser (CSS can't clip NSWindows)
 - `CHAT-PANEL-MINIMUM-WIDTH.md` — Constant 400px chat floor via dynamic activity cap, sidebar auto-collapse, header overflow fade
@@ -31,6 +31,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md` — Container-level blur reveal for sidebar view switches: skeleton hold timer, key-based remount, GPU compositing lesson
 - `OVERFLOW-CLIP-VS-HIDDEN.md` — overflow-clip over overflow-hidden for layout containers: prevents scrollIntoView from shifting ContentCard
 - `ACTIVITY-PANEL-CSS-MAXWIDTH-CLAMP.md` — CSS max-width with calc(100%) over JS clamping for activity panel overflow (4 failed JS attempts, WKWebView reflow/transition quirks)
+- `VIRTUOSO-SCROLLBAR-JITTER-COMPENSATION.md` — Three-tier scrollTop compensation for VirtuosoMessageList mid-list scrollbar jitter (MutationObserver + ResizeObserver + rAF, library gap analysis)
 
 ## architecture/ (11 files)
 

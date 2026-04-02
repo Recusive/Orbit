@@ -77,15 +77,16 @@ ASCII diagram showing the flow/structure.
 
 ## Current Records
 
-| File                                   | Summary                                                                                       | Date       |
-| -------------------------------------- | --------------------------------------------------------------------------------------------- | ---------- |
-| `BROWSER-WINDOW-CORNER-RADIUS.md`      | Native CALayer rounding for embedded browser — CSS can't clip NSWindows                       | 2026-02-23 |
-| `CHAT-PANEL-MINIMUM-WIDTH.md`          | Constant 400px chat floor, dynamic activity cap, sidebar auto-collapse, header overflow fade  | 2026-02-24 |
-| `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md` | Single margin-left slide instead of two-property transition to eliminate desync jank          | 2026-02-24 |
-| `INSTANT-HOVER-SIDEBAR-LISTS.md`       | Instant hover for all list items — removed backdrop-blur, bg transitions, transition-all      | 2026-02-25 |
-| `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md`   | Container-level blur reveal for sidebar view switches — skeleton hold, key-based remount      | 2026-03-12 |
-| `OVERFLOW-CLIP-VS-HIDDEN.md`           | overflow-clip over overflow-hidden for layout containers — prevents scrollIntoView card shift | 2026-03-18 |
-| `ACTIVITY-PANEL-CSS-MAXWIDTH-CLAMP.md` | CSS max-width with calc(100%) over JS clamping — 4 failed JS approaches, WKWebView quirks     | 2026-04-01 |
+| File                                        | Summary                                                                                                            | Date       |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ---------- |
+| `BROWSER-WINDOW-CORNER-RADIUS.md`           | Native CALayer rounding for embedded browser — CSS can't clip NSWindows                                            | 2026-02-23 |
+| `CHAT-PANEL-MINIMUM-WIDTH.md`               | Constant 400px chat floor, dynamic activity cap, sidebar auto-collapse, header overflow fade                       | 2026-02-24 |
+| `SIDEBAR-ANIMATION-SINGLE-PROPERTY.md`      | Single margin-left slide instead of two-property transition to eliminate desync jank                               | 2026-02-24 |
+| `INSTANT-HOVER-SIDEBAR-LISTS.md`            | Instant hover for all list items — removed backdrop-blur, bg transitions, transition-all                           | 2026-02-25 |
+| `BLUR-REVEAL-SIDEBAR-TRANSITIONS.md`        | Container-level blur reveal for sidebar view switches — skeleton hold, key-based remount                           | 2026-03-12 |
+| `OVERFLOW-CLIP-VS-HIDDEN.md`                | overflow-clip over overflow-hidden for layout containers — prevents scrollIntoView card shift                      | 2026-03-18 |
+| `ACTIVITY-PANEL-CSS-MAXWIDTH-CLAMP.md`      | CSS max-width with calc(100%) over JS clamping — 4 failed JS approaches, WKWebView quirks                          | 2026-04-01 |
+| `VIRTUOSO-SCROLLBAR-JITTER-COMPENSATION.md` | Three-tier scrollTop compensation for mid-list scrollbar jitter — MutationObserver + ResizeObserver + rAF fallback | 2026-04-02 |
 
 ---
 

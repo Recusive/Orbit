@@ -14,7 +14,23 @@
  * Returns a callback ref — attach it to the scrollable element, or call
  * it imperatively with the element from a useEffect.
  *
- * ── Tuning Guide (if scrollbar jitter or ghost text returns) ───────────
+ * ── Scrollbar Jitter Fix ─────────────────────────────────────────────
+ *
+ * VirtuosoMessageList's scroll compensation (the `jump` mechanism) only
+ * fires when scrolled to the bottom. During mid-list scrolling, when
+ * items in the overscan zone get measured by ResizeObserver, scrollHeight
+ * changes shift the scrollbar ratio (scrollTop / scrollRange) without
+ * any compensation — causing the scrollbar thumb to jump backward.
+ *
+ * The library's deviation system (translateY-based) only fires for
+ * upward scrolling. Downward scroll has zero compensation.
+ *
+ * Fix: A ResizeObserver on the inner list container detects height
+ * changes IN THE SAME FRAME (after layout, before paint). It adjusts
+ * scrollTop proportionally to maintain the scrollbar ratio. The rAF
+ * tick has a fallback check for any changes the observer misses.
+ *
+ * ── Tuning Guide ─────────────────────────────────────────────────────
  *
  * SCROLLBAR JITTER on first scroll of a session:
  *   - Increase `warmupEvents` (default 3). More native events = more time
@@ -56,6 +72,41 @@ interface VelocityScrollOptions {
   warmupEvents?: number;
 }
 
+/** Selector for Virtuoso's inner list container. */
+const LIST_SELECTOR = '[data-testid="virtuoso-list"]';
+
+/**
+ * Compensate scrollTop to maintain the scrollbar ratio when scrollHeight
+ * changes during active scrolling. Returns the compensation applied.
+ *
+ * Formula: newScrollTop / (newScrollHeight - clientHeight)
+ *        = oldScrollTop / (oldScrollHeight - clientHeight)
+ *
+ * Solving: compensation = scrollTop × (delta / oldScrollRange)
+ */
+function compensateScrollHeight(scroller: HTMLElement, lastScrollHeight: number): number {
+  const curScrollHeight = scroller.scrollHeight;
+  if (lastScrollHeight <= 0 || curScrollHeight === lastScrollHeight) {
+    return 0;
+  }
+
+  const delta = curScrollHeight - lastScrollHeight;
+  const scrollRange = lastScrollHeight - scroller.clientHeight;
+
+  // Skip when at bottom — the library handles that case internally.
+  const atBottom = scroller.scrollTop + scroller.clientHeight >= curScrollHeight - 4;
+
+  if (scrollRange <= 0 || atBottom) {
+    return 0;
+  }
+
+  const compensation = Math.round(scroller.scrollTop * (delta / scrollRange));
+  if (compensation !== 0) {
+    scroller.scrollTop += compensation;
+  }
+  return compensation;
+}
+
 export function useVelocityScroll(
   options?: VelocityScrollOptions
 ): (node: HTMLElement | null) => void {
@@ -79,15 +130,106 @@ export function useVelocityScroll(
       let animating = false;
       let raf = 0;
       let nativeCount = 0;
+      let lastScrollHeight = 0;
+
+      // ── Same-frame scrollHeight compensation ───────────────────────
+      // Two observers on the inner list container catch scrollHeight
+      // changes before the browser paints:
+      //
+      // 1. MutationObserver (style attribute) — fires as a MICROTASK
+      //    immediately after React updates the container's height/margin.
+      //    Reading scrollHeight forces synchronous layout → we get the
+      //    correct value and compensate before the rendering pipeline
+      //    continues. This is the primary mechanism.
+      //
+      // 2. ResizeObserver (border-box) — fires AFTER layout, catches
+      //    any changes the MutationObserver missed (e.g., changes that
+      //    don't go through React's style attribute updates).
+      //
+      // Both share `lastScrollHeight`. The first one to detect a change
+      // compensates and updates the variable; the second sees no delta.
+      // The rAF tick has a tertiary fallback for the pre-mount period.
+      let listResizeObserver: ResizeObserver | null = null;
+      let listStyleObserver: MutationObserver | null = null;
+
+      const onScrollHeightChange = (): void => {
+        if (!animating || lastScrollHeight <= 0) return;
+        compensateScrollHeight(node, lastScrollHeight);
+        lastScrollHeight = node.scrollHeight;
+      };
+
+      // Locate the inner list container and observe it. It may not exist
+      // yet if the data is empty (the library conditionally renders it).
+      const observeListContainer = (): void => {
+        const listEl = node.querySelector(LIST_SELECTOR);
+        if (listEl === null) return;
+
+        // Primary: MutationObserver on style attribute — earliest signal.
+        // Fires as a microtask after React updates height/margin/padding.
+        listStyleObserver = new MutationObserver(onScrollHeightChange);
+        listStyleObserver.observe(listEl, {
+          attributes: true,
+          attributeFilter: ['style'],
+        });
+
+        // Secondary: ResizeObserver on border-box — fires after layout,
+        // catches non-style size changes.
+        listResizeObserver = new ResizeObserver(onScrollHeightChange);
+        listResizeObserver.observe(listEl, { box: 'border-box' });
+      };
+
+      // If the list container isn't in the DOM yet, use a MutationObserver
+      // to detect when it appears, then start observation.
+      let listChildObserver: MutationObserver | null = null;
+
+      const initListObserver = (): void => {
+        if (node.querySelector(LIST_SELECTOR) !== null) {
+          observeListContainer();
+          return;
+        }
+
+        // Wait for the list container to appear.
+        listChildObserver = new MutationObserver(() => {
+          if (node.querySelector(LIST_SELECTOR) !== null) {
+            listChildObserver?.disconnect();
+            listChildObserver = null;
+            observeListContainer();
+          }
+        });
+        listChildObserver.observe(node, { childList: true });
+      };
+
+      initListObserver();
 
       const tick = (): void => {
         if (Math.abs(velocity) < 0.3) {
           velocity = 0;
           animating = false;
+          lastScrollHeight = 0;
           return;
         }
-        const max = node.scrollHeight - node.clientHeight;
-        node.scrollTop = Math.round(Math.max(0, Math.min(node.scrollTop + velocity, max)));
+
+        // Fallback: if the ResizeObserver missed a scrollHeight change
+        // (or hasn't been set up yet), catch it here. This fires 1 frame
+        // late but is better than no compensation.
+        const curScrollHeight = node.scrollHeight;
+        let compensation = 0;
+
+        if (lastScrollHeight > 0 && curScrollHeight !== lastScrollHeight) {
+          const delta = curScrollHeight - lastScrollHeight;
+          const scrollRange = lastScrollHeight - node.clientHeight;
+          const atBottom = node.scrollTop + node.clientHeight >= curScrollHeight - 4;
+
+          if (scrollRange > 0 && !atBottom) {
+            compensation = node.scrollTop * (delta / scrollRange);
+          }
+        }
+        lastScrollHeight = curScrollHeight;
+
+        const max = curScrollHeight - node.clientHeight;
+        node.scrollTop = Math.round(
+          Math.max(0, Math.min(node.scrollTop + velocity + compensation, max))
+        );
         velocity *= friction;
         raf = requestAnimationFrame(tick);
       };
@@ -106,6 +248,7 @@ export function useVelocityScroll(
         velocity = Math.max(-maxPx, Math.min(velocity, maxPx));
         if (!animating) {
           animating = true;
+          lastScrollHeight = node.scrollHeight;
           raf = requestAnimationFrame(tick);
         }
       };
@@ -123,6 +266,9 @@ export function useVelocityScroll(
         node.removeEventListener('wheel', onWheel);
         node.removeEventListener('scroll', onScroll);
         cancelAnimationFrame(raf);
+        listResizeObserver?.disconnect();
+        listStyleObserver?.disconnect();
+        listChildObserver?.disconnect();
       };
     },
     [maxPx, friction, sensitivity, warmupEvents]
