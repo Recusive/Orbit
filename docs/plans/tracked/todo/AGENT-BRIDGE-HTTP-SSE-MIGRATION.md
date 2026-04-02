@@ -150,7 +150,11 @@ curl -N -H "Authorization: Bearer $TOKEN" http://localhost:4200/events  # SSE st
 
 ---
 
-## Phase 1: Simplify Rust to Lifecycle-Only
+## Phase 1: ~~Simplify Rust to Lifecycle-Only~~ SUPERSEDED
+
+> **This phase is superseded by the companion spec.** The revised boundary retains all 36 Rust Tauri commands with internal transport changed from stdin to reqwest HTTP. Rust remains the orchestrator for cold-path operations. See `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md` Section 3.2 for the authoritative design.
+>
+> The changes below describe the OLD plan (delete 34 commands). Do NOT implement as written.
 
 ### Modify
 
@@ -196,7 +200,11 @@ bunx tauri dev
 
 ---
 
-## Phase 2: Frontend HTTP+SSE Client
+## Phase 2: ~~Frontend HTTP+SSE Client~~ SUPERSEDED
+
+> **This phase is superseded by the companion spec.** The revised design only moves 9 hot-path functions + 10 event listeners to direct HTTP+SSE. All cold-path functions stay on Tauri IPC. See `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md` Section 3.3 for the authoritative design.
+>
+> The file list below describes the OLD plan (move all 35 functions). Do NOT implement as written.
 
 ### Create
 
@@ -241,7 +249,9 @@ Natural dual-transport: if `agent_get_bridge_info` returns port+token → HTTP m
 
 ---
 
-## Phase 3: Cleanup
+## Phase 3: ~~Cleanup~~ SUPERSEDED
+
+> **This phase is superseded by the companion spec.** The revised design retains `agent-tauri.ts` for cold-path calls and does not delete `protocol.rs`. Cleanup scope is limited to removing stdin/stdout from the sidecar and deleting the Rust reader thread/crossbeam channel/emit functions. See spec AC-20 (P2).
 
 ### Delete
 

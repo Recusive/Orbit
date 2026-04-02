@@ -85,10 +85,18 @@ const ITEM_WRAPPER_STYLE = {
 const LIST_STYLE = { scrollbarGutter: 'stable both-edges' as const };
 
 const MessageItemContent: VirtuosoItemContent<ChatMessage, MessageListContext> = ({
-  data: message,
+  data,
   index,
   context,
 }) => {
+  // Virtuoso can call this with a stale index during key-driven remounts,
+  // delivering undefined before the new data array is committed. The library's
+  // type says `data: ChatMessage` but the runtime disagrees during transitions.
+  const message = data as ChatMessage | undefined;
+  if (!message) {
+    return null;
+  }
+
   const tools = context.toolsByMessageId.get(message.id) ?? EMPTY_TOOLS;
 
   return (
@@ -233,6 +241,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
+  const initialLocation = useMemo(() => {
+    if (messages.length === 0) {
+      return null;
+    }
+
+    if (scrollIntent === 'session-restore') {
+      return { index: messages.length - 1, align: 'end' as const };
+    }
+
+    return null;
+  }, [messages.length, scrollIntent]);
+
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
   const onOpenFileRef = useRef(onOpenFile);
@@ -274,29 +294,25 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (scrollIntent !== null) {
       switch (scrollIntent) {
         case 'history-load':
-        case 'session-restore':
-          // purgeItemSizes resets cached item heights from the previous session.
-          // Without it, stale measurements corrupt scroll positioning.
-          // This also uses a different code path in the library that avoids
-          // the 2-RAF delay of the normal item-location handler.
           return {
             data: messages,
             scrollModifier: {
               type: 'item-location',
-              location: { index: messages.length - 1, align: 'end' },
-              purgeItemSizes: true,
+              location: { index: 0, align: 'start' },
             },
-          };
-        case 'session-refresh':
-          // Background refresh of the same session — no size purge needed,
-          // no scroll modifier needed (preserve current position).
-          return {
-            data: messages,
           };
         case 'compact-reload':
           return {
             data: messages,
             scrollModifier: { type: 'items-change', behavior: 'auto' },
+          };
+        case 'session-restore':
+        case 'session-refresh':
+          // Session restore is handled by a keyed remount + initialLocation.
+          // Session refresh intentionally avoids item-location because the
+          // library applies it after paint, causing a visible top flash.
+          return {
+            data: messages,
           };
         case 'rewind':
           return {
@@ -382,11 +398,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, [scrollIntent, sessionId]);
 
   useLayoutEffect(() => {
-    if (
-      scrollIntent === 'session-restore' ||
-      scrollIntent === 'session-refresh' ||
-      scrollIntent === 'history-load'
-    ) {
+    if (scrollIntent === 'session-restore' || scrollIntent === 'session-refresh') {
       lastPlacedMessagesRef.current = messages;
       return;
     }
@@ -433,8 +445,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       <div className="flex-1 flex flex-col min-h-0">
         <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
           <VirtuosoMessageList<ChatMessage, MessageListContext>
+            key={sessionKey}
             ref={listRef}
             initialData={messages}
+            {...(initialLocation ? { initialLocation } : {})}
             data={messageListData}
             context={messageListContext}
             computeItemKey={computeItemKey}
