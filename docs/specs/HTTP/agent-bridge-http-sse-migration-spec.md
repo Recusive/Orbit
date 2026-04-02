@@ -6,7 +6,7 @@
 > **Date**: 2026-04-01
 > **Scope**: Replace the stdin/stdout Rust proxy with HTTP+SSE for the agent hot path while keeping Rust as the orchestrator for session lifecycle, conversations, and credentials.
 >
-> **Plan alignment**: The companion plan has been updated with a superseded-boundary header. Phase 0 of the plan (sidecar HTTP server) is still accurate. Phases 1-3 must be reimplemented per this spec. This spec is the authoritative source for the migration boundary.
+> **Plan alignment**: The companion plan's implementation phases (1-4), dependency graph, security section, and key files table have been rewritten to match this spec's migration boundary. The plan's introductory audit section still contains language from the original lifecycle-only analysis (e.g., "frontend can HTTP directly", "3 things must stay in Rust") — treat that as historical context for why the migration was proposed, not as the current design. The phases are authoritative; the intro is background.
 
 ---
 
@@ -149,7 +149,7 @@ Two distinct credential flows exist. The spec must handle both.
 4. SSE client's reconnection attempts fail (sidecar is dead)
 5. Frontend calls `invoke('agent_notify_sidecar_down')` to inform Rust
 6. Rust's `ensure_running()` (triggered by the notification or by any cold-path Tauri command) detects process exit via `try_wait()`
-7. Rust respawns sidecar with NEW port + NEW auth token + credentials from Keychain
+7. Rust respawns sidecar with NEW port + NEW auth token + API key from `credentials.enc` (via `CredentialBridge::inject_at_spawn()`)
 8. Rust waits for `/health` to return 200 (poll 500ms, max 30s)
 9. Frontend calls `invoke('agent_get_bridge_info')` to get new port + token
 10. Frontend calls `configureBridge(newPort, newToken)` to update HTTP client
@@ -500,7 +500,7 @@ After transformation, events are delivered via `window.postMessage()` in the exa
 - **Action**: `conversationAddMessage()` called via Tauri IPC
 - **Expected output**: Message persisted to JSONL file on disk via Rust `ConversationManager`. No HTTP calls for conversation operations.
 
-**AC-7 (P0): Credentials stay in Rust with Keychain access**
+**AC-7 (P0): API-key credentials stay in Rust**
 
 - **Input**: User saves API key in Settings
 - **Action**: `store_api_key()` Tauri command encrypts + saves to disk, then calls `session_manager.update_credentials()` which delegates to sidecar via `PUT /credentials`
@@ -998,17 +998,17 @@ pub struct BridgeInfo {
 
 ## Appendix B: Glossary
 
-| Term                    | Definition                                                                                                                                                   |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Sidecar**             | The agent-bridge Bun binary (`agent-bridge-aarch64-apple-darwin`). Wraps the Claude Agent SDK. Spawned once by Rust at app startup.                          |
-| **Hot path**            | The message send → streaming response → tool calls → permissions flow. Latency-critical. Moves to direct HTTP+SSE.                                           |
-| **Cold path**           | Session lifecycle, definitions CRUD, fork/rewind, title generation. Infrequent. Stays on Tauri IPC → Rust → sidecar HTTP.                                    |
-| **SSE**                 | Server-Sent Events. HTTP-based protocol for server→client streaming. Uses `text/event-stream` content type.                                                  |
-| **TextEventBatcher**    | Sidecar component that accumulates streaming text deltas for 16ms before emitting, reducing ~200 events per response to ~4-8.                                |
-| **contentOffset**       | Character position in the accumulated text stream where a tool widget should be rendered. Calculated by `TextEventBatcher.getAccumulatedLength()`.           |
-| **Session remap**       | When the SDK creates a session, it assigns an `sdkSessionId`. The frontend must remap from its temporary UUID to this ID. Triggered by `session_init` event. |
-| **Permission resolver** | A pending Promise in the sidecar's `SessionManager.permissionResolvers` Map. Blocks tool execution until the user approves or denies.                        |
-| **BrowserToolBridge**   | Sidecar component that sends browser automation requests to the frontend WebKit view and waits for results via pending Promise.                              |
-| **ConversationManager** | Rust component in `orbit-conversations` crate. Reads/writes JSONL conversation files to disk. No sidecar involvement.                                        |
-| **CredentialBridge**    | Rust component in `credential_bridge.rs`. Manages API key synchronization between macOS Keychain and the running sidecar.                                    |
-| **RAF batcher**         | RequestAnimationFrame-based text accumulator in `ChatMessageService`. Coalesces multiple `agent:chunk` window messages into single store updates at 60fps.   |
+| Term                    | Definition                                                                                                                                                                                                                                                                             |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Sidecar**             | The agent-bridge Bun binary (`agent-bridge-aarch64-apple-darwin`). Wraps the Claude Agent SDK. Spawned once by Rust at app startup.                                                                                                                                                    |
+| **Hot path**            | The message send → streaming response → tool calls → permissions flow. Latency-critical. Moves to direct HTTP+SSE.                                                                                                                                                                     |
+| **Cold path**           | Session lifecycle, definitions CRUD, fork/rewind, title generation. Infrequent. Stays on Tauri IPC → Rust → sidecar HTTP.                                                                                                                                                              |
+| **SSE**                 | Server-Sent Events. HTTP-based protocol for server→client streaming. Uses `text/event-stream` content type.                                                                                                                                                                            |
+| **TextEventBatcher**    | Sidecar component that accumulates streaming text deltas for 16ms before emitting, reducing ~200 events per response to ~4-8.                                                                                                                                                          |
+| **contentOffset**       | Character position in the accumulated text stream where a tool widget should be rendered. Calculated by `TextEventBatcher.getAccumulatedLength()`.                                                                                                                                     |
+| **Session remap**       | When the SDK creates a session, it assigns an `sdkSessionId`. The frontend must remap from its temporary UUID to this ID. Triggered by `session_init` event.                                                                                                                           |
+| **Permission resolver** | A pending Promise in the sidecar's `SessionManager.permissionResolvers` Map. Blocks tool execution until the user approves or denies.                                                                                                                                                  |
+| **BrowserToolBridge**   | Sidecar component that sends browser automation requests to the frontend WebKit view and waits for results via pending Promise.                                                                                                                                                        |
+| **ConversationManager** | Rust component in `orbit-conversations` crate. Reads/writes JSONL conversation files to disk. No sidecar involvement.                                                                                                                                                                  |
+| **CredentialBridge**    | Rust component in `credential_bridge.rs`. Manages API key synchronization between Rust's encrypted `credentials.enc` file and the running sidecar. Injects API key at spawn via env var, pushes runtime updates via `PUT /credentials`. Does NOT handle OAuth — that is sidecar-owned. |
+| **RAF batcher**         | RequestAnimationFrame-based text accumulator in `ChatMessageService`. Coalesces multiple `agent:chunk` window messages into single store updates at 60fps.                                                                                                                             |

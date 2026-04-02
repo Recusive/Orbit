@@ -852,9 +852,14 @@ html.dark [data-streamdown='code-block-container'] {
 
 /* Base markdown container - VS Code chat typography */
 .chat-markdown {
+  display: flow-root;
   font-size: 0.8125rem; /* 13px - VS Code chat body */
   line-height: 1.75; /* increased from 1.5 — prevents inline code backgrounds overlapping on wrapped lines */
   color: var(--foreground);
+}
+
+.tool-widget {
+  display: flow-root;
 }
 
 /* Headings - VS Code scale (H1: 20px, H2: 16px, H3: 14px) */
@@ -1110,16 +1115,6 @@ html.dark .chat-markdown code:not(pre code) {
 /* Remove margins on last elements */
 .chat-markdown > *:last-child {
   margin-bottom: 0;
-}
-
-/* Tool widget spacing within chat */
-.chat-markdown + .tool-widget,
-.tool-widget + .chat-markdown {
-  margin-top: 0.75rem;
-}
-
-.tool-widget + .tool-widget {
-  margin-top: 0.375rem;
 }
 
 /* Table styling - VS Code uses 12px for tables.

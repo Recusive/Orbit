@@ -113,4 +113,31 @@ describe('MessageItem action bar visibility', () => {
     expect(screen.getByText('/strategy-competitors')).toHaveClass('text-git-untracked');
     expect(container.querySelector('code')).toBeNull();
   });
+
+  it('uses gap and padding layout wrappers for assistant segments instead of margin stacks', () => {
+    const { container } = renderMessageItem();
+
+    const root = container.firstElementChild as HTMLElement | null;
+    const markdown = screen.getByText('Hello from assistant').closest('.chat-markdown');
+    const segmentStack = markdown?.parentElement;
+    const assistantContainer = segmentStack?.parentElement;
+
+    expect(root).not.toBeNull();
+    expect(markdown).not.toBeNull();
+    expect(segmentStack).not.toBeNull();
+    expect(assistantContainer).not.toBeNull();
+
+    expect(root?.className).toContain('flex');
+    expect(root?.className).toContain('flex-col');
+    expect(root?.className).toContain('gap-2');
+    expect(root?.className).not.toContain('space-y-2');
+
+    expect(segmentStack?.className).toContain('flex');
+    expect(segmentStack?.className).toContain('flex-col');
+    expect(segmentStack?.className).toContain('gap-2');
+    expect(segmentStack?.className).not.toContain('space-y-2');
+
+    expect(assistantContainer?.className).toContain('py-1');
+    expect(assistantContainer?.className).not.toContain('my-1');
+  });
 });

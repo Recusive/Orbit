@@ -361,7 +361,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
 
   return (
     <div
-      className="message-item space-y-2"
+      className="message-item flex flex-col gap-2"
       data-streaming={message.isStreaming === true ? 'true' : 'false'}
     >
       {/* Message block */}
@@ -389,7 +389,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       ) : (
         /* Assistant message - no bubble, content flows naturally */
         <div
-          className="my-1"
+          className="py-1"
           style={{
             paddingLeft: CHAT_SPACING.assistantPadding,
             paddingRight: CHAT_SPACING.assistantPadding,
@@ -398,7 +398,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           onMouseLeave={onMouseLeaveMessage}
         >
           {/* Content and tool segments */}
-          <div className="space-y-2">
+          <div className="flex flex-col gap-2">
             {segments.map((segment) => {
               if (segment.type === 'thinking') {
                 return (

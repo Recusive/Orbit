@@ -1,10 +1,8 @@
 # Plan: Agent-Bridge HTTP+SSE Migration
 
-> **SUPERSEDED BOUNDARY**: This plan's Phases 1-3 prescribe deleting 34 Rust commands and moving all operations to frontend HTTP. That boundary has been revised. The authoritative migration boundary is defined in the companion spec: `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md`.
+> **Companion spec**: `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md` — defines behavioral contracts, acceptance criteria, and data types.
 >
-> **Revised boundary**: Only the hot path (9 functions + 10 event listeners) moves to direct HTTP+SSE. All cold-path operations (sessions, definitions, fork/rewind, generate) stay on Tauri IPC through Rust, which delegates to the sidecar via HTTP instead of stdin. The 36 Tauri commands are retained with internal transport changed from stdin to reqwest.
->
-> **What to use from this plan**: Phase 0 (sidecar HTTP server) is still accurate. Phases 1-3 must be reimplemented per the spec.
+> **Migration boundary**: Hot path (9 functions + 10 event listeners) → direct HTTP+SSE. Cold path (sessions, definitions, fork/rewind, generate) → Tauri IPC through Rust, which delegates to sidecar via HTTP instead of stdin. The 36 Tauri commands are retained with internal transport changed from stdin to reqwest.
 
 ## Context
 
@@ -150,127 +148,149 @@ curl -N -H "Authorization: Bearer $TOKEN" http://localhost:4200/events  # SSE st
 
 ---
 
-## Phase 1: ~~Simplify Rust to Lifecycle-Only~~ SUPERSEDED
+## Phase 1: Rust Internal Transport — stdin to HTTP
 
-> **This phase is superseded by the companion spec.** The revised boundary retains all 36 Rust Tauri commands with internal transport changed from stdin to reqwest HTTP. Rust remains the orchestrator for cold-path operations. See `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md` Section 3.2 for the authoritative design.
->
-> The changes below describe the OLD plan (delete 34 commands). Do NOT implement as written.
+Replace the `AgentBridge` stdin/stdout IPC with `reqwest` HTTP calls to the sidecar. All 36 Tauri commands keep their existing signatures. The frontend sees no change.
 
 ### Modify
 
-| File                                        | Change                                                                                                                                                                                                                                 |
-| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src-tauri/src/agent/bridge.rs`             | Remove: reader_thread, send_request, stdin/stdout fields, crossbeam channel. Keep: spawn (with auth token + port env vars), wait_for_ready (poll GET /health), shutdown (POST /shutdown). Add: get_port(), get_auth_token() accessors. |
-| `src-tauri/src/agent/session.rs`            | Remove all 30+ proxy methods. Keep: new(), ensure_running(), shutdown(), get_port(), get_auth_token(), update_credentials() (now POST to HTTP endpoint).                                                                               |
-| `src-tauri/src/agent/protocol.rs`           | Delete entirely — Rust no longer serializes/deserializes bridge messages.                                                                                                                                                              |
-| `src-tauri/src/commands/agent/lifecycle.rs` | Replace 36 Tauri commands with 2: `agent_get_bridge_info` (returns { port, authToken }) and `agent_update_credentials`. Remove setup*event_callbacks and all emit*\* functions.                                                        |
-| `src-tauri/src/agent/credential_bridge.rs`  | `push_to_running()` now does HTTP POST to /credentials instead of stdin write.                                                                                                                                                         |
-| `src-tauri/src/lib.rs`                      | Remove setup_event_callbacks call. Keep session_manager in .manage() for the 2 remaining commands.                                                                                                                                     |
-| `src-tauri/src/commands/mod.rs`             | Update command registration — remove 34 commands, keep 2.                                                                                                                                                                              |
+| File                                        | Change                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src-tauri/src/agent/bridge.rs`             | Remove: `stdin` field, `response_rx` field, `event_callback` field, `reader_thread()`, `send_request()` (stdin-based), `send_request_async()`, `set_event_callback()`, `wait_for_ready()` (crossbeam-based). Add: `port: u16`, `auth_token: String`, `http_client: reqwest::Client`, `get_port()`, `get_auth_token()`. New `send_request()` does HTTP POST via reqwest. New `wait_for_ready()` polls `GET /health` (500ms intervals, 30s timeout). Keep: `spawn()` / `spawn_with_extra_env()` (add `ORBIT_BRIDGE_PORT` + `ORBIT_BRIDGE_AUTH_TOKEN` env vars), `check_and_recover()`, `shutdown()` (change to `POST /shutdown`), `is_running()`. |
+| `src-tauri/src/agent/session.rs`            | All methods that call `bridge.send_request(&BridgeRequest::...)` change to `bridge.http_post("/endpoint", &json!({...}))`. Public API unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `src-tauri/src/agent/credential_bridge.rs`  | `push_to_running()`: replace `bridge.send_request(&BridgeRequest::UpdateCredentials {...})` with `bridge.http_put("/credentials", &json!({...}))`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `src-tauri/src/commands/agent/lifecycle.rs` | Remove: 10 `emit_*` functions (lines 511-643), `setup_event_callbacks()` (line 646). Add: `agent_get_bridge_info` command (returns `{ port, authToken }`), `agent_notify_sidecar_down` command (triggers respawn, returns new `BridgeInfo`). All other 36 commands stay unchanged.                                                                                                                                                                                                                                                                                                                                                              |
+| `src-tauri/src/lib.rs`                      | Remove `setup_event_callbacks()` call. Add `agent_get_bridge_info` and `agent_notify_sidecar_down` to `generate_handler![]`. Keep `.manage(session_manager)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `src-tauri/Cargo.toml`                      | Activate `reqwest` with `json` feature (already in workspace deps). Remove `crossbeam-channel`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
-### Rust spawn changes
+### Spawn changes
 
 ```rust
-// Generate ephemeral auth token
 let auth_token = uuid::Uuid::new_v4().to_string();
-// Find available port
 let port = scan_ports(4200..4300)?;
-// Set env vars for sidecar
 Command::new(sidecar_path)
     .env("ORBIT_BRIDGE_AUTH_TOKEN", &auth_token)
     .env("ORBIT_BRIDGE_PORT", port.to_string())
     .env("CLAUDE_CLI_PATH", &cli_path)
     .env("CLAUDE_CODE_ENABLE_SDK_FILE_CHECKPOINTING", "1")
-    .stdin(Stdio::null())  // no more stdin pipe
-    .stdout(Stdio::inherit()) // for debug logging if needed
+    // inject_at_spawn() adds ANTHROPIC_API_KEY from credentials.enc if set
+    .stdout(Stdio::piped())  // still read stdout for Ready event during transition
     .stderr(Stdio::inherit())
     .spawn()
 ```
 
-Health check: poll `GET http://127.0.0.1:{port}/health` with 500ms intervals, up to 30s.
+Bootstrap: wait for existing `{"type":"ready"}` stdout event (no payload change), then poll `GET /health` until 200.
 
 ### Test
 
 ```bash
 bunx tauri dev
 # Verify sidecar spawns, health check passes
-# In frontend console: invoke('agent_get_bridge_info') → { port: 4200, authToken: "..." }
+# invoke('agent_get_bridge_info') → { port: 4200, authToken: "..." }
 # curl http://127.0.0.1:4200/health → { status: "ok" }
+# All existing agent operations work (session create, send message, etc.)
+# Events still flow via Tauri (emit functions removed in Phase 2)
 ```
 
 ---
 
-## Phase 2: ~~Frontend HTTP+SSE Client~~ SUPERSEDED
+## Phase 2: Frontend Hot Path — Direct HTTP+SSE
 
-> **This phase is superseded by the companion spec.** The revised design only moves 9 hot-path functions + 10 event listeners to direct HTTP+SSE. All cold-path functions stay on Tauri IPC. See `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md` Section 3.3 for the authoritative design.
->
-> The file list below describes the OLD plan (move all 35 functions). Do NOT implement as written.
+Move 9 hot-path functions and 10 event listeners from Tauri IPC to direct HTTP+SSE. Cold-path functions stay on Tauri IPC → Rust → sidecar HTTP.
 
 ### Create
 
-| File                                   | Purpose                                                                                                                                                                            |
-| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/lib/api/agent-http.ts` | HTTP client — configure(port, token), then all 35 agent functions as fetch() calls. Same function signatures as current agent.ts.                                                  |
-| `apps/agent/src/lib/api/agent-sse.ts`  | SSE client — connectSSE(port, token, handlers). Uses fetch + ReadableStream (not EventSource, since EventSource doesn't support custom headers). Exponential backoff reconnection. |
+| File                                   | Purpose                                                                                                                                                                                                                                                                                       |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/agent/src/lib/api/agent-http.ts` | HTTP client for hot path only: `configureBridge()`, `httpSendMessage()`, `httpInterrupt()`, `httpRespondPermission()`, `httpSetConfig()`, `httpBrowserToolResponse()`. Uses `fetch()` with `Authorization: Bearer` header and Sentry span wrapping.                                           |
+| `apps/agent/src/lib/api/agent-sse.ts`  | SSE client: `connectSSE(port, token, handlers)`. Uses `fetch()` + `ReadableStream` (not `EventSource` — need custom `Authorization` header). Exponential backoff reconnection (1s→2s→4s→...→30s). Translates SSE events to `window.postMessage()` in the format `ChatMessageService` expects. |
 
 ### Modify
 
-| File                                                        | Change                                                                                                                                                                                                                                       |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/agent/src/lib/api/agent.ts`                           | Rename to `agent-tauri.ts` (no code changes). New `agent.ts` becomes a dispatch layer: if HTTP configured → use agent-http, else → use agent-tauri. This enables incremental migration.                                                      |
-| `apps/agent/src/providers/tauri-provider.tsx`               | In initializeListeners: call `invoke('agent_get_bridge_info')` → `configure(port, token)` → `connectSSE(port, token, handlers)`. SSE handlers replace the 10 onAgent\* Tauri listeners. Keep terminal, browser, file listeners on Tauri IPC. |
-| `apps/agent/src/hooks/chat/handlers/chat-actions.ts`        | Replace 2-3 separate pre-flight IPC calls (thinking:set, model:set, effort:set) with single `PUT /sessions/:id/config` batch call.                                                                                                           |
-| `apps/agent/src/hooks/agent/handlers/agent-sdk-handlers.ts` | handleMessageSend now calls HTTP instead of Tauri invoke. ensureSession calls HTTP create session.                                                                                                                                           |
+| File                                                          | Change                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/agent/src/providers/tauri-provider.tsx`                 | After `bootstrapRuntimeHealth`: call `invoke('agent_get_bridge_info')` → `configureBridge(port, token)` → `connectSSE(port, token, handlers)`. Remove 10 `onAgent*` Tauri listener registrations (lines 258-663) + `onBrowserToolRequest` (line 771). Keep: `onTerminalOutput` (667), `onTerminalExit` (688), `onTerminalForeground` (709), `onBrowserNavigated` (731), `onBrowserLoading` (751). |
+| `apps/agent/src/hooks/agent/handlers/agent-sdk-handlers.ts`   | `handleMessageSend`: `agentSendMessage()` → `httpSendMessage()`. `handleAgentStop`: `agentInterrupt()` → `httpInterrupt()`. `handlePermissionResponse`: `agentRespondPermission()` → `httpRespondPermission()`. `handleThinkingSet/ModelSet/EffortSet/InputModeSet`: replace 2-3 individual calls with single `httpSetConfig()`.                                                                  |
+| `apps/agent/src/hooks/agent/handlers/browser-tool-handler.ts` | `browserToolResponse()` → `httpBrowserToolResponse()`.                                                                                                                                                                                                                                                                                                                                            |
+| `apps/agent/src/hooks/agent/use-tauri-session.ts`             | Export `clearStaleSessions()` that clears the `createdSessions` Set. Called by SSE recovery path after sidecar respawn.                                                                                                                                                                                                                                                                           |
+| `apps/agent/src/lib/api/agent.ts`                             | No changes — existing Tauri IPC wrappers stay for cold-path calls.                                                                                                                                                                                                                                                                                                                                |
 
 ### SSE → Window Message Bridge
 
-The SSE client translates events to the same window.postMessage format that ChatMessageService already expects:
+The SSE client replicates the event transformation logic from `tauri-provider.tsx` lines 259-663:
 
 ```
-SSE agent_message → postWindowMessage({ type: 'agent:chunk', ... })
-SSE permission_request → postWindowMessage({ type: 'permission:request', ... })
-SSE session_init → postWindowMessage({ type: 'system:init', ... })
+SSE agent_message (type: text)     → postWindowMessage({ type: 'agent:chunk', ... })
+SSE agent_message (type: thinking) → postWindowMessage({ type: 'agent:thinking', ... })
+SSE agent_message (type: tool_use) → postWindowMessage({ type: 'tool:start' or 'tool:end', ... })
+SSE agent_message (type: result)   → postWindowMessage({ type: 'agent:complete', ... })
+SSE agent_message (type: error)    → postWindowMessage({ type: 'agent:error', ... })
+SSE permission_request             → postWindowMessage({ type: 'permission:request', ... })
+SSE session_init                   → postWindowMessage({ type: 'system:init', ... })
+SSE auth_error                     → AuthStore mutation + toast (no window message)
+SSE browser_tool_request           → postWindowMessage({ type: 'browser:tool_request', ... })
 ```
 
-This means ChatMessageService, the RAF batchers, and the streaming reveal controller need zero changes.
+ChatMessageService, RAF batchers, and all Zustand stores need zero changes.
 
-### Feature Flag
+### CORS
 
-Natural dual-transport: if `agent_get_bridge_info` returns port+token → HTTP mode. If it fails (old Rust code) → Tauri IPC fallback. No explicit flag needed.
+Sidecar CORS middleware required (frontend origin differs from sidecar origin):
+
+- Origin allowlist: `tauri://localhost`, `http://tauri.localhost`, `http://localhost:5176`
+- `OPTIONS` preflight responds `204` with CORS headers, no auth check
+- `Access-Control-Allow-Headers: Authorization, Content-Type`
+- `Access-Control-Max-Age: 86400`
+
+### Crash Recovery
+
+On SSE disconnect:
+
+1. SSE client retries with backoff
+2. If all retries fail → call `invoke('agent_notify_sidecar_down')`
+3. Rust respawns sidecar → returns new `BridgeInfo`
+4. Frontend calls `configureBridge(newPort, newToken)`, `clearStaleSessions()`
+5. SSE reconnects to new port
 
 ### Test
 
-- Send message → verify streaming tokens appear in chat
-- Permission dialog → approve/deny → verify agent continues/stops
-- Interrupt (stop button) → verify agent halts
-- Rewind → verify files restored + conversation forked
-- Kill sidecar → verify SSE reconnects with backoff
-- Terminal, browser, files → verify still work via Tauri IPC
+- Send message → streaming tokens via SSE
+- Permission dialog → approve/deny via HTTP → agent continues/stops
+- Stop button → `httpInterrupt()` → streaming ceases
+- Rewind → Tauri IPC → Rust → sidecar HTTP (cold path unchanged)
+- Kill sidecar → SSE reconnect → `agent_notify_sidecar_down` → respawn → recovery
+- Terminal, browser nav, files → still work via Tauri IPC
+- CORS: verify `OPTIONS` returns correct headers in both dev and production
 
 ---
 
-## Phase 3: ~~Cleanup~~ SUPERSEDED
+## Phase 3: Cleanup — Remove stdin/stdout from Sidecar
 
-> **This phase is superseded by the companion spec.** The revised design retains `agent-tauri.ts` for cold-path calls and does not delete `protocol.rs`. Cleanup scope is limited to removing stdin/stdout from the sidecar and deleting the Rust reader thread/crossbeam channel/emit functions. See spec AC-20 (P2).
-
-### Delete
-
-| File                                    | Reason                                 |
-| --------------------------------------- | -------------------------------------- |
-| `apps/agent/src/lib/api/agent-tauri.ts` | Tauri transport no longer needed       |
-| `src-tauri/src/agent/protocol.rs`       | No bridge message types needed in Rust |
+After all operations work via HTTP, remove the stdin/stdout IPC from the sidecar.
 
 ### Modify
 
-| File                                          | Change                                                                                                                                                               |
-| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `agent-bridge/src/index.ts`                   | Remove readline stdin loop, sendResponse/sendEvent stdout functions. Main() now: create SessionManager → wire events → start HTTP server → register SIGTERM handler. |
-| `apps/agent/src/lib/api/agent.ts`             | Remove dispatch layer, directly export from agent-http.ts                                                                                                            |
-| `apps/agent/src/providers/tauri-provider.tsx` | Remove 10 onAgent\* Tauri listener registrations. Only terminal, browser, file listeners remain.                                                                     |
+| File                        | Change                                                                                                                                                                                                                                              |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent-bridge/src/index.ts` | Remove readline stdin loop, `sendResponse()`/`sendEvent()` stdout functions. Main becomes: create SessionManager → start HTTP server → register SIGTERM handler. The `{"type":"ready"}` bootstrap event also removed (Rust uses `/health` polling). |
+
+### Delete
+
+| Code                              | Location                                               |
+| --------------------------------- | ------------------------------------------------------ |
+| Reader thread + crossbeam channel | `bridge.rs` — already removed in Phase 1               |
+| `BridgeEvent` enum (if unused)    | `protocol.rs` — Rust no longer parses events           |
+| Stdout-based `wait_for_ready()`   | `bridge.rs` — replaced by `/health` polling in Phase 1 |
 
 ### Test
 
-Full regression of all agent operations. Verify zero Tauri agent events emitted.
+Full regression. Verify:
+
+- Zero stdout writes from sidecar
+- Zero Tauri agent events emitted
+- All HTTP+SSE paths work
+- All cold-path Tauri IPC → Rust → HTTP paths work
+- `cd agent-bridge && bun test` passes (tests must be rewritten to use HTTP before this phase)
 
 ---
 
@@ -278,45 +298,53 @@ Full regression of all agent operations. Verify zero Tauri agent events emitted.
 
 ### Modify
 
-| File                                                | Change                                                                                                             |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `agent-bridge/src/agent/session/session-manager.ts` | Set TextEventBatcher interval to 0 (immediate emission). Keep getAccumulatedLength() API for tool content offsets. |
+| File                                                | Change                                                                                                               |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `agent-bridge/src/agent/session/session-manager.ts` | Set TextEventBatcher interval to 0 (immediate emission). Keep `getAccumulatedLength()` API for tool content offsets. |
 
-The frontend RAF batcher already coalesces events at 60fps. Server-side batching adds 0-16ms first-token delay with no benefit over SSE.
+Frontend RAF batcher coalesces at 60fps. Server-side batching adds 0-16ms first-token delay with no benefit over SSE.
 
 ---
 
 ## Dependency Graph
 
 ```
-Phase 0 (additive, no breaks)
+Phase 0 (sidecar HTTP server — additive, no breaks)
     ↓
-Phase 1 (Rust) + Phase 2 (Frontend) — parallel development, test together
+Phase 1 (Rust stdin→HTTP — internal refactor, frontend unchanged)
     ↓
-Phase 3 (cleanup)
+Phase 2 (Frontend hot path → direct HTTP+SSE)
     ↓
-Phase 4 (batcher, independent)
+Phase 3 (Cleanup — remove stdin/stdout)
+    ↓
+Phase 4 (Batcher — independent)
 ```
+
+Phase 1 alone gives ~30% latency improvement (removes crossbeam + reader thread + stdout pipe).
+Phase 2 gives the remaining ~70% (bypasses Rust for streaming).
 
 ## Security
 
-- **Auth:** Random Bearer token generated per sidecar spawn, passed via env var
-- **Port:** Random from 4200-4300 range, communicated via Tauri command
-- **CORS:** Allow `tauri://localhost`, `http://tauri.localhost`, `http://localhost:5176` (dev)
+- **Auth:** Random Bearer token generated per sidecar spawn, passed via env var, regenerated on every restart
+- **Port:** 4200-4299 range, `127.0.0.1` binding only, communicated via `agent_get_bridge_info` Tauri command
+- **CORS:** Reflected origin from allowlist `[tauri://localhost, http://tauri.localhost, http://localhost:5176]`. `OPTIONS` preflight without auth. `Access-Control-Max-Age: 86400`.
 - **CSP:** Already allows `http://127.0.0.1:*` in connect-src (tauri.conf.json line 40)
-- **Scope:** Token is ephemeral, localhost-only, regenerated on every restart
+- **Credentials:** API keys stay in Rust (`credentials.enc` + `CredentialBridge`). OAuth tokens are sidecar-owned (Keychain access in `credentials.ts`).
 
 ## Key Files
 
-| File                                                 | Role in migration                                 |
-| ---------------------------------------------------- | ------------------------------------------------- |
-| `agent-bridge/src/index.ts`                          | Add HTTP server (Phase 0), remove stdin (Phase 3) |
-| `src-tauri/src/agent/bridge.rs`                      | Simplify to lifecycle-only (Phase 1)              |
-| `src-tauri/src/agent/session.rs`                     | Remove proxy methods (Phase 1)                    |
-| `src-tauri/src/commands/agent/lifecycle.rs`          | 36 commands → 2 (Phase 1)                         |
-| `apps/agent/src/lib/api/agent.ts`                    | Add HTTP transport (Phase 2)                      |
-| `apps/agent/src/providers/tauri-provider.tsx`        | SSE connection setup (Phase 2)                    |
-| `apps/agent/src/hooks/chat/handlers/chat-actions.ts` | Batch pre-flight config (Phase 2)                 |
+| File                                                        | Role in migration                                                |
+| ----------------------------------------------------------- | ---------------------------------------------------------------- |
+| `agent-bridge/src/index.ts`                                 | Add HTTP server (Phase 0), remove stdin (Phase 3)                |
+| `agent-bridge/src/server/`                                  | New HTTP routes + SSE + CORS middleware (Phase 0)                |
+| `src-tauri/src/agent/bridge.rs`                             | stdin→reqwest (Phase 1), remove reader thread (Phase 1)          |
+| `src-tauri/src/agent/session.rs`                            | Internal transport changes (Phase 1), public API unchanged       |
+| `src-tauri/src/commands/agent/lifecycle.rs`                 | Remove 10 emit functions (Phase 1), add 2 new commands (Phase 1) |
+| `apps/agent/src/lib/api/agent-http.ts`                      | New hot-path HTTP client (Phase 2)                               |
+| `apps/agent/src/lib/api/agent-sse.ts`                       | New SSE client with event transformation (Phase 2)               |
+| `apps/agent/src/providers/tauri-provider.tsx`               | SSE connection setup, remove 10 Tauri listeners (Phase 2)        |
+| `apps/agent/src/hooks/agent/handlers/agent-sdk-handlers.ts` | Switch 8 hot-path calls to HTTP (Phase 2)                        |
+| `apps/agent/src/hooks/agent/use-tauri-session.ts`           | Export `clearStaleSessions()` for crash recovery (Phase 2)       |
 
 ## Verification
 
