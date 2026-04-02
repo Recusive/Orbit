@@ -55,13 +55,21 @@ export interface PendingMessage {
   skills?: string[] | undefined;
 }
 
-export type ScrollIntent = 'history-load' | 'compact-reload' | 'rewind';
+export type SessionHydrationState = 'unloaded' | 'hydrated';
+
+export type ScrollIntent =
+  | 'history-load'
+  | 'compact-reload'
+  | 'rewind'
+  | 'session-restore'
+  | 'session-refresh';
 
 export interface ChatSessionData {
   messages: ChatMessage[];
   isAgentRunning: boolean;
   isStopPending: boolean;
   scrollIntent?: ScrollIntent | null;
+  hydrationState: SessionHydrationState;
 }
 
 export interface ActiveCompaction {
@@ -100,6 +108,8 @@ export interface ChatStoreState {
   setActiveSession: (id: string) => void;
   clearActiveSession: () => void;
   setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null) => void;
+  markSessionHydrated: (id: string) => void;
+  setScrollIntent: (id: string, intent: ScrollIntent | null) => void;
   clearScrollIntent: (id: string) => void;
   appendToLastMessage: (id: string, messageId: string, content: string) => void;
   appendThinking: (id: string, messageId: string, thinking: string) => void;
@@ -152,6 +162,7 @@ function createEmptySession(): ChatSessionData {
     isAgentRunning: false,
     isStopPending: false,
     scrollIntent: null,
+    hydrationState: 'unloaded',
   };
 }
 
@@ -210,6 +221,7 @@ function evictIfNeeded(
     // Evict: clear messages but keep key for state tracking
     if (session) {
       session.messages = [];
+      session.hydrationState = 'unloaded';
     }
     // Clear loadedSessions so switching back triggers a fresh conversation:load
     Reflect.deleteProperty(loadedSessions, candidate);
@@ -291,6 +303,24 @@ export const useChatStore = create<ChatStoreState>()(
           }
           draft.sessions[id].messages = msgs;
           draft.sessions[id].scrollIntent = scrollIntent ?? null;
+        });
+      },
+
+      markSessionHydrated: (id: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.hydrationState = 'hydrated';
+          }
+        });
+      },
+
+      setScrollIntent: (id: string, intent: ScrollIntent | null): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.scrollIntent = intent;
+          }
         });
       },
 

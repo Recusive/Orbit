@@ -90,6 +90,14 @@ interface MockVirtuosoMessageListProps<TData, TContext> {
       }) => React.Key)
     | undefined;
   readonly context?: TContext | undefined;
+  readonly initialData?: readonly TData[] | undefined;
+  readonly initialLocation?:
+    | {
+        readonly index: number | 'LAST';
+        readonly align?: string;
+      }
+    | null
+    | undefined;
   readonly data?:
     | {
         readonly data: readonly TData[] | null | undefined;
@@ -481,6 +489,7 @@ describe('ChatMessages', () => {
           isAgentRunning: false,
           isStopPending: false,
           scrollIntent: 'history-load',
+          hydrationState: 'hydrated',
         },
       },
     });
@@ -506,6 +515,8 @@ describe('ChatMessages', () => {
     expect(firstRenderProps.style).toMatchObject({
       scrollbarGutter: 'stable both-edges',
     });
+    expect(firstRenderProps.initialData).toEqual(messages);
+    expect(firstRenderProps.initialLocation).toBeUndefined();
     expect(
       firstRenderProps.computeItemKey?.({
         data: firstMessage,
@@ -518,6 +529,54 @@ describe('ChatMessages', () => {
       expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
     });
   });
+
+  it.each(['session-restore', 'session-refresh'] as const)(
+    'uses the plain data path for %s and clears the consumed intent without falling back to heuristics',
+    async (scrollIntent: 'session-restore' | 'session-refresh') => {
+      const messages = [
+        buildMessage({ id: 'assistant-1', role: 'assistant' }),
+        buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      ];
+
+      useChatStore.setState({
+        sessions: {
+          'session-a': {
+            messages: [],
+            isAgentRunning: false,
+            isStopPending: false,
+            scrollIntent,
+            hydrationState: 'hydrated',
+          },
+        },
+      });
+
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+      });
+
+      const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
+
+      expect(firstRenderProps.data).toEqual({
+        data: messages,
+      });
+      expect(firstRenderProps.initialData).toEqual(messages);
+      expect(firstRenderProps.initialLocation).toEqual(
+        scrollIntent === 'session-restore'
+          ? { index: messages.length - 1, align: 'end' }
+          : undefined
+      );
+
+      await waitFor(() => {
+        expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
+      });
+
+      const settledProps = getLatestVirtuosoMessageListProps();
+      expect(settledProps.data).toEqual({
+        data: messages,
+      });
+    }
+  );
 
   it('wires item content props and tool lookup into MessageItem correctly', () => {
     const messages = [

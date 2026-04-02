@@ -15,7 +15,7 @@
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
 import { VirtuosoMessageList, VirtuosoMessageListLicense } from '@virtuoso.dev/message-list';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useShallow } from 'zustand/shallow';
 
 import { MessageItem } from './messages';
@@ -134,6 +134,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const prevSessionIdRef = useRef(sessionId);
   const prevMessageCount = useRef(0);
   const messagesRef = useRef(messages);
+  const lastPlacedMessagesRef = useRef<ChatMessage[] | null>(null);
   messagesRef.current = messages;
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
 
@@ -232,6 +233,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
+  const initialLocation = useMemo(() => {
+    if (messages.length === 0) {
+      return null;
+    }
+
+    if (scrollIntent === 'session-restore') {
+      return { index: messages.length - 1, align: 'end' as const };
+    }
+
+    return null;
+  }, [messages.length, scrollIntent]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -286,12 +298,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             data: messages,
             scrollModifier: { type: 'items-change', behavior: 'auto' },
           };
+        case 'session-restore':
+        case 'session-refresh':
+          // Session restore is handled by a keyed remount + initialLocation.
+          // Session refresh intentionally avoids item-location because the
+          // library applies it after paint, causing a visible top flash.
+          return {
+            data: messages,
+          };
         case 'rewind':
           return {
             data: messages,
             scrollModifier: 'remove-from-end',
           };
       }
+    }
+
+    // A just-applied session placement intent clears on the next effect-driven
+    // render. Keep that render on the plain data path so we don't immediately
+    // fall through to the heuristic items-change modifier.
+    if (lastPlacedMessagesRef.current === messages) {
+      return { data: messages };
     }
 
     // Heuristic fallback for streaming and message appends.
@@ -362,6 +389,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
   }, [scrollIntent, sessionId]);
 
+  useLayoutEffect(() => {
+    if (scrollIntent === 'session-restore' || scrollIntent === 'session-refresh') {
+      lastPlacedMessagesRef.current = messages;
+      return;
+    }
+
+    if (lastPlacedMessagesRef.current !== messages) {
+      lastPlacedMessagesRef.current = null;
+    }
+  }, [messages, scrollIntent]);
+
   // Session switch: reset local state only. The data prop's item-location
   // modifier (from history-load scrollIntent) handles the data replacement
   // and scroll. A second data.replace() here would conflict — two replacements
@@ -399,7 +437,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       <div className="flex-1 flex flex-col min-h-0">
         <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
           <VirtuosoMessageList<ChatMessage, MessageListContext>
+            key={sessionKey}
             ref={listRef}
+            initialData={messages}
+            {...(initialLocation ? { initialLocation } : {})}
             data={messageListData}
             context={messageListContext}
             computeItemKey={computeItemKey}

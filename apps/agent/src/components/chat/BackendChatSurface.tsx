@@ -16,6 +16,7 @@ import {
   useSessionUsage,
   useMaxTokens,
 } from '@/stores/agent/tool-store';
+import { useChatStore } from '@/stores/chat/chat-store';
 import {
   useIsConversationTransitioning,
   useIsLoadingConversation,
@@ -54,9 +55,13 @@ const ClaudeAgentSurface: FC = () => {
     handleEffortLevelChange,
     handleModelChange,
   } = useChatMessages();
+  const isHydrated = useChatStore(
+    (state) => state.sessions[sessionId]?.hydrationState === 'hydrated'
+  );
 
   const { contentRef } = useLayoutStabilization({
     isTransitioning,
+    isHydrated,
     messageCount: messages.length,
     setLoadingConversation: useUIStore.getState().setLoadingConversation,
     setConversationTransitioning: useUIStore.getState().setConversationTransitioning,

@@ -21,16 +21,28 @@ export const claudeUiBridge: ConversationUiBridge = {
     }
 
     const uiState = useUIStore.getState();
+    const chatStore = useChatStore.getState();
     const title =
       uiState.conversations.find((conversation) => conversation.sessionId === sessionId)?.title ??
       null;
+    const isHydrated = chatStore.sessions[sessionId]?.hydrationState === 'hydrated';
 
-    uiState.setLoadingConversation(true);
-    uiState.setConversationTransitioning(true);
-    uiState.setActiveConversation(sessionId, title);
-    useMessageBufferStore.getState().markLoadPending(sessionId);
-    useChatStore.getState().setActiveSession(sessionId);
-    useFileStore.getState().switchSession(sessionId);
+    if (isHydrated) {
+      chatStore.setScrollIntent(sessionId, 'session-restore');
+      uiState.setActiveConversation(sessionId, title);
+      useMessageBufferStore.getState().markLoadPending(sessionId);
+      chatStore.setActiveSession(sessionId);
+      useFileStore.getState().switchSession(sessionId);
+      uiState.setLoadingConversation(false);
+      uiState.setConversationTransitioning(false);
+    } else {
+      uiState.setLoadingConversation(true);
+      uiState.setConversationTransitioning(true);
+      uiState.setActiveConversation(sessionId, title);
+      useMessageBufferStore.getState().markLoadPending(sessionId);
+      chatStore.setActiveSession(sessionId);
+      useFileStore.getState().switchSession(sessionId);
+    }
 
     await new Promise<void>((resolve, reject) => {
       startTransition(() => {

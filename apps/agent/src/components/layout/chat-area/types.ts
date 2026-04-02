@@ -69,6 +69,7 @@ export interface ChatContentProps {
 /** Props for layout stabilization hook */
 export interface UseLayoutStabilizationProps {
   readonly isTransitioning: boolean;
+  readonly isHydrated: boolean;
   readonly messageCount: number;
   readonly setLoadingConversation: (loading: boolean) => void;
   readonly setConversationTransitioning: (transitioning: boolean) => void;

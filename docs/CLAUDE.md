@@ -170,9 +170,10 @@ Use this to find the right file. Read the file directly — no links needed.
 - `vault/` — Implementation, bugfix, Milkdown Crepe, rebuild
 - `worktree/` — Workspace switching, session sync, stale worktrees, deletion fix
 
-## specs/ (1 file)
+## specs/ (2 files)
 
 - `agent-browser-integration-spec.md` — Behavior spec for browser accessibility snapshot + ref system and iOS Simulator support (companion to `plans/agent-browser-integration.md`)
+- `HTTP/agent-bridge-http-sse-migration-spec.md` — HTTP+SSE migration spec: hot path bypass (messages, streaming, permissions) via direct HTTP+SSE, cold path stays Rust (companion to `plans/tracked/todo/AGENT-BRIDGE-HTTP-SSE-MIGRATION.md`)
 
 ## quality/ (3 files)
 

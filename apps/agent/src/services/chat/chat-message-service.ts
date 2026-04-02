@@ -1052,6 +1052,7 @@ class ChatMessageService {
     // Mark as loaded BEFORE React re-render — prevents the session loading effect
     // from sending a spurious conversation:load for this brand-new session.
     chatStore.markSessionLoaded(sid);
+    chatStore.markSessionHydrated(sid);
 
     // Invalidate any in-flight conversation:loaded responses from the PREVIOUS session.
     // On app start, Effect 3 sends conversation:load for the stale localStorage sessionId.
@@ -1120,6 +1121,7 @@ class ChatMessageService {
 
     // Snapshot cached messages BEFORE setTimeout(0) — store state may change during deferral
     const cachedMessages = chatStore.sessions[message.session_id]?.messages ?? null;
+    const wasHydrated = chatStore.sessions[message.session_id]?.hydrationState === 'hydrated';
 
     // Capture epochs before deferral for staleness detection
     const epochAtLoad = chatStore.rewindEpoch;
@@ -1164,9 +1166,10 @@ class ChatMessageService {
             .getState()
             .setActiveConversation(message.session_id, preferredTitle ?? message.title);
           useToolStore.getState().switchSession(message.session_id);
+          useUIStore.getState().setLoadingConversation(false);
+          useUIStore.getState().setConversationTransitioning(false);
         }
-        useUIStore.getState().setLoadingConversation(false);
-        useUIStore.getState().setConversationTransitioning(false);
+        useChatStore.getState().markSessionHydrated(message.session_id);
         return;
       }
 
@@ -1303,7 +1306,14 @@ class ChatMessageService {
         }
 
         // Write messages to store
-        useChatStore.getState().setMessages(message.session_id, newMessages, 'history-load');
+        useChatStore
+          .getState()
+          .setMessages(
+            message.session_id,
+            newMessages,
+            wasHydrated ? 'session-refresh' : 'history-load'
+          );
+        useChatStore.getState().markSessionHydrated(message.session_id);
 
         // Count messages with tools for diagnostic logging
         const messagesWithTools = message.messages.filter(
@@ -1383,6 +1393,7 @@ class ChatMessageService {
 
     const targetSessionId = isSameSession ? message.session_id : message.new_session_id;
     useChatStore.getState().setMessages(targetSessionId, rewoundMessages, 'rewind');
+    useChatStore.getState().markSessionHydrated(targetSessionId);
 
     // Set rewind fork point
     if (rewoundMessages.length > 0) {

@@ -25,6 +25,7 @@ import type { UseLayoutStabilizationProps, UseLayoutStabilizationReturn } from '
  */
 export function useLayoutStabilization({
   isTransitioning,
+  isHydrated,
   messageCount,
   setLoadingConversation,
   setConversationTransitioning,
@@ -33,6 +34,7 @@ export function useLayoutStabilization({
 
   useLayoutEffect(() => {
     if (!isTransitioning) return undefined;
+    if (!isHydrated) return undefined;
 
     const container = contentRef.current;
     if (!container) {
@@ -110,7 +112,13 @@ export function useLayoutStabilization({
         clearTimeout(minDisplayTimer);
       }
     };
-  }, [isTransitioning, messageCount, setConversationTransitioning, setLoadingConversation]);
+  }, [
+    isTransitioning,
+    isHydrated,
+    messageCount,
+    setConversationTransitioning,
+    setLoadingConversation,
+  ]);
 
   return { contentRef };
 }
