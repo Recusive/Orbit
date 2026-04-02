@@ -1,5 +1,11 @@
 # Plan: Agent-Bridge HTTP+SSE Migration
 
+> **SUPERSEDED BOUNDARY**: This plan's Phases 1-3 prescribe deleting 34 Rust commands and moving all operations to frontend HTTP. That boundary has been revised. The authoritative migration boundary is defined in the companion spec: `docs/specs/HTTP/agent-bridge-http-sse-migration-spec.md`.
+>
+> **Revised boundary**: Only the hot path (9 functions + 10 event listeners) moves to direct HTTP+SSE. All cold-path operations (sessions, definitions, fork/rewind, generate) stay on Tauri IPC through Rust, which delegates to the sidecar via HTTP instead of stdin. The 36 Tauri commands are retained with internal transport changed from stdin to reqwest.
+>
+> **What to use from this plan**: Phase 0 (sidecar HTTP server) is still accurate. Phases 1-3 must be reimplemented per the spec.
+
 ## Context
 
 The agent-bridge sidecar (Claude Agent SDK wrapper) communicates with the frontend via stdin/stdout pipes proxied through Rust. Every streaming token crosses 5 serialization boundaries through a Rust process that does zero meaningful processing — it deserializes JSON from the sidecar, clones it, re-serializes it, and emits a Tauri event. This adds ~50-65ms of overhead per first-token delivery and causes Rust to block Tokio threads on crossbeam channel recv.
