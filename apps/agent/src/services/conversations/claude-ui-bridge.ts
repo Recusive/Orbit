@@ -29,12 +29,12 @@ export const claudeUiBridge: ConversationUiBridge = {
 
     if (isHydrated) {
       chatStore.setScrollIntent(sessionId, 'session-restore');
-      uiState.setConversationTransitioning(true);
       uiState.setActiveConversation(sessionId, title);
       useMessageBufferStore.getState().markLoadPending(sessionId);
       chatStore.setActiveSession(sessionId);
       useFileStore.getState().switchSession(sessionId);
       uiState.setLoadingConversation(false);
+      uiState.setConversationTransitioning(false);
     } else {
       uiState.setLoadingConversation(true);
       uiState.setConversationTransitioning(true);

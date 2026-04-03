@@ -42,6 +42,16 @@ import { useChatStore } from '@/stores/chat/chat-store';
  *  on every Virtuoso item re-render (e.g., container resize). */
 const EMPTY_TOOLS: ToolExecution[] = [];
 
+/** Per-session size cache — stores the library's AVL size-tree entries so we
+ *  can seed correct item heights when the user returns to a session.
+ *  This eliminates the blank frame + scroll jump caused by an empty sizeTree
+ *  at mount time. */
+interface SizeRange {
+  readonly k: number;
+  readonly v: number;
+}
+const sessionSizeCache = new Map<string, SizeRange[]>();
+
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly isAgentRunning: boolean;
@@ -144,7 +154,31 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const messagesRef = useRef(messages);
   const lastPlacedMessagesRef = useRef<ChatMessage[] | null>(null);
   messagesRef.current = messages;
+  const lastSizeCacheSessionRef = useRef(sessionId);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
+
+  // ── Render-time size injection ───────────────────────────────────────
+  // When sessionId changes, key={sessionKey} forces Virtuoso to remount.
+  // BEFORE the new instance mounts, we save the outgoing session's sizes
+  // and inject the incoming session's cached sizes into the global that
+  // the library's patched useMemo reads. This seeds the sizeTree in the
+  // same pubIn batch as data, so Ae computes correct positions from frame 0.
+  if (lastSizeCacheSessionRef.current !== sessionId) {
+    const handle = listRef.current;
+    if (handle !== null) {
+      const outgoing = lastSizeCacheSessionRef.current;
+      if (outgoing !== undefined) {
+        const sizes = handle.getSizeRanges();
+        if (sizes.length > 0) {
+          sessionSizeCache.set(outgoing, sizes);
+        }
+      }
+    }
+    const cached = sessionSizeCache.get(sessionId ?? '');
+    (window as unknown as Record<string, unknown>)['__orbitVirtuosoSizes'] =
+      cached !== undefined && cached.length > 0 ? cached : null;
+    lastSizeCacheSessionRef.current = sessionId;
+  }
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
   // viewport buffer keeps items pre-rendered ahead of the scroll.
