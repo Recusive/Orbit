@@ -49,11 +49,21 @@ const logger = createLogger('ChatMessages');
 /** Constant empty array — prevents a new [] allocation per no-tool message
  *  on every Virtuoso item re-render (e.g., container resize). */
 const EMPTY_TOOLS: ToolExecution[] = [];
+const OVERSCAN_PARKED = 0;
+const OVERSCAN_ENTRY = 800;
+const OVERSCAN_STEADY = 8000;
+const READY_STABLE_MS = 48;
+const READY_TIMEOUT_MS = 1500;
+
+type OverscanPhase = 'parked' | 'entry' | 'steady';
+type RestorePhase = 'idle' | 'positioning' | 'stabilizing' | 'done';
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
   readonly isAgentRunning: boolean;
   readonly sessionId?: string;
+  readonly isVisible?: boolean;
+  readonly shouldPrime?: boolean;
   readonly queuedMessage: QueuedMessage | null;
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
@@ -142,6 +152,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
   isAgentRunning,
   sessionId,
+  isVisible = true,
+  shouldPrime = true,
   queuedMessage,
   onRewind,
   onOpenFile,
@@ -154,10 +166,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const prevMessageCount = useRef(0);
   const lastPlacedMessagesRef = useRef<ChatMessage[] | null>(null);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
+  const [isReadyForSteady, setIsReadyForSteady] = useState(false);
+  const [hasUserScrolled, setHasUserScrolled] = useState(false);
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
   // viewport buffer keeps items pre-rendered ahead of the scroll.
-  const velocityScrollRef = useVelocityScroll();
+  const velocityScrollRef = useVelocityScroll({
+    enabled: isVisible,
+    onUserScrollStart: () => {
+      setHasUserScrolled(true);
+    },
+  });
   useEffect(() => {
     const scroller = listRef.current?.scrollerElement();
     if (!scroller) return;
@@ -252,22 +271,38 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
-  const initialLocation = useMemo(() => {
-    if (messages.length === 0) {
-      return null;
-    }
 
-    if (scrollIntent === 'session-restore') {
-      const loc = { index: messages.length - 1, align: 'end' as const };
-      logger.debug(`[${sid}] initialLocation (session-restore)`, {
-        index: loc.index,
-        msgCount: messages.length,
-      });
-      return loc;
-    }
+  const snapshotSizeCache = useCallback((): void => {
+    if (!sessionId) return;
 
-    return null;
-  }, [messages.length, scrollIntent, sid]);
+    const handle = listRef.current;
+    if (!handle) return;
+
+    const store = useChatStore.getState();
+    const session = store.sessions[sessionId];
+    if (!session) return;
+
+    store.setVirtuosoSizeCache(sessionId, {
+      ranges: handle.getSizeRanges(),
+      messageCount: session.messages.length,
+      lastMessageId: session.messages.at(-1)?.id ?? null,
+      layoutVersion: session.layoutVersion,
+    });
+  }, [sessionId]);
+
+  useLayoutEffect(() => {
+    if (!sessionId) return;
+
+    const store = useChatStore.getState();
+    const session = store.sessions[sessionId];
+    const cache = session?.virtuosoSizeCache ?? null;
+    if (!cache || !session) return;
+    if (cache.layoutVersion !== session.layoutVersion) return;
+    if (cache.messageCount !== session.messages.length) return;
+    if (cache.lastMessageId !== (session.messages.at(-1)?.id ?? null)) return;
+
+    listRef.current?.setSizeRanges([...cache.ranges]);
+  }, [sessionId]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -427,32 +462,219 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ]
   );
 
+  const overscanPhase: OverscanPhase =
+    !shouldPrime && !isVisible
+      ? 'parked'
+      : isReadyForSteady || hasUserScrolled
+        ? 'steady'
+        : shouldPrime
+          ? 'entry'
+          : 'steady';
+  const overscan =
+    overscanPhase === 'parked'
+      ? OVERSCAN_PARKED
+      : overscanPhase === 'entry'
+        ? OVERSCAN_ENTRY
+        : OVERSCAN_STEADY;
+  const previousOverscanPhaseRef = useRef<OverscanPhase | null>(null);
+
+  useEffect(() => {
+    if (previousOverscanPhaseRef.current === overscanPhase) {
+      return;
+    }
+
+    previousOverscanPhaseRef.current = overscanPhase;
+    logger.debug(`[${sid}] Overscan phase`, {
+      overscanPhase,
+      overscan,
+      isReadyForSteady,
+      hasUserScrolled,
+      shouldPrime,
+      isVisible,
+    });
+    if (import.meta.env.DEV) {
+      performance.mark('overscan-phase-change');
+    }
+  }, [hasUserScrolled, isReadyForSteady, isVisible, overscan, overscanPhase, shouldPrime, sid]);
+
   // Stable key function — avoids creating a new closure on each render.
   // Virtuoso compares the function reference; a new ref can force item re-renders.
   const computeItemKey = useCallback(
-    ({ index }: { index: number }): string => `${sessionKey}:${String(index)}`,
+    ({ data }: { data: ChatMessage }): string => `${sessionKey}:${data.id}`,
     [sessionKey]
   );
 
-  // ── Scroll-to-bottom with readiness polling ─────────────────────────
-  // VirtuosoMessageList processes data via useEffect (async, after paint).
-  // A single scrollToItem() call fires before items exist → no-op.
-  // Instead, poll via RAF until the scroller has rendered content
-  // (scrollHeight > clientHeight), then scroll and signal ready.
-  //
-  // IMPORTANT: The poll is tracked via a ref, NOT a reactive dependency on
-  // scrollIntent. The clearScrollIntent effect fires in the same batch,
-  // which would cancel the poll if it depended on scrollIntent.
+  // ── Event-driven readiness ──────────────────────────────────────────
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
   const hasSignaledReadyRef = useRef(false);
   const needsRestoreRef = useRef(false);
   const hasEverHadMessagesRef = useRef(false);
+  const restorePhaseRef = useRef<RestorePhase>('idle');
+  const lastMessageIdRef = useRef<string | null>(messages.at(-1)?.id ?? null);
+  const readinessTimeoutRef = useRef<number | null>(null);
+  const readinessStableTimerRef = useRef<number | null>(null);
+  const readinessResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const readinessStartMarkRef = useRef<string | null>(null);
+  lastMessageIdRef.current = messages.at(-1)?.id ?? null;
+
+  const cancelReadinessWork = useCallback((): void => {
+    if (readinessTimeoutRef.current !== null) {
+      window.clearTimeout(readinessTimeoutRef.current);
+      readinessTimeoutRef.current = null;
+    }
+    if (readinessStableTimerRef.current !== null) {
+      window.clearTimeout(readinessStableTimerRef.current);
+      readinessStableTimerRef.current = null;
+    }
+    readinessResizeObserverRef.current?.disconnect();
+    readinessResizeObserverRef.current = null;
+  }, []);
+
+  const alignScrollerToBottom = useCallback((): void => {
+    const handle = listRef.current;
+    if (!handle) return;
+
+    handle.scrollToItem({ index: 'LAST', align: 'end' });
+    const scroller = handle.scrollerElement();
+    if (!scroller) return;
+
+    scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  }, []);
+
+  const signalReady = useCallback(
+    (reason: 'timeout' | 'stabilized' | 'no-handle'): void => {
+      if (hasSignaledReadyRef.current) {
+        return;
+      }
+
+      hasSignaledReadyRef.current = true;
+      restorePhaseRef.current = 'done';
+      cancelReadinessWork();
+      alignScrollerToBottom();
+      setIsReadyForSteady(true);
+      snapshotSizeCache();
+
+      logger.debug(`[${sid}] Ready`, {
+        reason,
+        msgCount: messages.length,
+      });
+      if (import.meta.env.DEV) {
+        const readyMarkName = sessionKey !== '' ? `session-ready:${sessionKey}` : 'session-ready';
+        performance.mark('session-ready');
+        performance.mark(readyMarkName);
+        if (readinessStartMarkRef.current !== null) {
+          performance.measure(
+            sessionKey !== '' ? `readiness-duration:${sessionKey}` : 'readiness-duration',
+            readinessStartMarkRef.current,
+            readyMarkName
+          );
+        }
+      }
+
+      onReadyRef.current?.();
+    },
+    [
+      alignScrollerToBottom,
+      cancelReadinessWork,
+      messages.length,
+      sessionKey,
+      sid,
+      snapshotSizeCache,
+    ]
+  );
+
+  const startTemporaryResizeStabilityWindow = useCallback((): void => {
+    if (readinessStableTimerRef.current !== null) {
+      window.clearTimeout(readinessStableTimerRef.current);
+      readinessStableTimerRef.current = null;
+    }
+    readinessResizeObserverRef.current?.disconnect();
+    readinessResizeObserverRef.current = null;
+
+    const scheduleStabilityCheck = (): void => {
+      if (readinessStableTimerRef.current !== null) {
+        window.clearTimeout(readinessStableTimerRef.current);
+      }
+      readinessStableTimerRef.current = window.setTimeout(() => {
+        listRef.current?.scrollToItem({ index: 'LAST', align: 'end' });
+        signalReady('stabilized');
+      }, READY_STABLE_MS);
+    };
+
+    scheduleStabilityCheck();
+
+    const listElement = listRef.current
+      ?.scrollerElement()
+      ?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
+    if (!listElement) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (restorePhaseRef.current !== 'stabilizing') {
+        return;
+      }
+      scheduleStabilityCheck();
+    });
+
+    observer.observe(listElement);
+    readinessResizeObserverRef.current = observer;
+  }, [signalReady]);
+
+  const beginStabilizationIfTargetRendered = useCallback(
+    (rendered: ChatMessage[]): boolean => {
+      const targetId = lastMessageIdRef.current;
+      const scroller = listRef.current?.scrollerElement();
+      const isBottomAligned =
+        scroller !== null &&
+        scroller !== undefined &&
+        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
+      const hasTargetVisible = targetId !== null && rendered.some((item) => item.id === targetId);
+
+      if (!isBottomAligned && !hasTargetVisible) {
+        return false;
+      }
+
+      restorePhaseRef.current = 'stabilizing';
+      logger.debug(`[${sid}] Entering stabilization`, {
+        targetId,
+        isBottomAligned,
+        scrollTop: scroller?.scrollTop ?? null,
+        scrollHeight: scroller?.scrollHeight ?? null,
+        clientHeight: scroller?.clientHeight ?? null,
+        renderedCount: rendered.length,
+      });
+      startTemporaryResizeStabilityWindow();
+      return true;
+    },
+    [sid, startTemporaryResizeStabilityWindow]
+  );
+
+  const handleRenderedDataChange = useCallback(
+    (rendered: ChatMessage[]): void => {
+      if (import.meta.env.DEV && overscanPhase === 'entry') {
+        performance.mark('rendered-item-count');
+      }
+      if (overscanPhase === 'entry') {
+        logger.debug(`[${sid}] Rendered item count`, {
+          count: rendered.length,
+        });
+      }
+
+      if (restorePhaseRef.current !== 'positioning') {
+        return;
+      }
+
+      beginStabilizationIfTargetRendered(rendered);
+    },
+    [beginStabilizationIfTargetRendered, overscanPhase, sid]
+  );
 
   // Capture the restore intent into a ref before the clear effect runs.
   // Also trigger for re-mounted hydrated instances (no session-restore intent,
   // but messages appear on first render via useSessionMessages).
-  if (scrollIntent === 'session-restore' && messages.length > 0) {
+  if (scrollIntent === 'session-restore' && messages.length > 0 && !hasSignaledReadyRef.current) {
     needsRestoreRef.current = true;
   }
   if (!hasEverHadMessagesRef.current && messages.length > 0 && !hasSignaledReadyRef.current) {
@@ -461,107 +683,56 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }
 
   useEffect(() => {
-    if (!needsRestoreRef.current || hasSignaledReadyRef.current) return;
-    // Consumed — don't re-enter on future renders
+    if (!shouldPrime && restorePhaseRef.current !== 'done') {
+      needsRestoreRef.current = messages.length > 0 && !hasSignaledReadyRef.current;
+      cancelReadinessWork();
+      restorePhaseRef.current = 'idle';
+    }
+  }, [cancelReadinessWork, messages.length, shouldPrime]);
+
+  useLayoutEffect(() => {
+    if (!shouldPrime || !needsRestoreRef.current || hasSignaledReadyRef.current) return;
+
     needsRestoreRef.current = false;
 
     const handle = listRef.current;
     if (!handle) {
-      // No list ref — signal ready immediately (edge case)
-      hasSignaledReadyRef.current = true;
-      onReadyRef.current?.();
+      signalReady('no-handle');
       return;
     }
 
-    // Phase 1: Wait for Virtuoso to render items (scrollHeight > clientHeight).
-    // Phase 2: Wait for content to stabilize (tool widgets done expanding).
-    //          scrollHeight unchanged for STABLE_MS → content is done.
-    // Phase 3: Final scrollToItem + signal ready.
-    //
-    // The old session stays visible during both phases (first-visit handoff).
-    // When we signal ready, the instance is revealed with correct scroll.
-    const STABLE_MS = 150;
-    const MAX_WAIT_MS = 3000;
-    const startTime = performance.now();
-    let rafId = 0;
-    let lastScrollH = 0;
-    let stableStart = 0;
-    let phase: 'waiting-for-content' | 'waiting-for-stable' = 'waiting-for-content';
+    restorePhaseRef.current = 'positioning';
+    alignScrollerToBottom();
+    if (import.meta.env.DEV) {
+      const startMarkName = sessionKey !== '' ? `readiness-start:${sessionKey}` : 'readiness-start';
+      readinessStartMarkRef.current = startMarkName;
+      performance.mark(startMarkName);
+    }
 
-    const poll = (): void => {
-      const elapsed = performance.now() - startTime;
-      const scroller = handle.scrollerElement();
+    logger.debug(`[${sid}] Starting readiness`, {
+      lastMessageId: lastMessageIdRef.current,
+      msgCount: messages.length,
+    });
 
-      // Timeout — signal ready regardless (safety valve)
-      if (elapsed > MAX_WAIT_MS) {
-        handle.scrollToItem({ index: 'LAST', align: 'end' });
-        logger.debug(`[${sid}] Readiness timeout at ${elapsed.toFixed(0)}ms`, {
-          scrollerH: scroller?.scrollHeight ?? 0,
-          phase,
-        });
-        if (!hasSignaledReadyRef.current) {
-          hasSignaledReadyRef.current = true;
-          onReadyRef.current?.();
-        }
-        return;
-      }
-
-      if (phase === 'waiting-for-content') {
-        const hasContent = scroller !== null && scroller.scrollHeight > scroller.clientHeight + 10;
-        if (hasContent) {
-          // Items rendered — scroll to bottom and enter stabilization phase
-          handle.scrollToItem({ index: 'LAST', align: 'end' });
-          lastScrollH = scroller.scrollHeight;
-          stableStart = performance.now();
-          phase = 'waiting-for-stable';
-          logger.debug(`[${sid}] Content rendered, entering stabilization`, {
-            scrollerH: lastScrollH,
-            elapsed: elapsed.toFixed(0),
-          });
-        }
-        rafId = requestAnimationFrame(poll);
-        return;
-      }
-
-      // Phase: waiting-for-stable — watch scrollHeight for changes
-      if (scroller !== null) {
-        const currentH = scroller.scrollHeight;
-        if (currentH !== lastScrollH) {
-          // Content still growing (tool widgets rendering) — re-scroll + reset timer
-          handle.scrollToItem({ index: 'LAST', align: 'end' });
-          lastScrollH = currentH;
-          stableStart = performance.now();
-          rafId = requestAnimationFrame(poll);
-          return;
-        }
-
-        // scrollHeight unchanged — check if stable long enough
-        if (performance.now() - stableStart >= STABLE_MS) {
-          // Content stable — final scroll + signal ready
-          handle.scrollToItem({ index: 'LAST', align: 'end' });
-          logger.debug(`[${sid}] Content stable, signaling ready`, {
-            scrollerH: currentH,
-            elapsed: elapsed.toFixed(0),
-          });
-          if (!hasSignaledReadyRef.current) {
-            hasSignaledReadyRef.current = true;
-            onReadyRef.current?.();
-          }
-          return;
-        }
-      }
-
-      rafId = requestAnimationFrame(poll);
-    };
-
-    rafId = requestAnimationFrame(poll);
-
-    return (): void => {
-      if (rafId !== 0) {
-        cancelAnimationFrame(rafId);
-      }
-    };
-  }, [messages.length, sid]);
+    cancelReadinessWork();
+    readinessTimeoutRef.current = window.setTimeout(() => {
+      alignScrollerToBottom();
+      logger.debug(`[${sid}] Readiness timeout`, {
+        phase: restorePhaseRef.current,
+      });
+      signalReady('timeout');
+    }, READY_TIMEOUT_MS);
+    beginStabilizationIfTargetRendered(handle.data.getCurrentlyRendered());
+  }, [
+    alignScrollerToBottom,
+    beginStabilizationIfTargetRendered,
+    cancelReadinessWork,
+    messages.length,
+    sessionKey,
+    shouldPrime,
+    sid,
+    signalReady,
+  ]);
 
   // Clear consumed scroll intent (safe — poll is ref-driven, not affected)
   useEffect(() => {
@@ -570,6 +741,21 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       useChatStore.getState().clearScrollIntent(sessionId);
     }
   }, [scrollIntent, sessionId, sid]);
+
+  const previousShouldPrimeRef = useRef(shouldPrime);
+  useEffect(() => {
+    if (previousShouldPrimeRef.current && !shouldPrime) {
+      snapshotSizeCache();
+    }
+    previousShouldPrimeRef.current = shouldPrime;
+  }, [shouldPrime, snapshotSizeCache]);
+
+  useEffect(() => {
+    return (): void => {
+      cancelReadinessWork();
+      snapshotSizeCache();
+    };
+  }, [cancelReadinessWork, snapshotSizeCache]);
 
   useLayoutEffect(() => {
     if (scrollIntent === 'session-restore' || scrollIntent === 'session-refresh') {
@@ -607,12 +793,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           <VirtuosoMessageList<ChatMessage, MessageListContext>
             ref={listRef}
             initialData={messages}
-            {...(initialLocation ? { initialLocation } : {})}
             data={messageListData}
             context={messageListContext}
+            itemIdentity={(message) => message.id}
             computeItemKey={computeItemKey}
             ItemContent={MessageItemContent}
-            increaseViewportBy={10000}
+            onRenderedDataChange={handleRenderedDataChange}
+            increaseViewportBy={overscan}
             shortSizeAlign="top"
             className="flex-1 overflow-x-hidden overscroll-y-contain"
             style={LIST_STYLE}

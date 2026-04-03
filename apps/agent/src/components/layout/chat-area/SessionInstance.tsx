@@ -19,7 +19,7 @@
  * On revisit (already ready), the CSS toggle is instant.
  */
 import { createLogger } from '@orbit/common/lib';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { CSSProperties, FC } from 'react';
@@ -31,7 +31,8 @@ const logger = createLogger('SessionInstance');
 
 export interface SessionInstanceProps {
   readonly sessionId: string;
-  readonly isActive: boolean;
+  readonly isVisible: boolean;
+  readonly shouldPrime: boolean;
   readonly queuedMessage: QueuedMessage | null;
   readonly onRewind: (messageId: string) => void;
   readonly onOpenFile: (path: string) => void;
@@ -43,7 +44,7 @@ export interface SessionInstanceProps {
   readonly onStabilized?: (sessionId: string) => void;
 }
 
-/** Active instance — in-flow flex child that provides the height context. */
+/** Visible instance — in-flow flex child that provides the height context. */
 const ACTIVE_STYLE: CSSProperties = {
   position: 'relative',
   flex: 1,
@@ -65,9 +66,10 @@ const HIDDEN_STYLE: CSSProperties = {
   zIndex: 0,
 };
 
-export const SessionInstance: FC<SessionInstanceProps> = ({
+const SessionInstanceComponent: FC<SessionInstanceProps> = ({
   sessionId,
-  isActive,
+  isVisible,
+  shouldPrime,
   queuedMessage,
   onRewind,
   onOpenFile,
@@ -99,8 +101,8 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
   // ── Visibility + scroll preservation ─────────────────────────────────
   // WKWebView resets scrollTop when toggling between position:absolute
   // (hidden) and position:relative (active). Save on hide, restore on show.
-  const isVisible = isActive && isReady;
   const savedScrollTopRef = useRef<number | null>(null);
+  const savedWasAtBottomRef = useRef(false);
 
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
@@ -113,7 +115,10 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
       // HIDING — save scroll position before the layout change
       if (scroller) {
         savedScrollTopRef.current = scroller.scrollTop;
+        savedWasAtBottomRef.current =
+          scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
         logger.debug(`[${sid}] HIDDEN — saved scrollTop=${String(scroller.scrollTop)}`, {
+          wasAtBottom: savedWasAtBottomRef.current,
           msgCount: messages.length,
         });
       }
@@ -122,7 +127,17 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
     if (isVisible && !prevVisibleRef.current) {
       // SHOWING — restore scroll position after the layout change settles
       const savedTop = savedScrollTopRef.current;
-      if (savedTop !== null && savedTop > 0 && scroller) {
+      if (savedWasAtBottomRef.current && scroller) {
+        requestAnimationFrame(() => {
+          scroller.scrollTop = scroller.scrollHeight;
+          logger.debug(`[${sid}] REVEALED — restored to bottom`, {
+            scrollerH: scroller.scrollHeight,
+            clientH: scroller.clientHeight,
+            actualScrollTop: scroller.scrollTop,
+            msgCount: messages.length,
+          });
+        });
+      } else if (savedTop !== null && savedTop > 0 && scroller) {
         // Use RAF to let the browser complete the layout change first
         requestAnimationFrame(() => {
           scroller.scrollTop = savedTop;
@@ -156,13 +171,16 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
       ref={containerRef}
       style={isVisible ? ACTIVE_STYLE : HIDDEN_STYLE}
       data-session-instance={sessionId}
-      data-instance-active={isActive}
+      data-instance-visible={isVisible}
+      data-instance-prime={shouldPrime}
       data-instance-ready={isReady}
     >
       <ChatMessages
         messages={messages}
         isAgentRunning={isAgentRunning}
         sessionId={sessionId}
+        isVisible={isVisible}
+        shouldPrime={shouldPrime}
         queuedMessage={queuedMessage}
         onRewind={onRewind}
         onOpenFile={onOpenFile}
@@ -174,3 +192,6 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
     </div>
   );
 };
+
+export const SessionInstance = memo(SessionInstanceComponent);
+SessionInstance.displayName = 'SessionInstance';

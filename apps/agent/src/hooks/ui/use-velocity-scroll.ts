@@ -59,6 +59,7 @@
  *   - Decrease `maxPxPerFrame` (default 50 → 35).
  * ───────────────────────────────────────────────────────────────────────
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface VelocityScrollOptions {
@@ -70,10 +71,15 @@ interface VelocityScrollOptions {
   sensitivity?: number;
   /** Number of wheel events to let through natively before engaging. Default 3. */
   warmupEvents?: number;
+  /** When false, no observers or event listeners are attached. Default true. */
+  enabled?: boolean;
+  /** Fired on the first wheel event after warmup for the current attachment. */
+  onUserScrollStart?: () => void;
 }
 
 /** Selector for Virtuoso's inner list container. */
 const LIST_SELECTOR = '[data-testid="virtuoso-list"]';
+const logger = createLogger('VelocityScroll');
 
 /**
  * Compensate scrollTop to maintain the scrollbar ratio when scrollHeight
@@ -114,6 +120,9 @@ export function useVelocityScroll(
   const friction = options?.friction ?? 0.91;
   const sensitivity = options?.sensitivity ?? 0.55;
   const warmupEvents = options?.warmupEvents ?? 3;
+  const enabled = options?.enabled ?? true;
+  const onUserScrollStartRef = useRef(options?.onUserScrollStart);
+  onUserScrollStartRef.current = options?.onUserScrollStart;
 
   const cleanupRef = useRef<(() => void) | null>(null);
 
@@ -124,13 +133,21 @@ export function useVelocityScroll(
         cleanupRef.current = null;
       }
 
-      if (!node) return;
+      if (!node || !enabled) return;
 
       let velocity = 0;
       let animating = false;
       let raf = 0;
       let nativeCount = 0;
       let lastScrollHeight = 0;
+      let hasFiredUserScroll = false;
+
+      if (import.meta.env.DEV) {
+        performance.mark('velocity-scroll-attach');
+      }
+      logger.debug('Attached velocity scroll', {
+        enabled,
+      });
 
       // ── Same-frame scrollHeight compensation ───────────────────────
       // Two observers on the inner list container catch scrollHeight
@@ -244,6 +261,10 @@ export function useVelocityScroll(
         }
 
         e.preventDefault();
+        if (!hasFiredUserScroll) {
+          hasFiredUserScroll = true;
+          onUserScrollStartRef.current?.();
+        }
         velocity += e.deltaY * sensitivity;
         velocity = Math.max(-maxPx, Math.min(velocity, maxPx));
         if (!animating) {
@@ -269,9 +290,13 @@ export function useVelocityScroll(
         listResizeObserver?.disconnect();
         listStyleObserver?.disconnect();
         listChildObserver?.disconnect();
+        if (import.meta.env.DEV) {
+          performance.mark('velocity-scroll-detach');
+        }
+        logger.debug('Detached velocity scroll');
       };
     },
-    [maxPx, friction, sensitivity, warmupEvents]
+    [maxPx, friction, sensitivity, warmupEvents, enabled]
   );
 
   // Cleanup on unmount

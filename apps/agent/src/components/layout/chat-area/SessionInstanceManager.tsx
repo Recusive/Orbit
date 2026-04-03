@@ -193,6 +193,9 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
   useLayoutEffect(() => {
     if (isActiveHidden || activeSessionId === undefined) return;
     const isRevisit = stabilizedSetRef.current.has(activeSessionId);
+    if (import.meta.env.DEV) {
+      performance.mark('session-switch-start');
+    }
     if (isRevisit) {
       setShownSessionId(activeSessionId);
     }
@@ -238,7 +241,8 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
           <SessionInstance
             key={sid}
             sessionId={sid}
-            isActive={isActive}
+            isVisible={isActive}
+            shouldPrime={isTargetActive}
             queuedMessage={isTargetActive ? queuedMessage : null}
             onRewind={onRewind}
             onOpenFile={onOpenFile}

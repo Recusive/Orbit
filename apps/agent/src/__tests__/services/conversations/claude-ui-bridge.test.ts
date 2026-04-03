@@ -72,15 +72,15 @@ describe('claudeUiBridge.select', () => {
 
     await claudeUiBridge.select(sessionId);
 
-    expect(mockLoad).toHaveBeenCalledWith(sessionId);
+    expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().activeSessionId).toBe(sessionId);
-    expect(useChatStore.getState().sessions[sessionId]?.scrollIntent).toBe('session-restore');
+    expect(useChatStore.getState().sessions[sessionId]?.scrollIntent).toBeNull();
     expect(useUIStore.getState().activeConversationId).toBe(sessionId);
     expect(useUIStore.getState().activeConversationTitle).toBe('Cached Title');
     expect(useUIStore.getState().isLoadingConversation).toBe(false);
     expect(useUIStore.getState().isConversationTransitioning).toBe(false);
     expect(useFileStore.getState().currentSessionId).toBe(sessionId);
-    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(true);
+    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
   });
 
   it('uses the uncached session path for unloaded sessions', async () => {

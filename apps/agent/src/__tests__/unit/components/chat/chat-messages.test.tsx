@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import type { ChatMessage } from '@/components/chat/messages/types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
@@ -6,20 +6,48 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { ComponentProps, ReactNode } from 'react';
 
 const {
+  getSizeRangesMock,
   messageItemPropsById,
+  mockResizeObserverDisconnect,
+  mockResizeObserverObserve,
+  mockScrollerElement,
+  mockVirtuosoListElement,
+  mockUseVelocityScroll,
   mockVirtuosoMessageListProps,
   queuedMessageBubbleProps,
   replaceDataMock,
+  setSizeRangesMock,
   scrollerScrollToMock,
   scrollToItemMock,
-} = vi.hoisted(() => ({
-  messageItemPropsById: new Map<string, unknown>(),
-  mockVirtuosoMessageListProps: vi.fn(),
-  queuedMessageBubbleProps: [] as unknown[],
-  replaceDataMock: vi.fn(),
-  scrollerScrollToMock: vi.fn(),
-  scrollToItemMock: vi.fn(),
-}));
+  velocityScrollAttachMock,
+} = vi.hoisted(() => {
+  const scrollerScrollToMock = vi.fn();
+
+  return {
+    getSizeRangesMock: vi.fn(() => [{ k: 0, v: 120 }]),
+    messageItemPropsById: new Map<string, unknown>(),
+    mockResizeObserverDisconnect: vi.fn(),
+    mockResizeObserverObserve: vi.fn(),
+    mockScrollerElement: {
+      scrollHeight: 1200,
+      scrollTop: 0,
+      clientHeight: 800,
+      scrollTo: scrollerScrollToMock,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      querySelector: vi.fn(),
+    },
+    mockVirtuosoListElement: {},
+    mockUseVelocityScroll: vi.fn(),
+    mockVirtuosoMessageListProps: vi.fn(),
+    queuedMessageBubbleProps: [] as unknown[],
+    replaceDataMock: vi.fn(),
+    setSizeRangesMock: vi.fn(),
+    scrollerScrollToMock,
+    scrollToItemMock: vi.fn(),
+    velocityScrollAttachMock: vi.fn(),
+  };
+});
 
 interface MockMessageListContext {
   readonly toolsByMessageId: Map<string, ToolExecution[]>;
@@ -64,6 +92,7 @@ interface MockVirtuosoMessageListMethods<TData> {
         readonly purgeItemSizes?: boolean;
       }
     ) => void;
+    readonly getCurrentlyRendered: () => TData[];
   };
   readonly scrollToItem: (location: {
     readonly index: number | 'LAST';
@@ -78,6 +107,8 @@ interface MockVirtuosoMessageListMethods<TData> {
     readonly bottomOffset: number;
     readonly visibleListHeight: number;
   };
+  readonly getSizeRanges: () => { k: number; v: number }[];
+  readonly setSizeRanges: (ranges: { k: number; v: number }[]) => void;
 }
 
 interface MockVirtuosoMessageListProps<TData, TContext> {
@@ -118,6 +149,9 @@ interface MockVirtuosoMessageListProps<TData, TContext> {
         readonly context: TContext;
       }) => ReactNode)
     | undefined;
+  readonly increaseViewportBy?: number | undefined;
+  readonly itemIdentity?: ((item: TData) => unknown) | undefined;
+  readonly onRenderedDataChange?: ((range: TData[]) => void) | undefined;
   readonly shortSizeAlign?: string | undefined;
   readonly style?: React.CSSProperties | undefined;
 }
@@ -134,20 +168,16 @@ vi.mock('@virtuoso.dev/message-list', async () => {
       React.useImperativeHandle(ref, () => ({
         data: {
           replace: replaceDataMock,
+          getCurrentlyRendered: () => (props.data?.data ?? props.initialData ?? []) as TData[],
         },
         scrollToItem: scrollToItemMock,
-        scrollerElement: () => ({
-          scrollHeight: 1200,
-          scrollTop: 0,
-          clientHeight: 800,
-          scrollTo: scrollerScrollToMock,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-        }),
+        scrollerElement: () => mockScrollerElement,
         getScrollLocation: () => ({
           bottomOffset: 0,
           visibleListHeight: 800,
         }),
+        getSizeRanges: getSizeRangesMock,
+        setSizeRanges: setSizeRangesMock,
       }));
 
       mockVirtuosoMessageListProps(props);
@@ -231,7 +261,10 @@ vi.mock('@/components/chat/queued-message', () => ({
 }));
 
 vi.mock('@/hooks/ui/use-velocity-scroll', () => ({
-  useVelocityScroll: () => vi.fn(),
+  useVelocityScroll: (options?: unknown) => {
+    mockUseVelocityScroll(options);
+    return velocityScrollAttachMock;
+  },
 }));
 
 vi.mock('@/components/ui/shimmer-text', () => ({
@@ -343,6 +376,24 @@ function getVirtuosoContext(
   return context;
 }
 
+function getLatestVelocityScrollOptions(): {
+  readonly enabled?: boolean;
+  readonly onUserScrollStart?: (() => void) | undefined;
+} {
+  const options = mockUseVelocityScroll.mock.calls.at(-1)?.[0] as
+    | {
+        readonly enabled?: boolean;
+        readonly onUserScrollStart?: (() => void) | undefined;
+      }
+    | undefined;
+
+  if (options === undefined) {
+    throw new Error('useVelocityScroll was not called');
+  }
+
+  return options;
+}
+
 function renderChatMessages(
   overrides: Partial<ComponentProps<typeof ChatMessages>> = {}
 ): ReturnType<typeof render> {
@@ -369,9 +420,32 @@ describe('ChatMessages', () => {
     clearToolWidgetState();
     messageItemPropsById.clear();
     queuedMessageBubbleProps.length = 0;
+    getSizeRangesMock.mockClear();
+    mockResizeObserverDisconnect.mockClear();
+    mockResizeObserverObserve.mockClear();
+    mockScrollerElement.addEventListener.mockClear();
+    mockScrollerElement.querySelector.mockImplementation((selector: string) =>
+      selector === '[data-testid="virtuoso-list"]' ? mockVirtuosoListElement : null
+    );
+    mockScrollerElement.removeEventListener.mockClear();
+    mockScrollerElement.scrollTop = 0;
+    mockUseVelocityScroll.mockClear();
     mockVirtuosoMessageListProps.mockClear();
     replaceDataMock.mockClear();
+    setSizeRangesMock.mockClear();
     scrollerScrollToMock.mockClear();
+    scrollToItemMock.mockClear();
+    velocityScrollAttachMock.mockClear();
+    vi.spyOn(globalThis.ResizeObserver.prototype, 'observe').mockImplementation(
+      mockResizeObserverObserve
+    );
+    vi.spyOn(globalThis.ResizeObserver.prototype, 'disconnect').mockImplementation(
+      mockResizeObserverDisconnect
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('binds to a single session and uses session-prefixed item keys', async () => {
@@ -399,11 +473,84 @@ describe('ChatMessages', () => {
         index: 0,
         context,
       })
-    ).toBe('session-a:0');
+    ).toBe('session-a:user-a');
+    expect(props.itemIdentity?.(firstMessage)).toBe('user-a');
     expect(screen.getByTestId('message-item-user-a')).toHaveAttribute(
       'data-session-id',
       'session-a'
     );
+  });
+
+  it('keeps programmatic restore on entry overscan and starts stabilization work', async () => {
+    vi.useFakeTimers();
+
+    try {
+      const messages = [
+        buildMessage({ id: 'assistant-1', role: 'assistant' }),
+        buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      ];
+      const onReady = vi.fn();
+      const { rerender } = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: false,
+        onReady,
+      });
+
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(0);
+      expect(getLatestVelocityScrollOptions().enabled).toBe(false);
+
+      rerender(
+        <ChatMessages
+          messages={messages}
+          isAgentRunning={false}
+          sessionId="session-a"
+          isVisible={false}
+          shouldPrime={true}
+          queuedMessage={null}
+          onRewind={vi.fn()}
+          onOpenFile={vi.fn()}
+          onOpenUrl={vi.fn()}
+          onCancelQueue={vi.fn()}
+          onFeedback={vi.fn()}
+          onReady={onReady}
+        />
+      );
+
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+      expect(scrollToItemMock).toHaveBeenCalledWith({ index: 'LAST', align: 'end' });
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+
+      await act(async () => {
+        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(messages);
+        await vi.advanceTimersByTimeAsync(48);
+      });
+
+      expect(mockResizeObserverObserve).toHaveBeenCalled();
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('promotes overscan to steady on the first explicit user scroll', () => {
+    const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+      isVisible: true,
+      shouldPrime: true,
+    });
+
+    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+
+    act(() => {
+      getLatestVelocityScrollOptions().onUserScrollStart?.();
+    });
+
+    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
   });
 
   it('clears animation state after onAnimationComplete fires', async () => {
@@ -457,6 +604,8 @@ describe('ChatMessages', () => {
           isStopPending: false,
           scrollIntent: 'history-load',
           hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
         },
       },
     });
@@ -490,7 +639,7 @@ describe('ChatMessages', () => {
         index: 0,
         context,
       })
-    ).toBe('session-a:0');
+    ).toBe('session-a:assistant-1');
 
     await waitFor(() => {
       expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
@@ -511,6 +660,8 @@ describe('ChatMessages', () => {
           isStopPending: false,
           scrollIntent: 'session-restore',
           hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
         },
       },
     });
@@ -549,6 +700,8 @@ describe('ChatMessages', () => {
           isStopPending: false,
           scrollIntent: 'session-refresh',
           hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
         },
       },
     });
@@ -574,6 +727,65 @@ describe('ChatMessages', () => {
     });
   });
 
+  it('restores cached size ranges when the cache matches the mounted session', () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+
+    const chatStore = useChatStore.getState();
+    chatStore.getOrCreateSession('session-a');
+    chatStore.setMessages('session-a', messages);
+    chatStore.setVirtuosoSizeCache('session-a', {
+      ranges: [{ k: 0, v: 64 }],
+      messageCount: messages.length,
+      lastMessageId: 'assistant-2',
+      layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+    });
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
+
+    expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 64 }]);
+  });
+
+  it('snapshots size ranges when the session stops priming', () => {
+    const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
+    const chatStore = useChatStore.getState();
+    chatStore.getOrCreateSession('session-a');
+    chatStore.setMessages('session-a', messages);
+
+    const { rerender } = renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+      shouldPrime: true,
+    });
+
+    rerender(
+      <ChatMessages
+        messages={messages}
+        isAgentRunning={false}
+        sessionId="session-a"
+        shouldPrime={false}
+        queuedMessage={null}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+      />
+    );
+
+    expect(useChatStore.getState().sessions['session-a']?.virtuosoSizeCache).toEqual({
+      ranges: [{ k: 0, v: 120 }],
+      messageCount: 1,
+      lastMessageId: 'assistant-1',
+      layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+    });
+  });
+
   it('wires item content props and tool lookup into MessageItem correctly', () => {
     const messages = [
       buildMessage({ id: 'assistant-1', role: 'assistant' }),
@@ -588,6 +800,7 @@ describe('ChatMessages', () => {
     });
 
     useToolStore.setState({
+      currentSessionId: 'session-a',
       activeTools: {},
       completedTools: [tool],
     });

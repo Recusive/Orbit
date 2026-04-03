@@ -57,6 +57,17 @@ export interface PendingMessage {
 
 export type SessionHydrationState = 'unloaded' | 'hydrated';
 
+/** Opaque Virtuoso item measurement ranges — shape from getSizeRanges(). */
+export type VirtuosoSizeRange = { k: number; v: number }[];
+
+export interface VirtuosoSizeCache {
+  ranges: VirtuosoSizeRange;
+  messageCount: number;
+  lastMessageId: string | null;
+  /** Monotonic counter bumped on every height-affecting mutation. */
+  layoutVersion: number;
+}
+
 export type ScrollIntent =
   | 'history-load'
   | 'compact-reload'
@@ -70,6 +81,8 @@ export interface ChatSessionData {
   isStopPending: boolean;
   scrollIntent?: ScrollIntent | null;
   hydrationState: SessionHydrationState;
+  layoutVersion: number;
+  virtuosoSizeCache: VirtuosoSizeCache | null;
 }
 
 export interface ActiveCompaction {
@@ -111,6 +124,9 @@ export interface ChatStoreState {
   markSessionHydrated: (id: string) => void;
   setScrollIntent: (id: string, intent: ScrollIntent | null) => void;
   clearScrollIntent: (id: string) => void;
+  setVirtuosoSizeCache: (id: string, cache: VirtuosoSizeCache | null) => void;
+  clearVirtuosoSizeCache: (id: string) => void;
+  bumpLayoutVersion: (id: string) => void;
   appendToLastMessage: (id: string, messageId: string, content: string) => void;
   appendThinking: (id: string, messageId: string, thinking: string) => void;
   addMessage: (id: string, msg: ChatMessage) => void;
@@ -163,6 +179,8 @@ function createEmptySession(): ChatSessionData {
     isStopPending: false,
     scrollIntent: null,
     hydrationState: 'unloaded',
+    layoutVersion: 0,
+    virtuosoSizeCache: null,
   };
 }
 
@@ -222,6 +240,7 @@ function evictIfNeeded(
     if (session) {
       session.messages = [];
       session.hydrationState = 'unloaded';
+      session.virtuosoSizeCache = null;
     }
     // Clear loadedSessions so switching back triggers a fresh conversation:load
     Reflect.deleteProperty(loadedSessions, candidate);
@@ -301,8 +320,10 @@ export const useChatStore = create<ChatStoreState>()(
             draft.sessions[id] = createEmptySession();
             touchLru(draft.lruOrder, id);
           }
-          draft.sessions[id].messages = msgs;
-          draft.sessions[id].scrollIntent = scrollIntent ?? null;
+          const session = draft.sessions[id];
+          session.messages = msgs;
+          session.scrollIntent = scrollIntent ?? null;
+          session.layoutVersion += 1;
         });
       },
 
@@ -333,6 +354,33 @@ export const useChatStore = create<ChatStoreState>()(
         });
       },
 
+      setVirtuosoSizeCache: (id: string, cache: VirtuosoSizeCache | null): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.virtuosoSizeCache = cache;
+          }
+        });
+      },
+
+      clearVirtuosoSizeCache: (id: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.virtuosoSizeCache = null;
+          }
+        });
+      },
+
+      bumpLayoutVersion: (id: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            session.layoutVersion += 1;
+          }
+        });
+      },
+
       appendToLastMessage: (id: string, messageId: string, content: string): void => {
         set((draft) => {
           const session = draft.sessions[id];
@@ -345,6 +393,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (lastMsg.id === messageId) {
             lastMsg.content += content;
             lastMsg.displayedContent = lastMsg.content;
+            session.layoutVersion += 1;
             return;
           }
 
@@ -353,6 +402,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (target) {
             target.content += content;
             target.displayedContent = target.content;
+            session.layoutVersion += 1;
           }
         });
       },
@@ -370,6 +420,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (!target) return;
 
           target.thinking = (target.thinking ?? '') + thinking;
+          session.layoutVersion += 1;
         });
       },
 
@@ -379,7 +430,8 @@ export const useChatStore = create<ChatStoreState>()(
             draft.sessions[id] = createEmptySession();
             touchLru(draft.lruOrder, id);
           }
-          draft.sessions[id].messages.push(msg);
+          const session = draft.sessions[id];
+          session.messages.push(msg);
         });
       },
 
@@ -396,6 +448,7 @@ export const useChatStore = create<ChatStoreState>()(
           const existing = idx >= 0 ? session.messages[idx] : undefined;
           if (idx >= 0 && existing) {
             session.messages[idx] = updater(existing);
+            session.layoutVersion += 1;
           }
         });
       },
@@ -408,12 +461,14 @@ export const useChatStore = create<ChatStoreState>()(
       ): void => {
         set((draft) => {
           const session = draft.sessions[id];
-          const message = session?.messages.find((entry) => entry.id === messageId);
+          if (!session) return;
+          const message = session.messages.find((entry) => entry.id === messageId);
           const image = message?.attachedImages?.find(
             (entry) => entry.previewUrl === matchPreviewUrl
           );
           if (image) {
             image.previewUrl = previewUrl;
+            session.layoutVersion += 1;
           }
         });
       },
@@ -421,7 +476,8 @@ export const useChatStore = create<ChatStoreState>()(
       removeImageFromMessage: (id: string, messageId: string, matchPreviewUrl: string): void => {
         set((draft) => {
           const session = draft.sessions[id];
-          const message = session?.messages.find((entry) => entry.id === messageId);
+          if (!session) return;
+          const message = session.messages.find((entry) => entry.id === messageId);
           if (!message?.attachedImages) {
             return;
           }
@@ -432,6 +488,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (message.attachedImages.length === 0) {
             message.attachedImages = undefined;
           }
+          session.layoutVersion += 1;
         });
       },
 
@@ -443,6 +500,7 @@ export const useChatStore = create<ChatStoreState>()(
           const msg = session.messages.find((m) => m.id === oldId);
           if (msg) {
             msg.id = newId;
+            session.layoutVersion += 1;
           }
         });
       },
@@ -453,7 +511,8 @@ export const useChatStore = create<ChatStoreState>()(
             draft.sessions[id] = createEmptySession();
             touchLru(draft.lruOrder, id);
           }
-          draft.sessions[id].isAgentRunning = running;
+          const session = draft.sessions[id];
+          session.isAgentRunning = running;
         });
       },
 
