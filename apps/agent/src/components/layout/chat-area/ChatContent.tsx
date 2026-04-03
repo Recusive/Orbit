@@ -102,12 +102,8 @@ export const ChatContent: FC<ChatContentProps> = ({
         <VaultPage />
       ) : (
         /* SessionInstanceManager is ALWAYS mounted when not in vault mode.
-           Hidden instances are position:absolute so they don't affect layout.
-           Empty state spacer is layered on top when the active session has no messages. */
+           Hidden instances are position:absolute so they don't affect layout. */
         <>
-          {isEmptyState ? (
-            <div className="flex-1" style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }} />
-          ) : null}
           <SessionInstanceManager
             activeSessionId={sessionId}
             isActiveHidden={isEmptyState}
@@ -123,9 +119,15 @@ export const ChatContent: FC<ChatContentProps> = ({
       )}
 
       {/* ChatInput rendered ONCE outside the ternary — never unmounts during
-          session switches. */}
+          session switches. In empty state the container flexes to center the
+          input above the midpoint; otherwise it sits as a fixed footer. */}
       {!vaultOpen ? (
-        <div className="shrink-0 pb-2 px-0">
+        <div
+          className={
+            isEmptyState ? 'flex-1 flex flex-col justify-center px-0' : 'shrink-0 pb-2 px-0'
+          }
+          style={isEmptyState ? { paddingBottom: EMPTY_STATE_PADDING_BOTTOM } : undefined}
+        >
           <TodoBar overrideSessionId={shownSessionId} />
           {extraControls}
           <ChatInput {...inputProps} />
