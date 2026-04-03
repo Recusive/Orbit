@@ -12,16 +12,14 @@
  *   Overlays the parent's content box (sized by the active instance).
  *   Dimensions match because `inset: 0` fills the same area as `flex: 1`.
  *
- * First-mount stabilization:
- * On first mount, the instance stays hidden until messages arrive AND the
- * ResizeObserver detects stable layout. The PREVIOUS session's instance
- * remains visible during this period (its isActive stays true until this
- * instance signals ready via the onStabilized callback).
+ * Readiness:
+ * On first mount, the instance stays hidden until ChatMessages fires onReady
+ * (Virtuoso has rendered items AND scroll is positioned). The manager keeps
+ * the previous session visible until this signal arrives.
+ * On revisit (already ready), the CSS toggle is instant.
  */
 import { createLogger } from '@orbit/common/lib';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-
-import { STABILIZATION_STABLE_THRESHOLD_MS } from './constants';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { CSSProperties, FC } from 'react';
@@ -40,13 +38,12 @@ export interface SessionInstanceProps {
   readonly onOpenUrl: (url: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
-  /** Called once when the instance first stabilizes (messages loaded + layout settled).
+  /** Called once when the instance is ready (items rendered + scrolled).
    *  The manager uses this to hand off from the previous session. */
   readonly onStabilized?: (sessionId: string) => void;
 }
 
-/** Active instance — in-flow flex child that provides the height context.
- *  Without this, the parent has no in-flow children and Virtuoso gets 0 height. */
+/** Active instance — in-flow flex child that provides the height context. */
 const ACTIVE_STYLE: CSSProperties = {
   position: 'relative',
   flex: 1,
@@ -56,10 +53,7 @@ const ACTIVE_STYLE: CSSProperties = {
   zIndex: 1,
 };
 
-/** Hidden instance — absolute overlay fills the parent's content box (set by
- *  the active instance's flex:1). transform moves it offscreen so WKWebView
- *  keeps rendering (RAFs fire, ResizeObserver works). Dimensions match the
- *  active instance because inset:0 fills the same parent content area. */
+/** Hidden instance — absolute overlay, offscreen via transform. */
 const HIDDEN_STYLE: CSSProperties = {
   position: 'absolute',
   inset: 0,
@@ -86,119 +80,76 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
   const isAgentRunning = useSessionAgentRunning(sessionId);
   const sid = sessionId.slice(-6);
 
-  // ── Per-instance stabilization ──────────────────────────────────────
-  // On first mount: hidden until messages arrive AND ResizeObserver
-  // detects stable layout. After first stabilization: stays true forever.
-  const [hasStabilized, setHasStabilized] = useState(false);
+  // ── Readiness tracking ─────────────────────────────────────────────
+  // Driven by ChatMessages.onReady (Virtuoso items rendered + scrolled).
+  // Once ready, stays ready forever. No ResizeObserver — that fires before
+  // Virtuoso actually renders items into the scroller.
+  const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const mountTimeRef = useRef(performance.now());
-  const resizeCountRef = useRef(0);
 
-  // Track whether messages have arrived (0 → N transition).
-  // Stabilization waits for this before starting the quiet timer.
-  const hasMessagesRef = useRef(messages.length > 0);
-  if (messages.length > 0) {
-    hasMessagesRef.current = true;
-  }
-
-  useLayoutEffect(() => {
-    if (hasStabilized) return undefined;
-
-    const container = containerRef.current;
-    if (!container) {
-      setHasStabilized(true);
-      return undefined;
-    }
-
-    logger.debug(`[${sid}] Starting stabilization`, {
+  const handleReady = useCallback(() => {
+    if (isReady) return;
+    logger.debug(`[${sid}] Ready (items rendered + scrolled)`, {
       msgCount: messages.length,
-      isActive,
     });
+    setIsReady(true);
+    onStabilized?.(sessionId);
+  }, [isReady, sid, sessionId, messages.length, onStabilized]);
 
-    let stabilityTimer: ReturnType<typeof setTimeout> | null = null;
+  // ── Visibility + scroll preservation ─────────────────────────────────
+  // WKWebView resets scrollTop when toggling between position:absolute
+  // (hidden) and position:relative (active). Save on hide, restore on show.
+  const isVisible = isActive && isReady;
+  const savedScrollTopRef = useRef<number | null>(null);
 
-    const onStable = (): void => {
-      // Don't stabilize on an empty container — wait for messages.
-      if (!hasMessagesRef.current) {
-        return;
-      }
-      const elapsed = performance.now() - mountTimeRef.current;
-      logger.debug(`[${sid}] Stabilized`, {
-        elapsed: `${elapsed.toFixed(0)}ms`,
-        resizeCount: resizeCountRef.current,
-        msgCount: messages.length,
-      });
-      setHasStabilized(true);
-      onStabilized?.(sessionId);
-    };
-
-    const resetTimer = (): void => {
-      if (stabilityTimer !== null) {
-        clearTimeout(stabilityTimer);
-      }
-      stabilityTimer = setTimeout(onStable, STABILIZATION_STABLE_THRESHOLD_MS);
-    };
-
-    const observer = new ResizeObserver((entries) => {
-      resizeCountRef.current++;
-      const entry = entries[0];
-      if (entry !== undefined && resizeCountRef.current <= 5) {
-        logger.debug(`[${sid}] ResizeObserver #${String(resizeCountRef.current)}`, {
-          h: entry.contentRect.height.toFixed(0),
-          w: entry.contentRect.width.toFixed(0),
-        });
-      }
-      resetTimer();
-    });
-
-    observer.observe(container);
-    resetTimer();
-
-    return (): void => {
-      observer.disconnect();
-      if (stabilityTimer !== null) {
-        clearTimeout(stabilityTimer);
-      }
-    };
-  }, [hasStabilized, sid, sessionId, messages.length, isActive, onStabilized]);
-
-  // ── Visibility ──────────────────────────────────────────────────────
-  // Show the instance only if it's active AND stabilized.
-  // Before stabilization, even the active instance stays hidden (offscreen)
-  // so the user sees the previous session's instance until this one is ready.
-  const isVisible = isActive && hasStabilized;
-
-  // Log visibility changes + capture scroll diagnostics on reveal
   const prevVisibleRef = useRef(isVisible);
   useEffect(() => {
     if (prevVisibleRef.current === isVisible) return;
-    prevVisibleRef.current = isVisible;
 
-    if (isVisible) {
-      // Capture scroll state at reveal time — helps diagnose the 2/10 scroll
-      // position bug on sessions with TodoBar.
-      requestAnimationFrame(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        const scroller = container.querySelector('[data-testid="virtuoso-scroller"]');
-        const containerRect = container.getBoundingClientRect();
-        logger.debug(`[${sid}] REVEALED — scroll diagnostics`, {
-          containerH: containerRect.height.toFixed(0),
-          containerW: containerRect.width.toFixed(0),
-          scrollerH: scroller?.scrollHeight ?? 'N/A',
-          scrollerClientH: scroller?.clientHeight ?? 'N/A',
-          scrollTop: scroller?.scrollTop ?? 'N/A',
-          scrollBottom: scroller
-            ? scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight
-            : 'N/A',
+    const container = containerRef.current;
+    const scroller = container?.querySelector('[data-testid="virtuoso-scroller"]');
+
+    if (!isVisible && prevVisibleRef.current) {
+      // HIDING — save scroll position before the layout change
+      if (scroller) {
+        savedScrollTopRef.current = scroller.scrollTop;
+        logger.debug(`[${sid}] HIDDEN — saved scrollTop=${String(scroller.scrollTop)}`, {
           msgCount: messages.length,
-          childCount: scroller?.children[0]?.children.length ?? 'N/A',
         });
-      });
-    } else {
-      logger.debug(`[${sid}] HIDDEN`, { msgCount: messages.length });
+      }
     }
-  }, [isVisible, isActive, hasStabilized, sid, messages.length]);
+
+    if (isVisible && !prevVisibleRef.current) {
+      // SHOWING — restore scroll position after the layout change settles
+      const savedTop = savedScrollTopRef.current;
+      if (savedTop !== null && savedTop > 0 && scroller) {
+        // Use RAF to let the browser complete the layout change first
+        requestAnimationFrame(() => {
+          scroller.scrollTop = savedTop;
+          logger.debug(`[${sid}] REVEALED — restored scrollTop=${String(savedTop)}`, {
+            scrollerH: scroller.scrollHeight,
+            clientH: scroller.clientHeight,
+            actualScrollTop: scroller.scrollTop,
+            msgCount: messages.length,
+          });
+        });
+      } else {
+        // First reveal or no saved position — just log
+        requestAnimationFrame(() => {
+          if (!container) return;
+          const containerRect = container.getBoundingClientRect();
+          logger.debug(`[${sid}] REVEALED — no restore needed`, {
+            containerH: containerRect.height.toFixed(0),
+            scrollTop: scroller?.scrollTop ?? 'N/A',
+            savedTop,
+            msgCount: messages.length,
+          });
+        });
+      }
+    }
+
+    prevVisibleRef.current = isVisible;
+  }, [isVisible, sid, messages.length]);
 
   return (
     <div
@@ -206,7 +157,7 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
       style={isVisible ? ACTIVE_STYLE : HIDDEN_STYLE}
       data-session-instance={sessionId}
       data-instance-active={isActive}
-      data-instance-stabilized={hasStabilized}
+      data-instance-ready={isReady}
     >
       <ChatMessages
         messages={messages}
@@ -218,6 +169,7 @@ export const SessionInstance: FC<SessionInstanceProps> = ({
         onOpenUrl={onOpenUrl}
         onCancelQueue={onCancelQueue}
         onFeedback={onFeedback}
+        onReady={handleReady}
       />
     </div>
   );

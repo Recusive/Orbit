@@ -60,6 +60,9 @@ interface ChatMessagesProps {
   readonly onOpenUrl: (url: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
+  /** Called once when Virtuoso has rendered items and scroll is positioned.
+   *  SessionInstance waits for this before revealing the instance. */
+  readonly onReady?: () => void;
 }
 
 interface MessageListContext {
@@ -145,6 +148,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onOpenUrl,
   onCancelQueue,
   onFeedback,
+  onReady,
 }) => {
   const listRef = useRef<VirtuosoMessageListMethods<ChatMessage, MessageListContext>>(null);
   const prevMessageCount = useRef(0);
@@ -430,26 +434,94 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     [sessionKey]
   );
 
-  // Clear consumed scroll intent
-  // ── Imperative scroll-to-bottom for session-restore ──────────────────
-  // Uses scrollToItem() directly instead of the data prop's scrollModifier.
-  // The data-prop approach fails because clearing the intent triggers a
-  // re-render that sends plain data to the library, which can cancel the
-  // pending scroll before it executes.
+  // ── Scroll-to-bottom with readiness polling ─────────────────────────
+  // VirtuosoMessageList processes data via useEffect (async, after paint).
+  // A single scrollToItem() call fires before items exist → no-op.
+  // Instead, poll via RAF until the scroller has rendered content
+  // (scrollHeight > clientHeight), then scroll and signal ready.
   //
-  // Fires when:
-  // - Revisit: scrollIntent changes to 'session-restore', messages already loaded
-  // - First visit: messages arrive (0→N) with scrollIntent='session-restore'
+  // IMPORTANT: The poll is tracked via a ref, NOT a reactive dependency on
+  // scrollIntent. The clearScrollIntent effect fires in the same batch,
+  // which would cancel the poll if it depended on scrollIntent.
+  const onReadyRef = useRef(onReady);
+  onReadyRef.current = onReady;
+  const hasSignaledReadyRef = useRef(false);
+  const needsRestoreRef = useRef(false);
+
+  // Capture the restore intent into a ref before the clear effect runs
+  if (scrollIntent === 'session-restore' && messages.length > 0) {
+    needsRestoreRef.current = true;
+  }
+
   useEffect(() => {
-    if (scrollIntent !== 'session-restore' || messages.length === 0) return;
+    if (!needsRestoreRef.current || hasSignaledReadyRef.current) return;
+    // Consumed — don't re-enter on future renders
+    needsRestoreRef.current = false;
 
-    logger.debug(`[${sid}] Imperative scrollToItem(LAST, end)`, {
-      msgCount: messages.length,
-    });
-    listRef.current?.scrollToItem({ index: 'LAST', align: 'end' });
-  }, [scrollIntent, messages.length, sid]);
+    const handle = listRef.current;
+    if (!handle) {
+      // No list ref — signal ready immediately (edge case)
+      hasSignaledReadyRef.current = true;
+      onReadyRef.current?.();
+      return;
+    }
 
-  // Clear consumed scroll intent
+    let rafId = 0;
+    let attempts = 0;
+    const MAX_ATTEMPTS = 60; // ~1 second at 60fps
+
+    const poll = (): void => {
+      attempts++;
+      const scroller = handle.scrollerElement();
+      const hasContent = scroller !== null && scroller.scrollHeight > scroller.clientHeight + 10;
+
+      if (hasContent) {
+        handle.scrollToItem({ index: 'LAST', align: 'end' });
+        logger.debug(`[${sid}] scrollToItem after ${String(attempts)} RAF polls`, {
+          scrollerH: scroller.scrollHeight,
+          clientH: scroller.clientHeight,
+        });
+        // Signal ready after one more frame (let scroll settle)
+        requestAnimationFrame(() => {
+          if (!hasSignaledReadyRef.current) {
+            hasSignaledReadyRef.current = true;
+            onReadyRef.current?.();
+          }
+        });
+        return;
+      }
+
+      if (attempts >= MAX_ATTEMPTS) {
+        // Fallback: signal ready even without content (short conversations
+        // where all content fits in viewport — scrollHeight ≈ clientHeight)
+        logger.debug(
+          `[${sid}] Readiness timeout after ${String(attempts)} polls — signaling ready`,
+          {
+            scrollerH: scroller?.scrollHeight ?? 0,
+            clientH: scroller?.clientHeight ?? 0,
+          }
+        );
+        handle.scrollToItem({ index: 'LAST', align: 'end' });
+        if (!hasSignaledReadyRef.current) {
+          hasSignaledReadyRef.current = true;
+          onReadyRef.current?.();
+        }
+        return;
+      }
+
+      rafId = requestAnimationFrame(poll);
+    };
+
+    rafId = requestAnimationFrame(poll);
+
+    return (): void => {
+      if (rafId !== 0) {
+        cancelAnimationFrame(rafId);
+      }
+    };
+  }, [messages.length, sid]);
+
+  // Clear consumed scroll intent (safe — poll is ref-driven, not affected)
   useEffect(() => {
     if (scrollIntent !== null && sessionId !== undefined) {
       logger.debug(`[${sid}] Clearing scrollIntent: ${scrollIntent}`);
