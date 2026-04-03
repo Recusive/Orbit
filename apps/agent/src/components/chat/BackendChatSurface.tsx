@@ -11,8 +11,6 @@ import {
   useInputMode,
   useThinkingMode,
   useEffortLevel,
-  useSessionUsage,
-  useMaxTokens,
 } from '@/stores/agent/tool-store';
 import { useIsLoadingConversation } from '@/stores/ui/ui-store';
 
@@ -26,8 +24,6 @@ const ClaudeAgentSurface: FC = () => {
   const thinkingMode = useThinkingMode();
   const effortLevel = useEffortLevel();
   const allPendingPermissions = usePendingPermissions();
-  const sessionUsage = useSessionUsage();
-  const maxTokens = useMaxTokens();
   const {
     messages,
     isAgentRunning,
@@ -91,8 +87,6 @@ const ClaudeAgentSurface: FC = () => {
         inputMode={inputMode}
         thinkingMode={thinkingMode}
         effortLevel={effortLevel}
-        sessionUsage={sessionUsage}
-        maxTokens={maxTokens}
         onSend={handleSend}
         onStop={handleStop}
         onRewind={handleRewind}
@@ -117,8 +111,6 @@ const ClaudeEditorSurface: FC = () => {
   const thinkingMode = useThinkingMode();
   const effortLevel = useEffortLevel();
   const pendingPermissions = usePendingPermissions();
-  const sessionUsage = useSessionUsage();
-  const maxTokens = useMaxTokens();
   const {
     messages,
     isAgentRunning,
@@ -174,8 +166,6 @@ const ClaudeEditorSurface: FC = () => {
         inputMode={inputMode}
         thinkingMode={thinkingMode}
         effortLevel={effortLevel}
-        sessionUsage={sessionUsage}
-        maxTokens={maxTokens}
         onSend={handleSend}
         onStop={handleStop}
         onRewind={handleRewind}

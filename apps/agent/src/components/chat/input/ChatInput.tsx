@@ -21,7 +21,7 @@ import type { FC } from 'react';
 import { ElementContextChip } from '@/components/browser';
 import { PermissionModal } from '@/components/modals';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { useModel } from '@/stores/agent/tool-store';
+import { useMaxTokens, useModel, useSessionUsage } from '@/stores/agent/tool-store';
 
 /** Check if a permission request is for the AskUserQuestion tool */
 function isAskUserQuestion(toolName: string): boolean {
@@ -33,8 +33,6 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   thinkingMode,
   effortLevel,
   isAgentRunning,
-  usage,
-  maxTokens,
   permissions = [],
   onPermissionApprove,
   onPermissionDeny,
@@ -47,6 +45,11 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
 }) {
   // Read current model from store (used to conditionally render effort vs thinking UI)
   const model = useModel();
+  // Subscribe directly to ToolStore instead of receiving as props from root.
+  // This prevents BackendChatSurface (root) from re-rendering on switchSession,
+  // which would cascade through all 10 keep-alive VirtuosoMessageList instances.
+  const usage = useSessionUsage();
+  const maxTokens = useMaxTokens();
 
   const {
     // State

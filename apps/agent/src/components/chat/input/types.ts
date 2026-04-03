@@ -28,8 +28,6 @@ export interface ChatInputProps {
   readonly thinkingMode: ThinkingMode;
   readonly effortLevel: EffortLevel;
   readonly isAgentRunning: boolean;
-  readonly usage: UsageData;
-  readonly maxTokens: number;
   /** Permission requests to render inside the input container */
   readonly permissions?: readonly PermissionRequest[];
   readonly onPermissionApprove?: (

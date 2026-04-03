@@ -48,6 +48,14 @@ vi.mock('@/components/modals', () => ({
 
 vi.mock('@/stores/agent/tool-store', () => ({
   useModel: (): string => 'claude-sonnet-4-6',
+  useSessionUsage: () => ({
+    inputTokens: 0,
+    outputTokens: 0,
+    cacheReadInputTokens: 0,
+    cacheCreationInputTokens: 0,
+    totalCostUsd: 0,
+  }),
+  useMaxTokens: () => 200000,
 }));
 
 import { ChatInput } from '@/components/chat/input/ChatInput';
@@ -114,8 +122,6 @@ function createProps(overrides: Partial<ChatInputProps> = {}): ChatInputProps {
     thinkingMode: 'off',
     effortLevel: 'high',
     isAgentRunning: false,
-    usage: { inputTokens: 0, outputTokens: 0 },
-    maxTokens: 200000,
     permissions: [],
     onPermissionApprove: vi.fn(),
     onPermissionDeny: vi.fn(),

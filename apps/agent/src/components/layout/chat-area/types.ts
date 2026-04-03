@@ -1,6 +1,6 @@
 import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
-import type { PermissionRequest, UsageData } from '@/stores/agent/tool-store';
+import type { PermissionRequest } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type {
   EffortLevel,
@@ -32,10 +32,6 @@ export interface ChatContentProps {
   readonly thinkingMode: ThinkingMode;
   /** Current effort level (Opus 4.6 adaptive thinking) */
   readonly effortLevel: EffortLevel;
-  /** Session token usage */
-  readonly sessionUsage: UsageData;
-  /** Max tokens limit */
-  readonly maxTokens: number;
   /** Handlers */
   readonly onSend: (
     text: string,
