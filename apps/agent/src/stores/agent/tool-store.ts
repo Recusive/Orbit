@@ -1178,6 +1178,40 @@ export const usePendingPermissions = (): PermissionRequest[] =>
 export const useCompletedTools = (): ToolExecution[] =>
   useToolStore((state) => state.completedTools);
 
+// ────────────────────────────────────────────────────────────────────────────
+// Per-Session Tool Selectors (Multi-Instance Keep-Alive)
+//
+// Each keep-alive ChatMessages instance reads tools for its OWN session, not
+// the global active session. This prevents all mounted instances from
+// re-rendering when switchSession() swaps the global completedTools array.
+//
+// If sessionId === currentSessionId → read from global (live data).
+// Else → read from sessionCache (frozen at last switch-away).
+// ────────────────────────────────────────────────────────────────────────────
+
+const EMPTY_ACTIVE_TOOLS: Record<string, ToolExecution> = {};
+const EMPTY_COMPLETED_TOOLS: ToolExecution[] = [];
+
+/** Completed tools for a specific session. */
+export function useSessionCompletedTools(sessionId: string): ToolExecution[] {
+  return useToolStore((state) => {
+    if (state.currentSessionId === sessionId) {
+      return state.completedTools;
+    }
+    return state.sessionCache[sessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS;
+  });
+}
+
+/** Active (in-progress) tools for a specific session. */
+export function useSessionActiveTools(sessionId: string): Record<string, ToolExecution> {
+  return useToolStore((state) => {
+    if (state.currentSessionId === sessionId) {
+      return state.activeTools;
+    }
+    return state.sessionCache[sessionId]?.activeTools ?? EMPTY_ACTIVE_TOOLS;
+  });
+}
+
 // Usage selectors
 export const useSessionUsage = (): UsageData => useToolStore((state) => state.sessionUsage);
 export const useContextPercentage = (): number =>

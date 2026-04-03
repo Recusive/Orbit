@@ -658,3 +658,26 @@ export function useIsStopPending(): boolean {
     (s) => (s.activeSessionId ? s.sessions[s.activeSessionId]?.isStopPending : undefined) ?? false
   );
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// Per-Session Selectors (Multi-Instance Keep-Alive)
+//
+// These read a SPECIFIC session by ID (not the active session). Used by
+// SessionInstance components so each keep-alive VirtuosoMessageList subscribes
+// to its own session's data independently.
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Messages for a specific session. Returns stable EMPTY_MESSAGES when session has no data. */
+export function useSessionMessages(sessionId: string): ChatMessage[] {
+  return useChatStore((s) => s.sessions[sessionId]?.messages ?? EMPTY_MESSAGES);
+}
+
+/** Whether a specific session's agent is running. */
+export function useSessionAgentRunning(sessionId: string): boolean {
+  return useChatStore((s) => s.sessions[sessionId]?.isAgentRunning ?? false);
+}
+
+/** Hydration state for a specific session. */
+export function useSessionHydrationState(sessionId: string): SessionHydrationState {
+  return useChatStore((s) => s.sessions[sessionId]?.hydrationState ?? 'unloaded');
+}

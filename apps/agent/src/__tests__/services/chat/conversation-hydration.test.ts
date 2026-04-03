@@ -110,7 +110,7 @@ describe('ChatMessageService conversation hydration', () => {
     expect(session?.messages).toEqual(cachedMessages);
   });
 
-  it('uses history-load for unhydrated sessions and marks them hydrated after merge', async () => {
+  it('uses session-restore for unhydrated sessions and marks them hydrated after merge', async () => {
     const sessionId = 'unhydrated-session';
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession(sessionId);
@@ -135,7 +135,8 @@ describe('ChatMessageService conversation hydration', () => {
     await vi.runAllTimersAsync();
 
     const session = useChatStore.getState().sessions[sessionId];
-    expect(session?.scrollIntent).toBe('history-load');
+    // Initial load scrolls to bottom (session-restore) not top (history-load)
+    expect(session?.scrollIntent).toBe('session-restore');
     expect(session?.hydrationState).toBe('hydrated');
     expect(session?.messages).toHaveLength(2);
   });

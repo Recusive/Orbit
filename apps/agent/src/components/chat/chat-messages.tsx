@@ -2,6 +2,8 @@
  * ChatMessages - Virtualized chat list with message-aware scroll behavior.
  *
  * Architecture:
+ * - Each instance is bound to ONE session for its lifetime (mounted by
+ *   SessionInstance with `key={sessionId}`). No session-switch logic here.
  * - `@virtuoso.dev/message-list` owns virtualization AND scroll behavior
  * - The library's built-in `auto-scroll-to-bottom` and `items-change` scroll
  *   modifiers handle all auto-scroll (streaming, new messages, etc.)
@@ -14,9 +16,9 @@
  * WARNING: Do NOT add `contain: paint`, `content-visibility: auto`, or
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
+import { createLogger } from '@orbit/common/lib';
 import { VirtuosoMessageList, VirtuosoMessageListLicense } from '@virtuoso.dev/message-list';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useShallow } from 'zustand/shallow';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -35,22 +37,18 @@ import type { FC } from 'react';
 import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
-import { deduplicateAndSortTools, useToolStore } from '@/stores/agent/tool-store';
+import {
+  deduplicateAndSortTools,
+  useSessionActiveTools,
+  useSessionCompletedTools,
+} from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+
+const logger = createLogger('ChatMessages');
 
 /** Constant empty array — prevents a new [] allocation per no-tool message
  *  on every Virtuoso item re-render (e.g., container resize). */
 const EMPTY_TOOLS: ToolExecution[] = [];
-
-/** Per-session size cache — stores the library's AVL size-tree entries so we
- *  can seed correct item heights when the user returns to a session.
- *  This eliminates the blank frame + scroll jump caused by an empty sizeTree
- *  at mount time. */
-interface SizeRange {
-  readonly k: number;
-  readonly v: number;
-}
-const sessionSizeCache = new Map<string, SizeRange[]>();
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -149,36 +147,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onFeedback,
 }) => {
   const listRef = useRef<VirtuosoMessageListMethods<ChatMessage, MessageListContext>>(null);
-  const prevSessionIdRef = useRef(sessionId);
   const prevMessageCount = useRef(0);
-  const messagesRef = useRef(messages);
   const lastPlacedMessagesRef = useRef<ChatMessage[] | null>(null);
-  messagesRef.current = messages;
-  const lastSizeCacheSessionRef = useRef(sessionId);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
-
-  // ── Render-time size injection ───────────────────────────────────────
-  // When sessionId changes, key={sessionKey} forces Virtuoso to remount.
-  // BEFORE the new instance mounts, we save the outgoing session's sizes
-  // and inject the incoming session's cached sizes into the global that
-  // the library's patched useMemo reads. This seeds the sizeTree in the
-  // same pubIn batch as data, so Ae computes correct positions from frame 0.
-  if (lastSizeCacheSessionRef.current !== sessionId) {
-    const handle = listRef.current;
-    if (handle !== null) {
-      const outgoing = lastSizeCacheSessionRef.current;
-      if (outgoing !== undefined) {
-        const sizes = handle.getSizeRanges();
-        if (sizes.length > 0) {
-          sessionSizeCache.set(outgoing, sizes);
-        }
-      }
-    }
-    const cached = sessionSizeCache.get(sessionId ?? '');
-    (window as unknown as Record<string, unknown>)['__orbitVirtuosoSizes'] =
-      cached !== undefined && cached.length > 0 ? cached : null;
-    lastSizeCacheSessionRef.current = sessionId;
-  }
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
   // viewport buffer keeps items pre-rendered ahead of the scroll.
@@ -205,12 +176,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     });
   }, []);
 
-  const { activeTools, completedTools } = useToolStore(
-    useShallow((state) => ({
-      activeTools: state.activeTools,
-      completedTools: state.completedTools,
-    }))
-  );
+  // Per-session tool selectors — each keep-alive instance reads its OWN
+  // session's tools from the cache, not the global active arrays. This
+  // prevents all mounted instances from re-rendering on switchSession().
+  const sessionKey = sessionId ?? '';
+  const activeTools = useSessionActiveTools(sessionKey);
+  const completedTools = useSessionCompletedTools(sessionKey);
 
   const toolsByMessageId = useMemo(() => {
     const activeByMsg = new Map<string, ToolExecution[]>();
@@ -272,6 +243,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return ids;
   }, [messages]);
 
+  const sid = (sessionId ?? '').slice(-6);
+
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
@@ -281,11 +254,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     if (scrollIntent === 'session-restore') {
-      return { index: messages.length - 1, align: 'end' as const };
+      const loc = { index: messages.length - 1, align: 'end' as const };
+      logger.debug(`[${sid}] initialLocation (session-restore)`, {
+        index: loc.index,
+        msgCount: messages.length,
+      });
+      return loc;
     }
 
     return null;
-  }, [messages.length, scrollIntent]);
+  }, [messages.length, scrollIntent, sid]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -321,6 +299,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // items in an empty array: "Failed binary finding record, searched for 0".
     // This happens during session transitions when messages briefly becomes [].
     if (messages.length === 0) {
+      logger.debug(`[${sid}] scrollModifier: empty data`);
       return { data: messages };
     }
 
@@ -328,6 +307,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (scrollIntent !== null) {
       switch (scrollIntent) {
         case 'history-load':
+          logger.debug(`[${sid}] scrollModifier: history-load → item-location(0,start)`, {
+            msgCount: messages.length,
+          });
           return {
             data: messages,
             scrollModifier: {
@@ -336,19 +318,38 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             },
           };
         case 'compact-reload':
+          logger.debug(`[${sid}] scrollModifier: compact-reload → items-change(auto)`);
           return {
             data: messages,
             scrollModifier: { type: 'items-change', behavior: 'auto' },
           };
         case 'session-restore':
+          // Multi-instance keep-alive: scroll-to-bottom is handled by an
+          // imperative scrollToItem() call in the effect below, NOT through
+          // the data prop's scrollModifier. The data-prop approach fails
+          // because clearing the intent triggers a second render that passes
+          // plain data, which can cancel the pending scroll.
+          logger.debug(
+            `[${sid}] scrollModifier: session-restore → plain data (imperative scroll)`,
+            {
+              msgCount: messages.length,
+              prevCount: prevMessageCount.current,
+            }
+          );
+          return {
+            data: messages,
+          };
         case 'session-refresh':
-          // Session restore is handled by a keyed remount + initialLocation.
-          // Session refresh intentionally avoids item-location because the
-          // library applies it after paint, causing a visible top flash.
+          // Session refresh: backend re-sent the same data. Preserve scroll position.
+          logger.debug(`[${sid}] scrollModifier: session-refresh → plain data (no modifier)`, {
+            msgCount: messages.length,
+            prevCount: prevMessageCount.current,
+          });
           return {
             data: messages,
           };
         case 'rewind':
+          logger.debug(`[${sid}] scrollModifier: rewind → remove-from-end`);
           return {
             data: messages,
             scrollModifier: 'remove-from-end',
@@ -369,6 +370,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (messages.length === prevLength) {
       // Streaming: existing items changed content (same count).
       // The library auto-scrolls if previously at bottom.
+      logger.debug(`[${sid}] scrollModifier: heuristic items-change(smooth)`, {
+        count: messages.length,
+      });
       return {
         data: messages,
         scrollModifier: { type: 'items-change', behavior: 'smooth' },
@@ -376,6 +380,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     // Append: new message(s) arrived.
+    logger.debug(`[${sid}] scrollModifier: heuristic auto-scroll-to-bottom`, {
+      prevLength,
+      newLength: messages.length,
+    });
     return {
       data: messages,
       scrollModifier: {
@@ -384,7 +392,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           atBottom ? 'smooth' : false,
       },
     };
-  }, [messages, scrollIntent]);
+  }, [messages, scrollIntent, sid]);
 
   const messageListContext = useMemo(
     (): MessageListContext => ({
@@ -415,8 +423,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ]
   );
 
-  const sessionKey = sessionId ?? '';
-
   // Stable key function — avoids creating a new closure on each render.
   // Virtuoso compares the function reference; a new ref can force item re-renders.
   const computeItemKey = useCallback(
@@ -425,14 +431,37 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   // Clear consumed scroll intent
+  // ── Imperative scroll-to-bottom for session-restore ──────────────────
+  // Uses scrollToItem() directly instead of the data prop's scrollModifier.
+  // The data-prop approach fails because clearing the intent triggers a
+  // re-render that sends plain data to the library, which can cancel the
+  // pending scroll before it executes.
+  //
+  // Fires when:
+  // - Revisit: scrollIntent changes to 'session-restore', messages already loaded
+  // - First visit: messages arrive (0→N) with scrollIntent='session-restore'
+  useEffect(() => {
+    if (scrollIntent !== 'session-restore' || messages.length === 0) return;
+
+    logger.debug(`[${sid}] Imperative scrollToItem(LAST, end)`, {
+      msgCount: messages.length,
+    });
+    listRef.current?.scrollToItem({ index: 'LAST', align: 'end' });
+  }, [scrollIntent, messages.length, sid]);
+
+  // Clear consumed scroll intent
   useEffect(() => {
     if (scrollIntent !== null && sessionId !== undefined) {
+      logger.debug(`[${sid}] Clearing scrollIntent: ${scrollIntent}`);
       useChatStore.getState().clearScrollIntent(sessionId);
     }
-  }, [scrollIntent, sessionId]);
+  }, [scrollIntent, sessionId, sid]);
 
   useLayoutEffect(() => {
     if (scrollIntent === 'session-restore' || scrollIntent === 'session-refresh') {
+      logger.debug(`[${sid}] Pinning lastPlacedMessages (${scrollIntent})`, {
+        msgCount: messages.length,
+      });
       lastPlacedMessagesRef.current = messages;
       return;
     }
@@ -440,24 +469,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (lastPlacedMessagesRef.current !== messages) {
       lastPlacedMessagesRef.current = null;
     }
-  }, [messages, scrollIntent]);
-
-  // Session switch: reset local state only. The data prop's item-location
-  // modifier (from history-load scrollIntent) handles the data replacement
-  // and scroll. A second data.replace() here would conflict — two replacements
-  // through different library signal paths interleave with ResizeObserver
-  // measurements, causing scrollbar jitter.
-  useEffect(() => {
-    if (prevSessionIdRef.current === sessionId) {
-      return;
-    }
-
-    setAnimatingMessageIds(new Set());
-    // Set to current message count (not 0) so the heuristic fallback
-    // doesn't misread the cached data as "new appends" on the next render.
-    prevMessageCount.current = messagesRef.current.length;
-    prevSessionIdRef.current = sessionId;
-  }, [sessionId]);
+  }, [messages, scrollIntent, sid]);
 
   // New user message: animate and force scroll to bottom.
   // The library's auto-scroll-to-bottom modifier handles subsequent messages.
@@ -479,7 +491,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       <div className="flex-1 flex flex-col min-h-0">
         <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
           <VirtuosoMessageList<ChatMessage, MessageListContext>
-            key={sessionKey}
             ref={listRef}
             initialData={messages}
             {...(initialLocation ? { initialLocation } : {})}

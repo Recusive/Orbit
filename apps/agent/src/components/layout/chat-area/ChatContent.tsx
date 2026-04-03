@@ -1,9 +1,10 @@
+import { SessionInstanceManager } from './SessionInstanceManager';
 import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 
 import type { ChatContentProps } from './types';
 import type { FC } from 'react';
 
-import { AuthErrorBanner, ChatInput, ChatMessages, TodoBar } from '@/components/chat';
+import { AuthErrorBanner, ChatInput, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
 import { useVaultOpen } from '@/stores/ui/ui-store';
@@ -12,9 +13,8 @@ import { useVaultOpen } from '@/stores/ui/ui-store';
  * Chat content section handling both empty and messages states
  *
  * - Empty state: Input positioned above center with paddingBottom
- * - Messages state: Messages list + input at bottom
- *
- * Uses visibility:hidden during transitions to prevent layout flash.
+ * - Messages state: SessionInstanceManager renders keep-alive VirtuosoMessageList
+ *   instances per recently-visited session (Discord/Slack pattern)
  *
  * Drop target for file-explorer drag-and-drop: marked with
  * data-orbit-drop-zone="chat" so the source-side handleDragEnd
@@ -25,7 +25,6 @@ import { useVaultOpen } from '@/stores/ui/ui-store';
  */
 export const ChatContent: FC<ChatContentProps> = ({
   contentRef,
-  isTransitioning,
   isLoadingConversation,
   messages,
   isAgentRunning,
@@ -78,8 +77,7 @@ export const ChatContent: FC<ChatContentProps> = ({
     <div
       ref={contentRef}
       data-orbit-drop-zone="chat"
-      className={`relative flex-1 flex flex-col min-h-0${isTransitioning ? ' no-transitions' : ''}`}
-      style={isTransitioning ? { visibility: 'hidden' } : undefined}
+      className="relative flex-1 flex flex-col min-h-0"
     >
       {/* Screen reader status announcer for agent state changes */}
       <StatusAnnouncer
@@ -93,16 +91,17 @@ export const ChatContent: FC<ChatContentProps> = ({
       {vaultOpen ? (
         /* Vault page: Note tiles grid */
         <VaultPage />
-      ) : isEmptyState ? (
-        /* Empty state: spacer pushes input (rendered below) above center */
-        <div className="flex-1" style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }} />
       ) : (
-        /* Normal layout: Virtuoso fills remaining space, input sits below as sibling. */
-        <div className="flex-1 flex flex-col min-h-0">
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={isAgentRunning}
-            sessionId={sessionId}
+        /* SessionInstanceManager is ALWAYS mounted when not in vault mode.
+           Hidden instances are position:absolute so they don't affect layout.
+           Empty state spacer is layered on top when the active session has no messages. */
+        <>
+          {isEmptyState ? (
+            <div className="flex-1" style={{ paddingBottom: EMPTY_STATE_PADDING_BOTTOM }} />
+          ) : null}
+          <SessionInstanceManager
+            activeSessionId={sessionId}
+            isActiveHidden={isEmptyState}
             queuedMessage={queuedMessage}
             onRewind={onRewind}
             onOpenFile={onOpenFile}
@@ -110,14 +109,13 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
           />
-        </div>
+        </>
       )}
 
       {/* ChatInput rendered ONCE outside the ternary — never unmounts during
-          session switches. visibility:visible overrides the parent's
-          visibility:hidden so the input stays visible during transitions. */}
+          session switches. */}
       {!vaultOpen ? (
-        <div className="shrink-0 pb-2 px-0" style={{ visibility: 'visible' }}>
+        <div className="shrink-0 pb-2 px-0">
           <TodoBar />
           {extraControls}
           <ChatInput {...inputProps} />

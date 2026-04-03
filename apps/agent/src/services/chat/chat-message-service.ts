@@ -1305,14 +1305,16 @@ class ChatMessageService {
           }
         }
 
-        // Write messages to store
-        useChatStore
-          .getState()
-          .setMessages(
-            message.session_id,
-            newMessages,
-            wasHydrated ? 'session-refresh' : 'history-load'
-          );
+        // Write messages to store.
+        // Initial load (wasHydrated=false): use session-restore to scroll to bottom.
+        // Refresh (wasHydrated=true): use session-refresh to preserve scroll position.
+        // NOTE: history-load is reserved for explicit "load older messages" actions
+        // and scrolls to the TOP — not appropriate for session switching.
+        const scrollIntent = wasHydrated ? 'session-refresh' : 'session-restore';
+        logger.debug(
+          `conversation:loaded setMessages: session=${message.session_id.slice(-6)}, intent=${scrollIntent}, msgCount=${String(newMessages.length)}, wasHydrated=${String(wasHydrated)}, isStale=${String(isStaleNavigation)}`
+        );
+        useChatStore.getState().setMessages(message.session_id, newMessages, scrollIntent);
         useChatStore.getState().markSessionHydrated(message.session_id);
 
         // Count messages with tools for diagnostic logging

@@ -230,6 +230,10 @@ vi.mock('@/components/chat/queued-message', () => ({
   },
 }));
 
+vi.mock('@/hooks/ui/use-velocity-scroll', () => ({
+  useVelocityScroll: () => vi.fn(),
+}));
+
 vi.mock('@/components/ui/shimmer-text', () => ({
   ShimmerText: ({
     children,
@@ -370,15 +374,13 @@ describe('ChatMessages', () => {
     scrollerScrollToMock.mockClear();
   });
 
-  it('resets rows, remeasures the list, and resets session context when switching sessions', async () => {
-    const sessionAMessages = [buildMessage({ id: 'user-a', role: 'user', content: 'hi' })];
-    const sessionBMessages = [
-      buildMessage({ id: 'assistant-b', role: 'assistant', content: 'reply' }),
-      buildMessage({ id: 'user-b', role: 'user', content: 'next' }),
-    ];
+  it('binds to a single session and uses session-prefixed item keys', async () => {
+    // With multi-instance keep-alive, each ChatMessages is bound to ONE session.
+    // Verify session context and item key prefixing work correctly.
+    const messages = [buildMessage({ id: 'user-a', role: 'user', content: 'hi' })];
 
-    const { rerender } = renderChatMessages({
-      messages: sessionAMessages,
+    renderChatMessages({
+      messages,
       sessionId: 'session-a',
     });
 
@@ -387,56 +389,21 @@ describe('ChatMessages', () => {
       expect(userAProps?.animate).toBe(true);
     });
 
-    const initialProps = getLatestVirtuosoMessageListProps();
-    const initialContext = getVirtuosoContext(initialProps);
-    const sessionAFirstMessage = getMessageAt(sessionAMessages, 0);
+    const props = getLatestVirtuosoMessageListProps();
+    const context = getVirtuosoContext(props);
+    const firstMessage = getMessageAt(messages, 0);
 
     expect(
-      initialProps.computeItemKey?.({
-        data: sessionAFirstMessage,
+      props.computeItemKey?.({
+        data: firstMessage,
         index: 0,
-        context: initialContext,
+        context,
       })
     ).toBe('session-a:0');
     expect(screen.getByTestId('message-item-user-a')).toHaveAttribute(
       'data-session-id',
       'session-a'
     );
-
-    rerender(
-      <ChatMessages
-        messages={sessionBMessages}
-        isAgentRunning={false}
-        sessionId="session-b"
-        queuedMessage={null}
-        onRewind={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenUrl={vi.fn()}
-        onCancelQueue={vi.fn()}
-        onFeedback={vi.fn()}
-      />
-    );
-
-    const updatedProps = await waitFor(() => getLatestVirtuosoMessageListProps());
-    const updatedContext = getVirtuosoContext(updatedProps);
-    const sessionBFirstMessage = getMessageAt(sessionBMessages, 0);
-
-    expect(
-      updatedProps.computeItemKey?.({
-        data: sessionBFirstMessage,
-        index: 0,
-        context: updatedContext,
-      })
-    ).toBe('session-b:0');
-    expect(screen.getByTestId('message-item-assistant-b')).toHaveAttribute(
-      'data-session-id',
-      'session-b'
-    );
-
-    const assistantBProps = messageItemPropsById.get('assistant-b') as
-      | MockMessageItemProps
-      | undefined;
-    expect(assistantBProps?.animate).toBe(false);
   });
 
   it('clears animation state after onAnimationComplete fires', async () => {
@@ -530,53 +497,82 @@ describe('ChatMessages', () => {
     });
   });
 
-  it.each(['session-restore', 'session-refresh'] as const)(
-    'uses the plain data path for %s and clears the consumed intent without falling back to heuristics',
-    async (scrollIntent: 'session-restore' | 'session-refresh') => {
-      const messages = [
-        buildMessage({ id: 'assistant-1', role: 'assistant' }),
-        buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      ];
+  it('session-restore scrolls to bottom imperatively and clears the consumed intent', async () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
 
-      useChatStore.setState({
-        sessions: {
-          'session-a': {
-            messages: [],
-            isAgentRunning: false,
-            isStopPending: false,
-            scrollIntent,
-            hydrationState: 'hydrated',
-          },
+    useChatStore.setState({
+      sessions: {
+        'session-a': {
+          messages: [],
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: 'session-restore',
+          hydrationState: 'hydrated',
         },
-      });
+      },
+    });
 
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-      });
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
 
-      const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
+    const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
 
-      expect(firstRenderProps.data).toEqual({
-        data: messages,
-      });
-      expect(firstRenderProps.initialData).toEqual(messages);
-      expect(firstRenderProps.initialLocation).toEqual(
-        scrollIntent === 'session-restore'
-          ? { index: messages.length - 1, align: 'end' }
-          : undefined
-      );
+    // session-restore uses plain data — scroll handled by imperative scrollToItem()
+    expect(firstRenderProps.data).toEqual({ data: messages });
 
-      await waitFor(() => {
-        expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
-      });
+    // scrollToItem called imperatively for session-restore
+    await waitFor(() => {
+      expect(scrollToItemMock).toHaveBeenCalledWith({ index: 'LAST', align: 'end' });
+    });
 
-      const settledProps = getLatestVirtuosoMessageListProps();
-      expect(settledProps.data).toEqual({
-        data: messages,
-      });
-    }
-  );
+    await waitFor(() => {
+      expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
+    });
+  });
+
+  it('session-refresh uses plain data path and clears the consumed intent', async () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+
+    useChatStore.setState({
+      sessions: {
+        'session-a': {
+          messages: [],
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: 'session-refresh',
+          hydrationState: 'hydrated',
+        },
+      },
+    });
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
+
+    const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
+
+    expect(firstRenderProps.data).toEqual({
+      data: messages,
+    });
+
+    await waitFor(() => {
+      expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
+    });
+
+    const settledProps = getLatestVirtuosoMessageListProps();
+    expect(settledProps.data).toEqual({
+      data: messages,
+    });
+  });
 
   it('wires item content props and tool lookup into MessageItem correctly', () => {
     const messages = [

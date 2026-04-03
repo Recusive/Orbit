@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { startTransition } from 'react';
 
 import { claudeConversationRepo } from './claude-conversation-repo';
@@ -9,6 +10,8 @@ import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
+
+const logger = createLogger('UiBridge');
 
 export const claudeUiBridge: ConversationUiBridge = {
   getActiveSessionId(): string | null {
@@ -26,29 +29,49 @@ export const claudeUiBridge: ConversationUiBridge = {
       uiState.conversations.find((conversation) => conversation.sessionId === sessionId)?.title ??
       null;
     const isHydrated = chatStore.sessions[sessionId]?.hydrationState === 'hydrated';
+    const prevActive = uiState.activeConversationId;
+    const msgCount = chatStore.sessions[sessionId]?.messages.length ?? 0;
+    const sid = sessionId.slice(-6);
+
+    logger.debug(`select(${sid})`, {
+      from: prevActive?.slice(-6) ?? '(none)',
+      isHydrated,
+      msgCount,
+      path: isHydrated ? 'HYDRATED (instant)' : 'UNLOADED (first visit)',
+    });
 
     if (isHydrated) {
-      chatStore.setScrollIntent(sessionId, 'session-restore');
+      // Multi-instance keep-alive: the VirtuosoMessageList instance is already
+      // mounted with correct data and scroll position. Just flip the CSS toggle.
+      // NO conversation.load — avoids 51+ restoreToolsForMessage calls that
+      // re-render all 10 mounted instances (the FPS→2 killer).
+      // NO session-restore — instance already has the correct scroll position.
       uiState.setActiveConversation(sessionId, title);
-      useMessageBufferStore.getState().markLoadPending(sessionId);
       chatStore.setActiveSession(sessionId);
       useFileStore.getState().switchSession(sessionId);
       uiState.setLoadingConversation(false);
       uiState.setConversationTransitioning(false);
-    } else {
-      uiState.setLoadingConversation(true);
-      uiState.setConversationTransitioning(true);
-      uiState.setActiveConversation(sessionId, title);
-      useMessageBufferStore.getState().markLoadPending(sessionId);
-      chatStore.setActiveSession(sessionId);
-      useFileStore.getState().switchSession(sessionId);
+      logger.debug(`[${sid}] Hydrated instant switch (no load)`);
+      return;
     }
 
+    // First visit: SessionInstance handles per-instance stabilization.
+    uiState.setLoadingConversation(true);
+    uiState.setConversationTransitioning(true);
+    uiState.setActiveConversation(sessionId, title);
+    useMessageBufferStore.getState().markLoadPending(sessionId);
+    chatStore.setActiveSession(sessionId);
+    useFileStore.getState().switchSession(sessionId);
+
+    const loadStart = performance.now();
     await new Promise<void>((resolve, reject) => {
       startTransition(() => {
         claudeConversationRepo
           .load(sessionId)
           .then(() => {
+            logger.debug(`[${sid}] conversation.load completed`, {
+              elapsed: `${(performance.now() - loadStart).toFixed(0)}ms`,
+            });
             resolve();
           })
           .catch(reject);

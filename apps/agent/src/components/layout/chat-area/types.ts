@@ -14,8 +14,6 @@ import type {
 export interface ChatContentProps {
   /** Ref for stabilization measurement */
   readonly contentRef: React.RefObject<HTMLDivElement | null>;
-  /** Whether layout is transitioning (hides content) */
-  readonly isTransitioning: boolean;
   /** Whether conversation is loading */
   readonly isLoadingConversation: boolean;
   /** Chat messages - mutable for child component compatibility */
