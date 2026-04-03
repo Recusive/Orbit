@@ -447,9 +447,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onReadyRef.current = onReady;
   const hasSignaledReadyRef = useRef(false);
   const needsRestoreRef = useRef(false);
+  const hasEverHadMessagesRef = useRef(false);
 
-  // Capture the restore intent into a ref before the clear effect runs
+  // Capture the restore intent into a ref before the clear effect runs.
+  // Also trigger for re-mounted hydrated instances (no session-restore intent,
+  // but messages appear on first render via useSessionMessages).
   if (scrollIntent === 'session-restore' && messages.length > 0) {
+    needsRestoreRef.current = true;
+  }
+  if (!hasEverHadMessagesRef.current && messages.length > 0 && !hasSignaledReadyRef.current) {
+    hasEverHadMessagesRef.current = true;
     needsRestoreRef.current = true;
   }
 
@@ -466,47 +473,82 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
+    // Phase 1: Wait for Virtuoso to render items (scrollHeight > clientHeight).
+    // Phase 2: Wait for content to stabilize (tool widgets done expanding).
+    //          scrollHeight unchanged for STABLE_MS → content is done.
+    // Phase 3: Final scrollToItem + signal ready.
+    //
+    // The old session stays visible during both phases (first-visit handoff).
+    // When we signal ready, the instance is revealed with correct scroll.
+    const STABLE_MS = 150;
+    const MAX_WAIT_MS = 3000;
+    const startTime = performance.now();
     let rafId = 0;
-    let attempts = 0;
-    const MAX_ATTEMPTS = 60; // ~1 second at 60fps
+    let lastScrollH = 0;
+    let stableStart = 0;
+    let phase: 'waiting-for-content' | 'waiting-for-stable' = 'waiting-for-content';
 
     const poll = (): void => {
-      attempts++;
+      const elapsed = performance.now() - startTime;
       const scroller = handle.scrollerElement();
-      const hasContent = scroller !== null && scroller.scrollHeight > scroller.clientHeight + 10;
 
-      if (hasContent) {
+      // Timeout — signal ready regardless (safety valve)
+      if (elapsed > MAX_WAIT_MS) {
         handle.scrollToItem({ index: 'LAST', align: 'end' });
-        logger.debug(`[${sid}] scrollToItem after ${String(attempts)} RAF polls`, {
-          scrollerH: scroller.scrollHeight,
-          clientH: scroller.clientHeight,
+        logger.debug(`[${sid}] Readiness timeout at ${elapsed.toFixed(0)}ms`, {
+          scrollerH: scroller?.scrollHeight ?? 0,
+          phase,
         });
-        // Signal ready after one more frame (let scroll settle)
-        requestAnimationFrame(() => {
-          if (!hasSignaledReadyRef.current) {
-            hasSignaledReadyRef.current = true;
-            onReadyRef.current?.();
-          }
-        });
-        return;
-      }
-
-      if (attempts >= MAX_ATTEMPTS) {
-        // Fallback: signal ready even without content (short conversations
-        // where all content fits in viewport — scrollHeight ≈ clientHeight)
-        logger.debug(
-          `[${sid}] Readiness timeout after ${String(attempts)} polls — signaling ready`,
-          {
-            scrollerH: scroller?.scrollHeight ?? 0,
-            clientH: scroller?.clientHeight ?? 0,
-          }
-        );
-        handle.scrollToItem({ index: 'LAST', align: 'end' });
         if (!hasSignaledReadyRef.current) {
           hasSignaledReadyRef.current = true;
           onReadyRef.current?.();
         }
         return;
+      }
+
+      if (phase === 'waiting-for-content') {
+        const hasContent = scroller !== null && scroller.scrollHeight > scroller.clientHeight + 10;
+        if (hasContent) {
+          // Items rendered — scroll to bottom and enter stabilization phase
+          handle.scrollToItem({ index: 'LAST', align: 'end' });
+          lastScrollH = scroller.scrollHeight;
+          stableStart = performance.now();
+          phase = 'waiting-for-stable';
+          logger.debug(`[${sid}] Content rendered, entering stabilization`, {
+            scrollerH: lastScrollH,
+            elapsed: elapsed.toFixed(0),
+          });
+        }
+        rafId = requestAnimationFrame(poll);
+        return;
+      }
+
+      // Phase: waiting-for-stable — watch scrollHeight for changes
+      if (scroller !== null) {
+        const currentH = scroller.scrollHeight;
+        if (currentH !== lastScrollH) {
+          // Content still growing (tool widgets rendering) — re-scroll + reset timer
+          handle.scrollToItem({ index: 'LAST', align: 'end' });
+          lastScrollH = currentH;
+          stableStart = performance.now();
+          rafId = requestAnimationFrame(poll);
+          return;
+        }
+
+        // scrollHeight unchanged — check if stable long enough
+        if (performance.now() - stableStart >= STABLE_MS) {
+          // Content stable — final scroll + signal ready
+          handle.scrollToItem({ index: 'LAST', align: 'end' });
+          logger.debug(`[${sid}] Content stable, signaling ready`, {
+            scrollerH: currentH,
+            elapsed: elapsed.toFixed(0),
+          });
+          if (!hasSignaledReadyRef.current) {
+            hasSignaledReadyRef.current = true;
+            onReadyRef.current?.();
+          }
+          return;
+        }
       }
 
       rafId = requestAnimationFrame(poll);

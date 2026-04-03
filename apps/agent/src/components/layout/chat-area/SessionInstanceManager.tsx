@@ -59,7 +59,10 @@ export interface SessionInstanceManagerProps {
  * - The active session (always pinned)
  * - Sessions with an active agent (checked via store.getState())
  */
-function useMountedSessions(activeSessionId: string | undefined): string[] {
+function useMountedSessions(
+  activeSessionId: string | undefined,
+  onEvict?: (sessionIds: string[]) => void
+): string[] {
   const [mountedSessions, setMountedSessions] = useState<string[]>(() =>
     activeSessionId !== undefined && activeSessionId !== '' ? [activeSessionId] : []
   );
@@ -114,10 +117,11 @@ function useMountedSessions(activeSessionId: string | undefined): string[] {
 
       if (evicted.length === 0) return next;
       logger.debug('Evicting sessions', { evicted: evicted.map((s) => s.slice(-6)) });
+      onEvict?.(evicted);
       const evictedSet = new Set(evicted);
       return next.filter((sid) => !evictedSet.has(sid));
     });
-  }, [activeSessionId]);
+  }, [activeSessionId, onEvict]);
 
   // Handle session deletion — remove destroyed sessions
   useEffect(() => {
@@ -153,15 +157,23 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
   // Don't add the active session to the mount list when it's empty (isActiveHidden).
   // This prevents mounting a VirtuosoMessageList for a session with 0 messages.
   // Hidden instances from previous sessions stay alive.
-  const effectiveActiveId = isActiveHidden ? undefined : activeSessionId;
-  const mountedSessions = useMountedSessions(effectiveActiveId);
-
   // ── First-visit handoff ─────────────────────────────────────────────
   // Track the last session that was actually SHOWN (stabilized + active).
   // During first visit to a new session, keep the previous session visible
   // until the new one stabilizes. This prevents the blank gap.
   const [shownSessionId, setShownSessionId] = useState(activeSessionId);
   const stabilizedSetRef = useRef(new Set<string>());
+
+  // Clear evicted sessions from stabilizedSet so re-mounts go through
+  // proper first-visit handoff instead of showing an empty instance.
+  const handleEvict = useCallback((sessionIds: string[]) => {
+    for (const sid of sessionIds) {
+      stabilizedSetRef.current.delete(sid);
+    }
+  }, []);
+
+  const effectiveActiveId = isActiveHidden ? undefined : activeSessionId;
+  const mountedSessions = useMountedSessions(effectiveActiveId, handleEvict);
 
   // When the active session changes to one that's already stabilized
   // (revisit), update shownSessionId immediately.
