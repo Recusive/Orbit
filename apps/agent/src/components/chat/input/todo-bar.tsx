@@ -10,13 +10,12 @@
 import { CheckCircle2, ChevronDown, ChevronUp, Circle, ListTodo, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { memo, useMemo, useState } from 'react';
-import { useShallow } from 'zustand/shallow';
 
 import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { FC, ReactElement } from 'react';
 
 import { CHAT_WIDTH, CHAT_WIDTH_VAR, cn } from '@/lib/utils';
-import { useToolStore } from '@/stores/agent/tool-store';
+import { useSessionActiveTools, useSessionCompletedTools } from '@/stores/agent/tool-store';
 import { useActiveSessionId } from '@/stores/chat';
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -146,18 +145,24 @@ const EXPAND_TRANSITION_NONE = { duration: 0 };
 
 // ─── Main Component ──────────────────────────────────────────────────
 
-export const TodoBar: FC = memo(function TodoBar() {
+interface TodoBarProps {
+  /** Override session ID to read tools from. Used during first-visit handoff
+   *  to show the SHOWN session's tools, not the active session's. */
+  readonly overrideSessionId?: string | undefined;
+}
+
+export const TodoBar: FC<TodoBarProps> = memo(function TodoBar({ overrideSessionId }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const shouldReduceMotion = useReducedMotion();
-  const sessionId = useActiveSessionId();
+  const activeSessionId = useActiveSessionId();
+  const sessionId = overrideSessionId ?? activeSessionId;
 
-  // Subscribe to ToolStore — useShallow prevents rerenders from unrelated mutations
-  const { activeTools, completedTools } = useToolStore(
-    useShallow((state) => ({
-      activeTools: state.activeTools,
-      completedTools: state.completedTools,
-    }))
-  );
+  // Per-session tool selectors — reads from sessionCache when overrideSessionId
+  // differs from the active session (e.g., during first-visit handoff).
+  // Without this, ToolStore.switchSession() replaces global tools with the new
+  // session's tools, and filtering by the old session's ID finds nothing.
+  const activeTools = useSessionActiveTools(sessionId ?? '');
+  const completedTools = useSessionCompletedTools(sessionId ?? '');
 
   // Derive the latest TodoWrite tool and parse its todos.
   //

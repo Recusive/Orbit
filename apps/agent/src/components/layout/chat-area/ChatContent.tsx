@@ -1,3 +1,5 @@
+import { useCallback, useState } from 'react';
+
 import { SessionInstanceManager } from './SessionInstanceManager';
 import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 
@@ -54,6 +56,13 @@ export const ChatContent: FC<ChatContentProps> = ({
   const vaultOpen = useVaultOpen();
   const isEmptyState = messages.length === 0 && !isLoadingConversation;
 
+  // Track which session is visually shown (may differ from activeSessionId
+  // during first-visit handoff). TodoBar uses this to show the correct tools.
+  const [shownSessionId, setShownSessionId] = useState<string | undefined>(sessionId);
+  const handleShownSessionChange = useCallback((sid: string | undefined) => {
+    setShownSessionId(sid);
+  }, []);
+
   // Shared input props to avoid duplication
   const inputProps = {
     inputMode,
@@ -108,6 +117,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onOpenUrl={onOpenUrl}
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
+            onShownSessionChange={handleShownSessionChange}
           />
         </>
       )}
@@ -116,7 +126,7 @@ export const ChatContent: FC<ChatContentProps> = ({
           session switches. */}
       {!vaultOpen ? (
         <div className="shrink-0 pb-2 px-0">
-          <TodoBar />
+          <TodoBar overrideSessionId={shownSessionId} />
           {extraControls}
           <ChatInput {...inputProps} />
         </div>

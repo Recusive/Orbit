@@ -21,7 +21,7 @@
  * This prevents the blank gap between old→new during first-visit loading.
  */
 import { createLogger } from '@orbit/common/lib';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { SessionInstance } from './SessionInstance';
 
@@ -48,6 +48,9 @@ export interface SessionInstanceManagerProps {
   readonly onOpenUrl: (url: string) => void;
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
+  /** Called whenever the visually shown session changes. Used by TodoBar
+   *  to read the correct session's tools during first-visit handoff. */
+  readonly onShownSessionChange?: (sessionId: string | undefined) => void;
 }
 
 /**
@@ -153,6 +156,7 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
   onOpenUrl,
   onCancelQueue,
   onFeedback,
+  onShownSessionChange,
 }) => {
   // Don't add the active session to the mount list when it's empty (isActiveHidden).
   // This prevents mounting a VirtuosoMessageList for a session with 0 messages.
@@ -172,12 +176,21 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
     }
   }, []);
 
+  // Notify parent when the visually shown session changes.
+  // useLayoutEffect ensures the parent re-renders synchronously before paint,
+  // so TodoBar updates in the SAME frame as the content switch (no 1-frame lag).
+  useLayoutEffect(() => {
+    onShownSessionChange?.(shownSessionId ?? undefined);
+  }, [shownSessionId, onShownSessionChange]);
+
   const effectiveActiveId = isActiveHidden ? undefined : activeSessionId;
   const mountedSessions = useMountedSessions(effectiveActiveId, handleEvict);
 
   // When the active session changes to one that's already stabilized
-  // (revisit), update shownSessionId immediately.
-  useEffect(() => {
+  // (revisit), update shownSessionId synchronously before paint.
+  // useLayoutEffect ensures this + the onShownSessionChange notification
+  // happen in the same frame as the CSS toggle — no 1-frame TodoBar lag.
+  useLayoutEffect(() => {
     if (isActiveHidden || activeSessionId === undefined) return;
     const isRevisit = stabilizedSetRef.current.has(activeSessionId);
     if (isRevisit) {
