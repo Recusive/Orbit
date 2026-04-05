@@ -740,3 +740,8 @@ export function useSessionAgentRunning(sessionId: string): boolean {
 export function useSessionHydrationState(sessionId: string): SessionHydrationState {
   return useChatStore((s) => s.sessions[sessionId]?.hydrationState ?? 'unloaded');
 }
+
+/** Layout version for a specific session. */
+export function useSessionLayoutVersion(sessionId: string): number {
+  return useChatStore((s) => s.sessions[sessionId]?.layoutVersion ?? 0);
+}

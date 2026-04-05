@@ -9,6 +9,7 @@ import type { FC } from 'react';
 import { AuthErrorBanner, ChatInput, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
+import { useChatStore } from '@/stores/chat/chat-store';
 import { useVaultOpen } from '@/stores/ui/ui-store';
 
 /**
@@ -52,7 +53,14 @@ export const ChatContent: FC<ChatContentProps> = ({
   extraControls,
 }) => {
   const vaultOpen = useVaultOpen();
-  const isEmptyState = messages.length === 0 && !isLoadingConversation;
+  const sessionMessageCount = useChatStore(
+    (state) => state.sessions[sessionId]?.messages.length ?? 0
+  );
+  const sessionHydrationState = useChatStore(
+    (state) => state.sessions[sessionId]?.hydrationState ?? 'unloaded'
+  );
+  const isEmptyState =
+    sessionHydrationState === 'hydrated' && sessionMessageCount === 0 && !isLoadingConversation;
 
   // Track which session is visually shown (may differ from activeSessionId
   // during first-visit handoff). TodoBar uses this to show the correct tools.

@@ -138,15 +138,29 @@ export function useVelocityScroll(
       let velocity = 0;
       let animating = false;
       let raf = 0;
+      let primeRaf = 0;
+      let warmupResetTimer = 0;
       let nativeCount = 0;
       let lastScrollHeight = 0;
       let hasFiredUserScroll = false;
+      let warmupCompensating = false;
+      let wheelLogCount = 0;
+      let scrollLogCount = 0;
+      let compensationLogCount = 0;
+      let tickLogCount = 0;
 
       if (import.meta.env.DEV) {
         performance.mark('velocity-scroll-attach');
       }
       logger.debug('Attached velocity scroll', {
         enabled,
+        clientHeight: node.clientHeight,
+        friction,
+        maxPx,
+        scrollHeight: node.scrollHeight,
+        scrollTop: node.scrollTop,
+        sensitivity,
+        warmupEvents,
       });
 
       // ── Same-frame scrollHeight compensation ───────────────────────
@@ -170,8 +184,19 @@ export function useVelocityScroll(
       let listStyleObserver: MutationObserver | null = null;
 
       const onScrollHeightChange = (): void => {
-        if (!animating || lastScrollHeight <= 0) return;
-        compensateScrollHeight(node, lastScrollHeight);
+        if ((!animating && !warmupCompensating) || lastScrollHeight <= 0) return;
+        const compensation = compensateScrollHeight(node, lastScrollHeight);
+        if (compensation !== 0 && compensationLogCount < 12) {
+          compensationLogCount++;
+          logger.debug('Scroll height compensation applied', {
+            compensation,
+            count: compensationLogCount,
+            lastScrollHeight,
+            nextScrollHeight: node.scrollHeight,
+            scrollTop: node.scrollTop,
+            warmupCompensating,
+          });
+        }
         lastScrollHeight = node.scrollHeight;
       };
 
@@ -218,11 +243,39 @@ export function useVelocityScroll(
 
       initListObserver();
 
+      // Prime Virtuoso's internal scroll tracking before the first real wheel
+      // gesture. Without this 1px synthetic nudge, the first aggressive scroll
+      // after attach can disagree with the virtualizer's cached position and
+      // cause the scrollbar thumb to jitter until the second gesture.
+      const maxScrollTop = node.scrollHeight - node.clientHeight;
+      const originalScrollTop = node.scrollTop;
+      if (maxScrollTop > 0) {
+        const nudgedScrollTop =
+          originalScrollTop < maxScrollTop ? originalScrollTop + 1 : originalScrollTop - 1;
+
+        if (nudgedScrollTop !== originalScrollTop) {
+          logger.debug('Priming scroll position', {
+            maxScrollTop,
+            nudgedScrollTop,
+            originalScrollTop,
+          });
+          node.scrollTop = nudgedScrollTop;
+          primeRaf = requestAnimationFrame(() => {
+            node.scrollTop = originalScrollTop;
+            logger.debug('Restored primed scroll position', {
+              restoredScrollTop: originalScrollTop,
+            });
+          });
+        }
+      }
+
       const tick = (): void => {
         if (Math.abs(velocity) < 0.3) {
           velocity = 0;
           animating = false;
-          lastScrollHeight = 0;
+          if (!warmupCompensating) {
+            lastScrollHeight = 0;
+          }
           return;
         }
 
@@ -247,6 +300,17 @@ export function useVelocityScroll(
         node.scrollTop = Math.round(
           Math.max(0, Math.min(node.scrollTop + velocity + compensation, max))
         );
+        if ((compensation !== 0 || Math.abs(velocity) >= maxPx) && tickLogCount < 12) {
+          tickLogCount++;
+          logger.debug('Velocity tick', {
+            compensation,
+            count: tickLogCount,
+            max,
+            scrollHeight: curScrollHeight,
+            scrollTop: node.scrollTop,
+            velocity,
+          });
+        }
         velocity *= friction;
         raf = requestAnimationFrame(tick);
       };
@@ -257,9 +321,30 @@ export function useVelocityScroll(
         // compositor/main-thread position disagreement → scrollbar jitter.
         if (nativeCount < warmupEvents) {
           nativeCount++;
+          warmupCompensating = true;
+          lastScrollHeight = node.scrollHeight;
+          window.clearTimeout(warmupResetTimer);
+          warmupResetTimer = window.setTimeout(() => {
+            warmupCompensating = false;
+            if (!animating) {
+              lastScrollHeight = 0;
+            }
+          }, 120);
+          if (wheelLogCount < 8) {
+            wheelLogCount++;
+            logger.debug('Warmup wheel event', {
+              count: wheelLogCount,
+              deltaY: e.deltaY,
+              nativeCount,
+              scrollHeight: node.scrollHeight,
+              scrollTop: node.scrollTop,
+            });
+          }
           return;
         }
 
+        warmupCompensating = false;
+        window.clearTimeout(warmupResetTimer);
         e.preventDefault();
         if (!hasFiredUserScroll) {
           hasFiredUserScroll = true;
@@ -267,6 +352,16 @@ export function useVelocityScroll(
         }
         velocity += e.deltaY * sensitivity;
         velocity = Math.max(-maxPx, Math.min(velocity, maxPx));
+        if (wheelLogCount < 8) {
+          wheelLogCount++;
+          logger.debug('Damped wheel event', {
+            count: wheelLogCount,
+            deltaY: e.deltaY,
+            nextVelocity: velocity,
+            scrollHeight: node.scrollHeight,
+            scrollTop: node.scrollTop,
+          });
+        }
         if (!animating) {
           animating = true;
           lastScrollHeight = node.scrollHeight;
@@ -277,6 +372,16 @@ export function useVelocityScroll(
       // Reset velocity when external code scrolls (library auto-scroll,
       // scrollToItem) so the next wheel input starts fresh.
       const onScroll = (): void => {
+        if (scrollLogCount < 8) {
+          scrollLogCount++;
+          logger.debug('Scroller scroll event', {
+            animating,
+            count: scrollLogCount,
+            scrollHeight: node.scrollHeight,
+            scrollTop: node.scrollTop,
+            warmupCompensating,
+          });
+        }
         if (!animating) velocity = 0;
       };
 
@@ -287,6 +392,8 @@ export function useVelocityScroll(
         node.removeEventListener('wheel', onWheel);
         node.removeEventListener('scroll', onScroll);
         cancelAnimationFrame(raf);
+        cancelAnimationFrame(primeRaf);
+        window.clearTimeout(warmupResetTimer);
         listResizeObserver?.disconnect();
         listStyleObserver?.disconnect();
         listChildObserver?.disconnect();

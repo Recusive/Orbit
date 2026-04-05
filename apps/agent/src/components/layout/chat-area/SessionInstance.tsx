@@ -88,6 +88,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
   // Virtuoso actually renders items into the scroller.
   const [isReady, setIsReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isActuallyVisible = isVisible && isReady;
 
   const handleReady = useCallback(() => {
     if (isReady) return;
@@ -96,7 +97,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     });
     setIsReady(true);
     onStabilized?.(sessionId);
-  }, [isReady, sid, sessionId, messages.length, onStabilized]);
+  }, [isReady, messages.length, onStabilized, sessionId, sid]);
 
   // ── Visibility + scroll preservation ─────────────────────────────────
   // WKWebView resets scrollTop when toggling between position:absolute
@@ -104,14 +105,14 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
   const savedScrollTopRef = useRef<number | null>(null);
   const savedWasAtBottomRef = useRef(false);
 
-  const prevVisibleRef = useRef(isVisible);
+  const prevVisibleRef = useRef(isActuallyVisible);
   useEffect(() => {
-    if (prevVisibleRef.current === isVisible) return;
+    if (prevVisibleRef.current === isActuallyVisible) return;
 
     const container = containerRef.current;
     const scroller = container?.querySelector('[data-testid="virtuoso-scroller"]');
 
-    if (!isVisible && prevVisibleRef.current) {
+    if (!isActuallyVisible && prevVisibleRef.current) {
       // HIDING — save scroll position before the layout change
       if (scroller) {
         savedScrollTopRef.current = scroller.scrollTop;
@@ -124,7 +125,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       }
     }
 
-    if (isVisible && !prevVisibleRef.current) {
+    if (isActuallyVisible && !prevVisibleRef.current) {
       // SHOWING — restore scroll position after the layout change settles
       const savedTop = savedScrollTopRef.current;
       if (savedWasAtBottomRef.current && scroller) {
@@ -163,15 +164,15 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       }
     }
 
-    prevVisibleRef.current = isVisible;
-  }, [isVisible, sid, messages.length]);
+    prevVisibleRef.current = isActuallyVisible;
+  }, [isActuallyVisible, sid, messages.length]);
 
   return (
     <div
       ref={containerRef}
-      style={isVisible ? ACTIVE_STYLE : HIDDEN_STYLE}
+      style={isActuallyVisible ? ACTIVE_STYLE : HIDDEN_STYLE}
       data-session-instance={sessionId}
-      data-instance-visible={isVisible}
+      data-instance-visible={isActuallyVisible}
       data-instance-prime={shouldPrime}
       data-instance-ready={isReady}
     >
@@ -179,7 +180,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
         messages={messages}
         isAgentRunning={isAgentRunning}
         sessionId={sessionId}
-        isVisible={isVisible}
+        isVisible={isActuallyVisible}
         shouldPrime={shouldPrime}
         queuedMessage={queuedMessage}
         onRewind={onRewind}

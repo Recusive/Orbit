@@ -52,11 +52,27 @@ const EMPTY_TOOLS: ToolExecution[] = [];
 const OVERSCAN_PARKED = 0;
 const OVERSCAN_ENTRY = 800;
 const OVERSCAN_STEADY = 8000;
+const PREMEASURE_STEP_PX = OVERSCAN_STEADY * 2;
+const PREMEASURE_STABLE_MS = 32;
+const PREMEASURE_TIMEOUT_MS = 120;
 const READY_STABLE_MS = 48;
 const READY_TIMEOUT_MS = 1500;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
-type RestorePhase = 'idle' | 'positioning' | 'stabilizing' | 'done';
+type RestorePhase = 'idle' | 'positioning' | 'premeasuring' | 'stabilizing' | 'done';
+
+interface ScrollerMetrics {
+  readonly bottomTop: number;
+  readonly clientHeight: number;
+  readonly scrollHeight: number;
+  readonly scroller: HTMLDivElement;
+}
+
+interface RenderSurfaceMetrics extends ScrollerMetrics {
+  readonly hasLastItemVisible: boolean;
+  readonly isGenuineShort: boolean;
+  readonly renderedCount: number;
+}
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -165,8 +181,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const listRef = useRef<VirtuosoMessageListMethods<ChatMessage, MessageListContext>>(null);
   const prevMessageCount = useRef(0);
   const lastPlacedMessagesRef = useRef<ChatMessage[] | null>(null);
+  const readinessStartedRef = useRef(false);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
   const [isReadyForSteady, setIsReadyForSteady] = useState(false);
+  const [isPremeasuring, setIsPremeasuring] = useState(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
@@ -271,6 +289,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
+  const restoredSizeCacheRef = useRef(false);
 
   const snapshotSizeCache = useCallback((): void => {
     if (!sessionId) return;
@@ -290,19 +309,51 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     });
   }, [sessionId]);
 
+  const snapshotStableSizeCache = useCallback((): void => {
+    if (restorePhaseRef.current !== 'done') {
+      return;
+    }
+
+    snapshotSizeCache();
+  }, [snapshotSizeCache]);
+
   useLayoutEffect(() => {
+    restoredSizeCacheRef.current = false;
     if (!sessionId) return;
 
     const store = useChatStore.getState();
     const session = store.sessions[sessionId];
     const cache = session?.virtuosoSizeCache ?? null;
     if (!cache || !session) return;
-    if (cache.layoutVersion !== session.layoutVersion) return;
-    if (cache.messageCount !== session.messages.length) return;
-    if (cache.lastMessageId !== (session.messages.at(-1)?.id ?? null)) return;
+    if (cache.layoutVersion !== session.layoutVersion) {
+      logger.debug(`[${sid}] Skip size cache restore: layout version mismatch`, {
+        cacheLayoutVersion: cache.layoutVersion,
+        sessionLayoutVersion: session.layoutVersion,
+      });
+      return;
+    }
+    if (cache.messageCount !== session.messages.length) {
+      logger.debug(`[${sid}] Skip size cache restore: message count mismatch`, {
+        cacheMessageCount: cache.messageCount,
+        sessionMessageCount: session.messages.length,
+      });
+      return;
+    }
+    if (cache.lastMessageId !== (session.messages.at(-1)?.id ?? null)) {
+      logger.debug(`[${sid}] Skip size cache restore: last message mismatch`, {
+        cacheLastMessageId: cache.lastMessageId,
+        sessionLastMessageId: session.messages.at(-1)?.id ?? null,
+      });
+      return;
+    }
 
     listRef.current?.setSizeRanges([...cache.ranges]);
-  }, [sessionId]);
+    restoredSizeCacheRef.current = true;
+    logger.debug(`[${sid}] Restored size cache`, {
+      messageCount: cache.messageCount,
+      rangeCount: cache.ranges.length,
+    });
+  }, [sessionId, sid]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -465,7 +516,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const overscanPhase: OverscanPhase =
     !shouldPrime && !isVisible
       ? 'parked'
-      : isReadyForSteady || hasUserScrolled
+      : isPremeasuring || isReadyForSteady || hasUserScrolled
         ? 'steady'
         : shouldPrime
           ? 'entry'
@@ -512,6 +563,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const hasEverHadMessagesRef = useRef(false);
   const restorePhaseRef = useRef<RestorePhase>('idle');
   const lastMessageIdRef = useRef<string | null>(messages.at(-1)?.id ?? null);
+  const premeasureTimeoutRef = useRef<number | null>(null);
   const readinessTimeoutRef = useRef<number | null>(null);
   const readinessStableTimerRef = useRef<number | null>(null);
   const readinessResizeObserverRef = useRef<ResizeObserver | null>(null);
@@ -519,6 +571,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   lastMessageIdRef.current = messages.at(-1)?.id ?? null;
 
   const cancelReadinessWork = useCallback((): void => {
+    if (premeasureTimeoutRef.current !== null) {
+      window.clearTimeout(premeasureTimeoutRef.current);
+      premeasureTimeoutRef.current = null;
+    }
     if (readinessTimeoutRef.current !== null) {
       window.clearTimeout(readinessTimeoutRef.current);
       readinessTimeoutRef.current = null;
@@ -531,16 +587,78 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     readinessResizeObserverRef.current = null;
   }, []);
 
-  const alignScrollerToBottom = useCallback((): void => {
+  const getScrollerMetrics = useCallback((): ScrollerMetrics | null => {
+    const scroller = listRef.current?.scrollerElement();
+    if (!scroller) return null;
+
+    return {
+      scroller,
+      scrollHeight: scroller.scrollHeight,
+      clientHeight: scroller.clientHeight,
+      bottomTop: Math.max(0, scroller.scrollHeight - scroller.clientHeight),
+    };
+  }, []);
+
+  const getRenderSurfaceMetrics = useCallback(
+    (rendered: ChatMessage[]): RenderSurfaceMetrics | null => {
+      const metrics = getScrollerMetrics();
+      if (!metrics) return null;
+
+      const listElement = metrics.scroller.querySelector<HTMLElement>(
+        '[data-testid="virtuoso-list"]'
+      );
+      if (!listElement) {
+        logger.debug(`[${sid}] Render surface missing list element`, {
+          bottomTop: metrics.bottomTop,
+          clientHeight: metrics.clientHeight,
+          scrollHeight: metrics.scrollHeight,
+        });
+        return null;
+      }
+
+      const targetId = lastMessageIdRef.current;
+      const renderedCount = rendered.length;
+      const hasLastItemVisible = targetId !== null && rendered.some((item) => item.id === targetId);
+      const isGenuineShort =
+        renderedCount > 0 &&
+        renderedCount === messages.length &&
+        metrics.scrollHeight <= metrics.clientHeight + 4;
+      const hasRealBottomMetrics =
+        hasLastItemVisible && (metrics.scrollHeight > metrics.clientHeight + 4 || isGenuineShort);
+
+      if (!hasRealBottomMetrics && !isGenuineShort) {
+        logger.debug(`[${sid}] Render surface not ready`, {
+          bottomTop: metrics.bottomTop,
+          clientHeight: metrics.clientHeight,
+          hasLastItemVisible,
+          isGenuineShort,
+          renderedCount,
+          scrollHeight: metrics.scrollHeight,
+        });
+        return null;
+      }
+
+      return {
+        ...metrics,
+        renderedCount,
+        hasLastItemVisible,
+        isGenuineShort,
+      };
+    },
+    [getScrollerMetrics, messages.length, sid]
+  );
+
+  const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
     const handle = listRef.current;
-    if (!handle) return;
+    if (!handle) return null;
 
     handle.scrollToItem({ index: 'LAST', align: 'end' });
-    const scroller = handle.scrollerElement();
-    if (!scroller) return;
+    const metrics = getScrollerMetrics();
+    if (!metrics) return null;
 
-    scroller.scrollTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-  }, []);
+    metrics.scroller.scrollTop = metrics.bottomTop;
+    return getScrollerMetrics();
+  }, [getScrollerMetrics]);
 
   const signalReady = useCallback(
     (reason: 'timeout' | 'stabilized' | 'no-handle'): void => {
@@ -549,15 +667,22 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       hasSignaledReadyRef.current = true;
+      readinessStartedRef.current = false;
       restorePhaseRef.current = 'done';
       cancelReadinessWork();
       alignScrollerToBottom();
+      setIsPremeasuring(false);
       setIsReadyForSteady(true);
-      snapshotSizeCache();
+      snapshotStableSizeCache();
 
       logger.debug(`[${sid}] Ready`, {
+        hasUserScrolled,
+        isPremeasuring,
+        overscanPhase,
         reason,
         msgCount: messages.length,
+        restoredSizeCache: restoredSizeCacheRef.current,
+        scrollTop: getScrollerMetrics()?.scroller.scrollTop ?? null,
       });
       if (import.meta.env.DEV) {
         const readyMarkName = sessionKey !== '' ? `session-ready:${sessionKey}` : 'session-ready';
@@ -577,78 +702,265 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     [
       alignScrollerToBottom,
       cancelReadinessWork,
+      getScrollerMetrics,
+      hasUserScrolled,
+      isPremeasuring,
       messages.length,
+      overscanPhase,
       sessionKey,
       sid,
-      snapshotSizeCache,
+      snapshotStableSizeCache,
     ]
   );
 
-  const startTemporaryResizeStabilityWindow = useCallback((): void => {
-    if (readinessStableTimerRef.current !== null) {
-      window.clearTimeout(readinessStableTimerRef.current);
-      readinessStableTimerRef.current = null;
-    }
-    readinessResizeObserverRef.current?.disconnect();
-    readinessResizeObserverRef.current = null;
-
-    const scheduleStabilityCheck = (): void => {
+  const startTemporaryResizeStabilityWindow = useCallback(
+    (
+      phase: Extract<RestorePhase, 'premeasuring' | 'stabilizing'>,
+      stableMs: number,
+      onStable: () => void
+    ): void => {
       if (readinessStableTimerRef.current !== null) {
         window.clearTimeout(readinessStableTimerRef.current);
+        readinessStableTimerRef.current = null;
       }
-      readinessStableTimerRef.current = window.setTimeout(() => {
-        listRef.current?.scrollToItem({ index: 'LAST', align: 'end' });
-        signalReady('stabilized');
-      }, READY_STABLE_MS);
-    };
+      readinessResizeObserverRef.current?.disconnect();
+      readinessResizeObserverRef.current = null;
 
-    scheduleStabilityCheck();
+      const scheduleStabilityCheck = (): void => {
+        if (readinessStableTimerRef.current !== null) {
+          window.clearTimeout(readinessStableTimerRef.current);
+        }
+        readinessStableTimerRef.current = window.setTimeout(() => {
+          if (restorePhaseRef.current !== phase) {
+            return;
+          }
+          logger.debug(`[${sid}] Stability window settled`, {
+            phase,
+            stableMs,
+          });
+          onStable();
+        }, stableMs);
+      };
 
-    const listElement = listRef.current
-      ?.scrollerElement()
-      ?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
-    if (!listElement) {
-      return;
-    }
+      scheduleStabilityCheck();
 
-    const observer = new ResizeObserver(() => {
-      if (restorePhaseRef.current !== 'stabilizing') {
+      const listElement = listRef.current
+        ?.scrollerElement()
+        ?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
+      if (!listElement) {
+        logger.debug(`[${sid}] Stability window has no list element`, {
+          phase,
+        });
         return;
       }
-      scheduleStabilityCheck();
-    });
 
-    observer.observe(listElement);
-    readinessResizeObserverRef.current = observer;
-  }, [signalReady]);
+      const observer = new ResizeObserver(() => {
+        if (restorePhaseRef.current !== phase) {
+          return;
+        }
+        scheduleStabilityCheck();
+      });
+
+      observer.observe(listElement);
+      readinessResizeObserverRef.current = observer;
+    },
+    [sid]
+  );
 
   const beginStabilizationIfTargetRendered = useCallback(
     (rendered: ChatMessage[]): boolean => {
-      const targetId = lastMessageIdRef.current;
-      const scroller = listRef.current?.scrollerElement();
-      const isBottomAligned =
-        scroller !== null &&
-        scroller !== undefined &&
-        scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
-      const hasTargetVisible = targetId !== null && rendered.some((item) => item.id === targetId);
-
-      if (!isBottomAligned && !hasTargetVisible) {
+      const metrics = getRenderSurfaceMetrics(rendered);
+      if (!metrics) {
+        if (restorePhaseRef.current === 'positioning') {
+          alignScrollerToBottom();
+          logger.debug(`[${sid}] Reasserting bottom placement`, {
+            renderedCount: rendered.length,
+          });
+        }
         return false;
       }
 
       restorePhaseRef.current = 'stabilizing';
       logger.debug(`[${sid}] Entering stabilization`, {
-        targetId,
-        isBottomAligned,
-        scrollTop: scroller?.scrollTop ?? null,
-        scrollHeight: scroller?.scrollHeight ?? null,
-        clientHeight: scroller?.clientHeight ?? null,
-        renderedCount: rendered.length,
+        bottomTop: metrics.bottomTop,
+        clientHeight: metrics.clientHeight,
+        hasLastItemVisible: metrics.hasLastItemVisible,
+        isGenuineShort: metrics.isGenuineShort,
+        renderedCount: metrics.renderedCount,
+        scrollHeight: metrics.scrollHeight,
       });
-      startTemporaryResizeStabilityWindow();
+      startTemporaryResizeStabilityWindow('stabilizing', READY_STABLE_MS, () => {
+        signalReady('stabilized');
+      });
       return true;
     },
-    [sid, startTemporaryResizeStabilityWindow]
+    [
+      alignScrollerToBottom,
+      getRenderSurfaceMetrics,
+      sid,
+      signalReady,
+      startTemporaryResizeStabilityWindow,
+    ]
+  );
+
+  const finishPremeasure = useCallback((): void => {
+    if (premeasureTimeoutRef.current !== null) {
+      window.clearTimeout(premeasureTimeoutRef.current);
+      premeasureTimeoutRef.current = null;
+    }
+
+    restorePhaseRef.current = 'positioning';
+    const handle = listRef.current;
+    if (!handle) {
+      signalReady('no-handle');
+      return;
+    }
+
+    alignScrollerToBottom();
+    logger.debug(`[${sid}] Returning from premeasure`, {
+      renderedCount: handle.data.getCurrentlyRendered().length,
+    });
+    beginStabilizationIfTargetRendered(handle.data.getCurrentlyRendered());
+  }, [alignScrollerToBottom, beginStabilizationIfTargetRendered, sid, signalReady]);
+
+  const continuePremeasure = useCallback((): void => {
+    const metrics = getScrollerMetrics();
+    if (!metrics) {
+      finishPremeasure();
+      return;
+    }
+
+    const currentTop = metrics.scroller.scrollTop;
+    if (currentTop <= 0) {
+      finishPremeasure();
+      return;
+    }
+
+    const nextTop = Math.max(0, currentTop - PREMEASURE_STEP_PX);
+    if (nextTop === currentTop) {
+      finishPremeasure();
+      return;
+    }
+
+    metrics.scroller.scrollTop = nextTop;
+    logger.debug(`[${sid}] Continuing premeasure`, {
+      nextTop,
+      previousTop: currentTop,
+    });
+    startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
+    premeasureTimeoutRef.current = window.setTimeout(() => {
+      if (restorePhaseRef.current !== 'premeasuring') {
+        return;
+      }
+
+      logger.debug(`[${sid}] Premeasure timeout`, {
+        scrollTop: metrics.scroller.scrollTop,
+      });
+      continuePremeasure();
+    }, PREMEASURE_TIMEOUT_MS);
+  }, [finishPremeasure, getScrollerMetrics, sid, startTemporaryResizeStabilityWindow]);
+
+  const startPremeasureIfNeeded = useCallback((): boolean => {
+    if (isVisible || restoredSizeCacheRef.current) {
+      logger.debug(`[${sid}] Skip premeasure`, {
+        isVisible,
+        restoredSizeCache: restoredSizeCacheRef.current,
+      });
+      return false;
+    }
+
+    const metrics = getScrollerMetrics();
+    if (!metrics) {
+      logger.debug(`[${sid}] Skip premeasure: no scroller metrics`);
+      return false;
+    }
+
+    if (metrics.bottomTop <= metrics.clientHeight) {
+      logger.debug(`[${sid}] Skip premeasure: short bottom range`, {
+        bottomTop: metrics.bottomTop,
+        clientHeight: metrics.clientHeight,
+      });
+      return false;
+    }
+
+    const warmupTop = Math.max(0, metrics.bottomTop - PREMEASURE_STEP_PX);
+    if (warmupTop >= metrics.bottomTop) {
+      return false;
+    }
+
+    restorePhaseRef.current = 'premeasuring';
+    setIsPremeasuring(true);
+    metrics.scroller.scrollTop = warmupTop;
+    logger.debug(`[${sid}] Starting premeasure`, {
+      bottomTop: metrics.bottomTop,
+      clientHeight: metrics.clientHeight,
+      scrollHeight: metrics.scrollHeight,
+      warmupTop,
+    });
+
+    startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
+    premeasureTimeoutRef.current = window.setTimeout(() => {
+      if (restorePhaseRef.current !== 'premeasuring') {
+        return;
+      }
+
+      logger.debug(`[${sid}] Premeasure timeout`, {
+        scrollTop: metrics.scroller.scrollTop,
+        warmupTop,
+      });
+      continuePremeasure();
+    }, PREMEASURE_TIMEOUT_MS);
+
+    return true;
+  }, [continuePremeasure, getScrollerMetrics, isVisible, sid, startTemporaryResizeStabilityWindow]);
+
+  const startReadinessTimeoutIfNeeded = useCallback((): void => {
+    if (readinessStartedRef.current) {
+      return;
+    }
+
+    readinessStartedRef.current = true;
+    readinessTimeoutRef.current = window.setTimeout(() => {
+      alignScrollerToBottom();
+      logger.debug(`[${sid}] Readiness timeout`, {
+        phase: restorePhaseRef.current,
+      });
+      signalReady('timeout');
+    }, READY_TIMEOUT_MS);
+  }, [alignScrollerToBottom, sid, signalReady]);
+
+  const progressPositioning = useCallback(
+    (rendered: ChatMessage[]): void => {
+      if (restorePhaseRef.current !== 'positioning') {
+        return;
+      }
+
+      const metrics = getRenderSurfaceMetrics(rendered);
+      if (!metrics) {
+        alignScrollerToBottom();
+        return;
+      }
+
+      logger.debug(`[${sid}] Starting readiness timeout`, {
+        bottomTop: metrics.bottomTop,
+        clientHeight: metrics.clientHeight,
+        scrollHeight: metrics.scrollHeight,
+      });
+      startReadinessTimeoutIfNeeded();
+      if (startPremeasureIfNeeded()) {
+        return;
+      }
+
+      beginStabilizationIfTargetRendered(rendered);
+    },
+    [
+      alignScrollerToBottom,
+      beginStabilizationIfTargetRendered,
+      getRenderSurfaceMetrics,
+      sid,
+      startPremeasureIfNeeded,
+      startReadinessTimeoutIfNeeded,
+    ]
   );
 
   const handleRenderedDataChange = useCallback(
@@ -666,9 +978,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      beginStabilizationIfTargetRendered(rendered);
+      progressPositioning(rendered);
     },
-    [beginStabilizationIfTargetRendered, overscanPhase, sid]
+    [overscanPhase, progressPositioning, sid]
   );
 
   // Capture the restore intent into a ref before the clear effect runs.
@@ -685,6 +997,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   useEffect(() => {
     if (!shouldPrime && restorePhaseRef.current !== 'done') {
       needsRestoreRef.current = messages.length > 0 && !hasSignaledReadyRef.current;
+      readinessStartedRef.current = false;
+      setIsPremeasuring(false);
       cancelReadinessWork();
       restorePhaseRef.current = 'idle';
     }
@@ -703,6 +1017,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     restorePhaseRef.current = 'positioning';
     alignScrollerToBottom();
+    readinessStartedRef.current = false;
+    setIsPremeasuring(false);
     if (import.meta.env.DEV) {
       const startMarkName = sessionKey !== '' ? `readiness-start:${sessionKey}` : 'readiness-start';
       readinessStartMarkRef.current = startMarkName;
@@ -710,25 +1026,24 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     logger.debug(`[${sid}] Starting readiness`, {
+      isVisible,
       lastMessageId: lastMessageIdRef.current,
       msgCount: messages.length,
+      restoredSizeCache: restoredSizeCacheRef.current,
+      scrollIntent,
+      shouldPrime,
     });
 
     cancelReadinessWork();
-    readinessTimeoutRef.current = window.setTimeout(() => {
-      alignScrollerToBottom();
-      logger.debug(`[${sid}] Readiness timeout`, {
-        phase: restorePhaseRef.current,
-      });
-      signalReady('timeout');
-    }, READY_TIMEOUT_MS);
-    beginStabilizationIfTargetRendered(handle.data.getCurrentlyRendered());
+    progressPositioning(handle.data.getCurrentlyRendered());
   }, [
     alignScrollerToBottom,
-    beginStabilizationIfTargetRendered,
     cancelReadinessWork,
+    isVisible,
     messages.length,
     sessionKey,
+    progressPositioning,
+    scrollIntent,
     shouldPrime,
     sid,
     signalReady,
@@ -745,17 +1060,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const previousShouldPrimeRef = useRef(shouldPrime);
   useEffect(() => {
     if (previousShouldPrimeRef.current && !shouldPrime) {
-      snapshotSizeCache();
+      snapshotStableSizeCache();
     }
     previousShouldPrimeRef.current = shouldPrime;
-  }, [shouldPrime, snapshotSizeCache]);
+  }, [shouldPrime, snapshotStableSizeCache]);
 
   useEffect(() => {
     return (): void => {
       cancelReadinessWork();
-      snapshotSizeCache();
+      snapshotStableSizeCache();
     };
-  }, [cancelReadinessWork, snapshotSizeCache]);
+  }, [cancelReadinessWork, snapshotStableSizeCache]);
 
   useLayoutEffect(() => {
     if (scrollIntent === 'session-restore' || scrollIntent === 'session-refresh') {

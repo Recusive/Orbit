@@ -226,6 +226,16 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
     });
   }, []);
 
+  useEffect(() => {
+    return useChatStore.subscribe((state, prevState) => {
+      for (const sid of Object.keys(prevState.sessions)) {
+        if (!(sid in state.sessions)) {
+          stabilizedSetRef.current.delete(sid);
+        }
+      }
+    });
+  }, []);
+
   return (
     <div className="relative flex-1 flex flex-col min-h-0 overflow-hidden">
       {mountedSessions.map((sid) => {

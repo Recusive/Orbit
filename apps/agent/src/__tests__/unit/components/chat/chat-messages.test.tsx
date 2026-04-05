@@ -6,6 +6,7 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { ComponentProps, ReactNode } from 'react';
 
 const {
+  mockGetCurrentlyRendered,
   getSizeRangesMock,
   messageItemPropsById,
   mockResizeObserverDisconnect,
@@ -24,6 +25,7 @@ const {
   const scrollerScrollToMock = vi.fn();
 
   return {
+    mockGetCurrentlyRendered: vi.fn(),
     getSizeRangesMock: vi.fn(() => [{ k: 0, v: 120 }]),
     messageItemPropsById: new Map<string, unknown>(),
     mockResizeObserverDisconnect: vi.fn(),
@@ -168,7 +170,10 @@ vi.mock('@virtuoso.dev/message-list', async () => {
       React.useImperativeHandle(ref, () => ({
         data: {
           replace: replaceDataMock,
-          getCurrentlyRendered: () => (props.data?.data ?? props.initialData ?? []) as TData[],
+          getCurrentlyRendered: () => {
+            const fallback = (props.data?.data ?? props.initialData ?? []) as TData[];
+            return (mockGetCurrentlyRendered(fallback) as TData[] | undefined) ?? fallback;
+          },
         },
         scrollToItem: scrollToItemMock,
         scrollerElement: () => mockScrollerElement,
@@ -394,6 +399,34 @@ function getLatestVelocityScrollOptions(): {
   return options;
 }
 
+function trackScrollTopWrites(): {
+  readonly restore: () => void;
+  readonly writes: number[];
+} {
+  const writes: number[] = [];
+  let currentScrollTop = mockScrollerElement.scrollTop;
+
+  Object.defineProperty(mockScrollerElement, 'scrollTop', {
+    configurable: true,
+    get: () => currentScrollTop,
+    set: (value: number) => {
+      writes.push(value);
+      currentScrollTop = value;
+    },
+  });
+
+  return {
+    writes,
+    restore: () => {
+      Object.defineProperty(mockScrollerElement, 'scrollTop', {
+        configurable: true,
+        writable: true,
+        value: currentScrollTop,
+      });
+    },
+  };
+}
+
 function renderChatMessages(
   overrides: Partial<ComponentProps<typeof ChatMessages>> = {}
 ): ReturnType<typeof render> {
@@ -419,6 +452,7 @@ describe('ChatMessages', () => {
     useChatStore.setState(useChatStore.getInitialState(), true);
     clearToolWidgetState();
     messageItemPropsById.clear();
+    mockGetCurrentlyRendered.mockReset();
     queuedMessageBubbleProps.length = 0;
     getSizeRangesMock.mockClear();
     mockResizeObserverDisconnect.mockClear();
@@ -428,6 +462,8 @@ describe('ChatMessages', () => {
       selector === '[data-testid="virtuoso-list"]' ? mockVirtuosoListElement : null
     );
     mockScrollerElement.removeEventListener.mockClear();
+    mockScrollerElement.clientHeight = 800;
+    mockScrollerElement.scrollHeight = 1200;
     mockScrollerElement.scrollTop = 0;
     mockUseVelocityScroll.mockClear();
     mockVirtuosoMessageListProps.mockClear();
@@ -528,7 +564,213 @@ describe('ChatMessages', () => {
       });
 
       expect(mockResizeObserverObserve).toHaveBeenCalled();
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('premeasures an upward corridor before revealing a long first-visit session', async () => {
+    vi.useFakeTimers();
+
+    const messages = Array.from({ length: 10 }, (_, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+    const scrollTracker = trackScrollTopWrites();
+
+    try {
+      mockScrollerElement.scrollHeight = 4000;
+      mockScrollerElement.clientHeight = 800;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
+      useChatStore.setState({
+        sessions: {
+          'session-a': {
+            messages: [],
+            isAgentRunning: false,
+            isStopPending: false,
+            scrollIntent: 'session-restore',
+            hydrationState: 'hydrated',
+            layoutVersion: 0,
+            virtuosoSizeCache: null,
+          },
+        },
+      });
+
+      const onReady = vi.fn();
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: true,
+        onReady,
+      });
+
+      expect(scrollTracker.writes).toContain(3200);
+      expect(scrollTracker.writes).toContain(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(80);
+      });
+
+      expect(scrollTracker.writes.at(-1)).toBe(3200);
+      expect(onReady).toHaveBeenCalledTimes(1);
+    } finally {
+      scrollTracker.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips premeasure for short sessions and stabilizes directly from bottom positioning', async () => {
+    vi.useFakeTimers();
+
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+    const scrollTracker = trackScrollTopWrites();
+
+    try {
+      mockScrollerElement.scrollHeight = 1200;
+      mockScrollerElement.clientHeight = 800;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
+      useChatStore.setState({
+        sessions: {
+          'session-a': {
+            messages: [],
+            isAgentRunning: false,
+            isStopPending: false,
+            scrollIntent: 'session-restore',
+            hydrationState: 'hydrated',
+            layoutVersion: 0,
+            virtuosoSizeCache: null,
+          },
+        },
+      });
+
+      const onReady = vi.fn();
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: true,
+        onReady,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(48);
+      });
+
+      expect(new Set(scrollTracker.writes)).toEqual(new Set([400]));
+      expect(onReady).toHaveBeenCalledTimes(1);
+    } finally {
+      scrollTracker.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('skips premeasure when a valid size cache was restored', async () => {
+    vi.useFakeTimers();
+
+    const messages = Array.from({ length: 10 }, (_, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+    const scrollTracker = trackScrollTopWrites();
+
+    try {
+      mockScrollerElement.scrollHeight = 4000;
+      mockScrollerElement.clientHeight = 800;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
+      const chatStore = useChatStore.getState();
+      chatStore.getOrCreateSession('session-a');
+      chatStore.setMessages('session-a', messages, 'session-restore');
+      chatStore.setVirtuosoSizeCache('session-a', {
+        ranges: [{ k: 0, v: 120 }],
+        messageCount: messages.length,
+        lastMessageId: messages.at(-1)?.id ?? null,
+        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+      });
+
+      const onReady = vi.fn();
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: true,
+        onReady,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(48);
+      });
+
+      expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 120 }]);
+      expect(scrollTracker.writes).not.toContain(800);
+      expect(new Set(scrollTracker.writes)).toEqual(new Set([3200]));
+      expect(onReady).toHaveBeenCalledTimes(1);
+    } finally {
+      scrollTracker.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('cancels premeasure work when the session stops priming before ready', async () => {
+    vi.useFakeTimers();
+
+    const messages = Array.from({ length: 10 }, (_, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+
+    try {
+      mockScrollerElement.scrollHeight = 4000;
+      mockScrollerElement.clientHeight = 800;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
+      useChatStore.setState({
+        sessions: {
+          'session-a': {
+            messages: [],
+            isAgentRunning: false,
+            isStopPending: false,
+            scrollIntent: 'session-restore',
+            hydrationState: 'hydrated',
+            layoutVersion: 0,
+            virtuosoSizeCache: null,
+          },
+        },
+      });
+
+      const onReady = vi.fn();
+      const { rerender } = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: true,
+        onReady,
+      });
+
+      expect(mockResizeObserverObserve).toHaveBeenCalled();
+
+      rerender(
+        <ChatMessages
+          messages={messages}
+          isAgentRunning={false}
+          sessionId="session-a"
+          isVisible={false}
+          shouldPrime={false}
+          queuedMessage={null}
+          onRewind={vi.fn()}
+          onOpenFile={vi.fn()}
+          onOpenUrl={vi.fn()}
+          onCancelQueue={vi.fn()}
+          onFeedback={vi.fn()}
+          onReady={onReady}
+        />
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+
+      expect(onReady).not.toHaveBeenCalled();
+      expect(mockResizeObserverDisconnect).toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }
@@ -751,7 +993,7 @@ describe('ChatMessages', () => {
     expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 64 }]);
   });
 
-  it('snapshots size ranges when the session stops priming', () => {
+  it('does not snapshot size ranges when the session stops priming before ready', () => {
     const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession('session-a');
@@ -778,12 +1020,7 @@ describe('ChatMessages', () => {
       />
     );
 
-    expect(useChatStore.getState().sessions['session-a']?.virtuosoSizeCache).toEqual({
-      ranges: [{ k: 0, v: 120 }],
-      messageCount: 1,
-      lastMessageId: 'assistant-1',
-      layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
-    });
+    expect(useChatStore.getState().sessions['session-a']?.virtuosoSizeCache).toBeNull();
   });
 
   it('wires item content props and tool lookup into MessageItem correctly', () => {
