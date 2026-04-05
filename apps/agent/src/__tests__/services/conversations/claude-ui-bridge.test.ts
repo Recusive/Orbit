@@ -1,11 +1,27 @@
-import { claudeUiBridge } from '@/services/conversations/claude-ui-bridge';
-import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
-import { useChatStore } from '@/stores/chat/chat-store';
-import { useFileStore } from '@/stores/file/file-store';
-import { useUIStore } from '@/stores/ui/ui-store';
-
-const { mockLoad } = vi.hoisted(() => ({
+const {
+  mockApplyManualSessionTitle,
+  mockGetConversationGeneration,
+  mockGetFreshConversationDetail,
+  mockGetQueryState,
+  mockGetWorkspaceEpoch,
+  mockLoad,
+  mockLoadConversationDetailFresh,
+  mockMarkConversationTitleDirty,
+  mockRepoRemove,
+  mockRepoUpdateTitle,
+  mockRemoveConversationCache,
+} = vi.hoisted(() => ({
+  mockApplyManualSessionTitle: vi.fn<(sessionId: string, title: string) => Promise<void>>(),
+  mockGetConversationGeneration: vi.fn<(sessionId: string) => number>(),
+  mockGetFreshConversationDetail: vi.fn<(sessionId: string) => unknown>(),
+  mockGetQueryState: vi.fn<(queryKey: readonly unknown[]) => unknown>(),
+  mockGetWorkspaceEpoch: vi.fn<[], number>(),
   mockLoad: vi.fn<(sessionId: string) => Promise<void>>(),
+  mockLoadConversationDetailFresh: vi.fn<(sessionId: string) => Promise<unknown>>(),
+  mockMarkConversationTitleDirty: vi.fn<(sessionId: string) => void>(),
+  mockRepoRemove: vi.fn<(sessionId: string) => Promise<void>>(),
+  mockRepoUpdateTitle: vi.fn<(sessionId: string, title: string) => Promise<void>>(),
+  mockRemoveConversationCache: vi.fn<(sessionId: string) => Promise<void>>(),
 }));
 
 vi.mock('@/services/conversations/claude-conversation-repo', () => ({
@@ -14,10 +30,46 @@ vi.mock('@/services/conversations/claude-conversation-repo', () => ({
     restoreActiveSession: vi.fn(),
     list: vi.fn(),
     create: vi.fn(),
-    remove: vi.fn(),
-    updateTitle: vi.fn(),
+    remove: mockRepoRemove,
+    updateTitle: mockRepoUpdateTitle,
   },
 }));
+
+vi.mock('@/services/session', () => ({
+  applyManualSessionTitle: mockApplyManualSessionTitle,
+}));
+
+vi.mock('@/lib/query/conversation-detail', () => ({
+  getFreshConversationDetail: mockGetFreshConversationDetail,
+  loadConversationDetailFresh: mockLoadConversationDetailFresh,
+}));
+
+vi.mock('@/lib/query/conversation-detail-cache', () => ({
+  getConversationGeneration: mockGetConversationGeneration,
+  getWorkspaceEpoch: mockGetWorkspaceEpoch,
+  markConversationTitleDirty: mockMarkConversationTitleDirty,
+  removeConversationCache: mockRemoveConversationCache,
+}));
+
+vi.mock('@/lib/query/query-client', () => ({
+  queryClient: {
+    getQueryState: mockGetQueryState,
+  },
+}));
+
+vi.mock('@/lib/query/query-keys', () => ({
+  queryKeys: {
+    conversations: {
+      detail: (sessionId: string) => ['conversations', 'detail', sessionId] as const,
+    },
+  },
+}));
+
+import { claudeUiBridge } from '@/services/conversations/claude-ui-bridge';
+import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
+import { useChatStore } from '@/stores/chat/chat-store';
+import { useFileStore } from '@/stores/file/file-store';
+import { useUIStore } from '@/stores/ui/ui-store';
 
 function resetStores(): void {
   useChatStore.setState({
@@ -40,13 +92,41 @@ function resetStores(): void {
 describe('claudeUiBridge.select', () => {
   beforeEach(() => {
     resetStores();
+    mockApplyManualSessionTitle.mockReset();
+    mockApplyManualSessionTitle.mockResolvedValue(undefined);
+    mockGetConversationGeneration.mockReset();
+    mockGetConversationGeneration.mockReturnValue(0);
+    mockGetFreshConversationDetail.mockReset();
+    mockGetFreshConversationDetail.mockReturnValue(null);
+    mockGetQueryState.mockReset();
+    mockGetQueryState.mockReturnValue(undefined);
+    mockGetWorkspaceEpoch.mockReset();
+    mockGetWorkspaceEpoch.mockReturnValue(0);
     mockLoad.mockReset();
     mockLoad.mockResolvedValue(undefined);
+    mockLoadConversationDetailFresh.mockReset();
+    mockMarkConversationTitleDirty.mockReset();
+    mockRepoRemove.mockReset();
+    mockRepoRemove.mockResolvedValue(undefined);
+    mockRepoUpdateTitle.mockReset();
+    mockRepoUpdateTitle.mockResolvedValue(undefined);
+    mockRemoveConversationCache.mockReset();
+    mockRemoveConversationCache.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
     resetStores();
+    mockApplyManualSessionTitle.mockReset();
+    mockGetConversationGeneration.mockReset();
+    mockGetFreshConversationDetail.mockReset();
+    mockGetQueryState.mockReset();
+    mockGetWorkspaceEpoch.mockReset();
     mockLoad.mockReset();
+    mockLoadConversationDetailFresh.mockReset();
+    mockMarkConversationTitleDirty.mockReset();
+    mockRepoRemove.mockReset();
+    mockRepoUpdateTitle.mockReset();
+    mockRemoveConversationCache.mockReset();
   });
 
   it('uses the cached session path for hydrated sessions', async () => {
@@ -113,5 +193,248 @@ describe('claudeUiBridge.select', () => {
     expect(useUIStore.getState().isConversationTransitioning).toBe(true);
     expect(useFileStore.getState().currentSessionId).toBe(sessionId);
     expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(true);
+  });
+
+  it('hydrates directly from a fresh cached conversation', async () => {
+    const sessionId = 'fresh-cache-session';
+    mockGetFreshConversationDetail.mockReturnValue({
+      kind: 'data',
+      conversation: {
+        sessionId,
+        title: 'Cached Detail',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'hello',
+            createdAt: 1,
+            parentUuid: null,
+          },
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'world',
+            createdAt: 2,
+            parentUuid: 'user-1',
+          },
+        ],
+      },
+    });
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Sidebar Title',
+          updatedAt: 1,
+          messageCount: 2,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+      isLoadingConversation: true,
+      isConversationTransitioning: true,
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useChatStore.getState().sessions[sessionId]?.messages).toHaveLength(2);
+    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
+    expect(useUIStore.getState().activeConversationTitle).toBe('Sidebar Title');
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+  });
+
+  it('hydrates direct empty state from a fresh cached empty conversation', async () => {
+    const sessionId = 'empty-cache-session';
+    mockGetFreshConversationDetail.mockReturnValue({
+      kind: 'empty',
+      conversation: {
+        sessionId,
+        title: 'Empty Session',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [],
+      },
+    });
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Empty Sidebar Title',
+          updatedAt: 1,
+          messageCount: 0,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useChatStore.getState().sessions[sessionId]?.messages).toEqual([]);
+    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+  });
+
+  it('joins an in-flight prefetch instead of triggering the slow path load', async () => {
+    const sessionId = 'join-session';
+    mockGetQueryState.mockReturnValue({ fetchStatus: 'fetching' });
+    mockLoadConversationDetailFresh.mockResolvedValue({
+      kind: 'data',
+      conversation: {
+        sessionId,
+        title: 'Joined Detail',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'hello',
+            createdAt: 1,
+            parentUuid: null,
+          },
+        ],
+      },
+    });
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Joined Sidebar Title',
+          updatedAt: 1,
+          messageCount: 1,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useChatStore.getState().sessions[sessionId]?.messages).toHaveLength(1);
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
+  });
+
+  it('aborts an in-flight join when conversation generation changes during await', async () => {
+    const sessionId = 'stale-generation-session';
+    mockGetQueryState.mockReturnValue({ fetchStatus: 'fetching' });
+    mockGetConversationGeneration.mockReturnValueOnce(0).mockReturnValueOnce(1);
+    mockLoadConversationDetailFresh.mockResolvedValue({
+      kind: 'data',
+      conversation: {
+        sessionId,
+        title: 'Joined Detail',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'hello',
+            createdAt: 1,
+            parentUuid: null,
+          },
+        ],
+      },
+    });
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Joined Sidebar Title',
+          updatedAt: 1,
+          messageCount: 1,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
+    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('unloaded');
+  });
+
+  it('aborts an in-flight join when workspace epoch changes during await', async () => {
+    const sessionId = 'stale-epoch-session';
+    mockGetQueryState.mockReturnValue({ fetchStatus: 'fetching' });
+    mockGetWorkspaceEpoch.mockReturnValueOnce(0).mockReturnValueOnce(1);
+    mockLoadConversationDetailFresh.mockResolvedValue({
+      kind: 'data',
+      conversation: {
+        sessionId,
+        title: 'Joined Detail',
+        createdAt: 1,
+        updatedAt: 1,
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'hello',
+            createdAt: 1,
+            parentUuid: null,
+          },
+        ],
+      },
+    });
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Joined Sidebar Title',
+          updatedAt: 1,
+          messageCount: 1,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
+    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('unloaded');
+  });
+
+  it('removes query cache before deleting a conversation', async () => {
+    const sessionId = 'delete-session';
+
+    await claudeUiBridge.remove(sessionId);
+
+    expect(mockRemoveConversationCache).toHaveBeenCalledWith(sessionId);
+    expect(mockRepoRemove).toHaveBeenCalledWith(sessionId);
+  });
+
+  it('marks the title cache dirty after a successful rename', async () => {
+    const sessionId = 'rename-session';
+
+    await claudeUiBridge.rename(sessionId, 'Renamed Title');
+
+    expect(mockRepoUpdateTitle).toHaveBeenCalledWith(sessionId, 'Renamed Title');
+    expect(mockMarkConversationTitleDirty).toHaveBeenCalledWith(sessionId);
+    expect(mockRepoUpdateTitle.mock.invocationCallOrder[0]).toBeLessThan(
+      mockMarkConversationTitleDirty.mock.invocationCallOrder[0]
+    );
   });
 });

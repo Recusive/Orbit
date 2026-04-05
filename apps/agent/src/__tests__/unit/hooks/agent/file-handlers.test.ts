@@ -21,6 +21,10 @@ const { mockInitFileWatcher } = vi.hoisted(() => ({
   mockInitFileWatcher: vi.fn<[string], Promise<void>>(),
 }));
 
+const { mockInvalidateAllConversationCaches } = vi.hoisted(() => ({
+  mockInvalidateAllConversationCaches: vi.fn<[], Promise<void>>(),
+}));
+
 const { mockCloseTab, mockConvertFileSrc, mockSetImageFile, viewerStoreState } = vi.hoisted(() => ({
   mockCloseTab: vi.fn<[string], undefined>(),
   mockConvertFileSrc: vi.fn<[string], string>(),
@@ -33,8 +37,20 @@ const { mockCloseTab, mockConvertFileSrc, mockSetImageFile, viewerStoreState } =
   },
 }));
 
+const { mockInitializeWorkspace, mockSetConversations, uiStoreState } = vi.hoisted(() => ({
+  mockInitializeWorkspace: vi.fn<[string], undefined>(),
+  mockSetConversations: vi.fn<[unknown[]], undefined>(),
+  uiStoreState: {
+    workspacePath: null as string | null,
+  },
+}));
+
 vi.mock('@/hooks/agent/use-tauri-file-watcher', () => ({
   initFileWatcher: mockInitFileWatcher,
+}));
+
+vi.mock('@/lib/query', () => ({
+  invalidateAllConversationCaches: mockInvalidateAllConversationCaches,
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -91,9 +107,9 @@ vi.mock('@/stores/ui/ui-store', () => ({
       initializeWorkspace: (path: string) => void;
       setConversations: (conversations: unknown[]) => void;
     } => ({
-      workspacePath: null,
-      initializeWorkspace: vi.fn(),
-      setConversations: vi.fn(),
+      workspacePath: uiStoreState.workspacePath,
+      initializeWorkspace: mockInitializeWorkspace,
+      setConversations: mockSetConversations,
     }),
   },
 }));
@@ -107,13 +123,35 @@ describe('file-handlers', () => {
     mockConversationList.mockResolvedValue([]);
     mockBuildFileIndex.mockResolvedValue(undefined);
     mockGetFileInfo.mockResolvedValue({ size: 4096 });
+    mockInvalidateAllConversationCaches.mockResolvedValue(undefined);
     mockInitFileWatcher.mockResolvedValue(undefined);
+    mockInitializeWorkspace.mockReset();
+    mockSetConversations.mockReset();
     mockConvertFileSrc.mockImplementation((path: string) => `asset://${path}`);
     mockReadFile.mockResolvedValue('');
+    uiStoreState.workspacePath = null;
     viewerStoreState.openTabs = [];
   });
 
   describe('handleFileTreeRequest', () => {
+    it('invalidates conversation caches before bootstrapping a new workspace', async () => {
+      mockGetWorkspacePath.mockResolvedValue('/workspace-next');
+      mockListDirectory.mockResolvedValue([]);
+
+      const message: Extract<WebviewMessage, { type: 'file:tree:request' }> = {
+        type: 'file:tree:request',
+        uuid: '00000000-0000-4000-8000-000000000000',
+      };
+
+      await handleFileTreeRequest(message);
+
+      expect(mockInvalidateAllConversationCaches).toHaveBeenCalledTimes(1);
+      expect(mockInitializeWorkspace).toHaveBeenCalledWith('/workspace-next');
+      expect(mockInvalidateAllConversationCaches.mock.invocationCallOrder[0]).toBeLessThan(
+        mockInitializeWorkspace.mock.invocationCallOrder[0]
+      );
+    });
+
     it('filters system entries and forwards isGitIgnored to file tree nodes', async () => {
       const entries: FileEntry[] = [
         {

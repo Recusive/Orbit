@@ -43,6 +43,7 @@ import {
   useSessionCompletedTools,
 } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { getRenderCache } from '@/stores/chat/render-cache-store';
 
 const logger = createLogger('ChatMessages');
 
@@ -323,7 +324,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     const store = useChatStore.getState();
     const session = store.sessions[sessionId];
-    const cache = session?.virtuosoSizeCache ?? null;
+    let cache = session?.virtuosoSizeCache ?? null;
+    let cacheSource: 'session' | 'persistent' | null = cache ? 'session' : null;
+    if (!cache) {
+      cache = getRenderCache(sessionId);
+      if (cache) {
+        cacheSource = 'persistent';
+      }
+    }
     if (!cache || !session) return;
     if (cache.layoutVersion !== session.layoutVersion) {
       logger.debug(`[${sid}] Skip size cache restore: layout version mismatch`, {
@@ -350,6 +358,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     listRef.current?.setSizeRanges([...cache.ranges]);
     restoredSizeCacheRef.current = true;
     logger.debug(`[${sid}] Restored size cache`, {
+      source: cacheSource,
       messageCount: cache.messageCount,
       rangeCount: cache.ranges.length,
     });

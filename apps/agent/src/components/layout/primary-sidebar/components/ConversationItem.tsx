@@ -44,6 +44,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   isEditing = false,
   onClick,
   onDoubleClick,
+  onPrefetch,
   onRename,
   onCancelEdit,
   onDelete,
@@ -146,6 +147,12 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   const itemContent = (
     <div
       className="relative group mx-1.5 ml-2"
+      onPointerEnter={() => {
+        onPrefetch?.();
+      }}
+      onFocus={() => {
+        onPrefetch?.();
+      }}
       onMouseEnter={() => {
         setIsHovered(true);
       }}

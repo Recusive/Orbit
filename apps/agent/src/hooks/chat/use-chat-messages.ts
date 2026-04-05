@@ -43,6 +43,7 @@ import type {
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
 import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
+import { appendMessageToConversationCache, markConversationDirty } from '@/lib/query';
 import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
@@ -120,6 +121,22 @@ interface UseChatMessagesReturn {
   handleThinkingModeChange: (mode: ThinkingMode) => void;
   handleEffortLevelChange: (level: EffortLevel) => void;
   handleModelChange: (model: Model) => void;
+}
+
+function persistConversationMessage(
+  sessionId: string,
+  message: Parameters<typeof conversationAddMessage>[1],
+  workspacePath?: string,
+  worktreePath?: string
+): void {
+  appendMessageToConversationCache(sessionId, message);
+  void conversationAddMessage(sessionId, message, workspacePath, worktreePath)
+    .then(() => {
+      markConversationDirty(sessionId);
+    })
+    .catch(() => {
+      markConversationDirty(sessionId);
+    });
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -371,7 +388,7 @@ export function useChatMessages(): UseChatMessagesReturn {
     );
 
     // Persist user message to backend
-    void conversationAddMessage(
+    persistConversationMessage(
       lastCreatedSessionId,
       {
         id: userMessage.id,

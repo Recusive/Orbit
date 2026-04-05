@@ -63,6 +63,7 @@ import { useConversationList } from '@/hooks/sidebar/use-conversation-list';
 import { useSmoothScroll } from '@/hooks/ui';
 import { useRecentProjects } from '@/hooks/ui/use-recent-projects';
 import { addRecentProject, initializeWorkspace, openFileDialog } from '@/lib/api';
+import { useConversationPrefetch } from '@/lib/query/use-conversation-prefetch';
 import { cn, HEIGHTS, SIDEBAR } from '@/lib/utils';
 import { getSkillColor } from '@/lib/utils/skill-colors';
 import { getConversationUiBridge } from '@/services/conversations';
@@ -109,6 +110,7 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
+  const prefetchConversation = useConversationPrefetch();
 
   // Track whether the scrollable area can scroll further down.
   // The bottom fade mask is only applied when there's more content below,
@@ -763,6 +765,7 @@ export const PrimarySidebar: FC = () => {
               activeConversationId={activeConversationId}
               editingConversationId={editingConversationId}
               onLoadConversation={handleLoadConversation}
+              onPrefetchConversation={prefetchConversation}
               onStartEditConversation={setEditingConversationId}
               onRenameConversation={(sessionId, newTitle) => {
                 handleRenameConversation(sessionId, newTitle);
@@ -781,6 +784,7 @@ export const PrimarySidebar: FC = () => {
             activeConversationId={activeConversationId}
             editingConversationId={editingConversationId}
             onLoadConversation={handleLoadConversation}
+            onPrefetchConversation={prefetchConversation}
             onStartEditConversation={setEditingConversationId}
             onRenameConversation={(sessionId, newTitle) => {
               handleRenameConversation(sessionId, newTitle);

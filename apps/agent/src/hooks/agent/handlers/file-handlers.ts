@@ -14,6 +14,7 @@ import {
   readFile,
 } from '@/lib/api';
 import { toConversationSummaries, toFileNodes } from '@/lib/mappers';
+import { invalidateAllConversationCaches } from '@/lib/query';
 import { getImageMimeType, isImageFile } from '@/lib/utils';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -73,6 +74,7 @@ export async function handleFileTreeRequest(
       if (uiStore.workspacePath !== targetPath) {
         // Note: LSP workspace initialization is handled reactively by useLsp hook
         // when it receives rootPath from the file store
+        await invalidateAllConversationCaches();
         uiStore.initializeWorkspace(targetPath);
       }
 

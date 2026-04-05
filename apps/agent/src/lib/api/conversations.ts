@@ -128,9 +128,10 @@ export async function conversationList(
 
 export async function conversationLoad(
   sessionId: string,
-  workspacePath?: string
+  workspacePath?: string,
+  signal?: AbortSignal
 ): Promise<ConversationDto | null> {
-  return invoke<ConversationDto | null>('conversation_load', { sessionId, workspacePath });
+  return invoke<ConversationDto | null>('conversation_load', { sessionId, workspacePath }, signal);
 }
 
 export async function conversationDelete(sessionId: string, workspacePath?: string): Promise<void> {

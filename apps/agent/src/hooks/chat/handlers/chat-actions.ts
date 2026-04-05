@@ -12,6 +12,7 @@ import type {
 import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
 import { serializeThinkingBlocks } from '@/lib/mappers';
+import { appendMessageToConversationCache, markConversationDirty } from '@/lib/query';
 import { chatMessageService } from '@/services/chat/chat-message-service';
 import {
   buildOptimisticAttachedImages,
@@ -60,6 +61,22 @@ interface ChatActionsReturn {
   handleThinkingModeChange: (mode: ThinkingMode) => void;
   handleEffortLevelChange: (level: EffortLevel) => void;
   handleModelChange: (model: Model) => void;
+}
+
+function persistConversationMessage(
+  sessionId: string,
+  message: Parameters<typeof conversationAddMessage>[1],
+  workspacePath?: string,
+  worktreePath?: string
+): void {
+  appendMessageToConversationCache(sessionId, message);
+  void conversationAddMessage(sessionId, message, workspacePath, worktreePath)
+    .then(() => {
+      markConversationDirty(sessionId);
+    })
+    .catch(() => {
+      markConversationDirty(sessionId);
+    });
 }
 
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
@@ -225,7 +242,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         useChatStore.getState().setAgentRunning(sessionId, true);
 
         // Persist user message to backend
-        void conversationAddMessage(
+        persistConversationMessage(
           sessionId,
           {
             id: userMessage.id,
@@ -326,7 +343,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           // Persist interrupted assistant message
           if (interruptedMsg.content) {
             const thinkingPhasesDto = serializeThinkingBlocks(interruptedMsg.thinkingBlocks);
-            void conversationAddMessage(
+            persistConversationMessage(
               sessionId,
               {
                 id: interruptedMsg.id,
@@ -531,7 +548,7 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
       if (interruptedMsg.content) {
         const thinkingPhasesDto = serializeThinkingBlocks(interruptedMsg.thinkingBlocks);
-        void conversationAddMessage(
+        persistConversationMessage(
           sessionId,
           {
             id: interruptedMsg.id,

@@ -15,6 +15,14 @@ import type { FC } from 'react';
 
 import { cn } from '@/lib/utils';
 
+const CODE_LINE_HEIGHT_PX = 22;
+const COMMAND_PADDING_Y_PX = 4;
+const OUTPUT_PADDING_Y_PX = 8;
+
+function estimateCodeShellMinHeight(lineCount: number, paddingYPx: number): string {
+  return `${String(Math.max(1, lineCount) * CODE_LINE_HEIGHT_PX + paddingYPx * 2)}px`;
+}
+
 interface BashToolWidgetProps {
   readonly toolId: string;
   readonly command: string;
@@ -113,6 +121,14 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const outputLines = output?.split('\n') ?? [];
   const hasMoreLines = outputLines.length > maxCollapsedLines;
   const displayOutput = isExpanded ? output : outputLines.slice(0, maxCollapsedLines).join('\n');
+  const commandShellMinHeight = estimateCodeShellMinHeight(
+    command.split('\n').length,
+    COMMAND_PADDING_Y_PX
+  );
+  const outputShellMinHeight = estimateCodeShellMinHeight(
+    displayOutput ? displayOutput.split('\n').length : 1,
+    OUTPUT_PADDING_Y_PX
+  );
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -176,16 +192,16 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                 <div className="text-[9px] font-medium tracking-wide text-muted-foreground capitalize mb-1.5">
                   command
                 </div>
-                {highlightedCommand ? (
-                  <div
-                    className="bg-lg-control rounded-lg px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
-                    dangerouslySetInnerHTML={{ __html: highlightedCommand }}
-                  />
-                ) : (
-                  <code className="block bg-lg-control rounded-lg px-2 py-1 font-mono text-sm text-foreground break-all">
-                    {command}
-                  </code>
-                )}
+                <div
+                  className="bash-command-shell bg-lg-control rounded-lg px-2 py-1 font-mono text-sm [&_pre]:bg-transparent! [&_pre]:m-0! [&_pre]:p-0! [&_pre]:whitespace-pre-wrap [&_pre]:wrap-break-word [&_code]:bg-transparent!"
+                  style={{ minHeight: commandShellMinHeight }}
+                >
+                  {highlightedCommand ? (
+                    <div dangerouslySetInnerHTML={{ __html: highlightedCommand }} />
+                  ) : (
+                    <code className="block text-foreground break-all">{command}</code>
+                  )}
+                </div>
               </div>
 
               {/* Description section */}
@@ -213,7 +229,10 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
                     <span>Running command...</span>
                   </div>
                 ) : output ? (
-                  <div className="bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent">
+                  <div
+                    className="bash-output-shell bg-lg-control rounded-lg p-2 font-mono text-sm leading-relaxed text-foreground overflow-x-auto max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border/30 scrollbar-track-transparent"
+                    style={{ minHeight: outputShellMinHeight }}
+                  >
                     {highlightedOutput ? (
                       /* SECURITY: Safe — highlightedOutput comes from Shiki's codeToHtml() which HTML-escapes all content */
                       <div

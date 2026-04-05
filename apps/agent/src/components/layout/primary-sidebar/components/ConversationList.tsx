@@ -33,6 +33,7 @@ interface ConversationListProps {
   readonly activeConversationId: string | null;
   readonly editingConversationId: string | null;
   readonly onLoadConversation: (sessionId: string) => void;
+  readonly onPrefetchConversation?: (sessionId: string) => void;
   readonly onStartEditConversation: (sessionId: string) => void;
   readonly onRenameConversation: (sessionId: string, newTitle: string) => void;
   readonly onCancelEditConversation: () => void;
@@ -46,6 +47,7 @@ export const ConversationList: FC<ConversationListProps> = ({
   activeConversationId,
   editingConversationId,
   onLoadConversation,
+  onPrefetchConversation,
   onStartEditConversation,
   onRenameConversation,
   onCancelEditConversation,
@@ -98,6 +100,9 @@ export const ConversationList: FC<ConversationListProps> = ({
                   }}
                   onDoubleClick={() => {
                     onStartEditConversation(conv.sessionId);
+                  }}
+                  onPrefetch={() => {
+                    onPrefetchConversation?.(conv.sessionId);
                   }}
                   onRename={(newTitle) => {
                     onRenameConversation(conv.sessionId, newTitle);

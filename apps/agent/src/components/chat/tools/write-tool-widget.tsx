@@ -190,7 +190,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="my-1.5 overflow-hidden rounded-lg">
+            <div className="my-1.5 min-h-[12rem] overflow-hidden rounded-lg">
               {preloaded ? (
                 <PierreFileDiff
                   fileDiff={preloaded.fileDiff}
@@ -199,7 +199,7 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                   options={pierreOptions}
                 />
               ) : preloadError ? (
-                <div className="px-3 py-2 text-xs text-destructive/90 flex items-center gap-2">
+                <div className="flex min-h-[12rem] items-start px-3 py-2 text-xs text-destructive/90 gap-2">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   <span className="flex-1">{preloadError}</span>
                   <button
@@ -211,7 +211,9 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="px-3 py-2 text-xs text-muted-foreground/60">Loading diff...</div>
+                <div className="flex min-h-[12rem] items-start px-3 py-2 text-xs text-muted-foreground/60">
+                  Loading diff...
+                </div>
               )}
             </div>
           </motion.div>

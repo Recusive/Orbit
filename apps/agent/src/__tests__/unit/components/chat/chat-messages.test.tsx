@@ -290,6 +290,7 @@ import { ChatMessages } from '@/components/chat/chat-messages';
 import { clearToolWidgetState } from '@/components/chat/tools/shared';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { removeRenderCache, saveRenderCache } from '@/stores/chat/render-cache-store';
 
 function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -450,6 +451,7 @@ describe('ChatMessages', () => {
   beforeEach(() => {
     useToolStore.getState().reset();
     useChatStore.setState(useChatStore.getInitialState(), true);
+    removeRenderCache('session-a');
     clearToolWidgetState();
     messageItemPropsById.clear();
     mockGetCurrentlyRendered.mockReset();
@@ -481,6 +483,7 @@ describe('ChatMessages', () => {
   });
 
   afterEach(() => {
+    removeRenderCache('session-a');
     vi.restoreAllMocks();
   });
 
@@ -991,6 +994,41 @@ describe('ChatMessages', () => {
     });
 
     expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 64 }]);
+  });
+
+  it('restores persistent size ranges when the Zustand cache was evicted', () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+
+    saveRenderCache('session-a', {
+      ranges: [{ k: 0, v: 96 }],
+      messageCount: messages.length,
+      lastMessageId: 'assistant-2',
+      layoutVersion: 0,
+    });
+
+    useChatStore.setState({
+      sessions: {
+        'session-a': {
+          messages,
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
+        },
+      },
+    });
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
+
+    expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 96 }]);
   });
 
   it('does not snapshot size ranges when the session stops priming before ready', () => {

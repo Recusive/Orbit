@@ -23,7 +23,8 @@
 import { createLogger } from '@orbit/common/lib';
 import { startTransition } from 'react';
 
-import type { ChatMessage, ThinkingBlock } from '@/components/chat';
+import type { ChatMessage } from '@/components/chat';
+import type { ConversationMessageDto, SessionUsageDto } from '@/lib/api/conversations';
 import type { RafBatchHandler } from '@/lib/utils/event-batcher';
 import type { ExtensionMessage } from '@/types/protocol';
 
@@ -31,14 +32,17 @@ import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { recordBrowserActivityFromAI } from '@/hooks/agent/handlers/browser-handlers';
 import { remapCreatedSession } from '@/hooks/agent/use-tauri-session';
 import { conversationAddMessage, conversationList, conversationLoad } from '@/lib/api';
-import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
-import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
 import { wasMessagePersisted } from '@/lib/conversation-persistence';
 import { classifyAgentError } from '@/lib/error-classifier';
 import { serializeThinkingBlocks, toConversationSummaries } from '@/lib/mappers';
+import { appendMessageToConversationCache, markConversationDirty } from '@/lib/query';
 import { AGENT_RUNNING_CLEAR_DELAY_MS } from '@/lib/utils/constants';
 import { computeSimpleDiff, getLanguageFromPath } from '@/lib/utils/diff-utils';
 import { createCheckpointBatcher, rafBatch } from '@/lib/utils/event-batcher';
+import {
+  hydrateConversationSnapshot,
+  mapPersistedMessage,
+} from '@/services/chat/hydrate-conversation-snapshot';
 import { StreamingRevealController } from '@/services/chat/streaming-reveal-controller';
 import {
   clearSessionTitleState,
@@ -134,14 +138,16 @@ function scheduleSidebarRefresh(): void {
   }
 }
 
-function mapPersistedMessage(m: {
+function sanitizePersistedMessage(message: {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   content: string;
+  createdAt?: number | undefined;
+  timestamp?: number | undefined;
   thinking?: string | undefined;
   thinkingDurationMs?: number | undefined;
   thinkingPhases?:
-    | {
+    | readonly {
         content: string;
         contentOffset?: number | undefined;
         ordinal?: number | undefined;
@@ -150,64 +156,147 @@ function mapPersistedMessage(m: {
     | undefined;
   isInterrupted?: boolean | undefined;
   turnDurationMs?: number | undefined;
-  parentUuid?: string | null | undefined;
-  toolUses?: { name: string; success: boolean }[] | undefined;
+  toolUses?:
+    | readonly {
+        id: string;
+        name: string;
+        input: Record<string, unknown>;
+        output?: string | undefined;
+        success: boolean;
+        contentOffset?: number | undefined;
+        ordinal?: number | undefined;
+      }[]
+    | undefined;
   attachedImages?:
-    | {
+    | readonly {
         name: string;
         mimeType: string;
         previewUrl: string;
       }[]
     | undefined;
-}): ChatMessage {
-  const thinkingPhases = m.thinkingPhases ?? [];
-  const thinkingBlocks: ThinkingBlock[] | undefined =
-    thinkingPhases.length > 0
-      ? thinkingPhases.map((phase, index) => ({
-          content: phase.content,
-          durationMs:
-            phase.durationMs ??
-            (index === thinkingPhases.length - 1 ? (m.thinkingDurationMs ?? 0) : 0),
-          contentOffset: phase.contentOffset,
-          ordinal: phase.ordinal,
-        }))
-      : m.thinking
-        ? [{ content: m.thinking, durationMs: m.thinkingDurationMs ?? 0 }]
-        : undefined;
-
-  const base: ChatMessage = {
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    displayedContent: m.content,
-    ...(m.parentUuid !== undefined ? { parentUuid: m.parentUuid } : {}),
-    ...(thinkingBlocks ? { thinkingBlocks } : {}),
-    ...(m.thinking ? { thinking: m.thinking } : {}),
-    ...(m.thinkingDurationMs !== undefined ? { thinkingDurationMs: m.thinkingDurationMs } : {}),
-    ...(m.turnDurationMs !== undefined ? { turnDurationMs: m.turnDurationMs } : {}),
-    ...(m.attachedImages && m.attachedImages.length > 0
+  usage?:
+    | {
+        inputTokens: number;
+        outputTokens: number;
+        cacheReadInputTokens?: number | undefined;
+        cacheCreationInputTokens?: number | undefined;
+        totalCostUsd?: number | undefined;
+      }
+    | undefined;
+  parentUuid?: string | null | undefined;
+}): ConversationMessageDto {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt ?? message.timestamp ?? Date.now(),
+    ...(message.thinking !== undefined ? { thinking: message.thinking } : {}),
+    ...(message.thinkingDurationMs !== undefined
+      ? { thinkingDurationMs: message.thinkingDurationMs }
+      : {}),
+    ...(message.thinkingPhases !== undefined
       ? {
-          attachedImages: m.attachedImages.map((image) => ({
-            name: image.name,
-            mimeType: image.mimeType,
-            previewUrl: toCachedImagePreviewUrl(image.previewUrl),
+          thinkingPhases: message.thinkingPhases.map((phase) => ({
+            content: phase.content,
+            ...(phase.contentOffset !== undefined ? { contentOffset: phase.contentOffset } : {}),
+            ...(phase.ordinal !== undefined ? { ordinal: phase.ordinal } : {}),
+            ...(phase.durationMs !== undefined ? { durationMs: phase.durationMs } : {}),
           })),
         }
       : {}),
+    ...(message.isInterrupted !== undefined ? { isInterrupted: message.isInterrupted } : {}),
+    ...(message.turnDurationMs !== undefined ? { turnDurationMs: message.turnDurationMs } : {}),
+    ...(message.toolUses !== undefined
+      ? {
+          toolUses: message.toolUses.map((tool) => ({
+            id: tool.id,
+            name: tool.name,
+            input: tool.input,
+            success: tool.success,
+            ...(tool.output !== undefined ? { output: tool.output } : {}),
+            ...(tool.contentOffset !== undefined ? { contentOffset: tool.contentOffset } : {}),
+            ...(tool.ordinal !== undefined ? { ordinal: tool.ordinal } : {}),
+          })),
+        }
+      : {}),
+    ...(message.attachedImages !== undefined
+      ? {
+          attachedImages: message.attachedImages.map((image) => ({
+            name: image.name,
+            mimeType: image.mimeType,
+            previewUrl: image.previewUrl,
+          })),
+        }
+      : {}),
+    ...(message.usage !== undefined
+      ? {
+          usage: {
+            inputTokens: message.usage.inputTokens,
+            outputTokens: message.usage.outputTokens,
+            ...(message.usage.cacheReadInputTokens !== undefined
+              ? { cacheReadInputTokens: message.usage.cacheReadInputTokens }
+              : {}),
+            ...(message.usage.cacheCreationInputTokens !== undefined
+              ? { cacheCreationInputTokens: message.usage.cacheCreationInputTokens }
+              : {}),
+            ...(message.usage.totalCostUsd !== undefined
+              ? { totalCostUsd: message.usage.totalCostUsd }
+              : {}),
+          },
+        }
+      : {}),
+    ...(message.parentUuid !== undefined ? { parentUuid: message.parentUuid } : {}),
   };
+}
 
-  if (m.isInterrupted === true) {
-    const hasRejectedQuestion = m.toolUses?.some(
-      (tool) => tool.name.toLowerCase() === 'askuserquestion' && !tool.success
-    );
-    return {
-      ...base,
-      isInterrupted: true,
-      ...(hasRejectedQuestion ? { interruptReason: 'User rejected to answer' } : {}),
-    };
+function sanitizeSessionUsage(
+  sessionUsage:
+    | {
+        inputTokens: number;
+        outputTokens: number;
+        cacheReadInputTokens?: number | undefined;
+        cacheCreationInputTokens?: number | undefined;
+        totalCostUsd?: number | undefined;
+        lastTurnUsage?:
+          | {
+              inputTokens: number;
+              outputTokens: number;
+              cacheReadInputTokens?: number | undefined;
+              cacheCreationInputTokens?: number | undefined;
+            }
+          | undefined;
+      }
+    | undefined
+): SessionUsageDto | undefined {
+  if (!sessionUsage) {
+    return undefined;
   }
 
-  return base;
+  return {
+    inputTokens: sessionUsage.inputTokens,
+    outputTokens: sessionUsage.outputTokens,
+    ...(sessionUsage.cacheReadInputTokens !== undefined
+      ? { cacheReadInputTokens: sessionUsage.cacheReadInputTokens }
+      : {}),
+    ...(sessionUsage.cacheCreationInputTokens !== undefined
+      ? { cacheCreationInputTokens: sessionUsage.cacheCreationInputTokens }
+      : {}),
+    ...(sessionUsage.totalCostUsd !== undefined ? { totalCostUsd: sessionUsage.totalCostUsd } : {}),
+    ...(sessionUsage.lastTurnUsage !== undefined
+      ? {
+          lastTurnUsage: {
+            inputTokens: sessionUsage.lastTurnUsage.inputTokens,
+            outputTokens: sessionUsage.lastTurnUsage.outputTokens,
+            ...(sessionUsage.lastTurnUsage.cacheReadInputTokens !== undefined
+              ? { cacheReadInputTokens: sessionUsage.lastTurnUsage.cacheReadInputTokens }
+              : {}),
+            ...(sessionUsage.lastTurnUsage.cacheCreationInputTokens !== undefined
+              ? { cacheCreationInputTokens: sessionUsage.lastTurnUsage.cacheCreationInputTokens }
+              : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -774,27 +863,34 @@ class ChatMessageService {
       const thinkingPhasesDto = serializeThinkingBlocks(completedMsg.thinkingBlocks);
 
       if (!wasMessagePersisted(sid, completedMsg.id)) {
+        const messageDto = {
+          id: completedMsg.id,
+          role: 'assistant' as const,
+          content: completedMsg.content,
+          ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
+          ...(completedMsg.thinkingDurationMs !== undefined
+            ? { thinkingDurationMs: completedMsg.thinkingDurationMs }
+            : {}),
+          ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
+          createdAt: Date.now(),
+          ...(usageDto ? { usage: usageDto } : {}),
+          ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
+          ...(completedMsg.parentUuid !== undefined ? { parentUuid: completedMsg.parentUuid } : {}),
+        };
+
+        appendMessageToConversationCache(sid, messageDto);
         void conversationAddMessage(
           sid,
-          {
-            id: completedMsg.id,
-            role: 'assistant',
-            content: completedMsg.content,
-            ...(completedMsg.thinking ? { thinking: completedMsg.thinking } : {}),
-            ...(completedMsg.thinkingDurationMs !== undefined
-              ? { thinkingDurationMs: completedMsg.thinkingDurationMs }
-              : {}),
-            ...(thinkingPhasesDto ? { thinkingPhases: thinkingPhasesDto } : {}),
-            createdAt: Date.now(),
-            ...(usageDto ? { usage: usageDto } : {}),
-            ...(toolUsesDto ? { toolUses: toolUsesDto } : {}),
-            ...(completedMsg.parentUuid !== undefined
-              ? { parentUuid: completedMsg.parentUuid }
-              : {}),
-          },
+          messageDto,
           workspacePath ?? undefined,
           activeWorktreePath ?? undefined
-        );
+        )
+          .then(() => {
+            markConversationDirty(sid);
+          })
+          .catch(() => {
+            markConversationDirty(sid);
+          });
       }
 
       // Replace last message with completed version
@@ -1010,19 +1106,14 @@ class ChatMessageService {
         return;
       }
 
-      // Build ChatMessage[] from the disk data
-      const chainableMessages = conv.messages.map((m) => ({
-        id: m.id,
-        parentUuid: m.parentUuid ?? undefined,
-      }));
-      const activeChainIds = new Set(getActiveChain(chainableMessages).map((m) => m.id));
-
-      const newMessages: ChatMessage[] = conv.messages
-        .filter((m) => activeChainIds.has(m.id))
-        .map((m) => mapPersistedMessage({ ...m, role: m.role as 'user' | 'assistant' }));
-
-      // Replace messages in store — full swap, no merge
-      useChatStore.getState().setMessages(sessionId, newMessages, 'compact-reload');
+      const newMessages = hydrateConversationSnapshot({
+        sessionId,
+        persistedMessages: conv.messages.map(sanitizePersistedMessage),
+        sessionUsage: sanitizeSessionUsage(conv.sessionUsage),
+        scrollIntent: 'compact-reload',
+        source: 'event-load',
+        title: conv.title,
+      });
       logger.info(
         `Compact reload: replaced ${String(newMessages.length)} messages for ${sessionId}`
       );
@@ -1179,8 +1270,11 @@ class ChatMessageService {
       }
 
       startTransition(() => {
+        const persistedMessages = message.messages.map((entry) => sanitizePersistedMessage(entry));
+        const sessionUsage = sanitizeSessionUsage(message.session_usage);
+
         // Prepare new messages (filter system messages, extract active chain)
-        const allBackendMessages = message.messages
+        const allBackendMessages = persistedMessages
           .filter(
             (m): m is typeof m & { role: 'user' | 'assistant' } =>
               m.role === 'user' || m.role === 'assistant'
@@ -1254,77 +1348,18 @@ class ChatMessageService {
           }
         }
 
-        const activeChainIds = new Set(backendMessages.map((m) => m.id));
-
-        // Restore session usage
-        if (message.session_usage) {
-          const processedMessageIds = collectUsageMessageIds(message.messages);
-          useToolStore
-            .getState()
-            .restoreSessionUsage(
-              message.session_id,
-              toContextUsage(message.session_usage),
-              processedMessageIds.length > 0 ? processedMessageIds : undefined
-            );
-        } else if (message.messages.length > 0) {
-          // Fallback: sum per-message usage from JSONL
-          const seenIds = new Set<string>();
-          const processedMessageIds: string[] = [];
-          const cumulativeUsage = message.messages
-            .filter((m) => activeChainIds.has(m.id))
-            .reduce(
-              (acc, m) => {
-                if (m.usage && !seenIds.has(m.id)) {
-                  seenIds.add(m.id);
-                  processedMessageIds.push(m.id);
-                  return {
-                    inputTokens: acc.inputTokens + m.usage.inputTokens,
-                    outputTokens: acc.outputTokens + m.usage.outputTokens,
-                    cacheReadInputTokens:
-                      acc.cacheReadInputTokens + (m.usage.cacheReadInputTokens ?? 0),
-                    cacheCreationInputTokens:
-                      acc.cacheCreationInputTokens + (m.usage.cacheCreationInputTokens ?? 0),
-                    totalCostUsd: acc.totalCostUsd + (m.usage.totalCostUsd ?? 0),
-                  };
-                }
-                return acc;
-              },
-              {
-                inputTokens: 0,
-                outputTokens: 0,
-                cacheReadInputTokens: 0,
-                cacheCreationInputTokens: 0,
-                totalCostUsd: 0,
-              }
-            );
-
-          if (processedMessageIds.length > 0) {
-            useToolStore
-              .getState()
-              .restoreSessionUsage(message.session_id, cumulativeUsage, processedMessageIds);
-          }
-        }
-
-        // Write messages to store.
-        // Initial load (wasHydrated=false): use session-restore to scroll to bottom.
-        // Refresh (wasHydrated=true): use session-refresh to preserve scroll position.
-        // NOTE: history-load is reserved for explicit "load older messages" actions
-        // and scrolls to the TOP — not appropriate for session switching.
+        const preferredTitle = getPreferredTitle(message.session_id);
         const scrollIntent = wasHydrated ? 'session-refresh' : 'session-restore';
-        logger.debug(
-          `conversation:loaded setMessages: session=${message.session_id.slice(-6)}, intent=${scrollIntent}, msgCount=${String(newMessages.length)}, wasHydrated=${String(wasHydrated)}, isStale=${String(isStaleNavigation)}`
-        );
-        useChatStore.getState().setMessages(message.session_id, newMessages, scrollIntent);
-        useChatStore.getState().markSessionHydrated(message.session_id);
-
-        // Count messages with tools for diagnostic logging
-        const messagesWithTools = message.messages.filter(
-          (m) => activeChainIds.has(m.id) && m.toolUses.length > 0
-        );
-        const totalToolUses = messagesWithTools.reduce((acc, m) => acc + m.toolUses.length, 0);
-        logger.debug(
-          `conversation:loaded tool restoration: session=${message.session_id}, messages=${String(newMessages.length)}, msgsWithTools=${String(messagesWithTools.length)}, totalToolUses=${String(totalToolUses)}, isStale=${String(isStaleNavigation)}`
-        );
+        const hydratedMessages = hydrateConversationSnapshot({
+          sessionId: message.session_id,
+          persistedMessages,
+          sessionUsage,
+          scrollIntent,
+          cachedMessages: cachedMessages ?? undefined,
+          resolvedMessages: newMessages,
+          source: 'event-load',
+          title: preferredTitle ?? message.title,
+        });
 
         // Only switch active session if this load is for the currently active session
         // (data refresh or initial mount). Skip if the user navigated to a different
@@ -1332,37 +1367,14 @@ class ChatMessageService {
         // handleLoadConversation sets activeSession immediately on sidebar click,
         // so this guard won't break sidebar navigation.
         if (!isStaleNavigation) {
-          const preferredTitle = getPreferredTitle(message.session_id);
           useChatStore.getState().setActiveSession(message.session_id);
           useUIStore
             .getState()
             .setActiveConversation(message.session_id, preferredTitle ?? message.title);
-          useToolStore.getState().switchSession(message.session_id);
         }
 
-        // Restore tool executions for active chain
-        for (const m of message.messages) {
-          if (activeChainIds.has(m.id) && m.toolUses.length > 0) {
-            useToolStore.getState().restoreToolsForMessage(
-              m.id,
-              m.toolUses.map((t) => ({
-                id: t.id,
-                name: t.name,
-                input: t.input,
-                success: t.success,
-                ...(t.output !== undefined ? { output: t.output } : {}),
-                ...(t.contentOffset !== undefined ? { contentOffset: t.contentOffset } : {}),
-                ...(t.ordinal !== undefined ? { ordinal: t.ordinal } : {}),
-              })),
-              message.session_id
-            );
-          }
-        }
-
-        // Log final tool state after restoration
-        const finalToolState = useToolStore.getState();
         logger.debug(
-          `conversation:loaded COMPLETE: completedTools=${String(finalToolState.completedTools.length)}, currentSession=${String(finalToolState.currentSessionId)}`
+          `conversation:loaded COMPLETE: session=${message.session_id.slice(-6)}, intent=${scrollIntent}, msgCount=${String(hydratedMessages.length)}, wasHydrated=${String(wasHydrated)}, isStale=${String(isStaleNavigation)}`
         );
       });
     }, 0);
@@ -1380,9 +1392,19 @@ class ChatMessageService {
 
     // Bump rewind epoch so in-flight conversation:loaded is skipped
     useChatStore.getState().bumpRewindEpoch();
+    markConversationDirty(message.session_id);
+    if (message.new_session_id !== message.session_id) {
+      markConversationDirty(message.new_session_id);
+    }
 
     // Prepare rewound messages
-    const rewoundMessages: ChatMessage[] = message.messages.map((m) => mapPersistedMessage(m));
+    const rewoundMessages: ChatMessage[] = message.messages.map((messageEntry) => {
+      const sanitized = sanitizePersistedMessage(messageEntry);
+      return mapPersistedMessage({
+        ...sanitized,
+        role: messageEntry.role,
+      });
+    });
 
     const isSameSession = message.new_session_id === message.session_id;
 

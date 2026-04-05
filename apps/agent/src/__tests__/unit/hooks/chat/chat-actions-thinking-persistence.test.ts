@@ -1,15 +1,19 @@
 import type { ChatMessage } from '@/components/chat';
 
-const { mockConversationAddMessage, mockConversationList, mockConversationLoad } = vi.hoisted(
-  () => ({
-    mockConversationAddMessage: vi.fn<
-      [string, Record<string, unknown>, string | undefined, string | undefined],
-      Promise<void>
-    >(),
-    mockConversationList: vi.fn<[], Promise<unknown[]>>(),
-    mockConversationLoad: vi.fn<[], Promise<null>>(),
-  })
-);
+const {
+  mockAppendMessageToConversationCache,
+  mockConversationAddMessage,
+  mockConversationList,
+  mockConversationLoad,
+} = vi.hoisted(() => ({
+  mockAppendMessageToConversationCache: vi.fn<(sessionId: string, message: unknown) => void>(),
+  mockConversationAddMessage: vi.fn<
+    [string, Record<string, unknown>, string | undefined, string | undefined],
+    Promise<void>
+  >(),
+  mockConversationList: vi.fn<[], Promise<unknown[]>>(),
+  mockConversationLoad: vi.fn<[], Promise<null>>(),
+}));
 
 vi.mock('@sentry/react', () => ({
   startSpan: (_options: unknown, callback: () => void) => {
@@ -21,6 +25,11 @@ vi.mock('@/lib/api', () => ({
   conversationAddMessage: mockConversationAddMessage,
   conversationList: mockConversationList,
   conversationLoad: mockConversationLoad,
+}));
+
+vi.mock('@/lib/query', () => ({
+  appendMessageToConversationCache: mockAppendMessageToConversationCache,
+  markConversationDirty: vi.fn(),
 }));
 
 vi.mock('@/services/chat/image-attachment-cache', () => ({
@@ -156,6 +165,13 @@ describe('chat-actions thinking persistence', () => {
       '/workspace',
       '/workspace/worktree'
     );
+    expect(mockAppendMessageToConversationCache).toHaveBeenCalledWith(
+      sessionId,
+      expect.objectContaining({
+        id: 'assistant-1',
+        role: 'assistant',
+      })
+    );
 
     const interruptedMessage = useChatStore.getState().sessions[sessionId]?.messages.at(-1);
     expect(interruptedMessage).toMatchObject({
@@ -221,6 +237,13 @@ describe('chat-actions thinking persistence', () => {
       }),
       '/workspace',
       '/workspace/worktree'
+    );
+    expect(mockAppendMessageToConversationCache).toHaveBeenCalledWith(
+      sessionId,
+      expect.objectContaining({
+        id: 'assistant-1',
+        role: 'assistant',
+      })
     );
 
     const interruptedMessage = useChatStore.getState().sessions[sessionId]?.messages.at(-1);

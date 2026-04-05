@@ -4,14 +4,51 @@ import { startTransition } from 'react';
 import { claudeConversationRepo } from './claude-conversation-repo';
 
 import type { ConversationListContext, ConversationUiBridge } from './types';
+import type { ConversationDetailResult } from '@/lib/query/conversation-detail';
 
+import {
+  getFreshConversationDetail,
+  loadConversationDetailFresh,
+} from '@/lib/query/conversation-detail';
+import {
+  getConversationGeneration,
+  getWorkspaceEpoch,
+  markConversationTitleDirty,
+  removeConversationCache,
+} from '@/lib/query/conversation-detail-cache';
+import { queryClient } from '@/lib/query/query-client';
+import { queryKeys } from '@/lib/query/query-keys';
+import { hydrateConversationSnapshot } from '@/services/chat/hydrate-conversation-snapshot';
 import { applyManualSessionTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
+import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('UiBridge');
+
+type RevealableConversationDetail = Exclude<ConversationDetailResult, { kind: 'error' }>;
+
+function isRevealableConversationDetail(value: unknown): value is RevealableConversationDetail {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as {
+    kind?: unknown;
+    conversation?: unknown;
+  };
+  if (candidate.kind !== 'data' && candidate.kind !== 'empty') {
+    return false;
+  }
+  if (candidate.conversation === null || typeof candidate.conversation !== 'object') {
+    return false;
+  }
+
+  const conversation = candidate.conversation as { title?: unknown };
+  return typeof conversation.title === 'string';
+}
 
 export const claudeUiBridge: ConversationUiBridge = {
   getActiveSessionId(): string | null {
@@ -53,6 +90,94 @@ export const claudeUiBridge: ConversationUiBridge = {
       uiState.setConversationTransitioning(false);
       logger.debug(`[${sid}] Hydrated instant switch (no load)`);
       return;
+    }
+
+    const freshResultValue = getFreshConversationDetail(sessionId) as unknown;
+    const freshResult = isRevealableConversationDetail(freshResultValue) ? freshResultValue : null;
+    if (freshResult) {
+      uiState.setActiveConversation(sessionId, title ?? freshResult.conversation.title);
+      chatStore.setActiveSession(sessionId);
+      chatStore.markSessionLoaded(sessionId);
+      useFileStore.getState().switchSession(sessionId);
+
+      if (freshResult.kind === 'data') {
+        hydrateConversationSnapshot({
+          sessionId,
+          persistedMessages: freshResult.conversation.messages,
+          sessionUsage: freshResult.conversation.sessionUsage,
+          scrollIntent: 'session-restore',
+          source: 'query-fast-path',
+          title: title ?? freshResult.conversation.title,
+        });
+      } else {
+        chatStore.setMessages(sessionId, [], 'session-restore');
+        chatStore.markSessionHydrated(sessionId);
+        chatStore.markSessionLoaded(sessionId);
+        chatStore.bumpConversationLoadEpoch();
+        useToolStore.getState().switchSession(sessionId);
+      }
+
+      uiState.setLoadingConversation(false);
+      uiState.setConversationTransitioning(false);
+      logger.debug(`[${sid}] FAST PATH: ${freshResult.kind}`);
+      return;
+    }
+
+    const queryState = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
+    if (queryState?.fetchStatus === 'fetching') {
+      uiState.setLoadingConversation(true);
+      uiState.setConversationTransitioning(true);
+      uiState.setActiveConversation(sessionId, title);
+      useMessageBufferStore.getState().markLoadPending(sessionId);
+      chatStore.setActiveSession(sessionId);
+      useFileStore.getState().switchSession(sessionId);
+
+      const epochBefore = getWorkspaceEpoch();
+      const generationBefore = getConversationGeneration(sessionId);
+      const result = await loadConversationDetailFresh(sessionId);
+      const epochAfter = getWorkspaceEpoch();
+      const generationAfter = getConversationGeneration(sessionId);
+
+      if (epochBefore !== epochAfter || generationBefore !== generationAfter) {
+        useMessageBufferStore.getState().clearLoadPending(sessionId);
+        uiState.setLoadingConversation(false);
+        uiState.setConversationTransitioning(false);
+        logger.debug(`[${sid}] JOIN PATH: stale, aborting`);
+        return;
+      }
+
+      if (result.kind === 'data') {
+        chatStore.markSessionLoaded(sessionId);
+        useMessageBufferStore.getState().clearLoadPending(sessionId);
+        hydrateConversationSnapshot({
+          sessionId,
+          persistedMessages: result.conversation.messages,
+          sessionUsage: result.conversation.sessionUsage,
+          scrollIntent: 'session-restore',
+          source: 'query-fast-path',
+          title: title ?? result.conversation.title,
+        });
+        uiState.setLoadingConversation(false);
+        uiState.setConversationTransitioning(false);
+        logger.debug(`[${sid}] JOIN PATH: data`);
+        return;
+      }
+
+      if (result.kind === 'empty') {
+        chatStore.setMessages(sessionId, [], 'session-restore');
+        chatStore.markSessionHydrated(sessionId);
+        chatStore.markSessionLoaded(sessionId);
+        chatStore.bumpConversationLoadEpoch();
+        useToolStore.getState().switchSession(sessionId);
+        useMessageBufferStore.getState().clearLoadPending(sessionId);
+        uiState.setLoadingConversation(false);
+        uiState.setConversationTransitioning(false);
+        logger.debug(`[${sid}] JOIN PATH: empty`);
+        return;
+      }
+
+      useMessageBufferStore.getState().clearLoadPending(sessionId);
+      logger.debug(`[${sid}] JOIN PATH: loader error, falling through`);
     }
 
     // First visit: SessionInstance handles per-instance stabilization.
@@ -116,9 +241,11 @@ export const claudeUiBridge: ConversationUiBridge = {
   async rename(sessionId, title): Promise<void> {
     await applyManualSessionTitle(sessionId, title);
     await claudeConversationRepo.updateTitle(sessionId, title);
+    markConversationTitleDirty(sessionId);
   },
 
   async remove(sessionId): Promise<void> {
+    await removeConversationCache(sessionId);
     useUIStore.getState().removeConversation(sessionId);
     await claudeConversationRepo.remove(sessionId);
   },

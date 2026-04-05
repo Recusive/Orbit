@@ -32,13 +32,21 @@ const SpanStatusCode = {
 export const logger = createLogger('Backend');
 export const IS_TAURI = typeof window !== 'undefined' && '__TAURI__' in window;
 
+function createAbortError(): DOMException {
+  return new DOMException('Aborted', 'AbortError');
+}
+
 /**
  * Invoke a Tauri command with automatic Sentry span instrumentation.
  *
  * Each invocation creates a span under the `tauri.invoke` operation,
  * allowing performance monitoring of all backend calls.
  */
-export async function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+export async function invoke<T>(
+  command: string,
+  args?: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<T> {
   if (!IS_TAURI) {
     // Mock mode for browser development
     logger.debug(`Mock invoke: ${command}`, args);
@@ -58,9 +66,34 @@ export async function invoke<T>(command: string, args?: Record<string, unknown>)
     async (span) => {
       try {
         const { invoke: tauriInvoke } = await import('@tauri-apps/api/core');
-        const result = await tauriInvoke<T>(command, args);
-        span.setStatus({ code: SpanStatusCode.OK });
-        return result;
+        const invokePromise = tauriInvoke<T>(command, args);
+
+        if (!signal) {
+          const result = await invokePromise;
+          span.setStatus({ code: SpanStatusCode.OK });
+          return result;
+        }
+
+        if (signal.aborted) {
+          throw createAbortError();
+        }
+
+        let rejectAbort: ((reason: DOMException) => void) | null = null;
+        const abortPromise = new Promise<never>((_, reject) => {
+          rejectAbort = reject;
+        });
+        const onAbort = (): void => {
+          rejectAbort?.(createAbortError());
+        };
+
+        signal.addEventListener('abort', onAbort, { once: true });
+        try {
+          const racedResult = await Promise.race([invokePromise, abortPromise]);
+          span.setStatus({ code: SpanStatusCode.OK });
+          return racedResult;
+        } finally {
+          signal.removeEventListener('abort', onAbort);
+        }
       } catch (error) {
         span.setStatus({
           code: SpanStatusCode.ERROR,

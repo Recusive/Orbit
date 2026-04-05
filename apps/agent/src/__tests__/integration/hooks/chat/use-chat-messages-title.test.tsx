@@ -1,6 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 
 const {
+  mockAppendMessageToConversationCache,
   mockApplySessionTitle,
   mockCacheAttachedImagesForMessage,
   mockConversationAddMessage,
@@ -9,6 +10,7 @@ const {
   mockGenerateFallbackTitle,
   mockPostMessage,
 } = vi.hoisted(() => ({
+  mockAppendMessageToConversationCache: vi.fn<(sessionId: string, message: unknown) => void>(),
   mockApplySessionTitle: vi.fn<(sessionId: string, title: string) => void>(),
   mockCacheAttachedImagesForMessage: vi.fn<(sessionId: string, messageId: string) => void>(),
   mockConversationAddMessage: vi.fn<
@@ -32,6 +34,11 @@ vi.mock('@/hooks/agent/use-tauri', () => ({
 vi.mock('@/lib/api', () => ({
   conversationAddMessage: mockConversationAddMessage,
   conversationLoad: mockConversationLoad,
+}));
+
+vi.mock('@/lib/query', () => ({
+  appendMessageToConversationCache: mockAppendMessageToConversationCache,
+  markConversationDirty: vi.fn(),
 }));
 
 vi.mock('@/services/session', () => ({
@@ -104,6 +111,13 @@ describe('new conversation title generation', () => {
     });
 
     expect(mockGenerateAITitle).toHaveBeenCalledWith('new-session', 'help me debug');
+    expect(mockAppendMessageToConversationCache).toHaveBeenCalledWith(
+      'new-session',
+      expect.objectContaining({
+        role: 'user',
+        content: 'help me debug',
+      })
+    );
   });
 
   it('uses the image conversation fallback when the pending message has no text', async () => {

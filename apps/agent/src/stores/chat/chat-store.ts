@@ -21,6 +21,8 @@ import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 
+import { removeRenderCache, saveRenderCache } from './render-cache-store';
+
 import type { ChatMessage } from '@/components/chat';
 import type { ImageAttachment } from '@/components/chat/input';
 import type { ReactElementContext } from '@/types/protocol';
@@ -238,6 +240,9 @@ function evictIfNeeded(
 
     // Evict: clear messages but keep key for state tracking
     if (session) {
+      if (session.virtuosoSizeCache) {
+        saveRenderCache(candidate, session.virtuosoSizeCache);
+      }
       session.messages = [];
       session.hydrationState = 'unloaded';
       session.virtuosoSizeCache = null;
@@ -578,6 +583,7 @@ export const useChatStore = create<ChatStoreState>()(
             draft.activeSessionId = null;
           }
         });
+        removeRenderCache(id);
       },
 
       bumpRewindEpoch: (): number => {

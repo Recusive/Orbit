@@ -1,6 +1,7 @@
 import type { ChatMessage } from '@/components/chat/messages/types';
 
 import { useChatStore } from '@/stores/chat/chat-store';
+import { getRenderCache, removeRenderCache } from '@/stores/chat/render-cache-store';
 
 function resetChatStore(): void {
   useChatStore.setState({
@@ -15,6 +16,9 @@ function resetChatStore(): void {
     activeCompactions: {},
     lruOrder: [],
   });
+  removeRenderCache('session-1');
+  removeRenderCache('session-old');
+  removeRenderCache('session-new');
 }
 
 function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
@@ -118,5 +122,26 @@ describe('ChatStore virtuoso size cache', () => {
 
     expect(useChatStore.getState().sessions['session-1']?.messages).toEqual([]);
     expect(useChatStore.getState().sessions['session-1']?.virtuosoSizeCache).toBeNull();
+    expect(getRenderCache('session-1')).toEqual({
+      ranges: [{ k: 0, v: 120 }],
+      messageCount: 1,
+      lastMessageId: 'message-1',
+      layoutVersion: 1,
+    });
+  });
+
+  it('removes the persistent render cache when the session is destroyed', () => {
+    const store = useChatStore.getState();
+    store.getOrCreateSession('session-1');
+    store.setVirtuosoSizeCache('session-1', {
+      ranges: [{ k: 0, v: 120 }],
+      messageCount: 1,
+      lastMessageId: 'message-1',
+      layoutVersion: 0,
+    });
+
+    store.destroySession('session-1');
+
+    expect(getRenderCache('session-1')).toBeNull();
   });
 });

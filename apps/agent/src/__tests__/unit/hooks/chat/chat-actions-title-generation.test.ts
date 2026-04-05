@@ -1,10 +1,12 @@
 const {
+  mockAppendMessageToConversationCache,
   mockApplySessionTitle,
   mockCacheAttachedImagesForMessage,
   mockConversationAddMessage,
   mockGenerateAITitle,
   mockGenerateFallbackTitle,
 } = vi.hoisted(() => ({
+  mockAppendMessageToConversationCache: vi.fn<(sessionId: string, message: unknown) => void>(),
   mockApplySessionTitle: vi.fn<(sessionId: string, title: string) => void>(),
   mockCacheAttachedImagesForMessage: vi.fn<(sessionId: string, messageId: string) => void>(),
   mockConversationAddMessage: vi.fn<
@@ -23,6 +25,11 @@ vi.mock('@sentry/react', () => ({
 
 vi.mock('@/lib/api', () => ({
   conversationAddMessage: mockConversationAddMessage,
+}));
+
+vi.mock('@/lib/query', () => ({
+  appendMessageToConversationCache: mockAppendMessageToConversationCache,
+  markConversationDirty: vi.fn(),
 }));
 
 vi.mock('@/services/session', () => ({
@@ -127,6 +134,13 @@ describe('send-time title generation', () => {
 
     expect(mockApplySessionTitle).toHaveBeenCalledWith(sessionId, 'Fallback: help me debug');
     expect(mockGenerateAITitle).toHaveBeenCalledWith(sessionId, 'help me debug');
+    expect(mockAppendMessageToConversationCache).toHaveBeenCalledWith(
+      sessionId,
+      expect.objectContaining({
+        role: 'user',
+        content: 'help me debug',
+      })
+    );
   });
 
   it('does not trigger AI title generation on the second message', () => {

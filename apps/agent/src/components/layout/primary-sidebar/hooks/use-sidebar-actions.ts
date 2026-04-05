@@ -9,6 +9,7 @@ import type { WorktreeInfo } from '@/lib/api';
 import type { ConversationSummary, WorktreeUIState } from '@/stores/ui/ui-store';
 
 import { gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
+import { invalidateAllConversationCaches } from '@/lib/query';
 import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
 import { getConversationUiBridge } from '@/services/conversations';
 import { clearSessionTitleState } from '@/services/session';
@@ -165,6 +166,7 @@ export const useSidebarActions = ({
       if (worktreeList.length === 0) {
         const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
         if (currentActiveWorktree !== null) {
+          await invalidateAllConversationCaches();
           switchToWorktree(null);
           useChatStore.getState().clearActiveSession();
         }
@@ -190,15 +192,18 @@ export const useSidebarActions = ({
             stale: currentActiveWorktree,
             newPath: fallbackWorktree.path,
           });
+          await invalidateAllConversationCaches();
           switchToWorktree(fallbackWorktree.path);
         } else {
           // No worktrees available - clear the active path
+          await invalidateAllConversationCaches();
           switchToWorktree(null);
         }
         useChatStore.getState().clearActiveSession();
       } else {
         const currentWorkspace = useUIStore.getState().workspacePath;
         if (currentActiveWorktree && currentWorkspace !== currentActiveWorktree) {
+          await invalidateAllConversationCaches();
           switchToWorktree(currentActiveWorktree);
         }
       }
@@ -209,6 +214,7 @@ export const useSidebarActions = ({
       const current = useUIStore.getState().activeWorktreePath;
       const root = useUIStore.getState().repoRootPath;
       if (current !== null && current !== root) {
+        await invalidateAllConversationCaches();
         switchToWorktree(null);
         useChatStore.getState().clearActiveSession();
       }
@@ -289,6 +295,9 @@ export const useSidebarActions = ({
           deleteBranch
         );
 
+        if (useUIStore.getState().activeWorktreePath === deletingWorktree.path) {
+          await invalidateAllConversationCaches();
+        }
         removeWorktree(deletingWorktree.path);
         useChatStore.getState().clearActiveSession();
         logger.info('Removed worktree', {
