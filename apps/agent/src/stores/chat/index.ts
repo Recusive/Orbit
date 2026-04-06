@@ -24,6 +24,7 @@ export {
   usePendingConversationTitle,
   usePendingSessionId,
   usePendingSessionPhase,
+  usePreMountSessionId,
   useSessionSwitchRequestId,
   useSessionSwitchStore,
 } from './session-switch-store';

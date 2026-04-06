@@ -31,6 +31,7 @@ export interface ConversationItemProps {
   readonly onClick?: () => void;
   readonly onDoubleClick?: () => void;
   readonly onPrefetch?: () => void;
+  readonly onCancelPrefetch?: () => void;
   readonly onRename?: (newTitle: string) => void;
   readonly onCancelEdit?: () => void;
   readonly onDelete?: () => void;

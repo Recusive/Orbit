@@ -127,6 +127,7 @@ describe('ChatStore virtuoso size cache', () => {
       messageCount: 1,
       lastMessageId: 'message-1',
       layoutVersion: 1,
+      viewportWidth: null,
     });
   });
 

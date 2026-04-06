@@ -17,6 +17,7 @@ describe('ConversationList prefetch wiring', () => {
   it('prefetches on hover and keyboard focus without changing click behavior', () => {
     const onLoadConversation = vi.fn();
     const onPrefetchConversation = vi.fn();
+    const onCancelPrefetchConversation = vi.fn();
 
     render(
       <ConversationList
@@ -33,6 +34,7 @@ describe('ConversationList prefetch wiring', () => {
         editingConversationId={null}
         onLoadConversation={onLoadConversation}
         onPrefetchConversation={onPrefetchConversation}
+        onCancelPrefetchConversation={onCancelPrefetchConversation}
         onStartEditConversation={vi.fn()}
         onRenameConversation={vi.fn()}
         onCancelEditConversation={vi.fn()}
@@ -48,6 +50,12 @@ describe('ConversationList prefetch wiring', () => {
 
     fireEvent.focus(button);
     expect(onPrefetchConversation).toHaveBeenCalledTimes(2);
+
+    fireEvent.pointerLeave(button);
+    expect(onCancelPrefetchConversation).toHaveBeenCalledWith('session-1');
+
+    fireEvent.blur(button);
+    expect(onCancelPrefetchConversation).toHaveBeenCalledTimes(2);
 
     fireEvent.click(button);
     expect(onLoadConversation).toHaveBeenCalledWith('session-1');

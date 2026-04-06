@@ -68,6 +68,8 @@ export interface VirtuosoSizeCache {
   lastMessageId: string | null;
   /** Monotonic counter bumped on every height-affecting mutation. */
   layoutVersion: number;
+  /** Width of the chat scroller when the cache was captured. */
+  viewportWidth?: number | null;
 }
 
 export type ScrollIntent =
@@ -433,6 +435,13 @@ export const useChatStore = create<ChatStoreState>()(
             session.virtuosoSizeCache = cache;
           }
         });
+
+        if (cache) {
+          saveRenderCache(id, cache);
+          return;
+        }
+
+        removeRenderCache(id);
       },
 
       clearVirtuosoSizeCache: (id: string): void => {
@@ -442,6 +451,8 @@ export const useChatStore = create<ChatStoreState>()(
             session.virtuosoSizeCache = null;
           }
         });
+
+        removeRenderCache(id);
       },
 
       bumpLayoutVersion: (id: string): void => {

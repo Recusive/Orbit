@@ -4,6 +4,7 @@ import type { ChatRenderRow } from '@/components/chat/chat-messages';
 import type { ChatMessage } from '@/components/chat/messages/types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
+import type { RenderCachePersistenceAdapter } from '@/stores/chat/render-cache-store';
 import type { ComponentProps, ReactNode } from 'react';
 
 const {
@@ -295,7 +296,12 @@ import { ChatMessages } from '@/components/chat/chat-messages';
 import { clearToolWidgetState } from '@/components/chat/tools/shared';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
-import { removeRenderCache, saveRenderCache } from '@/stores/chat/render-cache-store';
+import {
+  removeRenderCache,
+  resetRenderCacheStoreForTests,
+  saveRenderCache,
+  setRenderCachePersistenceAdapterForTests,
+} from '@/stores/chat/render-cache-store';
 
 function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -333,6 +339,25 @@ function buildTool(overrides: Partial<ToolExecution> = {}): ToolExecution {
   }
 
   return tool;
+}
+
+function createPersistenceAdapter(
+  initialEntries: Record<string, unknown>
+): RenderCachePersistenceAdapter {
+  const entries = new Map<string, unknown>(Object.entries(initialEntries));
+
+  return {
+    load: (sessionId) => Promise.resolve(entries.get(sessionId) ?? null),
+    loadAll: () => Promise.resolve([...entries.values()]),
+    save: (sessionId, entry) => {
+      entries.set(sessionId, structuredClone(entry));
+      return Promise.resolve();
+    },
+    remove: (sessionId) => {
+      entries.delete(sessionId);
+      return Promise.resolve();
+    },
+  };
 }
 
 function buildRenderRows(
@@ -476,6 +501,8 @@ describe('ChatMessages', () => {
   beforeEach(() => {
     useToolStore.getState().reset();
     useChatStore.setState(useChatStore.getInitialState(), true);
+    setRenderCachePersistenceAdapterForTests(null);
+    resetRenderCacheStoreForTests();
     removeRenderCache('session-a');
     clearToolWidgetState();
     messageItemPropsById.clear();
@@ -517,6 +544,8 @@ describe('ChatMessages', () => {
 
   afterEach(() => {
     removeRenderCache('session-a');
+    setRenderCachePersistenceAdapterForTests(null);
+    resetRenderCacheStoreForTests();
     vi.restoreAllMocks();
   });
 
@@ -821,16 +850,59 @@ describe('ChatMessages', () => {
         await vi.advanceTimersByTimeAsync(180);
       });
 
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(40);
-      });
-
       expect(onVerificationResult).toHaveBeenCalledTimes(1);
       expect(onVerificationResult).toHaveBeenCalledWith({
         phase: 'visible',
         result: 'visible-ready',
+        tailProofVersion: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('marks hidden verification ready after one animation frame when a restored cache stays stable', async () => {
+    vi.useFakeTimers();
+
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      buildMessage({ id: 'assistant-3', role: 'assistant' }),
+    ];
+
+    try {
+      mockScrollerElement.clientHeight = 800;
+      mockScrollerElement.scrollHeight = 1200;
+      mockScrollerElement.scrollTop = 400;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+
+      const chatStore = useChatStore.getState();
+      chatStore.getOrCreateSession('session-a');
+      chatStore.setMessages('session-a', messages, 'session-restore');
+      chatStore.setVirtuosoSizeCache('session-a', {
+        ranges: [{ k: 0, v: 120 }],
+        messageCount: messages.length,
+        lastMessageId: 'assistant-3',
+        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+      });
+
+      const onVerificationResult = vi.fn();
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        verificationPhase: 'hidden',
+        verificationKey: 'hidden-cache-match-instant',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'hidden',
+        result: 'hidden-ready',
         tailProofVersion: 1,
       });
     } finally {
@@ -1711,6 +1783,91 @@ describe('ChatMessages', () => {
     });
 
     expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 96 }]);
+  });
+
+  it('applies estimated size ranges when no real cache is available', () => {
+    const messages = [
+      buildMessage({ id: 'user-1', role: 'user', content: 'short prompt' }),
+      buildMessage({
+        id: 'assistant-2',
+        role: 'assistant',
+        content:
+          'A longer assistant reply that should produce a larger estimated height than the user prompt.',
+      }),
+    ];
+
+    useChatStore.setState({
+      sessions: {
+        'session-a': {
+          messages,
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
+        },
+      },
+    });
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
+
+    expect(setSizeRangesMock).toHaveBeenCalled();
+    const estimatedRanges = setSizeRangesMock.mock.calls[0]?.[0] as
+      | { k: number; v: number }[]
+      | undefined;
+    expect(estimatedRanges?.[0]?.k).toBe(0);
+    expect(estimatedRanges?.[0]?.v).toBeGreaterThan(0);
+  });
+
+  it('restores persistent size ranges asynchronously when startup warmup misses the first pass', async () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+
+    setRenderCachePersistenceAdapterForTests(
+      createPersistenceAdapter({
+        'session-a': {
+          sessionId: 'session-a',
+          schemaVersion: 1,
+          accessedAt: Date.now(),
+          cache: {
+            ranges: [{ k: 0, v: 96 }],
+            messageCount: messages.length,
+            lastMessageId: 'assistant-2',
+            layoutVersion: 0,
+            viewportWidth: null,
+          },
+        },
+      })
+    );
+
+    useChatStore.setState({
+      sessions: {
+        'session-a': {
+          messages,
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          virtuosoSizeCache: null,
+        },
+      },
+    });
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+    });
+
+    await waitFor(() => {
+      expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 96 }]);
+    });
   });
 
   it('does not snapshot size ranges when the session stops priming before ready', () => {

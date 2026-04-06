@@ -244,7 +244,36 @@ export function hydrateConversationSnapshot(
   restoreSessionUsage(input.sessionId, input.persistedMessages, activeChainIds, input.sessionUsage);
 
   const chatStore = useChatStore.getState();
-  chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
+  const existingSession = chatStore.sessions[input.sessionId];
+
+  // Detect layout-equivalent rehydration: if the session already has the same
+  // messages with identical height-affecting fields, skip setMessages() to
+  // preserve layoutVersion. This prevents the Virtuoso size cache from being
+  // invalidated on warm revisits where the data hasn't actually changed.
+  // Compares IDs, content length, thinking presence, and image count — all
+  // fields that affect rendered row height.
+  const isLayoutEquivalent =
+    existingSession?.hydrationState === 'hydrated' &&
+    existingSession.messages.length === messages.length &&
+    existingSession.messages.length > 0 &&
+    existingSession.messages.every((existing, i) => {
+      const incoming = messages[i];
+      if (existing.id !== incoming?.id) return false;
+      if (existing.content.length !== incoming.content.length) return false;
+      if ((existing.thinking ?? '').length !== (incoming.thinking ?? '').length) return false;
+      if ((existing.thinkingBlocks?.length ?? 0) !== (incoming.thinkingBlocks?.length ?? 0))
+        return false;
+      if ((existing.attachedImages?.length ?? 0) !== (incoming.attachedImages?.length ?? 0))
+        return false;
+      return true;
+    });
+
+  if (isLayoutEquivalent) {
+    chatStore.setScrollIntent(input.sessionId, input.scrollIntent);
+  } else {
+    chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
+  }
+
   chatStore.markSessionHydrated(input.sessionId);
   chatStore.markSessionLoaded(input.sessionId);
   chatStore.bumpConversationLoadEpoch();

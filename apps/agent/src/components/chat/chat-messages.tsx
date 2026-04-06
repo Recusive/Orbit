@@ -26,6 +26,7 @@ import { ToolWidgetLayoutFrozenContext, ToolWidgetSessionContext } from './tools
 import type { ChatMessage } from './messages';
 import type { SessionSwitchTraceGeometry } from '@/services/conversations/session-switch-trace';
 import type { ToolExecution } from '@/stores/agent/tool-store';
+import type { VirtuosoSizeCache } from '@/stores/chat/chat-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type {
   DataWithScrollModifier,
@@ -53,7 +54,7 @@ import {
   useSessionLayoutPendingCount,
   useSessionLayoutSettledVersion,
 } from '@/stores/chat/chat-store';
-import { getRenderCache } from '@/stores/chat/render-cache-store';
+import { getRenderCache, getRenderCacheAsync } from '@/stores/chat/render-cache-store';
 import { useSessionSwitchRequestId } from '@/stores/chat/session-switch-store';
 
 /** Constant empty array — prevents a new [] allocation per no-tool message
@@ -70,6 +71,17 @@ const VISIBLE_READY_QUIET_MS = 200;
 const READY_TIMEOUT_MS = 1500;
 const BOTTOM_TOLERANCE_PX = 4;
 const POSITIONING_RECHECK_MS = 32;
+const VIEWPORT_WIDTH_TOLERANCE_PX = 16;
+const ESTIMATED_CHARS_PER_LINE = 72;
+const ESTIMATED_USER_BASE_HEIGHT = 48;
+const ESTIMATED_USER_LINE_HEIGHT = 24;
+const ESTIMATED_ASSISTANT_BASE_HEIGHT = 68;
+const ESTIMATED_ASSISTANT_LINE_HEIGHT = 22;
+const ESTIMATED_THINKING_HEIGHT = 96;
+const ESTIMATED_IMAGE_GRID_HEIGHT = 144;
+const ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT = 24;
+const ESTIMATED_COMPLEX_MARKDOWN_BONUS = 48;
+const MAX_ESTIMATED_MESSAGE_HEIGHT = 640;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
 type RestorePhase = 'idle' | 'positioning' | 'premeasuring' | 'stabilizing' | 'done';
@@ -181,6 +193,100 @@ function buildReadinessProgressSignature(input: {
     String(input.layoutSettledVersion),
     String(input.renderedCount),
   ].join('|');
+}
+
+function estimateWrappedLines(text: string, charsPerLine: number): number {
+  const lines = text.split('\n');
+  let wrappedLines = 0;
+
+  for (const line of lines) {
+    wrappedLines += Math.max(1, Math.ceil(line.length / charsPerLine));
+  }
+
+  return Math.max(1, wrappedLines);
+}
+
+function estimateMessageHeight(message: ChatMessage): number {
+  const content = message.displayedContent.length > 0 ? message.displayedContent : message.content;
+  const baseHeight =
+    message.role === 'user' ? ESTIMATED_USER_BASE_HEIGHT : ESTIMATED_ASSISTANT_BASE_HEIGHT;
+  const lineHeight =
+    message.role === 'user' ? ESTIMATED_USER_LINE_HEIGHT : ESTIMATED_ASSISTANT_LINE_HEIGHT;
+
+  let estimatedHeight =
+    baseHeight + estimateWrappedLines(content, ESTIMATED_CHARS_PER_LINE) * lineHeight;
+
+  if (
+    message.role === 'assistant' &&
+    (content.includes('```') || content.includes('|') || content.includes('!['))
+  ) {
+    estimatedHeight += ESTIMATED_COMPLEX_MARKDOWN_BONUS;
+  }
+
+  if ((message.thinkingBlocks?.length ?? 0) > 0 || message.thinking) {
+    estimatedHeight += ESTIMATED_THINKING_HEIGHT;
+  }
+
+  if ((message.attachedImages?.length ?? 0) > 0) {
+    estimatedHeight += ESTIMATED_IMAGE_GRID_HEIGHT;
+    estimatedHeight +=
+      Math.max(0, (message.attachedImages?.length ?? 1) - 1) * ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT;
+  }
+
+  return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, estimatedHeight);
+}
+
+function buildEstimatedSizeRanges(messages: ChatMessage[]): { k: number; v: number }[] {
+  const ranges: { k: number; v: number }[] = [];
+  let previousHeight: number | null = null;
+
+  messages.forEach((message, index) => {
+    const nextHeight = estimateMessageHeight(message);
+    if (previousHeight === nextHeight) {
+      return;
+    }
+
+    ranges.push({ k: index, v: nextHeight });
+    previousHeight = nextHeight;
+  });
+
+  return ranges;
+}
+
+function isViewportWidthCompatible(
+  cacheEntry: VirtuosoSizeCache,
+  viewportWidth: number | null
+): boolean {
+  if (
+    cacheEntry.viewportWidth === undefined ||
+    cacheEntry.viewportWidth === null ||
+    viewportWidth === null
+  ) {
+    return true;
+  }
+
+  return Math.abs(cacheEntry.viewportWidth - viewportWidth) <= VIEWPORT_WIDTH_TOLERANCE_PX;
+}
+
+function isUsableRenderCache(
+  session: {
+    layoutVersion: number;
+    messages: ChatMessage[];
+  },
+  cacheEntry: VirtuosoSizeCache,
+  viewportWidth: number | null
+): boolean {
+  if (cacheEntry.layoutVersion !== session.layoutVersion) {
+    return false;
+  }
+  if (cacheEntry.messageCount !== session.messages.length) {
+    return false;
+  }
+  if (cacheEntry.lastMessageId !== (session.messages.at(-1)?.id ?? null)) {
+    return false;
+  }
+
+  return isViewportWidthCompatible(cacheEntry, viewportWidth);
 }
 
 interface MessageRow {
@@ -475,6 +581,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return rows;
   }, [isVerifying, messages]);
 
+  const getCurrentViewportWidth = useCallback((): number | null => {
+    const scrollerWidth = listRef.current?.scrollerElement()?.clientWidth ?? 0;
+    if (scrollerWidth > 0) {
+      return scrollerWidth;
+    }
+
+    const containerWidth = traceRootRef.current?.clientWidth ?? 0;
+    return containerWidth > 0 ? containerWidth : null;
+  }, []);
+
   const snapshotSizeCache = useCallback((): void => {
     if (!sessionId) return;
 
@@ -490,8 +606,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       messageCount: session.messages.length,
       lastMessageId: session.messages.at(-1)?.id ?? null,
       layoutVersion: session.layoutVersion,
+      viewportWidth: getCurrentViewportWidth(),
     });
-  }, [sessionId]);
+  }, [getCurrentViewportWidth, sessionId]);
 
   const snapshotStableSizeCache = useCallback((): void => {
     if (restorePhaseRef.current !== 'done') {
@@ -509,20 +626,46 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const session = store.sessions[sessionId];
     let cache = session?.virtuosoSizeCache ?? null;
     cache ??= getRenderCache(sessionId);
-    if (!cache || !session) return;
-    if (cache.layoutVersion !== session.layoutVersion) {
-      return;
-    }
-    if (cache.messageCount !== session.messages.length) {
-      return;
-    }
-    if (cache.lastMessageId !== (session.messages.at(-1)?.id ?? null)) {
+    const viewportWidth = getCurrentViewportWidth();
+    if (cache && session && isUsableRenderCache(session, cache, viewportWidth)) {
+      listRef.current?.setSizeRanges([...cache.ranges]);
+      restoredSizeCacheRef.current = true;
       return;
     }
 
-    listRef.current?.setSizeRanges([...cache.ranges]);
-    restoredSizeCacheRef.current = true;
-  }, [sessionId]);
+    if (session && session.messages.length > 0) {
+      const estimatedRanges = buildEstimatedSizeRanges(session.messages);
+      if (estimatedRanges.length > 0) {
+        listRef.current?.setSizeRanges(estimatedRanges);
+      }
+    }
+  }, [getCurrentViewportWidth, sessionId]);
+
+  useEffect(() => {
+    if (!sessionId || restoredSizeCacheRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getRenderCacheAsync(sessionId).then((cache) => {
+      if (cancelled || restoredSizeCacheRef.current || !cache) {
+        return;
+      }
+
+      const session = useChatStore.getState().sessions[sessionId];
+      if (!session || !isUsableRenderCache(session, cache, getCurrentViewportWidth())) {
+        return;
+      }
+
+      listRef.current?.setSizeRanges([...cache.ranges]);
+      restoredSizeCacheRef.current = true;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [getCurrentViewportWidth, sessionId]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -956,7 +1099,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const signalReady = useCallback(
-    (reason: 'stabilized'): void => {
+    (reason: 'stabilized', detail?: string): void => {
       void reason;
       if (!effectiveVerificationPhase) {
         return;
@@ -968,7 +1111,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       markSwitchTimeline(
         effectiveVerificationPhase === 'hidden' ? 'hidden-ready' : 'visible-ready',
-        `stable · ${String(messages.length)} msgs`
+        `${detail ?? 'stable'} · ${String(messages.length)} msgs`
       );
       if (import.meta.env.DEV) {
         const readyMarkName = sessionKey !== '' ? `session-ready:${sessionKey}` : 'session-ready';
@@ -1190,6 +1333,41 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const scheduleHiddenVerificationCheck = useCallback((): void => {
+    // Fast path for warm instances with restored size caches.
+    // Restored cache → Virtuoso has accurate heights (no estimates).
+    // layoutPendingCount === 0 → no pending mutations.
+    // Geometry checks → tail sentinel rendered, at bottom, not placeholder.
+    // These conditions guarantee layout stability — skip the 48ms
+    // ResizeObserver quiet window entirely and signal ready immediately.
+    //
+    // The rAF two-snapshot comparison was removed because alignScrollerToBottom()
+    // (called at verification start) triggers a Virtuoso internal re-render that
+    // settles across frames, causing the two snapshots to always differ for warm
+    // instances even though the layout is genuinely stable.
+    if (
+      restoredSizeCacheRef.current &&
+      layoutPendingCount === 0 &&
+      restorePhaseRef.current === 'stabilizing' &&
+      effectiveVerificationPhase === 'hidden'
+    ) {
+      const handle = listRef.current;
+      const immediateRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const immediateMetrics = getRenderSurfaceMetrics(immediateRendered);
+      if (
+        immediateMetrics?.tailSentinelRendered === true &&
+        immediateMetrics.isAtBottom &&
+        !isHiddenPlaceholderShortSurface(immediateMetrics) &&
+        hasObservedPostProbeSurface(immediateMetrics)
+      ) {
+        hiddenCandidateSnapshotRef.current = buildReadinessSurfaceSnapshot(
+          immediateMetrics,
+          layoutSettledVersion
+        );
+        signalReady('stabilized', 'cache-match-instant');
+        return;
+      }
+    }
+
     startTemporaryResizeStabilityWindow('stabilizing', HIDDEN_READY_STABLE_MS, () => {
       if (restorePhaseRef.current !== 'stabilizing' || effectiveVerificationPhase !== 'hidden') {
         return;
@@ -1746,6 +1924,26 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     tailProofVersionRef.current = 0;
     restorePhaseRef.current = 'idle';
     restoredSizeCacheRef.current = false;
+
+    // For keep-alive instances, the cache restore useLayoutEffect (line 621)
+    // won't re-run because sessionId hasn't changed. Re-check the memory
+    // cache synchronously so the instant hidden verification fast path can
+    // fire. Only re-set the flag — don't call setSizeRanges (Virtuoso
+    // retains its internal sizes across display mode transitions).
+    if (sessionId) {
+      const reCacheSession = useChatStore.getState().sessions[sessionId];
+      if (reCacheSession) {
+        let reCache = reCacheSession.virtuosoSizeCache ?? null;
+        reCache ??= getRenderCache(sessionId);
+        if (
+          reCache !== null &&
+          isUsableRenderCache(reCacheSession, reCache, getCurrentViewportWidth())
+        ) {
+          restoredSizeCacheRef.current = true;
+        }
+      }
+    }
+
     cancelReadinessWork();
     setIsPremeasuring(false);
     setIsReadyForSteady(false);
@@ -1753,11 +1951,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, [
     cancelReadinessWork,
     emitVerificationResult,
+    getCurrentViewportWidth,
     isVerifying,
     messages.length,
     clearVisibleVerificationCandidate,
     effectiveVerificationKey,
     effectiveVerificationPhase,
+    sessionId,
   ]);
 
   useLayoutEffect(() => {
@@ -1883,7 +2083,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <ToolWidgetSessionContext.Provider value={sessionKey}>
       <ToolWidgetLayoutFrozenContext.Provider value={isVerifying}>
-        <div className="flex-1 flex flex-col min-h-0">
+        <div ref={traceRootRef} className="flex-1 flex flex-col min-h-0">
           <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
             <VirtuosoMessageList<ChatRenderRow, MessageListContext>
               ref={listRef}

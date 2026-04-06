@@ -110,7 +110,8 @@ const logger = createLogger('PrimarySidebar');
 
 export const PrimarySidebar: FC = () => {
   const smoothScrollRef = useSmoothScroll(0.08);
-  const prefetchConversation = useConversationPrefetch();
+  const { prefetch: prefetchConversation, cancel: cancelPrefetchConversation } =
+    useConversationPrefetch();
 
   // Track whether the scrollable area can scroll further down.
   // The bottom fade mask is only applied when there's more content below,
@@ -766,6 +767,7 @@ export const PrimarySidebar: FC = () => {
               editingConversationId={editingConversationId}
               onLoadConversation={handleLoadConversation}
               onPrefetchConversation={prefetchConversation}
+              onCancelPrefetchConversation={cancelPrefetchConversation}
               onStartEditConversation={setEditingConversationId}
               onRenameConversation={(sessionId, newTitle) => {
                 handleRenameConversation(sessionId, newTitle);
@@ -785,6 +787,7 @@ export const PrimarySidebar: FC = () => {
             editingConversationId={editingConversationId}
             onLoadConversation={handleLoadConversation}
             onPrefetchConversation={prefetchConversation}
+            onCancelPrefetchConversation={cancelPrefetchConversation}
             onStartEditConversation={setEditingConversationId}
             onRenameConversation={(sessionId, newTitle) => {
               handleRenameConversation(sessionId, newTitle);

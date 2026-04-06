@@ -63,6 +63,7 @@ export function beginSessionSwitch(targetSessionId: string, title: string | null
   if (switchState.pending !== null) {
     abortSessionSwitch(switchState.requestId, 'superseded_by_new_request');
   }
+  useSessionSwitchStore.getState().clearPreMount();
 
   const shownSessionId = useChatStore.getState().activeSessionId;
   const conversationGeneration = getConversationGeneration(targetSessionId);

@@ -6,6 +6,8 @@ import '@fontsource-variable/geist-mono';
 import './globals.css';
 import App from './App';
 
+import { warmMemoryCacheFromIdb } from '@/stores/chat/render-cache-store';
+
 // Enable React Scan in development to visualize component re-renders.
 // Must run before createRoot so it can instrument React internals.
 if (typeof __DEV__ !== 'undefined' && __DEV__) {
@@ -70,6 +72,8 @@ document.addEventListener('contextmenu', (e) => {
 if (localStorage.getItem('orbit-backend-mode') !== null) {
   localStorage.removeItem('orbit-backend-mode');
 }
+
+void warmMemoryCacheFromIdb();
 
 const rootElement = document.getElementById('root');
 

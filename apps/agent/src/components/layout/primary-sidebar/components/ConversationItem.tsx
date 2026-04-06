@@ -46,6 +46,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   onClick,
   onDoubleClick,
   onPrefetch,
+  onCancelPrefetch,
   onRename,
   onCancelEdit,
   onDelete,
@@ -151,8 +152,14 @@ export const ConversationItem: FC<ConversationItemProps> = ({
       onPointerEnter={() => {
         onPrefetch?.();
       }}
+      onPointerLeave={() => {
+        onCancelPrefetch?.();
+      }}
       onFocus={() => {
         onPrefetch?.();
+      }}
+      onBlur={() => {
+        onCancelPrefetch?.();
       }}
       onMouseEnter={() => {
         setIsHovered(true);

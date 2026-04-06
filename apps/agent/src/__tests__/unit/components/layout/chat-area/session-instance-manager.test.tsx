@@ -1,6 +1,8 @@
-import { act, render } from '@testing-library/react';
+import { act, render, waitFor } from '@testing-library/react';
 
 import { SessionInstanceManager } from '@/components/layout/chat-area/SessionInstanceManager';
+import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 
 interface MockChatMessagesProps {
   readonly sessionId?: string;
@@ -42,10 +44,22 @@ function getSessionNode(container: HTMLElement, sessionId: string): HTMLElement 
 describe('SessionInstanceManager', () => {
   beforeEach(() => {
     chatMessagesBySession.clear();
+    useChatStore.setState({
+      sessions: {},
+      activeSessionId: null,
+    });
+    useSessionSwitchStore.setState({
+      status: 'idle',
+      requestId: 0,
+      pending: null,
+      readyInstances: {},
+      preMountSessionId: null,
+    });
   });
 
   afterEach(() => {
     chatMessagesBySession.clear();
+    useSessionSwitchStore.getState().clearPreMount();
   });
 
   it('keeps the shown session visible while the pending session warms hidden', () => {
@@ -227,5 +241,117 @@ describe('SessionInstanceManager', () => {
       'false'
     );
     expect(getSessionNode(container, 'session-d')).toHaveAttribute('data-instance-prime', 'true');
+  });
+
+  it('mounts a hydrated pre-mount session hidden without starting verification', () => {
+    useChatStore.setState({
+      sessions: {
+        'session-hover': {
+          messages: [],
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          layoutPendingCount: 0,
+          layoutSettledVersion: 0,
+          lastLayoutMutationAt: null,
+          layoutLeakDeadlineAt: null,
+          virtuosoSizeCache: null,
+        },
+      },
+    });
+    useSessionSwitchStore.getState().requestPreMount('session-hover');
+
+    const { container } = render(
+      <SessionInstanceManager
+        shownSessionId={undefined}
+        pendingSessionId={undefined}
+        pendingPhase="idle"
+        pendingRequestId={0}
+        queuedMessage={null}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+      />
+    );
+
+    expect(getSessionNode(container, 'session-hover')).toHaveAttribute(
+      'data-instance-visible',
+      'false'
+    );
+    expect(getSessionNode(container, 'session-hover')).toHaveAttribute(
+      'data-instance-prime',
+      'false'
+    );
+  });
+
+  it('removes abandoned pre-mount sessions when hover moves to another conversation', async () => {
+    useChatStore.setState({
+      sessions: {
+        'session-hover-a': {
+          messages: [],
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          layoutPendingCount: 0,
+          layoutSettledVersion: 0,
+          lastLayoutMutationAt: null,
+          layoutLeakDeadlineAt: null,
+          virtuosoSizeCache: null,
+        },
+        'session-hover-b': {
+          messages: [],
+          isAgentRunning: false,
+          isStopPending: false,
+          scrollIntent: null,
+          hydrationState: 'hydrated',
+          layoutVersion: 0,
+          layoutPendingCount: 0,
+          layoutSettledVersion: 0,
+          lastLayoutMutationAt: null,
+          layoutLeakDeadlineAt: null,
+          virtuosoSizeCache: null,
+        },
+      },
+    });
+    useSessionSwitchStore.getState().requestPreMount('session-hover-a');
+
+    const { container } = render(
+      <SessionInstanceManager
+        shownSessionId="session-a"
+        pendingSessionId={undefined}
+        pendingPhase="idle"
+        pendingRequestId={0}
+        queuedMessage={null}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+      />
+    );
+
+    expect(getSessionNode(container, 'session-hover-a')).toHaveAttribute(
+      'data-instance-visible',
+      'false'
+    );
+
+    act(() => {
+      useSessionSwitchStore.getState().clearPreMount('session-hover-a');
+      useSessionSwitchStore.getState().requestPreMount('session-hover-b');
+    });
+
+    await waitFor(() => {
+      expect(container.querySelector('[data-session-instance="session-hover-a"]')).toBeNull();
+    });
+    expect(getSessionNode(container, 'session-hover-b')).toHaveAttribute(
+      'data-instance-visible',
+      'false'
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SessionInstance } from './SessionInstance';
 
@@ -10,6 +10,7 @@ import type { FC } from 'react';
 
 import { clearReadyInstances } from '@/services/conversations/session-switch-coordinator';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { usePreMountSessionId, useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 
 const logger = createLogger('SessionInstanceMgr');
 
@@ -46,22 +47,45 @@ function touchMountedSession(list: string[], sessionId: string | undefined): str
 
 function useMountedSessions(
   shownSessionId: string | undefined,
-  pendingSessionId: string | undefined
+  pendingSessionId: string | undefined,
+  preMountSessionId: string | undefined
 ): string[] {
+  const ephemeralSessionsRef = useRef<Set<string>>(
+    new Set(preMountSessionId ? [preMountSessionId] : [])
+  );
   const [mountedSessions, setMountedSessions] = useState<string[]>(() =>
-    [shownSessionId, pendingSessionId].filter(
+    [shownSessionId, pendingSessionId, preMountSessionId].filter(
       (sessionId): sessionId is string => sessionId !== undefined && sessionId !== ''
     )
   );
 
   useEffect(() => {
     setMountedSessions((prev) => {
-      let next = prev;
+      const ephemeralSessions = ephemeralSessionsRef.current;
+      if (shownSessionId) {
+        ephemeralSessions.delete(shownSessionId);
+      }
+      if (pendingSessionId) {
+        ephemeralSessions.delete(pendingSessionId);
+      }
+      if (preMountSessionId) {
+        ephemeralSessions.add(preMountSessionId);
+      }
+
+      let next = prev.filter(
+        (sessionId) =>
+          !ephemeralSessions.has(sessionId) ||
+          sessionId === shownSessionId ||
+          sessionId === pendingSessionId ||
+          sessionId === preMountSessionId
+      );
+
       next = touchMountedSession(next, shownSessionId);
       next = touchMountedSession(next, pendingSessionId);
+      next = touchMountedSession(next, preMountSessionId);
 
       const protectedSessions = new Set(
-        [shownSessionId, pendingSessionId].filter(
+        [shownSessionId, pendingSessionId, preMountSessionId].filter(
           (sessionId): sessionId is string => sessionId !== undefined && sessionId !== ''
         )
       );
@@ -98,13 +122,14 @@ function useMountedSessions(
       const evictedSet = new Set(evicted);
       return next.filter((sessionId) => !evictedSet.has(sessionId));
     });
-  }, [pendingSessionId, shownSessionId]);
+  }, [pendingSessionId, preMountSessionId, shownSessionId]);
 
   useEffect(() => {
     return useChatStore.subscribe((state, prevState) => {
       for (const sid of Object.keys(prevState.sessions)) {
         if (!(sid in state.sessions)) {
           clearReadyInstances([sid]);
+          useSessionSwitchStore.getState().clearPreMount(sid);
           setMountedSessions((prev) => prev.filter((sessionId) => sessionId !== sid));
         }
       }
@@ -147,7 +172,8 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
   onPendingVerificationResult,
 }) => {
   const effectiveShownId = isShownHidden ? undefined : shownSessionId;
-  const mountedSessions = useMountedSessions(effectiveShownId, pendingSessionId);
+  const preMountSessionId = usePreMountSessionId() ?? undefined;
+  const mountedSessions = useMountedSessions(effectiveShownId, pendingSessionId, preMountSessionId);
 
   const handleVerificationResult = useCallback(
     (result: SessionVerificationResult): void => {

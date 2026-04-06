@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { useChatStore } from './chat-store';
+
 import type { ChatSessionData, PendingMessage } from './chat-store';
 
 export type PendingLoadStrategy = 'none' | 'query' | 'slow';
@@ -42,6 +44,7 @@ export interface SessionSwitchState {
   requestId: number;
   pending: PendingSessionSwitch | null;
   readyInstances: Record<string, ReadyInstanceRecord>;
+  preMountSessionId: string | null;
   pendingCreate: PendingCreateState | null;
   createRegistry: Record<string, PendingCreateState>;
   createSessionIndex: Record<string, string>;
@@ -77,6 +80,8 @@ export interface SessionSwitchState {
   ) => boolean;
   clearReadyInstance: (sessionId: string, instanceGeneration?: number) => void;
   clearReadyInstances: (sessionIds: string[]) => void;
+  requestPreMount: (sessionId: string) => boolean;
+  clearPreMount: (sessionId?: string) => void;
   beginPendingCreate: (
     createRequestId: string,
     title: string,
@@ -155,6 +160,7 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
   requestId: 0,
   pending: null,
   readyInstances: {},
+  preMountSessionId: null,
   pendingCreate: null,
   createRegistry: {},
   createSessionIndex: {},
@@ -175,6 +181,7 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
       return {
         requestId: nextRequestId,
         status: 'hidden-priming',
+        preMountSessionId: null,
         pending: {
           sessionId,
           title,
@@ -346,6 +353,52 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
         }
       }
       return changed ? { readyInstances: next } : state;
+    });
+  },
+
+  requestPreMount: (sessionId): boolean => {
+    const activeSessionId = useChatStore.getState().activeSessionId;
+    const session = useChatStore.getState().sessions[sessionId];
+    if (
+      sessionId === '' ||
+      session?.hydrationState !== 'hydrated' ||
+      activeSessionId === sessionId
+    ) {
+      return false;
+    }
+
+    let requested = false;
+    set((state) => {
+      if (state.pending !== null) {
+        return state;
+      }
+
+      if (state.preMountSessionId === sessionId) {
+        requested = true;
+        return state;
+      }
+
+      requested = true;
+      return {
+        preMountSessionId: sessionId,
+      };
+    });
+
+    return requested;
+  },
+
+  clearPreMount: (sessionId): void => {
+    set((state) => {
+      if (state.preMountSessionId === null) {
+        return state;
+      }
+      if (sessionId !== undefined && state.preMountSessionId !== sessionId) {
+        return state;
+      }
+
+      return {
+        preMountSessionId: null,
+      };
     });
   },
 
@@ -573,4 +626,8 @@ export function useSessionSwitchRequestId(): number {
 
 export function usePendingSessionPhase(): SessionSwitchStatus {
   return useSessionSwitchStore((state) => state.status);
+}
+
+export function usePreMountSessionId(): string | null {
+  return useSessionSwitchStore((state) => state.preMountSessionId);
 }
