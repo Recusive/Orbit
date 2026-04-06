@@ -36,6 +36,16 @@ import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('SessionSwitchCoordinator');
 const READY_BOTTOM_TOLERANCE_PX = 4;
+const VISIBLE_VERIFICATION_SAFETY_TIMEOUT_MS = 3000;
+
+let visibleVerificationSafetyTimer: number | null = null;
+
+function clearVisibleVerificationSafetyTimer(): void {
+  if (visibleVerificationSafetyTimer !== null) {
+    window.clearTimeout(visibleVerificationSafetyTimer);
+    visibleVerificationSafetyTimer = null;
+  }
+}
 
 export interface SessionVerificationResult {
   sessionId: string;
@@ -106,6 +116,19 @@ export function promotePendingToVisibleVerification(
         title,
       },
     });
+
+    clearVisibleVerificationSafetyTimer();
+    visibleVerificationSafetyTimer = window.setTimeout(() => {
+      visibleVerificationSafetyTimer = null;
+      const current = useSessionSwitchStore.getState();
+      if (current.requestId === requestId && current.pending?.sessionId === sessionId) {
+        logger.warn('Visible verification safety timeout — forcing commit', {
+          requestId,
+          sessionId,
+        });
+        commitSessionReveal(requestId, sessionId, title);
+      }
+    }, VISIBLE_VERIFICATION_SAFETY_TIMEOUT_MS);
   }
   return promoted;
 }
@@ -157,6 +180,8 @@ export function abortSessionSwitch(
     return;
   }
 
+  clearVisibleVerificationSafetyTimer();
+
   const pendingSessionId = switchState.pending.sessionId;
   const pendingLoadStrategy = switchState.pending.loadStrategy;
   useSessionSwitchStore.getState().clearPendingSwitch(requestId);
@@ -184,6 +209,8 @@ export function commitSessionReveal(
   targetSessionId: string,
   title: string | null
 ): boolean {
+  clearVisibleVerificationSafetyTimer();
+
   const switchState = useSessionSwitchStore.getState();
   if (switchState.requestId !== requestId || switchState.pending?.sessionId !== targetSessionId) {
     return false;

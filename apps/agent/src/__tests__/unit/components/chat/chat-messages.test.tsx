@@ -553,7 +553,7 @@ describe('ChatMessages', () => {
     );
   });
 
-  it('keeps hidden verification on steady overscan while priming', async () => {
+  it('keeps hidden verification on entry overscan while priming', async () => {
     vi.useFakeTimers();
 
     try {
@@ -590,8 +590,8 @@ describe('ChatMessages', () => {
         />
       );
 
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
 
       await act(async () => {
         getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
@@ -756,6 +756,164 @@ describe('ChatMessages', () => {
       });
     } finally {
       scrollTracker.restore();
+      vi.useRealTimers();
+    }
+  });
+
+  it('pre-seeds visible verification from the hidden-ready snapshot when the surface still matches', async () => {
+    vi.useFakeTimers();
+
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      buildMessage({ id: 'assistant-3', role: 'assistant' }),
+    ];
+
+    try {
+      mockScrollerElement.clientHeight = 800;
+      mockScrollerElement.scrollHeight = 1200;
+      mockScrollerElement.scrollTop = 400;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+
+      const onVerificationResult = vi.fn();
+      const view = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        verificationPhase: 'hidden',
+        verificationKey: 'phase-shared-verification',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'hidden',
+        result: 'hidden-ready',
+        tailProofVersion: 1,
+      });
+
+      onVerificationResult.mockClear();
+
+      act(() => {
+        view.rerender(
+          <ChatMessages
+            messages={messages}
+            isAgentRunning={false}
+            sessionId="session-a"
+            isVisible={true}
+            verificationPhase="visible"
+            verificationKey="phase-shared-verification"
+            queuedMessage={null}
+            onRewind={vi.fn()}
+            onOpenFile={vi.fn()}
+            onOpenUrl={vi.fn()}
+            onCancelQueue={vi.fn()}
+            onFeedback={vi.fn()}
+            onVerificationResult={onVerificationResult}
+          />
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(180);
+      });
+
+      expect(onVerificationResult).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(40);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledTimes(1);
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'visible',
+        result: 'visible-ready',
+        tailProofVersion: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('falls back to a second visible pass when the hidden-ready snapshot no longer matches', async () => {
+    vi.useFakeTimers();
+
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      buildMessage({ id: 'assistant-3', role: 'assistant' }),
+    ];
+
+    try {
+      mockScrollerElement.clientHeight = 800;
+      mockScrollerElement.scrollHeight = 1200;
+      mockScrollerElement.scrollTop = 400;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+
+      const onVerificationResult = vi.fn();
+      const view = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        verificationPhase: 'hidden',
+        verificationKey: 'phase-fallback-verification',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'hidden',
+        result: 'hidden-ready',
+        tailProofVersion: 1,
+      });
+
+      onVerificationResult.mockClear();
+      mockScrollerElement.scrollHeight = 1600;
+      mockScrollerElement.scrollTop = 800;
+
+      act(() => {
+        view.rerender(
+          <ChatMessages
+            messages={messages}
+            isAgentRunning={false}
+            sessionId="session-a"
+            isVisible={true}
+            verificationPhase="visible"
+            verificationKey="phase-fallback-verification"
+            queuedMessage={null}
+            onRewind={vi.fn()}
+            onOpenFile={vi.fn()}
+            onOpenUrl={vi.fn()}
+            onCancelQueue={vi.fn()}
+            onFeedback={vi.fn()}
+            onVerificationResult={onVerificationResult}
+          />
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(220);
+      });
+
+      expect(onVerificationResult).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(220);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledTimes(1);
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'visible',
+        result: 'visible-ready',
+        tailProofVersion: 1,
+      });
+    } finally {
       vi.useRealTimers();
     }
   });
@@ -1299,7 +1457,7 @@ describe('ChatMessages', () => {
     }
   });
 
-  it('keeps hidden verification on steady overscan before and after explicit user scroll', () => {
+  it('keeps hidden verification on entry overscan before and after explicit user scroll', () => {
     const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
 
     renderChatMessages({
@@ -1309,13 +1467,13 @@ describe('ChatMessages', () => {
       shouldPrime: true,
     });
 
-    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
+    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
 
     act(() => {
       getLatestVelocityScrollOptions().onUserScrollStart?.();
     });
 
-    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(8000);
+    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
   });
 
   it('clears animation state after onAnimationComplete fires', async () => {

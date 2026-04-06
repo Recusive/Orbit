@@ -672,7 +672,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     !isVerifying && !isVisible
       ? 'parked'
       : effectiveVerificationPhase === 'hidden'
-        ? 'steady'
+        ? 'entry'
         : isPremeasuring || isReadyForSteady || hasUserScrolled
           ? 'steady'
           : isVerifying
@@ -713,11 +713,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const hasAttemptedPremeasureRef = useRef(false);
   const hasAttemptedTailProbeRef = useRef(false);
   const hiddenCandidateSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
+  const hiddenReadySnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const tailProbePlaceholderScrollHeightRef = useRef<number | null>(null);
   const tailProbePlaceholderSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const tailProbeRealSurfaceSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const tailProbeStartedAtRef = useRef<number | null>(null);
   const visibleCandidateSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
+  const visiblePreseedPendingRef = useRef(false);
   const restorePhaseRef = useRef<RestorePhase>('idle');
   const lastMessageIdRef = useRef<string | null>(messages.at(-1)?.id ?? null);
   const premeasureTimeoutRef = useRef<number | null>(null);
@@ -732,6 +734,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const lastSurfaceResizeAtRef = useRef<number | null>(null);
   const tailProofVersionRef = useRef(0);
   const [surfaceReadyVersion, setSurfaceReadyVersion] = useState(0);
+  const [restoreVersion, setRestoreVersion] = useState(0);
   const [latestRenderedRowCount, setLatestRenderedRowCount] = useState(0);
   const purgeItemSizesUsedRef = useRef(false);
   const traceRootRef = useRef<HTMLDivElement>(null);
@@ -763,6 +766,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       window.clearTimeout(positioningRecheckTimerRef.current);
       positioningRecheckTimerRef.current = null;
     }
+  }, []);
+
+  const clearVisibleVerificationCandidate = useCallback((): void => {
+    visibleCandidateSnapshotRef.current = null;
+    hiddenReadySnapshotRef.current = null;
+    visiblePreseedPendingRef.current = false;
   }, []);
 
   const ensureListSurfaceReady = useCallback((): boolean => {
@@ -951,6 +960,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       void reason;
       if (!effectiveVerificationPhase) {
         return;
+      }
+
+      if (effectiveVerificationPhase === 'hidden') {
+        hiddenReadySnapshotRef.current = hiddenCandidateSnapshotRef.current;
       }
 
       markSwitchTimeline(
@@ -1282,7 +1295,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       if (!latestMetrics?.tailSentinelRendered) {
         restorePhaseRef.current = 'positioning';
-        visibleCandidateSnapshotRef.current = null;
+        clearVisibleVerificationCandidate();
         alignScrollerToBottom();
         progressPositioningRef.current(latestRendered);
         return;
@@ -1290,7 +1303,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       if (!latestMetrics.isAtBottom) {
         restorePhaseRef.current = 'positioning';
-        visibleCandidateSnapshotRef.current = null;
+        clearVisibleVerificationCandidate();
         alignScrollerToBottom();
         scheduleVisibleVerificationCheckRef.current();
         progressPositioningRef.current(latestRendered);
@@ -1298,7 +1311,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (layoutPendingCount > 0) {
-        visibleCandidateSnapshotRef.current = null;
+        clearVisibleVerificationCandidate();
         scheduleVisibleVerificationCheckRef.current();
         return;
       }
@@ -1306,14 +1319,22 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       const currentSnapshot = buildReadinessSurfaceSnapshot(latestMetrics, layoutSettledVersion);
       if (!isSameReadinessSurfaceSnapshot(visibleCandidateSnapshotRef.current, currentSnapshot)) {
         visibleCandidateSnapshotRef.current = currentSnapshot;
+        hiddenReadySnapshotRef.current = null;
+        visiblePreseedPendingRef.current = false;
         scheduleVisibleVerificationCheckRef.current();
         return;
+      }
+
+      if (visiblePreseedPendingRef.current) {
+        markSwitchTimeline('visible-preseed', 'snapshot-match');
+        visiblePreseedPendingRef.current = false;
       }
 
       signalReady('stabilized');
     });
   }, [
     alignScrollerToBottom,
+    clearVisibleVerificationCandidate,
     effectiveVerificationPhase,
     getRenderSurfaceMetrics,
     layoutPendingCount,
@@ -1637,12 +1658,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       tailProbePlaceholderSnapshotRef.current = null;
       tailProbeRealSurfaceSnapshotRef.current = null;
       tailProbeStartedAtRef.current = null;
-      visibleCandidateSnapshotRef.current = null;
+      clearVisibleVerificationCandidate();
       setIsPremeasuring(false);
       cancelReadinessWork();
       restorePhaseRef.current = 'idle';
     }
-  }, [cancelReadinessWork, emitVerificationResult, isVerifying]);
+  }, [cancelReadinessWork, clearVisibleVerificationCandidate, emitVerificationResult, isVerifying]);
 
   useEffect(() => {
     if (!isVerifying) {
@@ -1677,12 +1698,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     hasEverHadMessagesRef.current = messages.length > 0;
     hasAttemptedPremeasureRef.current = false;
     hasAttemptedTailProbeRef.current = false;
+    const preseededVisibleSnapshot =
+      effectiveVerificationPhase === 'visible' ? hiddenReadySnapshotRef.current : null;
     hiddenCandidateSnapshotRef.current = null;
     tailProbePlaceholderScrollHeightRef.current = null;
     tailProbePlaceholderSnapshotRef.current = null;
     tailProbeRealSurfaceSnapshotRef.current = null;
     tailProbeStartedAtRef.current = null;
-    visibleCandidateSnapshotRef.current = null;
+    if (preseededVisibleSnapshot !== null) {
+      visibleCandidateSnapshotRef.current = preseededVisibleSnapshot;
+      visiblePreseedPendingRef.current = true;
+    } else {
+      clearVisibleVerificationCandidate();
+    }
+    hiddenReadySnapshotRef.current = null;
     readinessStartedRef.current = false;
     tailProofVersionRef.current = 0;
     restorePhaseRef.current = 'idle';
@@ -1690,11 +1719,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     cancelReadinessWork();
     setIsPremeasuring(false);
     setIsReadyForSteady(false);
+    setRestoreVersion((v) => v + 1);
   }, [
     cancelReadinessWork,
     emitVerificationResult,
     isVerifying,
     messages.length,
+    clearVisibleVerificationCandidate,
     effectiveVerificationKey,
     effectiveVerificationPhase,
   ]);
@@ -1744,6 +1775,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ensureListSurfaceReady,
     effectiveVerificationPhase,
     surfaceReadyVersion,
+    restoreVersion,
   ]);
 
   useLayoutEffect(() => {
@@ -1782,10 +1814,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           tailProofVersion: tailProofVersionRef.current,
         });
       }
+      clearVisibleVerificationCandidate();
       cancelReadinessWork();
       snapshotStableSizeCache();
     };
-  }, [cancelReadinessWork, snapshotStableSizeCache]);
+  }, [cancelReadinessWork, clearVisibleVerificationCandidate, snapshotStableSizeCache]);
 
   useLayoutEffect(() => {
     if (
