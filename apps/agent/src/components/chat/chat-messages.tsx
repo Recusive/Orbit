@@ -1274,6 +1274,36 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   scheduleHiddenVerificationCheckRef.current = scheduleHiddenVerificationCheck;
 
   const scheduleVisibleVerificationCheck = useCallback((): void => {
+    // Fast path: if we have a preseed snapshot from hidden-ready, check it
+    // immediately before entering the 200ms quiet window. When the geometry
+    // matches and layout is settled, the surface is already stable — commit
+    // without waiting.
+    if (
+      visiblePreseedPendingRef.current &&
+      layoutPendingCount === 0 &&
+      restorePhaseRef.current === 'stabilizing' &&
+      effectiveVerificationPhase === 'visible'
+    ) {
+      const handle = listRef.current;
+      const immediateRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const immediateMetrics = getRenderSurfaceMetrics(immediateRendered);
+      if (immediateMetrics?.tailSentinelRendered === true && immediateMetrics.isAtBottom) {
+        const immediateSnapshot = buildReadinessSurfaceSnapshot(
+          immediateMetrics,
+          layoutSettledVersion
+        );
+        if (
+          isSameReadinessSurfaceSnapshot(visibleCandidateSnapshotRef.current, immediateSnapshot)
+        ) {
+          markSwitchTimeline('visible-preseed', 'snapshot-match-instant');
+          visiblePreseedPendingRef.current = false;
+          signalReady('stabilized');
+          return;
+        }
+      }
+    }
+
+    // Slow path: wait for 200ms of resize stability before checking
     startTemporaryResizeStabilityWindow('stabilizing', VISIBLE_READY_QUIET_MS, () => {
       if (restorePhaseRef.current !== 'stabilizing' || effectiveVerificationPhase !== 'visible') {
         return;

@@ -75,7 +75,6 @@ export const ImageAttachmentTiles: FC<ImageAttachmentTilesProps> = memo(
                     <SafeImage
                       src={image.previewUrl}
                       alt={image.name}
-                      loading="lazy"
                       layoutMutationSessionId={sessionId}
                       layoutMutationSource="message-image"
                       className="h-full w-full object-cover"

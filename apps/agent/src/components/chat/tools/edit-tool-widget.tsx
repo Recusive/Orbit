@@ -215,7 +215,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
           >
-            <div className="my-1.5 min-h-[12rem] overflow-hidden rounded-lg">
+            <div className="my-1.5 overflow-clip rounded-lg">
               {preloaded ? (
                 <PierreFileDiff
                   fileDiff={preloaded.fileDiff}
