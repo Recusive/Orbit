@@ -978,13 +978,19 @@ export const useToolStore = create<ToolState>()(
           `restoreToolsForMessage: msgId=${messageId}, toolCount=${String(tools.length)}, names=[${tools.map((t) => t.name).join(', ')}]`
         );
         set((state) => {
+          const targetSessionId = sessionId ?? state.currentSessionId ?? undefined;
+          const existingCompletedTools =
+            targetSessionId !== undefined && targetSessionId !== state.currentSessionId
+              ? [...(state.sessionCache[targetSessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS)]
+              : [...state.completedTools];
+
           // Convert persisted tool data to ToolExecution format.
           // If a tool already exists (e.g., from localStorage rehydration), UPDATE it
           // rather than skipping — the rehydrated copy may have a stale messageId
           // (from the live streaming session) that doesn't match the merged JSONL
           // message ID used after reload.
           for (const tool of tools) {
-            const existingIdx = state.completedTools.findIndex((t) => t.id === tool.id);
+            const existingIdx = existingCompletedTools.findIndex((t) => t.id === tool.id);
 
             const toolExecution: ToolExecution = {
               id: tool.id,
@@ -998,7 +1004,7 @@ export const useToolStore = create<ToolState>()(
               success: tool.success,
               contentOffset: tool.contentOffset,
               ordinal: tool.ordinal,
-              sessionId: sessionId ?? state.currentSessionId ?? undefined,
+              sessionId: targetSessionId,
             };
 
             if (existingIdx >= 0) {
@@ -1006,7 +1012,7 @@ export const useToolStore = create<ToolState>()(
               // Preserve client-side-only fields (e.g., answers merged by
               // mergeToolInputAnswers for AskUserQuestion) that don't exist
               // in JSONL. Without this, switching conversations wipes answers.
-              const existing = state.completedTools[existingIdx];
+              const existing = existingCompletedTools[existingIdx];
               if (existing) {
                 const existingAnswers = existing.toolInput['answers'];
                 if (
@@ -1019,22 +1025,23 @@ export const useToolStore = create<ToolState>()(
                   };
                 }
               }
-              state.completedTools[existingIdx] = toolExecution;
+              existingCompletedTools[existingIdx] = toolExecution;
             } else {
-              state.completedTools.push(toolExecution);
+              existingCompletedTools.push(toolExecution);
             }
           }
 
-          // Also update sessionCache so tools survive session switches
-          // Without this, switching away and back would lose the restored tools
-          const sid = state.currentSessionId;
-          if (sid) {
-            const existingCache = state.sessionCache[sid];
-            state.sessionCache[sid] = {
+          if (targetSessionId === state.currentSessionId) {
+            state.completedTools = existingCompletedTools;
+          }
+
+          if (targetSessionId) {
+            const existingCache = state.sessionCache[targetSessionId];
+            state.sessionCache[targetSessionId] = {
               usage: existingCache?.usage ?? { ...initialUsage },
               processedIds: existingCache?.processedIds ?? [],
               activeTools: existingCache?.activeTools ?? {},
-              completedTools: [...state.completedTools],
+              completedTools: existingCompletedTools,
               contextWindow: existingCache?.contextWindow,
               sessionModel: existingCache?.sessionModel,
               sessionTools: existingCache?.sessionTools,
@@ -1042,7 +1049,7 @@ export const useToolStore = create<ToolState>()(
             };
           }
           logger.debug(
-            `restoreToolsForMessage DONE: total completedTools=${String(state.completedTools.length)}, cached for session=${String(sid)}`
+            `restoreToolsForMessage DONE: total completedTools=${String(existingCompletedTools.length)}, cached for session=${String(targetSessionId)}`
           );
         });
       },

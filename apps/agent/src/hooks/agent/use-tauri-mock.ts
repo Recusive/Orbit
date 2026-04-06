@@ -399,6 +399,7 @@ export function handleMockMessage(message: WebviewMessage): void {
             type: 'conversation:created',
             uuid: crypto.randomUUID(),
             session_id: crypto.randomUUID(),
+            create_request_id: message.uuid,
             title: message.title ?? 'New Conversation',
           },
           '*'

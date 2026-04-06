@@ -4,6 +4,7 @@ import { chatMessageService } from '@/services/chat/chat-message-service';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const TEST_UUID = '00000000-0000-4000-8000-000000000301';
@@ -174,7 +175,7 @@ describe('ChatMessageService conversation hydration', () => {
     expect(useChatStore.getState().sessions[staleSessionId]?.hydrationState).toBe('hydrated');
   });
 
-  it('tears down transition flags for active streaming loads', async () => {
+  it('does not mutate transition flags for active streaming loads', async () => {
     const sessionId = 'active-streaming-session';
     const chatStore = useChatStore.getState();
 
@@ -201,8 +202,61 @@ describe('ChatMessageService conversation hydration', () => {
     chatMessageService.handleMessage(makeConversationLoaded(sessionId, []));
     await vi.runAllTimersAsync();
 
-    expect(useUIStore.getState().isLoadingConversation).toBe(false);
-    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
     expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
+  });
+
+  it('hydrates pending targets without activating shown-session ownership', async () => {
+    const shownSessionId = 'shown-session';
+    const pendingSessionId = 'pending-session';
+    const chatStore = useChatStore.getState();
+
+    chatStore.getOrCreateSession(shownSessionId);
+    chatStore.setMessages(shownSessionId, [
+      {
+        id: 'shown-user',
+        role: 'user',
+        content: 'shown',
+        displayedContent: 'shown',
+        parentUuid: null,
+      },
+    ]);
+    chatStore.markSessionHydrated(shownSessionId);
+    chatStore.setActiveSession(shownSessionId);
+
+    useUIStore.setState({
+      activeConversationId: shownSessionId,
+      activeConversationTitle: 'Shown Title',
+      isLoadingConversation: true,
+      isConversationTransitioning: true,
+    });
+    useSessionSwitchStore.setState({
+      pending: {
+        sessionId: pendingSessionId,
+        title: 'Pending Title',
+        sourceSessionId: shownSessionId,
+        loadStrategy: 'slow',
+      },
+      requestId: 7,
+      status: 'hidden-priming',
+    });
+
+    chatMessageService.handleMessage(
+      makeConversationLoaded(pendingSessionId, [
+        makePersistedMessage({
+          id: 'pending-user',
+          role: 'user',
+          content: 'hello pending',
+        }),
+      ])
+    );
+    await vi.runAllTimersAsync();
+
+    expect(useChatStore.getState().activeSessionId).toBe(shownSessionId);
+    expect(useUIStore.getState().activeConversationId).toBe(shownSessionId);
+    expect(useUIStore.getState().activeConversationTitle).toBe('Shown Title');
+    expect(useChatStore.getState().sessions[pendingSessionId]?.hydrationState).toBe('hydrated');
+    expect(useChatStore.getState().sessions[pendingSessionId]?.scrollIntent).toBe('pending-verify');
   });
 });

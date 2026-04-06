@@ -62,6 +62,8 @@
 import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { recordSessionSwitchTrace } from '@/services/conversations/session-switch-trace';
+
 interface VelocityScrollOptions {
   /** Max pixels per frame. Caps speed for virtualization buffer. Default 50. */
   maxPxPerFrame?: number;
@@ -75,6 +77,8 @@ interface VelocityScrollOptions {
   enabled?: boolean;
   /** Fired on the first wheel event after warmup for the current attachment. */
   onUserScrollStart?: () => void;
+  traceRequestId?: number | null;
+  traceSessionId?: string | null;
 }
 
 /** Selector for Virtuoso's inner list container. */
@@ -121,6 +125,8 @@ export function useVelocityScroll(
   const sensitivity = options?.sensitivity ?? 0.55;
   const warmupEvents = options?.warmupEvents ?? 3;
   const enabled = options?.enabled ?? true;
+  const traceRequestId = options?.traceRequestId ?? null;
+  const traceSessionId = options?.traceSessionId ?? null;
   const onUserScrollStartRef = useRef(options?.onUserScrollStart);
   onUserScrollStartRef.current = options?.onUserScrollStart;
 
@@ -161,6 +167,14 @@ export function useVelocityScroll(
         scrollTop: node.scrollTop,
         sensitivity,
         warmupEvents,
+      });
+      recordSessionSwitchTrace({
+        event: 'velocity_scroll_attach',
+        requestId: traceRequestId,
+        sessionId: traceSessionId,
+        data: {
+          reason: 'enabled',
+        },
       });
 
       // ── Same-frame scrollHeight compensation ───────────────────────
@@ -401,9 +415,17 @@ export function useVelocityScroll(
           performance.mark('velocity-scroll-detach');
         }
         logger.debug('Detached velocity scroll');
+        recordSessionSwitchTrace({
+          event: 'velocity_scroll_detach',
+          requestId: traceRequestId,
+          sessionId: traceSessionId,
+          data: {
+            reason: 'cleanup',
+          },
+        });
       };
     },
-    [maxPx, friction, sensitivity, warmupEvents, enabled]
+    [maxPx, friction, sensitivity, warmupEvents, enabled, traceRequestId, traceSessionId]
   );
 
   // Cleanup on unmount

@@ -1,9 +1,13 @@
 import { createLogger } from '@orbit/common/lib';
-import { startTransition } from 'react';
 
 import { claudeConversationRepo } from './claude-conversation-repo';
+import { recordSessionSwitchTrace } from './session-switch-trace';
 
-import type { ConversationListContext, ConversationUiBridge } from './types';
+import type {
+  ConversationListContext,
+  ConversationUiBridge,
+  RestoreSelectionResult,
+} from './types';
 import type { ConversationDetailResult } from '@/lib/query/conversation-detail';
 
 import {
@@ -19,11 +23,22 @@ import {
 import { queryClient } from '@/lib/query/query-client';
 import { queryKeys } from '@/lib/query/query-keys';
 import { hydrateConversationSnapshot } from '@/services/chat/hydrate-conversation-snapshot';
+import {
+  abortPendingCreate,
+  abortSessionSwitch,
+  beginPendingCreate,
+  beginSessionSwitch,
+  clearReadyInstances,
+  commitSessionReveal,
+  getPendingCreateBySessionId,
+  hasCurrentReadyInstance,
+  isPendingSessionRequest,
+  setPendingConversationTitle,
+  setPendingLoadStrategy,
+} from '@/services/conversations/session-switch-coordinator';
 import { applyManualSessionTitle } from '@/services/session';
-import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
-import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
-import { useFileStore } from '@/stores/file/file-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 const logger = createLogger('UiBridge');
@@ -65,151 +80,193 @@ export const claudeUiBridge: ConversationUiBridge = {
     const title =
       uiState.conversations.find((conversation) => conversation.sessionId === sessionId)?.title ??
       null;
-    const isHydrated = chatStore.sessions[sessionId]?.hydrationState === 'hydrated';
     const prevActive = uiState.activeConversationId;
     const msgCount = chatStore.sessions[sessionId]?.messages.length ?? 0;
     const sid = sessionId.slice(-6);
 
     logger.debug(`select(${sid})`, {
       from: prevActive?.slice(-6) ?? '(none)',
-      isHydrated,
       msgCount,
-      path: isHydrated ? 'HYDRATED (instant)' : 'UNLOADED (first visit)',
+      path: 'BEGIN SWITCH',
     });
 
-    if (isHydrated) {
-      // Multi-instance keep-alive: the VirtuosoMessageList instance is already
-      // mounted with correct data and scroll position. Just flip the CSS toggle.
-      // NO conversation.load — avoids 51+ restoreToolsForMessage calls that
-      // re-render all 10 mounted instances (the FPS→2 killer).
-      // NO session-restore — instance already has the correct scroll position.
-      uiState.setActiveConversation(sessionId, title);
-      chatStore.setActiveSession(sessionId);
-      useFileStore.getState().switchSession(sessionId);
-      uiState.setLoadingConversation(false);
-      uiState.setConversationTransitioning(false);
-      logger.debug(`[${sid}] Hydrated instant switch (no load)`);
+    const requestId = beginSessionSwitch(sessionId, title);
+
+    if (hasCurrentReadyInstance(sessionId, requestId)) {
+      void commitSessionReveal(requestId, sessionId, title);
+      logger.debug(`[${sid}] Instant reveal from current ready instance`);
+      recordSessionSwitchTrace({
+        event: 'hydrate_source_chosen',
+        requestId,
+        sessionId,
+        data: {
+          source: 'ready-instance-reuse',
+        },
+      });
       return;
     }
 
     const freshResultValue = getFreshConversationDetail(sessionId) as unknown;
     const freshResult = isRevealableConversationDetail(freshResultValue) ? freshResultValue : null;
     if (freshResult) {
-      uiState.setActiveConversation(sessionId, title ?? freshResult.conversation.title);
-      chatStore.setActiveSession(sessionId);
-      chatStore.markSessionLoaded(sessionId);
-      useFileStore.getState().switchSession(sessionId);
+      setPendingLoadStrategy('query', requestId);
+      setPendingConversationTitle(title ?? freshResult.conversation.title, requestId);
+      recordSessionSwitchTrace({
+        event: 'hydrate_source_chosen',
+        requestId,
+        sessionId,
+        data: {
+          source: freshResult.kind === 'data' ? 'query-fast-path' : 'query-fast-empty',
+        },
+      });
 
       if (freshResult.kind === 'data') {
         hydrateConversationSnapshot({
           sessionId,
           persistedMessages: freshResult.conversation.messages,
           sessionUsage: freshResult.conversation.sessionUsage,
-          scrollIntent: 'session-restore',
+          scrollIntent: 'pending-verify',
           source: 'query-fast-path',
           title: title ?? freshResult.conversation.title,
+          activateToolSession: false,
         });
+        if (hasCurrentReadyInstance(sessionId, requestId)) {
+          void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
+        }
       } else {
-        chatStore.setMessages(sessionId, [], 'session-restore');
+        chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
         chatStore.markSessionLoaded(sessionId);
         chatStore.bumpConversationLoadEpoch();
-        useToolStore.getState().switchSession(sessionId);
+        if (hasCurrentReadyInstance(sessionId, requestId)) {
+          void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
+        }
       }
 
-      uiState.setLoadingConversation(false);
-      uiState.setConversationTransitioning(false);
       logger.debug(`[${sid}] FAST PATH: ${freshResult.kind}`);
       return;
     }
 
     const queryState = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
     if (queryState?.fetchStatus === 'fetching') {
-      uiState.setLoadingConversation(true);
-      uiState.setConversationTransitioning(true);
-      uiState.setActiveConversation(sessionId, title);
-      useMessageBufferStore.getState().markLoadPending(sessionId);
-      chatStore.setActiveSession(sessionId);
-      useFileStore.getState().switchSession(sessionId);
+      setPendingLoadStrategy('query', requestId);
 
       const epochBefore = getWorkspaceEpoch();
       const generationBefore = getConversationGeneration(sessionId);
       const result = await loadConversationDetailFresh(sessionId);
       const epochAfter = getWorkspaceEpoch();
       const generationAfter = getConversationGeneration(sessionId);
+      const currentRequestId = useSessionSwitchStore.getState().requestId;
 
-      if (epochBefore !== epochAfter || generationBefore !== generationAfter) {
-        useMessageBufferStore.getState().clearLoadPending(sessionId);
-        uiState.setLoadingConversation(false);
-        uiState.setConversationTransitioning(false);
+      if (
+        epochBefore !== epochAfter ||
+        generationBefore !== generationAfter ||
+        currentRequestId !== requestId ||
+        !isPendingSessionRequest(sessionId, requestId)
+      ) {
+        abortSessionSwitch(
+          requestId,
+          epochBefore !== epochAfter
+            ? 'stale_workspace_epoch'
+            : generationBefore !== generationAfter
+              ? 'stale_conversation_generation'
+              : currentRequestId !== requestId
+                ? 'superseded_by_new_request'
+                : 'unexpected_pending_clear'
+        );
         logger.debug(`[${sid}] JOIN PATH: stale, aborting`);
         return;
       }
 
       if (result.kind === 'data') {
-        chatStore.markSessionLoaded(sessionId);
-        useMessageBufferStore.getState().clearLoadPending(sessionId);
+        setPendingConversationTitle(title ?? result.conversation.title, requestId);
         hydrateConversationSnapshot({
           sessionId,
           persistedMessages: result.conversation.messages,
           sessionUsage: result.conversation.sessionUsage,
-          scrollIntent: 'session-restore',
+          scrollIntent: 'pending-verify',
           source: 'query-fast-path',
           title: title ?? result.conversation.title,
+          activateToolSession: false,
         });
-        uiState.setLoadingConversation(false);
-        uiState.setConversationTransitioning(false);
+        if (hasCurrentReadyInstance(sessionId, requestId)) {
+          void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+        }
         logger.debug(`[${sid}] JOIN PATH: data`);
         return;
       }
 
       if (result.kind === 'empty') {
-        chatStore.setMessages(sessionId, [], 'session-restore');
+        setPendingConversationTitle(title ?? result.conversation.title, requestId);
+        chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
         chatStore.markSessionLoaded(sessionId);
         chatStore.bumpConversationLoadEpoch();
-        useToolStore.getState().switchSession(sessionId);
-        useMessageBufferStore.getState().clearLoadPending(sessionId);
-        uiState.setLoadingConversation(false);
-        uiState.setConversationTransitioning(false);
+        if (hasCurrentReadyInstance(sessionId, requestId)) {
+          void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+        }
         logger.debug(`[${sid}] JOIN PATH: empty`);
         return;
       }
 
-      useMessageBufferStore.getState().clearLoadPending(sessionId);
       logger.debug(`[${sid}] JOIN PATH: loader error, falling through`);
     }
 
-    // First visit: SessionInstance handles per-instance stabilization.
-    uiState.setLoadingConversation(true);
-    uiState.setConversationTransitioning(true);
-    uiState.setActiveConversation(sessionId, title);
-    useMessageBufferStore.getState().markLoadPending(sessionId);
-    chatStore.setActiveSession(sessionId);
-    useFileStore.getState().switchSession(sessionId);
-
-    const loadStart = performance.now();
-    await new Promise<void>((resolve, reject) => {
-      startTransition(() => {
-        claudeConversationRepo
-          .load(sessionId)
-          .then(() => {
-            logger.debug(`[${sid}] conversation.load completed`, {
-              elapsed: `${(performance.now() - loadStart).toFixed(0)}ms`,
-            });
-            resolve();
-          })
-          .catch(reject);
-      });
+    setPendingLoadStrategy('slow', requestId);
+    logger.debug(`[${sid}] SLOW PATH scheduled`);
+    recordSessionSwitchTrace({
+      event: 'hydrate_source_chosen',
+      requestId,
+      sessionId,
+      data: {
+        source: 'slow-path',
+      },
     });
   },
 
-  async restoreSelection(): Promise<void> {
+  async restoreSelection(): Promise<RestoreSelectionResult> {
     const sessionId = claudeConversationRepo.restoreActiveSession();
     if (!sessionId) {
-      return;
+      recordSessionSwitchTrace({
+        event: 'restore_selection',
+        sessionId: null,
+        data: {
+          status: 'missing',
+        },
+      });
+      return {
+        status: 'missing',
+        sessionId: null,
+      };
+    }
+    if (sessionId === useUIStore.getState().activeConversationId) {
+      recordSessionSwitchTrace({
+        event: 'restore_selection',
+        sessionId,
+        data: {
+          status: 'skipped',
+        },
+      });
+      return {
+        status: 'skipped',
+        sessionId,
+      };
     }
     await this.select(sessionId);
+    const requestId = useSessionSwitchStore.getState().requestId;
+    recordSessionSwitchTrace({
+      event: 'restore_selection',
+      requestId,
+      sessionId,
+      data: {
+        status: 'started',
+      },
+    });
+    return {
+      status: 'started',
+      sessionId,
+      requestId,
+    };
   },
 
   getActiveMeta() {
@@ -235,7 +292,20 @@ export const claudeUiBridge: ConversationUiBridge = {
   },
 
   async create(input): Promise<void> {
-    await claudeConversationRepo.create(input);
+    const title = input?.title ?? 'Untitled';
+    const createRequestId = input?.createRequestId ?? crypto.randomUUID();
+
+    beginPendingCreate(createRequestId, title, null);
+    try {
+      await claudeConversationRepo.create({
+        ...input,
+        title,
+        createRequestId,
+      });
+    } catch (error) {
+      abortPendingCreate(createRequestId);
+      throw error;
+    }
   },
 
   async rename(sessionId, title): Promise<void> {
@@ -245,6 +315,15 @@ export const claudeUiBridge: ConversationUiBridge = {
   },
 
   async remove(sessionId): Promise<void> {
+    const switchState = useSessionSwitchStore.getState();
+    if (switchState.pending?.sessionId === sessionId) {
+      abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+    }
+    const pendingCreate = getPendingCreateBySessionId(sessionId);
+    if (pendingCreate !== null) {
+      abortPendingCreate(pendingCreate.createRequestId);
+    }
+    clearReadyInstances([sessionId]);
     await removeConversationCache(sessionId);
     useUIStore.getState().removeConversation(sessionId);
     await claudeConversationRepo.remove(sessionId);

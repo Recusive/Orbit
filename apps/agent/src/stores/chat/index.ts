@@ -10,6 +10,9 @@ export {
   useActiveSessionId,
   useIsAgentRunning,
   useIsStopPending,
+  useSessionLastLayoutMutationAt,
+  useSessionLayoutPendingCount,
+  useSessionLayoutSettledVersion,
 } from './chat-store';
 export type {
   ActiveCompaction,
@@ -17,6 +20,22 @@ export type {
   ChatStoreState,
   PendingMessage,
 } from './chat-store';
+export {
+  usePendingConversationTitle,
+  usePendingSessionId,
+  usePendingSessionPhase,
+  useSessionSwitchRequestId,
+  useSessionSwitchStore,
+} from './session-switch-store';
+export type {
+  PendingCreateState,
+  PendingCreateStatus,
+  PendingLoadStrategy,
+  PendingSessionSwitch,
+  ReadyInstancePhase,
+  ReadyInstanceRecord,
+  SessionSwitchStatus,
+} from './session-switch-store';
 
 // Queued message store
 export { useQueuedMessageStore, useQueuedMessage } from './queued-message-store';

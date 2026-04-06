@@ -56,6 +56,7 @@ import { useChatMessages } from '@/hooks/chat/use-chat-messages';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 function resetStores(): void {
@@ -73,6 +74,7 @@ function resetStores(): void {
     activeCompactions: {},
     lruOrder: [],
   });
+  useSessionSwitchStore.setState(useSessionSwitchStore.getInitialState(), true);
   useUIStore.setState({
     ...useUIStore.getInitialState(),
     workspacePath: '/workspace',
@@ -94,8 +96,29 @@ describe('new conversation title generation', () => {
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession('new-session');
     chatStore.setActiveSession('new-session');
-    chatStore.setPendingMessage({ text: 'help me debug' });
-    useChatStore.setState({ lastCreatedSessionId: 'new-session' });
+    useSessionSwitchStore.setState({
+      pendingCreate: {
+        createRequestId: 'create-request',
+        draftSessionId: 'new-session',
+        effectiveSessionId: 'new-session',
+        title: 'Untitled',
+        payload: { text: 'help me debug' },
+        status: 'awaiting-first-send',
+      },
+      createRegistry: {
+        'create-request': {
+          createRequestId: 'create-request',
+          draftSessionId: 'new-session',
+          effectiveSessionId: 'new-session',
+          title: 'Untitled',
+          payload: { text: 'help me debug' },
+          status: 'awaiting-first-send',
+        },
+      },
+      createSessionIndex: {
+        'new-session': 'create-request',
+      },
+    });
   });
 
   afterEach(() => {
@@ -121,16 +144,48 @@ describe('new conversation title generation', () => {
   });
 
   it('uses the image conversation fallback when the pending message has no text', async () => {
-    useChatStore.getState().setPendingMessage({
-      text: '',
-      images: [
-        {
-          name: 'diagram.png',
-          mimeType: 'image/png',
-          data: 'abc',
-          previewUrl: 'data:image/png;base64,abc',
+    useSessionSwitchStore.setState({
+      pendingCreate: {
+        createRequestId: 'create-request',
+        draftSessionId: 'new-session',
+        effectiveSessionId: 'new-session',
+        title: 'Untitled',
+        payload: {
+          text: '',
+          images: [
+            {
+              name: 'diagram.png',
+              mimeType: 'image/png',
+              data: 'abc',
+              previewUrl: 'data:image/png;base64,abc',
+            },
+          ],
         },
-      ],
+        status: 'awaiting-first-send',
+      },
+      createRegistry: {
+        'create-request': {
+          createRequestId: 'create-request',
+          draftSessionId: 'new-session',
+          effectiveSessionId: 'new-session',
+          title: 'Untitled',
+          payload: {
+            text: '',
+            images: [
+              {
+                name: 'diagram.png',
+                mimeType: 'image/png',
+                data: 'abc',
+                previewUrl: 'data:image/png;base64,abc',
+              },
+            ],
+          },
+          status: 'awaiting-first-send',
+        },
+      },
+      createSessionIndex: {
+        'new-session': 'create-request',
+      },
     });
 
     renderHook(() => useChatMessages());

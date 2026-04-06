@@ -7,11 +7,12 @@
  */
 import { code } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
 import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
+import { ToolWidgetSessionContext, useObservedSessionLayoutMutation } from '../tools/shared';
 
 import { ImageAttachmentTiles } from './ImageAttachmentTiles';
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
@@ -71,6 +72,7 @@ const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
 const STREAMDOWN_PLUGINS = { mermaid, code };
+const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 
 const FlowTokenSegment: FC<{
   readonly text: string;
@@ -288,6 +290,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
   const rejectedQuestion = tools.find(
     (t) => t.toolName.toLowerCase() === 'askuserquestion' && t.success === false
   );
+  const sessionId = useContext(ToolWidgetSessionContext);
   const showInterrupted = message.isInterrupted === true || rejectedQuestion !== undefined;
   const interruptReason =
     message.interruptReason ??
@@ -353,6 +356,17 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
       message.isStreaming,
     ]
   );
+  const hasMarkdownSegments = useMemo(
+    () => segments.some((segment) => segment.type === 'content'),
+    [segments]
+  );
+  const assistantContentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'assistant-markdown',
+    `${message.id}:${String(animatedContent.length)}:${String(segments.length)}`,
+    hasMarkdownSegments,
+    STREAMDOWN_LAYOUT_STABLE_MS
+  );
 
   // Don't render empty assistant message bubbles
   if (!hasVisibleContent(message, segments, isComplete)) {
@@ -398,7 +412,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
           onMouseLeave={onMouseLeaveMessage}
         >
           {/* Content and tool segments */}
-          <div className="flex flex-col gap-2">
+          <div ref={assistantContentRef} className="flex flex-col gap-2">
             {segments.map((segment) => {
               if (segment.type === 'thinking') {
                 return (

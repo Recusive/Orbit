@@ -18,6 +18,11 @@ import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
 } from '@/services/chat/image-attachment-cache';
+import {
+  beginPendingCreate,
+  getPendingCreateBySessionId,
+  markPendingCreateAwaitingSystemInit,
+} from '@/services/conversations/session-switch-coordinator';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
@@ -169,18 +174,23 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         // If no sessionId OR first message in a non-existent conversation,
         // we need to create a conversation first via the backend
         if (!sessionId || (messages.length === 0 && !conversationExists)) {
-          // Store pending message — will be sent after conversation:created
-          chatStore.setPendingMessage({
+          const createRequestId = crypto.randomUUID();
+          const title = generateFallbackTitle(text || 'Image conversation');
+          const pendingMessage = {
             text,
             contextFiles: hasMergedContextFiles ? mergedContextFiles : undefined,
             images,
             elements,
             skills,
-          });
+          };
+
+          // Store pending message — will be sent after conversation:created
+          chatStore.setPendingMessage(pendingMessage);
+          beginPendingCreate(createRequestId, title, pendingMessage);
           postMessage({
             type: 'conversation:create',
-            uuid: crypto.randomUUID(),
-            title: generateFallbackTitle(text || 'Image conversation'),
+            uuid: createRequestId,
+            title,
             workspace_path: workspacePath ?? undefined,
             worktree_path: activeWorktreePath ?? undefined,
           });
@@ -192,6 +202,11 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         if (messages.length === 0 && conversationExists) {
           applySessionTitle(sessionId, generateFallbackTitle(text || 'Image conversation'));
           generateAITitle(sessionId, text || 'Image conversation');
+        }
+
+        const pendingCreate = getPendingCreateBySessionId(sessionId);
+        if (messages.length === 0 && pendingCreate?.status === 'awaiting-first-send') {
+          markPendingCreateAwaitingSystemInit(pendingCreate.createRequestId);
         }
 
         // Always send current thinking mode and model BEFORE message:send

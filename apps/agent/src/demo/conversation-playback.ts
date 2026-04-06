@@ -59,6 +59,7 @@ function playScript(script: DemoScript): () => void {
       type: 'conversation:created',
       uuid: crypto.randomUUID(),
       session_id: DEMO_SESSION_ID,
+      create_request_id: DEMO_SESSION_ID,
       title: script.title,
     },
     '*'

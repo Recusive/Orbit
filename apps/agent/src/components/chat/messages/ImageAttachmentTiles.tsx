@@ -1,11 +1,12 @@
 import { ImageOff } from 'lucide-react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { ImageLightbox } from './ImageLightbox';
 
 import type { ImageAttachment } from '../input';
 import type { FC } from 'react';
 
+import { ToolWidgetSessionContext } from '@/components/chat/tools/shared';
 import { SafeImage } from '@/components/shared';
 
 interface ImageAttachmentTilesProps {
@@ -14,6 +15,7 @@ interface ImageAttachmentTilesProps {
 
 export const ImageAttachmentTiles: FC<ImageAttachmentTilesProps> = memo(
   function ImageAttachmentTiles({ attachedImages }) {
+    const sessionId = useContext(ToolWidgetSessionContext);
     const [activeIndex, setActiveIndex] = useState(0);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [brokenPreviewUrls, setBrokenPreviewUrls] = useState<Record<string, true>>({});
@@ -74,6 +76,8 @@ export const ImageAttachmentTiles: FC<ImageAttachmentTilesProps> = memo(
                       src={image.previewUrl}
                       alt={image.name}
                       loading="lazy"
+                      layoutMutationSessionId={sessionId}
+                      layoutMutationSource="message-image"
                       className="h-full w-full object-cover"
                       onError={() => {
                         setBrokenPreviewUrls((prev) => ({

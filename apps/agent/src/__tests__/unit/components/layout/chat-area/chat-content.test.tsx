@@ -1,13 +1,16 @@
-import { act, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 
 import { ChatContent } from '@/components/layout/chat-area/ChatContent';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 interface MockSessionInstanceManagerProps {
-  readonly activeSessionId: string | undefined;
-  readonly isActiveHidden?: boolean;
-  readonly onShownSessionChange?: (sessionId: string | undefined) => void;
+  readonly shownSessionId: string | undefined;
+  readonly pendingSessionId: string | undefined;
+  readonly pendingPhase: string;
+  readonly pendingRequestId: number;
+  readonly isShownHidden?: boolean;
 }
 
 interface MockTodoBarProps {
@@ -29,7 +32,7 @@ const todoBarControls: {
 vi.mock('@/components/layout/chat-area/SessionInstanceManager', () => ({
   SessionInstanceManager: (props: MockSessionInstanceManagerProps) => {
     managerControls.props = props;
-    return <div data-testid="session-instance-manager" data-empty={String(props.isActiveHidden)} />;
+    return <div data-testid="session-instance-manager" data-empty={String(props.isShownHidden)} />;
   },
 }));
 
@@ -52,6 +55,7 @@ vi.mock('@/features/vault', () => ({
 
 function resetStores(): void {
   useChatStore.setState(useChatStore.getInitialState(), true);
+  useSessionSwitchStore.setState(useSessionSwitchStore.getInitialState(), true);
   useUIStore.setState(useUIStore.getInitialState(), true);
   managerControls.props = null;
   todoBarControls.props = null;
@@ -109,7 +113,7 @@ describe('ChatContent render invariants', () => {
       />
     );
 
-    expect(managerControls.props?.isActiveHidden).toBe(false);
+    expect(managerControls.props?.isShownHidden).toBe(false);
     expect(screen.getByTestId('todo-bar')).toHaveAttribute('data-override-session-id', 'session-a');
   });
 
@@ -156,10 +160,10 @@ describe('ChatContent render invariants', () => {
       />
     );
 
-    expect(managerControls.props?.isActiveHidden).toBe(true);
+    expect(managerControls.props?.isShownHidden).toBe(true);
   });
 
-  it('updates TodoBar to the shown session when the manager reports a handoff', () => {
+  it('keeps TodoBar aligned to the shown session during pending verification', () => {
     useChatStore.setState({
       sessions: {
         'session-a': {
@@ -174,6 +178,16 @@ describe('ChatContent render invariants', () => {
           virtuosoSizeCache: null,
         },
       },
+    });
+    useSessionSwitchStore.setState({
+      pending: {
+        sessionId: 'session-b',
+        title: 'Pending',
+        sourceSessionId: 'session-a',
+        loadStrategy: 'query',
+      },
+      requestId: 1,
+      status: 'visible-verifying',
     });
 
     render(
@@ -205,11 +219,95 @@ describe('ChatContent render invariants', () => {
     );
 
     expect(screen.getByTestId('todo-bar')).toHaveAttribute('data-override-session-id', 'session-a');
+  });
 
-    act(() => {
-      managerControls.props?.onShownSessionChange?.('session-b');
+  it('shows the neutral loading shell when there is no shown session and a pending target', () => {
+    useSessionSwitchStore.setState({
+      pending: {
+        sessionId: 'session-b',
+        title: 'Pending',
+        sourceSessionId: null,
+        loadStrategy: 'query',
+      },
+      requestId: 1,
+      status: 'hidden-priming',
     });
 
-    expect(screen.getByTestId('todo-bar')).toHaveAttribute('data-override-session-id', 'session-b');
+    render(
+      <ChatContent
+        contentRef={{ current: null }}
+        isLoadingConversation={true}
+        messages={[]}
+        isAgentRunning={false}
+        sessionId=""
+        queuedMessage={null}
+        pendingPermissions={[]}
+        inputMode="default"
+        thinkingMode="off"
+        effortLevel="medium"
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+        onModeChange={vi.fn()}
+        onThinkingModeChange={vi.fn()}
+        onEffortLevelChange={vi.fn()}
+        onModelChange={vi.fn()}
+        onPermissionApprove={vi.fn()}
+        onPermissionDeny={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Loading conversation...')).toBeInTheDocument();
+    expect(managerControls.props?.shownSessionId).toBeUndefined();
+    expect(managerControls.props?.pendingSessionId).toBe('session-b');
+  });
+
+  it('keeps the neutral loading shell visible through visible verification when no chat is shown', () => {
+    useSessionSwitchStore.setState({
+      pending: {
+        sessionId: 'session-b',
+        title: 'Pending',
+        sourceSessionId: null,
+        loadStrategy: 'query',
+      },
+      requestId: 2,
+      status: 'visible-verifying',
+    });
+
+    render(
+      <ChatContent
+        contentRef={{ current: null }}
+        isLoadingConversation={true}
+        messages={[]}
+        isAgentRunning={false}
+        sessionId=""
+        queuedMessage={null}
+        pendingPermissions={[]}
+        inputMode="default"
+        thinkingMode="off"
+        effortLevel="medium"
+        onSend={vi.fn()}
+        onStop={vi.fn()}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+        onModeChange={vi.fn()}
+        onThinkingModeChange={vi.fn()}
+        onEffortLevelChange={vi.fn()}
+        onModelChange={vi.fn()}
+        onPermissionApprove={vi.fn()}
+        onPermissionDeny={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Loading conversation...')).toBeInTheDocument();
+    expect(managerControls.props?.pendingPhase).toBe('visible-verifying');
+    expect(managerControls.props?.shownSessionId).toBeUndefined();
   });
 });

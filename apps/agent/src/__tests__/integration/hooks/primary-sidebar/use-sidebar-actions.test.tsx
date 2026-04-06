@@ -35,6 +35,7 @@ const {
   mockApplyManualSessionTitle,
   mockClearSessionTitleState,
   mockConversationDelete,
+  mockConversationUpdateTitle,
   mockGitWorktreeList,
   mockGitWorktreeRemove,
   mockHandleConversationCreate,
@@ -47,6 +48,7 @@ const {
   mockApplyManualSessionTitle: vi.fn().mockResolvedValue(true),
   mockClearSessionTitleState: vi.fn(),
   mockConversationDelete: vi.fn().mockResolvedValue(undefined),
+  mockConversationUpdateTitle: vi.fn().mockResolvedValue(true),
   mockGitWorktreeList: vi.fn().mockResolvedValue([]),
   mockGitWorktreeRemove: vi.fn().mockResolvedValue({ branchDeleteFailed: null }),
   mockHandleConversationCreate: vi.fn().mockReturnValue('created-session-id'),
@@ -67,6 +69,7 @@ vi.mock('@/hooks/agent/handlers/conversation-handlers', () => ({
  */
 vi.mock('@/lib/api', () => ({
   conversationDelete: mockConversationDelete,
+  conversationUpdateTitle: mockConversationUpdateTitle,
   gitWorktreeList: mockGitWorktreeList,
   gitWorktreeRemove: mockGitWorktreeRemove,
 }));
@@ -466,19 +469,22 @@ describe('useSidebarActions', () => {
   // =============================================================================
 
   describe('handleLoadConversation', () => {
-    it('should send conversation:load message with session_id', () => {
+    it('should start a pending session switch without flipping the shown session immediately', () => {
+      useUIStore.setState({
+        activeConversationId: 'current-session',
+        activeConversationTitle: 'Current Title',
+      });
+
       const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
 
       act(() => {
         result.current.handleLoadConversation('target-session-id');
       });
 
-      expect(mockHandleConversationLoad).toHaveBeenCalledWith(
-        expect.objectContaining({
-          type: 'conversation:load',
-          session_id: 'target-session-id',
-        })
-      );
+      expect(mockHandleConversationLoad).not.toHaveBeenCalled();
+      expect(useUIStore.getState().activeConversationId).toBe('current-session');
+      expect(useUIStore.getState().isLoadingConversation).toBe(true);
+      expect(useUIStore.getState().isConversationTransitioning).toBe(true);
     });
 
     it('should set loading states before sending message', () => {

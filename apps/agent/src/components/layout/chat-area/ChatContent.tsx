@@ -1,16 +1,28 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { SessionInstanceManager } from './SessionInstanceManager';
 import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 
 import type { ChatContentProps } from './types';
+import type { SessionVerificationResult } from '@/services/conversations/session-switch-coordinator';
 import type { FC } from 'react';
 
 import { AuthErrorBanner, ChatInput, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
 import { VaultPage } from '@/features/vault';
+import {
+  abortSessionSwitch,
+  commitSessionReveal,
+  promotePendingToVisibleVerification,
+} from '@/services/conversations/session-switch-coordinator';
 import { useChatStore } from '@/stores/chat/chat-store';
-import { useVaultOpen } from '@/stores/ui/ui-store';
+import {
+  usePendingConversationTitle,
+  usePendingSessionId,
+  usePendingSessionPhase,
+  useSessionSwitchRequestId,
+} from '@/stores/chat/session-switch-store';
+import { useUIStore, useVaultOpen } from '@/stores/ui/ui-store';
 
 /**
  * Chat content section handling both empty and messages states
@@ -53,21 +65,79 @@ export const ChatContent: FC<ChatContentProps> = ({
   extraControls,
 }) => {
   const vaultOpen = useVaultOpen();
+  const shownSessionId = sessionId !== '' ? sessionId : undefined;
+  const pendingSessionId = usePendingSessionId() ?? undefined;
+  const pendingPhase = usePendingSessionPhase();
+  const pendingConversationTitle = usePendingConversationTitle();
+  const sessionSwitchRequestId = useSessionSwitchRequestId();
+  const isConversationTransitioning = useUIStore((state) => state.isConversationTransitioning);
   const sessionMessageCount = useChatStore(
-    (state) => state.sessions[sessionId]?.messages.length ?? 0
+    (state) => (shownSessionId ? state.sessions[shownSessionId]?.messages.length : undefined) ?? 0
   );
   const sessionHydrationState = useChatStore(
-    (state) => state.sessions[sessionId]?.hydrationState ?? 'unloaded'
+    (state) =>
+      (shownSessionId ? state.sessions[shownSessionId]?.hydrationState : undefined) ?? 'unloaded'
   );
   const isEmptyState =
-    sessionHydrationState === 'hydrated' && sessionMessageCount === 0 && !isLoadingConversation;
+    shownSessionId !== undefined &&
+    pendingSessionId === undefined &&
+    sessionHydrationState === 'hydrated' &&
+    sessionMessageCount === 0 &&
+    !isLoadingConversation &&
+    !isConversationTransitioning;
+  const shouldShowPendingShell = shownSessionId === undefined && pendingSessionId !== undefined;
+  const focusRestoreRef = useRef<HTMLElement | null>(null);
 
-  // Track which session is visually shown (may differ from activeSessionId
-  // during first-visit handoff). TodoBar uses this to show the correct tools.
-  const [shownSessionId, setShownSessionId] = useState<string | undefined>(sessionId);
-  const handleShownSessionChange = useCallback((sid: string | undefined) => {
-    setShownSessionId(sid);
+  const restoreFocus = useCallback((): void => {
+    const target = focusRestoreRef.current;
+    if (target && document.contains(target)) {
+      requestAnimationFrame(() => {
+        target.focus();
+      });
+    }
+    focusRestoreRef.current = null;
   }, []);
+
+  const handlePendingVerificationResult = useCallback(
+    (result: SessionVerificationResult): void => {
+      if (
+        pendingSessionId === undefined ||
+        result.sessionId !== pendingSessionId ||
+        result.requestId !== sessionSwitchRequestId
+      ) {
+        return;
+      }
+
+      if (result.result === 'hidden-ready') {
+        const activeElement =
+          document.activeElement instanceof HTMLElement ? document.activeElement : null;
+        focusRestoreRef.current = activeElement;
+        promotePendingToVisibleVerification(
+          result.requestId,
+          result.sessionId,
+          pendingConversationTitle
+        );
+        return;
+      }
+
+      if (result.result === 'visible-ready') {
+        commitSessionReveal(result.requestId, result.sessionId, pendingConversationTitle);
+        focusRestoreRef.current = null;
+        return;
+      }
+
+      if (result.result === 'aborted') {
+        return;
+      }
+
+      abortSessionSwitch(
+        result.requestId,
+        result.phase === 'hidden' ? 'hidden_timeout' : 'visible_timeout'
+      );
+      restoreFocus();
+    },
+    [pendingConversationTitle, pendingSessionId, restoreFocus, sessionSwitchRequestId]
+  );
 
   // Shared input props to avoid duplication
   const inputProps = {
@@ -108,16 +178,31 @@ export const ChatContent: FC<ChatContentProps> = ({
         /* SessionInstanceManager is ALWAYS mounted when not in vault mode.
            Hidden instances are position:absolute so they don't affect layout. */
         <>
+          {shouldShowPendingShell ? (
+            <div className="absolute inset-0 z-10 flex items-center justify-center px-6">
+              <div className="w-full max-w-xl rounded-2xl border border-border/60 bg-background/95 px-6 py-8 shadow-sm">
+                <div className="space-y-3" aria-live="polite" aria-busy="true">
+                  <div className="text-sm font-medium text-foreground">Loading conversation...</div>
+                  <div className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
+                  <div className="h-3 w-full animate-pulse rounded-full bg-muted/80" />
+                  <div className="h-3 w-5/6 animate-pulse rounded-full bg-muted/70" />
+                </div>
+              </div>
+            </div>
+          ) : null}
           <SessionInstanceManager
-            activeSessionId={sessionId}
-            isActiveHidden={isEmptyState}
-            queuedMessage={queuedMessage}
+            shownSessionId={shownSessionId}
+            pendingSessionId={pendingSessionId}
+            pendingPhase={pendingPhase}
+            pendingRequestId={sessionSwitchRequestId}
+            isShownHidden={isEmptyState}
+            queuedMessage={shownSessionId ? queuedMessage : null}
             onRewind={onRewind}
             onOpenFile={onOpenFile}
             onOpenUrl={onOpenUrl}
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
-            onShownSessionChange={handleShownSessionChange}
+            onPendingVerificationResult={handlePendingVerificationResult}
           />
         </>
       )}

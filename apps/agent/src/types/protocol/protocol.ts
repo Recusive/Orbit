@@ -1436,6 +1436,7 @@ export const ConversationCreatedSchema = z
     type: z.literal('conversation:created'),
     uuid: UUIDSchema,
     session_id: SessionIdSchema,
+    create_request_id: z.string().min(1).optional(),
     title: z.string(),
     workspace_path: z.string().optional(),
     worktree_path: z.string().optional(),

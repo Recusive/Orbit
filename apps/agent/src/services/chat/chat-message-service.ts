@@ -45,6 +45,25 @@ import {
 } from '@/services/chat/hydrate-conversation-snapshot';
 import { StreamingRevealController } from '@/services/chat/streaming-reveal-controller';
 import {
+  abortPendingCreate,
+  abortSessionSwitch,
+  beginSessionSwitch,
+  clearReadyInstances,
+  commitSessionReveal,
+  finishPendingCreate,
+  getCreateRequestIdBySessionId,
+  getPendingCreate,
+  getPendingCreateBySessionId,
+  getPendingSessionTitle,
+  hasCurrentReadyInstance,
+  isPendingSessionRequest,
+  remapPendingCreateSession,
+  resolvePendingCreateDraft,
+  retargetPendingSession,
+  setPendingConversationTitle,
+  setPendingLoadStrategy,
+} from '@/services/conversations/session-switch-coordinator';
+import {
   clearSessionTitleState,
   flushPendingTitle,
   generateAITitle,
@@ -57,6 +76,7 @@ import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
@@ -596,6 +616,19 @@ class ChatMessageService {
   private handleSystemInit(message: Extract<ExtensionMessage, { type: 'system:init' }>): void {
     const sdkSessionId = message.sdk_session_id;
     const chatStore = useChatStore.getState();
+    const activePendingCreate = getPendingCreate();
+    const createRequestId = getCreateRequestIdBySessionId(message.session_id);
+
+    if (createRequestId !== null && activePendingCreate?.createRequestId !== createRequestId) {
+      logger.debug('Ignoring late system:init for superseded create', {
+        createRequestId,
+        sessionId: message.session_id,
+        sdkSessionId,
+      });
+      finishPendingCreate(createRequestId);
+      return;
+    }
+
     // Determine which frontend session to remap to the SDK session ID.
     //
     // Prefer message.session_id when it differs from sdk_session_id — this is the
@@ -623,6 +656,7 @@ class ChatMessageService {
       );
       // Remap session in ChatStore (atomically moves data, updates activeSessionId if active)
       useChatStore.getState().remapSession(frontendSessionId, sdkSessionId);
+      clearReadyInstances([frontendSessionId, sdkSessionId]);
 
       // Update createdSessions so ensureSession() recognises the new ID
       remapCreatedSession(frontendSessionId, sdkSessionId);
@@ -644,6 +678,19 @@ class ChatMessageService {
       // Migrate service-owned in-flight state (timers + tool flags).
       this.remapRunningState(frontendSessionId, sdkSessionId);
       remapSessionTitleState(frontendSessionId, sdkSessionId);
+
+      if (createRequestId !== null) {
+        remapPendingCreateSession(frontendSessionId, sdkSessionId);
+        const switchState = useSessionSwitchStore.getState();
+        if (switchState.pending?.sessionId === frontendSessionId) {
+          retargetPendingSession(
+            frontendSessionId,
+            sdkSessionId,
+            switchState.pending.title ?? activePendingCreate?.title ?? null,
+            switchState.requestId
+          );
+        }
+      }
 
       // Only update UI navigation if the user is still on this session.
       // remapSession() already conditionally updates activeSessionId in ChatStore
@@ -696,6 +743,10 @@ class ChatMessageService {
       effectiveId,
       message.session_id !== effectiveId ? message.session_id : undefined
     );
+
+    if (createRequestId !== null) {
+      finishPendingCreate(createRequestId);
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1130,36 +1181,29 @@ class ChatMessageService {
     message: Extract<ExtensionMessage, { type: 'conversation:created' }>
   ): void {
     const sid = message.session_id;
+    const createRequestId =
+      message.create_request_id ?? getPendingCreate()?.createRequestId ?? null;
+    const pendingCreate =
+      createRequestId !== null
+        ? resolvePendingCreateDraft(createRequestId, sid, message.title)
+        : null;
 
-    // Switch file store to new session
-    useFileStore.getState().switchSession(sid);
+    if (createRequestId !== null && pendingCreate === null) {
+      logger.debug('Ignoring late conversation:created for superseded create', {
+        createRequestId,
+        sessionId: sid,
+      });
+      return;
+    }
 
-    // Create new session in store and set as active
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession(sid);
     chatStore.setMessages(sid, []);
-    chatStore.setActiveSession(sid);
-
-    // Mark as loaded BEFORE React re-render — prevents the session loading effect
-    // from sending a spurious conversation:load for this brand-new session.
     chatStore.markSessionLoaded(sid);
     chatStore.markSessionHydrated(sid);
-
-    // Invalidate any in-flight conversation:loaded responses from the PREVIOUS session.
-    // On app start, Effect 3 sends conversation:load for the stale localStorage sessionId.
-    // If the user sends a message before that response arrives, the stale conversation:loaded
-    // calls setActiveSession(staleId) inside setTimeout(0) — hijacking activeSessionId back
-    // to the old session and orphaning the user's message in the new session.
-    // Bumping the epoch causes the setTimeout guard to reject the stale response.
     chatStore.bumpConversationLoadEpoch();
-
-    // Set lastCreatedSessionId for hook subscription (replaces onSessionCreated callback)
     useChatStore.setState({ lastCreatedSessionId: sid });
 
-    // Add to conversations array so handleSend's `conversationExists` check returns true.
-    // Without this, the "New conversation" session isn't in conversations[] — handleSend
-    // takes the pending message path, creates a SECOND session, and Effect 4 fires
-    // prematurely with the first session's lastCreatedSessionId, orphaning the user message.
     const uiStore = useUIStore.getState();
     uiStore.addConversation({
       sessionId: sid,
@@ -1169,8 +1213,11 @@ class ChatMessageService {
       ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
       ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
     });
-    uiStore.setActiveConversation(sid, message.title);
-    useToolStore.getState().switchSession(sid);
+
+    const requestId = beginSessionSwitch(sid, pendingCreate?.title ?? message.title);
+    if (hasCurrentReadyInstance(sid, requestId)) {
+      void commitSessionReveal(requestId, sid, pendingCreate?.title ?? message.title);
+    }
   }
 
   private handleConversationList(
@@ -1198,6 +1245,8 @@ class ChatMessageService {
     message: Extract<ExtensionMessage, { type: 'conversation:loaded' }>
   ): void {
     const chatStore = useChatStore.getState();
+    const pendingRequestId = useSessionSwitchStore.getState().requestId;
+    const isPendingSession = isPendingSessionRequest(message.session_id, pendingRequestId);
 
     // Skip stale responses for remapped Orbit session IDs — but allow if the
     // user explicitly navigated to this session (e.g., clicking a parent session
@@ -1205,9 +1254,15 @@ class ChatMessageService {
     // block truly stale in-flight responses, not intentional sidebar clicks.
     if (
       message.session_id in chatStore.remappedOrbitIds &&
-      chatStore.activeSessionId !== message.session_id
+      chatStore.activeSessionId !== message.session_id &&
+      !isPendingSession
     ) {
       return;
+    }
+
+    useMessageBufferStore.getState().clearLoadPending(message.session_id);
+    if (isPendingSession) {
+      setPendingLoadStrategy('none', pendingRequestId);
     }
 
     // Snapshot cached messages BEFORE setTimeout(0) — store state may change during deferral
@@ -1230,7 +1285,25 @@ class ChatMessageService {
       // load for the old session was in-flight). If so, populate the session's
       // messages (for when the user switches back) but do NOT hijack activeSessionId.
       const currentActive = useChatStore.getState().activeSessionId;
-      const isStaleNavigation = currentActive !== null && currentActive !== message.session_id;
+      const switchState = useSessionSwitchStore.getState();
+      const currentPendingRequestId = switchState.requestId;
+      const currentPendingSession = isPendingSessionRequest(
+        message.session_id,
+        currentPendingRequestId
+      );
+      const isShownSession = currentActive === message.session_id;
+      const hasDifferentPendingTarget =
+        switchState.pending !== null && switchState.pending.sessionId !== message.session_id;
+      const isStaleNavigation =
+        !isShownSession &&
+        !currentPendingSession &&
+        (currentActive !== null || hasDifferentPendingTarget);
+      if (currentPendingSession) {
+        setPendingConversationTitle(
+          getPreferredTitle(message.session_id) ?? message.title,
+          currentPendingRequestId
+        );
+      }
 
       // STREAMING GUARD: If the target session is actively streaming AND has live
       // messages in cache, the cache is authoritative. Disk data has different
@@ -1249,24 +1322,8 @@ class ChatMessageService {
         logger.debug('Skipping conversation:loaded merge — session is actively streaming', {
           sessionId: message.session_id,
         });
-        if (!isStaleNavigation) {
-          const preferredTitle = getPreferredTitle(message.session_id);
-          useFileStore.getState().switchSession(message.session_id);
-          useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore
-            .getState()
-            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
-          useToolStore.getState().switchSession(message.session_id);
-          useUIStore.getState().setLoadingConversation(false);
-          useUIStore.getState().setConversationTransitioning(false);
-        }
         useChatStore.getState().markSessionHydrated(message.session_id);
         return;
-      }
-
-      // Only switch file store if this load is for the active session
-      if (!isStaleNavigation) {
-        useFileStore.getState().switchSession(message.session_id);
       }
 
       startTransition(() => {
@@ -1349,7 +1406,11 @@ class ChatMessageService {
         }
 
         const preferredTitle = getPreferredTitle(message.session_id);
-        const scrollIntent = wasHydrated ? 'session-refresh' : 'session-restore';
+        const scrollIntent = currentPendingSession
+          ? 'pending-verify'
+          : wasHydrated
+            ? 'session-refresh'
+            : 'session-restore';
         const hydratedMessages = hydrateConversationSnapshot({
           sessionId: message.session_id,
           persistedMessages,
@@ -1359,18 +1420,41 @@ class ChatMessageService {
           resolvedMessages: newMessages,
           source: 'event-load',
           title: preferredTitle ?? message.title,
+          activateToolSession: !currentPendingSession,
         });
 
-        // Only switch active session if this load is for the currently active session
-        // (data refresh or initial mount). Skip if the user navigated to a different
-        // session — e.g., created a new session while this load was in-flight.
-        // handleLoadConversation sets activeSession immediately on sidebar click,
-        // so this guard won't break sidebar navigation.
-        if (!isStaleNavigation) {
-          useChatStore.getState().setActiveSession(message.session_id);
-          useUIStore
-            .getState()
-            .setActiveConversation(message.session_id, preferredTitle ?? message.title);
+        if (currentPendingSession) {
+          const pendingTitle =
+            getPendingSessionTitle(message.session_id) ?? preferredTitle ?? message.title;
+          setPendingConversationTitle(pendingTitle, currentPendingRequestId);
+
+          const switchAfterHydrate = useSessionSwitchStore.getState();
+          if (
+            switchAfterHydrate.requestId !== currentPendingRequestId ||
+            switchAfterHydrate.pending?.sessionId !== message.session_id
+          ) {
+            abortSessionSwitch(
+              currentPendingRequestId,
+              switchAfterHydrate.requestId !== currentPendingRequestId
+                ? 'superseded_by_new_request'
+                : 'unexpected_pending_clear'
+            );
+            return;
+          }
+
+          if (hydratedMessages.length === 0) {
+            const isKnownEmptyTarget =
+              useUIStore
+                .getState()
+                .conversations.some(
+                  (conversation) => conversation.sessionId === message.session_id
+                ) || getPendingCreateBySessionId(message.session_id) !== null;
+
+            if (!isKnownEmptyTarget) {
+              abortSessionSwitch(currentPendingRequestId, 'unexpected_pending_clear');
+              return;
+            }
+          }
         }
 
         logger.debug(
@@ -1384,6 +1468,21 @@ class ChatMessageService {
     message: Extract<ExtensionMessage, { type: 'conversation:rewound' }>
   ): void {
     const sid = message.session_id;
+    const switchState = useSessionSwitchStore.getState();
+    if (
+      switchState.pending?.sessionId === message.session_id ||
+      switchState.pending?.sessionId === message.new_session_id
+    ) {
+      abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+    }
+    clearReadyInstances([message.session_id, message.new_session_id]);
+
+    const pendingCreate =
+      getPendingCreateBySessionId(message.session_id) ??
+      getPendingCreateBySessionId(message.new_session_id);
+    if (pendingCreate !== null) {
+      abortPendingCreate(pendingCreate.createRequestId);
+    }
 
     // Cancel RAF batchers (discard stale pre-rewind chunks)
     this.cancelSession(sid);
@@ -1449,6 +1548,14 @@ class ChatMessageService {
   private handleConversationDeleted(
     message: Extract<ExtensionMessage, { type: 'conversation:deleted' }>
   ): void {
+    const switchState = useSessionSwitchStore.getState();
+    if (switchState.pending?.sessionId === message.session_id) {
+      abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+    }
+    const pendingCreate = getPendingCreateBySessionId(message.session_id);
+    if (pendingCreate !== null) {
+      abortPendingCreate(pendingCreate.createRequestId);
+    }
     useToolStore.getState().clearSessionTools(message.session_id);
     useFileStore.getState().clearSessionFiles(message.session_id);
     clearSessionTitleState(message.session_id);

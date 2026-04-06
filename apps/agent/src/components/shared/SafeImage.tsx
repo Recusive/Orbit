@@ -1,6 +1,8 @@
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 
 import type { FC, ImgHTMLAttributes, SyntheticEvent } from 'react';
+
+import { useChatStore } from '@/stores/chat/chat-store';
 
 /**
  * Convert a base64 data: URL to a Blob. Returns null on malformed input.
@@ -51,6 +53,9 @@ function getDataUrlKind(src: string): DataUrlKind {
 
 interface SafeImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   readonly src: string;
+  readonly layoutMutationSessionId?: string;
+  readonly layoutMutationSource?: string;
+  readonly layoutMutationTimeoutMs?: number;
 }
 
 /**
@@ -59,7 +64,15 @@ interface SafeImageProps extends ImgHTMLAttributes<HTMLImageElement> {
  * Prevents large base64 payloads from appearing in the DOM while preserving
  * the original previewUrl in state for later cache patching.
  */
-export const SafeImage: FC<SafeImageProps> = memo(function SafeImage({ src, onError, ...props }) {
+export const SafeImage: FC<SafeImageProps> = memo(function SafeImage({
+  src,
+  onError,
+  onLoad,
+  layoutMutationSessionId,
+  layoutMutationSource,
+  layoutMutationTimeoutMs,
+  ...props
+}) {
   const initialKind = getDataUrlKind(src);
   const [safeSrc, setSafeSrc] = useState<string>(
     initialKind === 'base64' || initialKind === 'invalid' ? '' : src
@@ -67,7 +80,21 @@ export const SafeImage: FC<SafeImageProps> = memo(function SafeImage({ src, onEr
   const [sanitizeFailed, setSanitizeFailed] = useState(initialKind === 'invalid');
   const blobUrlRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
+  const onLoadRef = useRef(onLoad);
+  const layoutMutationTokenRef = useRef<string | null>(null);
   onErrorRef.current = onError;
+  onLoadRef.current = onLoad;
+
+  const finishLayoutMutation = useCallback((): void => {
+    if (!layoutMutationSessionId || layoutMutationTokenRef.current === null) {
+      return;
+    }
+
+    useChatStore
+      .getState()
+      .layoutMutationEnd(layoutMutationSessionId, layoutMutationTokenRef.current);
+    layoutMutationTokenRef.current = null;
+  }, [layoutMutationSessionId]);
 
   useEffect(() => {
     if (blobUrlRef.current !== null) {
@@ -108,13 +135,48 @@ export const SafeImage: FC<SafeImageProps> = memo(function SafeImage({ src, onEr
 
   useEffect(() => {
     if (sanitizeFailed) {
+      finishLayoutMutation();
       onErrorRef.current?.({} as SyntheticEvent<HTMLImageElement>);
     }
-  }, [sanitizeFailed]);
+  }, [finishLayoutMutation, sanitizeFailed]);
+
+  useEffect(() => {
+    finishLayoutMutation();
+    if (!layoutMutationSessionId || !layoutMutationSource || safeSrc === '') {
+      return;
+    }
+
+    layoutMutationTokenRef.current = useChatStore
+      .getState()
+      .layoutMutationStart(layoutMutationSessionId, layoutMutationSource, layoutMutationTimeoutMs);
+
+    return () => {
+      finishLayoutMutation();
+    };
+  }, [
+    finishLayoutMutation,
+    layoutMutationSessionId,
+    layoutMutationSource,
+    layoutMutationTimeoutMs,
+    safeSrc,
+  ]);
 
   if (safeSrc === '') {
     return null;
   }
 
-  return <img {...props} src={safeSrc} onError={onError} />;
+  return (
+    <img
+      {...props}
+      src={safeSrc}
+      onError={(event) => {
+        finishLayoutMutation();
+        onErrorRef.current?.(event);
+      }}
+      onLoad={(event) => {
+        finishLayoutMutation();
+        onLoadRef.current?.(event);
+      }}
+    />
+  );
 });

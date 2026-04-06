@@ -1,5 +1,6 @@
 import { ChevronRight, Code, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -7,6 +8,8 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -19,6 +22,7 @@ const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
 const LINK_SAFETY_DISABLED = { enabled: false } as const;
 const CONTROLS_CONFIG = { table: false } as const;
+const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 
 interface CodeSearchToolWidgetProps {
   readonly toolId: string;
@@ -38,6 +42,14 @@ export const CodeSearchToolWidget: FC<CodeSearchToolWidgetProps> = ({
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const sessionId = useContext(ToolWidgetSessionContext);
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'code-search-markdown',
+    output ?? '',
+    isExpanded && !isRunning && (output?.length ?? 0) > 0,
+    STREAMDOWN_LAYOUT_STABLE_MS
+  );
 
   const statusLabel = isRunning ? 'Searching code' : 'Code Search';
 
@@ -113,7 +125,10 @@ export const CodeSearchToolWidget: FC<CodeSearchToolWidgetProps> = ({
                   </div>
                 ) : output ? (
                   <div className="overflow-auto max-h-[400px]">
-                    <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
+                    <div
+                      ref={contentRef}
+                      className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
+                    >
                       <Streamdown
                         remarkPlugins={REMARK_PLUGINS}
                         rehypePlugins={REHYPE_PLUGINS}

@@ -17,7 +17,7 @@ export interface ConversationListContext {
 export interface ConversationRepository {
   list(context: ConversationListContext): Promise<ConversationSummary[]>;
   load(sessionId: string): Promise<void>;
-  create(input?: { title?: string }): Promise<ConversationSummary>;
+  create(input?: { title?: string; createRequestId?: string }): Promise<ConversationSummary>;
   remove(sessionId: string): Promise<void>;
   updateTitle(sessionId: string, title: string): Promise<void>;
   getActiveSessionKey(): string;
@@ -28,17 +28,23 @@ export interface RestoreSelectionInput {
   readonly listedSessionIds?: Set<string>;
 }
 
+export interface RestoreSelectionResult {
+  readonly status: 'started' | 'missing' | 'skipped';
+  readonly sessionId: string | null;
+  readonly requestId?: number;
+}
+
 export interface ConversationUiBridge {
   getActiveSessionId(): string | null;
   select(sessionId: string): Promise<void>;
-  restoreSelection(input?: RestoreSelectionInput): Promise<void>;
+  restoreSelection(input?: RestoreSelectionInput): Promise<RestoreSelectionResult>;
   getActiveMeta(): {
     id: string | null;
     title: string | null;
     isTitleLoading: boolean;
   };
   list(): ConversationSummary[];
-  create(input?: { title?: string }): Promise<void>;
+  create(input?: { title?: string; createRequestId?: string }): Promise<void>;
   rename(sessionId: string, title: string): Promise<void>;
   remove(sessionId: string): Promise<void>;
   hydrateWorkspace(context: ConversationListContext): Promise<void>;

@@ -16,6 +16,12 @@ import {
 import { toConversationSummaries, toFileNodes } from '@/lib/mappers';
 import { invalidateAllConversationCaches } from '@/lib/query';
 import { getImageMimeType, isImageFile } from '@/lib/utils';
+import {
+  abortPendingCreate,
+  abortSessionSwitch,
+  clearAllReadyInstances,
+} from '@/services/conversations/session-switch-coordinator';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useFileViewerStore } from '@/stores/file/file-viewer-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -74,6 +80,12 @@ export async function handleFileTreeRequest(
       if (uiStore.workspacePath !== targetPath) {
         // Note: LSP workspace initialization is handled reactively by useLsp hook
         // when it receives rootPath from the file store
+        const switchState = useSessionSwitchStore.getState();
+        if (switchState.pending !== null) {
+          abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+        }
+        abortPendingCreate();
+        clearAllReadyInstances();
         await invalidateAllConversationCaches();
         uiStore.initializeWorkspace(targetPath);
       }

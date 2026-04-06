@@ -48,6 +48,9 @@ import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
 } from '@/services/chat/image-attachment-cache';
+import { getConversationUiBridge } from '@/services/conversations';
+import { markPendingCreateAwaitingSystemInit } from '@/services/conversations/session-switch-coordinator';
+import { recordSessionSwitchTrace } from '@/services/conversations/session-switch-trace';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
@@ -57,6 +60,7 @@ import {
   useChatStore,
   useIsAgentRunning,
 } from '@/stores/chat/chat-store';
+import { usePendingSessionId, useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -148,6 +152,8 @@ export function useChatMessages(): UseChatMessagesReturn {
   const messages = useActiveMessages();
   const isAgentRunning = useIsAgentRunning();
   const sessionId = useActiveSessionId() ?? '';
+  const pendingSessionId = usePendingSessionId();
+  const pendingCreate = useSessionSwitchStore((s) => s.pendingCreate);
 
   // ── Communication ─────────────────────────────────────────────────────
   // No onMessage handler — ChatMessageService receives events via the
@@ -157,6 +163,9 @@ export function useChatMessages(): UseChatMessagesReturn {
   // UIStore selectors (only these cause re-renders)
   const workspacePath = useUIStore((s) => s.workspacePath);
   const activeWorktreePath = useUIStore((s) => s.activeWorktreePath);
+  const conversationCount = useUIStore((s) => s.conversations.length);
+  const pendingLoadStrategy = useSessionSwitchStore((s) => s.pending?.loadStrategy ?? 'none');
+  const initialRestoreCompleted = useSessionSwitchStore((s) => s.initialRestoreCompleted);
 
   // ── Compat wrappers ───────────────────────────────────────────────────
   // ChatArea passes these to useQueuedMessageHandler which calls
@@ -273,50 +282,97 @@ export function useChatMessages(): UseChatMessagesReturn {
     }
   }, [sessionId, workspacePath, activeWorktreePath, postMessage]);
 
-  // ── 3. Load messages from backend on session change ───────────────────
-  // Handles initial mount (sessionId from localStorage) and sidebar switching.
-  // ChatStore.loadedSessions tracks which sessions have been loaded to prevent
-  // duplicate conversation:load requests.
+  // ── 3. Restore the last shown session on startup ───────────────────────
   useEffect(() => {
-    if (!sessionId) return;
+    if (sessionId) {
+      useSessionSwitchStore.getState().completeInitialRestore();
+    }
+  }, [sessionId]);
+
+  useEffect(() => {
+    const switchState = useSessionSwitchStore.getState();
+    if (sessionId || switchState.pending !== null || initialRestoreCompleted || !workspacePath) {
+      return;
+    }
+    const attemptKey = `${workspacePath}:${activeWorktreePath ?? ''}:${String(conversationCount)}`;
+    if (!switchState.shouldAttemptInitialRestore(attemptKey)) {
+      return;
+    }
+    recordSessionSwitchTrace({
+      event: 'initial_restore_attempt',
+      sessionId: null,
+      data: {
+        attemptKey,
+        conversationCount,
+        workspacePath,
+        activeWorktreePath,
+      },
+    });
+    void getConversationUiBridge()
+      .restoreSelection()
+      .then((result) => {
+        if (result.status === 'started' && result.requestId !== undefined) {
+          useSessionSwitchStore.getState().markInitialRestorePending(result.requestId);
+          recordSessionSwitchTrace({
+            event: 'initial_restore_pending',
+            requestId: result.requestId,
+            sessionId: result.sessionId,
+            data: {
+              attemptKey,
+            },
+          });
+          return;
+        }
+        if (result.status !== 'started') {
+          useSessionSwitchStore.getState().completeInitialRestore();
+        }
+      });
+  }, [
+    activeWorktreePath,
+    conversationCount,
+    initialRestoreCompleted,
+    pendingSessionId,
+    sessionId,
+    workspacePath,
+  ]);
+
+  // ── 4. Load messages from backend when the current load strategy is slow ─
+  useEffect(() => {
+    const targetSessionId = pendingSessionId ?? sessionId;
+    if (!targetSessionId) return;
+    if (pendingSessionId && pendingLoadStrategy !== 'slow') return;
 
     const chatStore = useChatStore.getState();
-    if (chatStore.isSessionLoaded(sessionId)) return;
+    if (chatStore.isSessionLoaded(targetSessionId)) return;
 
-    // Check if another component (e.g., sidebar) already has a pending load
     const bufferStore = useMessageBufferStore.getState();
-    if (bufferStore.hasLoadPending(sessionId)) {
-      chatStore.markSessionLoaded(sessionId);
-      bufferStore.clearLoadPending(sessionId);
+    if (bufferStore.hasLoadPending(targetSessionId)) {
       return;
     }
 
-    chatStore.markSessionLoaded(sessionId);
-    bufferStore.markLoadPending(sessionId);
+    chatStore.markSessionLoaded(targetSessionId);
+    bufferStore.markLoadPending(targetSessionId);
 
     postMessage({
       type: 'conversation:load',
       uuid: crypto.randomUUID(),
-      session_id: sessionId,
+      session_id: targetSessionId,
     });
-  }, [sessionId, postMessage]);
-
-  // ── 4. Send pending message after conversation creation ───────────────
-  // When handleSend detects no session exists, it stores the message in
-  // ChatStore.pendingMessage and sends conversation:create. The service
-  // sets lastCreatedSessionId on conversation:created. This effect then
-  // sends the actual message.
-  const pendingMessage = useChatStore((s) => s.pendingMessage);
-  const lastCreatedSessionId = useChatStore((s) => s.lastCreatedSessionId);
+  }, [pendingLoadStrategy, pendingSessionId, postMessage, sessionId]);
 
   useEffect(() => {
-    if (!lastCreatedSessionId || !pendingMessage) return;
+    if (pendingCreate?.status !== 'awaiting-first-send' || pendingCreate.payload === null) {
+      return;
+    }
 
-    // Guard: don't send if user already switched to a different session
-    if (lastCreatedSessionId !== (useChatStore.getState().activeSessionId ?? '')) return;
+    const targetSessionId = pendingCreate.effectiveSessionId ?? pendingCreate.draftSessionId;
+    if (!targetSessionId) {
+      return;
+    }
 
-    const { text, contextFiles, images, elements } = pendingMessage;
+    const { text, contextFiles, images, elements } = pendingCreate.payload;
     useChatStore.getState().setPendingMessage(null);
+    markPendingCreateAwaitingSystemInit(pendingCreate.createRequestId);
     const sendableImages = (images ?? []).flatMap((image) =>
       image.data
         ? [
@@ -335,32 +391,32 @@ export function useChatMessages(): UseChatMessagesReturn {
       postMessage({
         type: 'thinking:set',
         uuid: crypto.randomUUID(),
-        session_id: lastCreatedSessionId,
+        session_id: targetSessionId,
         mode: toolState.thinkingMode,
       });
     }
     postMessage({
       type: 'model:set',
       uuid: crypto.randomUUID(),
-      session_id: lastCreatedSessionId,
+      session_id: targetSessionId,
       model: toolState.model,
     });
     if (isAdaptiveThinkingModel(toolState.model)) {
       postMessage({
         type: 'effort:set',
         uuid: crypto.randomUUID(),
-        session_id: lastCreatedSessionId,
+        session_id: targetSessionId,
         effort: toolState.effortLevel,
       });
     }
 
     // Update title immediately, then kick off async title generation.
-    applySessionTitle(lastCreatedSessionId, generateFallbackTitle(text || 'Image conversation'));
-    generateAITitle(lastCreatedSessionId, text || 'Image conversation');
+    applySessionTitle(targetSessionId, generateFallbackTitle(text || 'Image conversation'));
+    generateAITitle(targetSessionId, text || 'Image conversation');
 
     // Build user message
     const chatStore = useChatStore.getState();
-    const session = chatStore.sessions[lastCreatedSessionId];
+    const session = chatStore.sessions[targetSessionId];
     const msgs = session?.messages ?? [];
     const lastMsg = msgs[msgs.length - 1];
     const parentUuid = lastMsg?.id ?? null;
@@ -376,20 +432,20 @@ export function useChatMessages(): UseChatMessagesReturn {
       parentUuid,
     };
 
-    chatStore.addMessage(lastCreatedSessionId, userMessage);
-    cacheAttachedImagesForMessage(lastCreatedSessionId, userMessage.id, images);
-    chatStore.setAgentRunning(lastCreatedSessionId, true);
+    chatStore.addMessage(targetSessionId, userMessage);
+    cacheAttachedImagesForMessage(targetSessionId, userMessage.id, images);
+    chatStore.setAgentRunning(targetSessionId, true);
 
     // Broadcast for cross-instance sync (Agent ↔ Editor)
     window.dispatchEvent(
       new CustomEvent('orbit:user-message', {
-        detail: { sessionId: lastCreatedSessionId, message: userMessage },
+        detail: { sessionId: targetSessionId, message: userMessage },
       })
     );
 
     // Persist user message to backend
     persistConversationMessage(
-      lastCreatedSessionId,
+      targetSessionId,
       {
         id: userMessage.id,
         role: 'user',
@@ -417,14 +473,14 @@ export function useChatMessages(): UseChatMessagesReturn {
     postMessage({
       type: 'message:send',
       uuid: userMessage.id,
-      session_id: lastCreatedSessionId,
+      session_id: targetSessionId,
       content: text,
       parent_uuid: parentUuid,
       context,
     });
-  }, [lastCreatedSessionId, pendingMessage, postMessage, workspacePath, activeWorktreePath]);
+  }, [activeWorktreePath, pendingCreate, postMessage, workspacePath]);
 
-  // ── 5. Cross-instance user message sync (Agent ↔ Editor) ──────────────
+  // ── 6. Cross-instance user message sync (Agent ↔ Editor) ──────────────
   // Both views share the same ChatStore, but the CustomEvent approach ensures
   // messages are visible even if React trees use separate mount points.
   useEffect(() => {
@@ -443,7 +499,7 @@ export function useChatMessages(): UseChatMessagesReturn {
     };
   }, [sessionId]);
 
-  // ── 6. Sync ToolStore session on activeSessionId change ───────────────
+  // ── 7. Sync ToolStore session on activeSessionId change ───────────────
   // Ensures token usage tracking follows the active session.
   useEffect(() => {
     if (sessionId) {
@@ -454,7 +510,7 @@ export function useChatMessages(): UseChatMessagesReturn {
     }
   }, [sessionId]);
 
-  // ── 7. Dev-mode debug interface ─────────────────────────────────────
+  // ── 8. Dev-mode debug interface ─────────────────────────────────────
   // Exposes chatActions on window.__orbit_debug for DevTools console access.
   // Used by the rewind stress test and manual debugging.
   useEffect(() => {

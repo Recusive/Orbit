@@ -5,4 +5,8 @@ export {
   ToolWidgetSessionContext,
   useToolWidgetExpanded,
 } from './use-tool-widget-state';
+export {
+  useBeginSessionLayoutMutation,
+  useObservedSessionLayoutMutation,
+} from './use-session-layout-mutation';
 export { getShiki, useIsDarkMode } from './use-syntax-highlight';

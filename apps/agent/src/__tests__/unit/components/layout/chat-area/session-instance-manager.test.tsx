@@ -1,13 +1,15 @@
 import { act, render } from '@testing-library/react';
 
 import { SessionInstanceManager } from '@/components/layout/chat-area/SessionInstanceManager';
-import { useChatStore } from '@/stores/chat/chat-store';
 
 interface MockChatMessagesProps {
   readonly sessionId?: string;
   readonly isVisible?: boolean;
-  readonly shouldPrime?: boolean;
-  readonly onReady?: () => void;
+  readonly verificationPhase?: 'hidden' | 'visible' | null;
+  readonly onVerificationResult?: (result: {
+    phase: 'hidden' | 'visible';
+    result: 'hidden-ready' | 'visible-ready' | 'timeout' | 'aborted';
+  }) => void;
 }
 
 const chatMessagesBySession = new Map<string, MockChatMessagesProps>();
@@ -22,16 +24,11 @@ vi.mock('@/components/chat', () => ({
       <div
         data-testid={`mock-chat-messages-${props.sessionId ?? 'unknown'}`}
         data-visible={String(props.isVisible ?? false)}
-        data-prime={String(props.shouldPrime ?? false)}
+        data-phase={props.verificationPhase ?? 'none'}
       />
     );
   },
 }));
-
-function resetStores(): void {
-  useChatStore.setState(useChatStore.getInitialState(), true);
-  chatMessagesBySession.clear();
-}
 
 function getSessionNode(container: HTMLElement, sessionId: string): HTMLElement {
   const node = container.querySelector<HTMLElement>(`[data-session-instance="${sessionId}"]`);
@@ -42,45 +39,46 @@ function getSessionNode(container: HTMLElement, sessionId: string): HTMLElement 
   return node;
 }
 
-describe('SessionInstanceManager handoff', () => {
+describe('SessionInstanceManager', () => {
   beforeEach(() => {
-    resetStores();
+    chatMessagesBySession.clear();
   });
 
   afterEach(() => {
-    resetStores();
+    chatMessagesBySession.clear();
   });
 
-  it('keeps the previous session visible until the next session stabilizes', () => {
-    useChatStore.setState({ activeSessionId: 'session-a' });
-
+  it('keeps the shown session visible while the pending session warms hidden', () => {
+    const onPendingVerificationResult = vi.fn();
     const { container, rerender } = render(
       <SessionInstanceManager
-        activeSessionId="session-a"
+        shownSessionId="session-a"
+        pendingSessionId={undefined}
+        pendingPhase="idle"
+        pendingRequestId={0}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
         onOpenUrl={vi.fn()}
         onCancelQueue={vi.fn()}
         onFeedback={vi.fn()}
+        onPendingVerificationResult={onPendingVerificationResult}
       />
     );
 
-    act(() => {
-      chatMessagesBySession.get('session-a')?.onReady?.();
-    });
-
-    expect(getSessionNode(container, 'session-a')).toHaveAttribute('data-instance-visible', 'true');
-
     rerender(
       <SessionInstanceManager
-        activeSessionId="session-b"
+        shownSessionId="session-a"
+        pendingSessionId="session-b"
+        pendingPhase="hidden-priming"
+        pendingRequestId={1}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
         onOpenUrl={vi.fn()}
         onCancelQueue={vi.fn()}
         onFeedback={vi.fn()}
+        onPendingVerificationResult={onPendingVerificationResult}
       />
     );
 
@@ -91,80 +89,91 @@ describe('SessionInstanceManager handoff', () => {
     );
     expect(getSessionNode(container, 'session-b')).toHaveAttribute('data-instance-prime', 'true');
 
-    useChatStore.setState({ activeSessionId: 'session-b' });
     act(() => {
-      chatMessagesBySession.get('session-b')?.onReady?.();
+      chatMessagesBySession.get('session-b')?.onVerificationResult?.({
+        phase: 'hidden',
+        result: 'hidden-ready',
+      });
     });
 
-    expect(getSessionNode(container, 'session-a')).toHaveAttribute(
-      'data-instance-visible',
-      'false'
+    expect(onPendingVerificationResult).toHaveBeenCalledTimes(1);
+    expect(onPendingVerificationResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-b',
+        requestId: 1,
+        phase: 'hidden',
+        result: 'hidden-ready',
+      })
     );
-    expect(getSessionNode(container, 'session-b')).toHaveAttribute('data-instance-visible', 'true');
   });
 
-  it('switches back to an already stabilized session immediately on revisit', () => {
-    useChatStore.setState({ activeSessionId: 'session-a' });
-
-    const { container, rerender } = render(
+  it('does not surface a stale primed session after the request changes', () => {
+    const onPendingVerificationResult = vi.fn();
+    const { rerender } = render(
       <SessionInstanceManager
-        activeSessionId="session-a"
+        shownSessionId="session-a"
+        pendingSessionId="session-b"
+        pendingPhase="hidden-priming"
+        pendingRequestId={1}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
         onOpenUrl={vi.fn()}
         onCancelQueue={vi.fn()}
         onFeedback={vi.fn()}
+        onPendingVerificationResult={onPendingVerificationResult}
+      />
+    );
+
+    rerender(
+      <SessionInstanceManager
+        shownSessionId="session-a"
+        pendingSessionId="session-d"
+        pendingPhase="hidden-priming"
+        pendingRequestId={4}
+        queuedMessage={null}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+        onPendingVerificationResult={onPendingVerificationResult}
       />
     );
 
     act(() => {
-      chatMessagesBySession.get('session-a')?.onReady?.();
+      chatMessagesBySession.get('session-b')?.onVerificationResult?.({
+        phase: 'hidden',
+        result: 'hidden-ready',
+      });
     });
 
-    useChatStore.setState({ activeSessionId: 'session-b' });
-    rerender(
-      <SessionInstanceManager
-        activeSessionId="session-b"
-        queuedMessage={null}
-        onRewind={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenUrl={vi.fn()}
-        onCancelQueue={vi.fn()}
-        onFeedback={vi.fn()}
-      />
-    );
+    expect(onPendingVerificationResult).not.toHaveBeenCalled();
 
     act(() => {
-      chatMessagesBySession.get('session-b')?.onReady?.();
+      chatMessagesBySession.get('session-d')?.onVerificationResult?.({
+        phase: 'hidden',
+        result: 'hidden-ready',
+      });
     });
 
-    useChatStore.setState({ activeSessionId: 'session-a' });
-    rerender(
-      <SessionInstanceManager
-        activeSessionId="session-a"
-        queuedMessage={null}
-        onRewind={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenUrl={vi.fn()}
-        onCancelQueue={vi.fn()}
-        onFeedback={vi.fn()}
-      />
-    );
-
-    expect(getSessionNode(container, 'session-a')).toHaveAttribute('data-instance-visible', 'true');
-    expect(getSessionNode(container, 'session-b')).toHaveAttribute(
-      'data-instance-visible',
-      'false'
+    expect(onPendingVerificationResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: 'session-d',
+        requestId: 4,
+        phase: 'hidden',
+        result: 'hidden-ready',
+      })
     );
   });
 
   it('keeps the last shown session visible across rapid A to B to C to D switching', () => {
-    useChatStore.setState({ activeSessionId: 'session-a' });
-
     const { container, rerender } = render(
       <SessionInstanceManager
-        activeSessionId="session-a"
+        shownSessionId="session-a"
+        pendingSessionId="session-b"
+        pendingPhase="hidden-priming"
+        pendingRequestId={1}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
@@ -174,14 +183,12 @@ describe('SessionInstanceManager handoff', () => {
       />
     );
 
-    act(() => {
-      chatMessagesBySession.get('session-a')?.onReady?.();
-    });
-
-    useChatStore.setState({ activeSessionId: 'session-b' });
     rerender(
       <SessionInstanceManager
-        activeSessionId="session-b"
+        shownSessionId="session-a"
+        pendingSessionId="session-c"
+        pendingPhase="hidden-priming"
+        pendingRequestId={2}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
@@ -191,23 +198,12 @@ describe('SessionInstanceManager handoff', () => {
       />
     );
 
-    useChatStore.setState({ activeSessionId: 'session-c' });
     rerender(
       <SessionInstanceManager
-        activeSessionId="session-c"
-        queuedMessage={null}
-        onRewind={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenUrl={vi.fn()}
-        onCancelQueue={vi.fn()}
-        onFeedback={vi.fn()}
-      />
-    );
-
-    useChatStore.setState({ activeSessionId: 'session-d' });
-    rerender(
-      <SessionInstanceManager
-        activeSessionId="session-d"
+        shownSessionId="session-a"
+        pendingSessionId="session-d"
+        pendingPhase="hidden-priming"
+        pendingRequestId={3}
         queuedMessage={null}
         onRewind={vi.fn()}
         onOpenFile={vi.fn()}
@@ -231,15 +227,5 @@ describe('SessionInstanceManager handoff', () => {
       'false'
     );
     expect(getSessionNode(container, 'session-d')).toHaveAttribute('data-instance-prime', 'true');
-
-    act(() => {
-      chatMessagesBySession.get('session-d')?.onReady?.();
-    });
-
-    expect(getSessionNode(container, 'session-a')).toHaveAttribute(
-      'data-instance-visible',
-      'false'
-    );
-    expect(getSessionNode(container, 'session-d')).toHaveAttribute('data-instance-visible', 'true');
   });
 });

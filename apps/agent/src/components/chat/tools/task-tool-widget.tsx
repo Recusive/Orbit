@@ -1,5 +1,6 @@
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 import { z } from 'zod';
@@ -8,6 +9,8 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -20,6 +23,7 @@ const LINK_SAFETY_DISABLED = { enabled: false } as const;
 
 // Disable table copy/download controls
 const CONTROLS_CONFIG = { table: false } as const;
+const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 
 // Zod schema for task output content blocks
 const ContentBlockSchema = z
@@ -86,6 +90,15 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const sessionId = useContext(ToolWidgetSessionContext);
+  const renderedOutput = output ? parseTaskOutput(output) : '';
+  const outputRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'task-markdown',
+    renderedOutput,
+    isExpanded && !isRunning && renderedOutput.length > 0,
+    STREAMDOWN_LAYOUT_STABLE_MS
+  );
 
   const formattedType = formatSubagentType(subagentType);
   const statusLabel = isRunning ? 'Running Task' : 'Task';
@@ -169,14 +182,17 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
                     <span>Agent is working on the task...</span>
                   </div>
                 ) : output ? (
-                  <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm">
+                  <div
+                    ref={outputRef}
+                    className="chat-markdown prose prose-sm dark:prose-invert max-w-none text-sm"
+                  >
                     <Streamdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[]}
                       controls={CONTROLS_CONFIG}
                       linkSafety={LINK_SAFETY_DISABLED}
                     >
-                      {parseTaskOutput(output)}
+                      {renderedOutput}
                     </Streamdown>
                   </div>
                 ) : (

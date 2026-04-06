@@ -7,6 +7,7 @@
  */
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -14,6 +15,8 @@ import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -31,6 +34,7 @@ const CONTROLS_CONFIG = { table: false } as const;
 // This is critical for Streamdown performance as it compares plugin arrays by reference
 const REMARK_PLUGINS = [remarkGfm];
 const REHYPE_PLUGINS: never[] = [];
+const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 
 interface PlanToolWidgetProps {
   readonly toolId: string;
@@ -52,6 +56,14 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId, true);
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const sessionId = useContext(ToolWidgetSessionContext);
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'plan-markdown',
+    content,
+    isExpanded && content.trim().length > 0,
+    STREAMDOWN_LAYOUT_STABLE_MS
+  );
 
   const fileName = filePath.split('/').pop() ?? filePath;
 
@@ -127,7 +139,10 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
               <div className="overflow-auto max-h-[400px]">
                 <div className="p-3">
                   {content.trim() ? (
-                    <div className="chat-markdown prose prose-sm dark:prose-invert max-w-none">
+                    <div
+                      ref={contentRef}
+                      className="chat-markdown prose prose-sm dark:prose-invert max-w-none"
+                    >
                       <Streamdown
                         remarkPlugins={REMARK_PLUGINS}
                         rehypePlugins={REHYPE_PLUGINS}

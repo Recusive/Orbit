@@ -12,9 +12,15 @@ import { gitWorktreeList, gitWorktreeRemove } from '@/lib/api';
 import { invalidateAllConversationCaches } from '@/lib/query';
 import { isPathEqualOrWithin, isPathWithin } from '@/lib/utils/path-utils';
 import { getConversationUiBridge } from '@/services/conversations';
+import {
+  abortPendingCreate,
+  abortSessionSwitch,
+  clearAllReadyInstances,
+} from '@/services/conversations/session-switch-coordinator';
 import { clearSessionTitleState } from '@/services/session';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -99,6 +105,14 @@ export const useSidebarActions = ({
   const closeSecondarySurface = useUIStore((s) => s.closeSecondarySurface);
   const repoRootPath = useUIStore((s) => s.repoRootPath);
   const bridge = getConversationUiBridge();
+  const abortPendingTransitions = useCallback((): void => {
+    const switchState = useSessionSwitchStore.getState();
+    if (switchState.pending !== null) {
+      abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+    }
+    abortPendingCreate();
+    clearAllReadyInstances();
+  }, []);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -166,6 +180,7 @@ export const useSidebarActions = ({
       if (worktreeList.length === 0) {
         const currentActiveWorktree = useUIStore.getState().activeWorktreePath;
         if (currentActiveWorktree !== null) {
+          abortPendingTransitions();
           await invalidateAllConversationCaches();
           switchToWorktree(null);
           useChatStore.getState().clearActiveSession();
@@ -187,22 +202,35 @@ export const useSidebarActions = ({
       if (!isActiveWorktreeValid) {
         // Reset to main worktree (or first available) when active is invalid/stale
         const fallbackWorktree = mainWorktree ?? worktreeList[0];
+        const isInitialWorktreeBootstrap =
+          currentActiveWorktree === null &&
+          useChatStore.getState().activeSessionId === null &&
+          useSessionSwitchStore.getState().pending !== null;
+
         if (fallbackWorktree) {
           logger.info('Resetting stale activeWorktreePath', {
             stale: currentActiveWorktree,
             newPath: fallbackWorktree.path,
           });
-          await invalidateAllConversationCaches();
+
+          if (!isInitialWorktreeBootstrap) {
+            abortPendingTransitions();
+            await invalidateAllConversationCaches();
+          }
           switchToWorktree(fallbackWorktree.path);
         } else {
           // No worktrees available - clear the active path
+          abortPendingTransitions();
           await invalidateAllConversationCaches();
           switchToWorktree(null);
         }
-        useChatStore.getState().clearActiveSession();
+        if (!isInitialWorktreeBootstrap) {
+          useChatStore.getState().clearActiveSession();
+        }
       } else {
         const currentWorkspace = useUIStore.getState().workspacePath;
         if (currentActiveWorktree && currentWorkspace !== currentActiveWorktree) {
+          abortPendingTransitions();
           await invalidateAllConversationCaches();
           switchToWorktree(currentActiveWorktree);
         }
@@ -214,12 +242,20 @@ export const useSidebarActions = ({
       const current = useUIStore.getState().activeWorktreePath;
       const root = useUIStore.getState().repoRootPath;
       if (current !== null && current !== root) {
+        abortPendingTransitions();
         await invalidateAllConversationCaches();
         switchToWorktree(null);
         useChatStore.getState().clearActiveSession();
       }
     }
-  }, [repoRootPath, workspacePath, setRepoRootPath, setWorktrees, switchToWorktree]);
+  }, [
+    abortPendingTransitions,
+    repoRootPath,
+    setRepoRootPath,
+    setWorktrees,
+    switchToWorktree,
+    workspacePath,
+  ]);
 
   // Auto-load worktrees on workspace change
   useEffect(() => {
@@ -296,6 +332,7 @@ export const useSidebarActions = ({
         );
 
         if (useUIStore.getState().activeWorktreePath === deletingWorktree.path) {
+          abortPendingTransitions();
           await invalidateAllConversationCaches();
         }
         removeWorktree(deletingWorktree.path);
@@ -322,7 +359,7 @@ export const useSidebarActions = ({
         isRemovingWorktreeRef.current = false;
       }
     },
-    [workspacePath, worktreeToDelete, removeWorktree]
+    [abortPendingTransitions, removeWorktree, workspacePath, worktreeToDelete]
   );
 
   /**

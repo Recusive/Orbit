@@ -1,12 +1,14 @@
 import { ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 
 import {
   getShiki,
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useBeginSessionLayoutMutation,
   useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
@@ -43,15 +45,19 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
+  const sessionId = useContext(ToolWidgetSessionContext);
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const [highlightedCommand, setHighlightedCommand] = useState<string>('');
   const [highlightedOutput, setHighlightedOutput] = useState<string>('');
+  const beginCommandLayoutMutation = useBeginSessionLayoutMutation(sessionId, 'bash-command-shiki');
+  const beginOutputLayoutMutation = useBeginSessionLayoutMutation(sessionId, 'bash-output-shiki');
 
   // Syntax highlight the command (responds to theme changes via MutationObserver)
   useEffect(() => {
     let mounted = true;
     const shikiTheme = isDarkMode ? 'github-dark' : 'github-light';
+    const layoutMutation = isExpanded ? beginCommandLayoutMutation() : null;
 
     const highlightCommand = async (): Promise<void> => {
       try {
@@ -71,6 +77,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         if (mounted) {
           setHighlightedCommand('');
         }
+      } finally {
+        layoutMutation?.complete();
       }
     };
 
@@ -78,8 +86,9 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 
     return () => {
       mounted = false;
+      layoutMutation?.complete();
     };
-  }, [command, isDarkMode]);
+  }, [beginCommandLayoutMutation, command, isDarkMode, isExpanded]);
 
   // Syntax highlight the output
   useEffect(() => {
@@ -91,6 +100,7 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
     }
 
     const shikiTheme = isDarkMode ? 'github-dark' : 'github-light';
+    const layoutMutation = isExpanded ? beginOutputLayoutMutation() : null;
 
     const highlightOutput = async (): Promise<void> => {
       try {
@@ -106,6 +116,8 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
         if (mounted) {
           setHighlightedOutput('');
         }
+      } finally {
+        layoutMutation?.complete();
       }
     };
 
@@ -113,8 +125,9 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 
     return () => {
       mounted = false;
+      layoutMutation?.complete();
     };
-  }, [output, isDarkMode]);
+  }, [beginOutputLayoutMutation, isExpanded, output, isDarkMode]);
 
   // Truncate long output for collapsed view
   const maxCollapsedLines = 10;

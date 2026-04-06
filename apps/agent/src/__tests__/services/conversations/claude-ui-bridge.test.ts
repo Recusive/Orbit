@@ -68,6 +68,11 @@ vi.mock('@/lib/query/query-keys', () => ({
 import { claudeUiBridge } from '@/services/conversations/claude-ui-bridge';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useChatStore } from '@/stores/chat/chat-store';
+import {
+  buildSessionReadinessSignature,
+  buildSessionSettledSignature,
+  useSessionSwitchStore,
+} from '@/stores/chat/session-switch-store';
 import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
@@ -84,9 +89,38 @@ function resetStores(): void {
     activeCompactions: {},
     lruOrder: [],
   });
+  useSessionSwitchStore.setState(useSessionSwitchStore.getInitialState(), true);
   useUIStore.setState(useUIStore.getInitialState(), true);
   useFileStore.setState(useFileStore.getInitialState(), true);
   useMessageBufferStore.setState(useMessageBufferStore.getInitialState(), true);
+  document.body.innerHTML = '';
+}
+
+function mountReadySessionInstance(sessionId: string): void {
+  const instance = document.createElement('div');
+  instance.setAttribute('data-session-instance', sessionId);
+  instance.setAttribute('data-instance-generation', '1');
+  instance.setAttribute('data-instance-visible', 'true');
+  instance.setAttribute('data-tail-proof-version', '1');
+
+  const scroller = document.createElement('div');
+  scroller.setAttribute('data-testid', 'virtuoso-scroller');
+  Object.defineProperty(scroller, 'scrollHeight', {
+    configurable: true,
+    value: 1200,
+  });
+  Object.defineProperty(scroller, 'clientHeight', {
+    configurable: true,
+    value: 800,
+  });
+  Object.defineProperty(scroller, 'scrollTop', {
+    configurable: true,
+    writable: true,
+    value: 400,
+  });
+
+  instance.appendChild(scroller);
+  document.body.appendChild(instance);
 }
 
 describe('claudeUiBridge.select', () => {
@@ -133,7 +167,22 @@ describe('claudeUiBridge.select', () => {
     const sessionId = 'cached-session';
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession(sessionId);
+    chatStore.setMessages(
+      sessionId,
+      [{ id: 'message-1', role: 'assistant', content: 'ready', displayedContent: 'ready' }],
+      null
+    );
     chatStore.markSessionHydrated(sessionId);
+    useSessionSwitchStore.getState().setReadyInstance(sessionId, {
+      phase: 'visible',
+      requestId: 0,
+      signature: buildSessionReadinessSignature(useChatStore.getState().sessions[sessionId]) ?? '',
+      settledSignature:
+        buildSessionSettledSignature(useChatStore.getState().sessions[sessionId]) ?? '',
+      tailProofVersion: 1,
+      instanceGeneration: 1,
+    });
+    mountReadySessionInstance(sessionId);
 
     useUIStore.setState({
       conversations: [
@@ -154,13 +203,63 @@ describe('claudeUiBridge.select', () => {
 
     expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().activeSessionId).toBe(sessionId);
-    expect(useChatStore.getState().sessions[sessionId]?.scrollIntent).toBeNull();
     expect(useUIStore.getState().activeConversationId).toBe(sessionId);
     expect(useUIStore.getState().activeConversationTitle).toBe('Cached Title');
     expect(useUIStore.getState().isLoadingConversation).toBe(false);
     expect(useUIStore.getState().isConversationTransitioning).toBe(false);
     expect(useFileStore.getState().currentSessionId).toBe(sessionId);
-    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
+  });
+
+  it('rejects instant reveal when the settled proof no longer matches the live session', async () => {
+    const sessionId = 'stale-ready-session';
+    const chatStore = useChatStore.getState();
+    chatStore.getOrCreateSession(sessionId);
+    chatStore.setMessages(
+      sessionId,
+      [{ id: 'message-1', role: 'assistant', content: 'ready', displayedContent: 'ready' }],
+      null
+    );
+    chatStore.markSessionHydrated(sessionId);
+
+    const staleSignature = buildSessionReadinessSignature(
+      useChatStore.getState().sessions[sessionId]
+    );
+    const staleSettledSignature = buildSessionSettledSignature(
+      useChatStore.getState().sessions[sessionId]
+    );
+    chatStore.markLayoutSettled(sessionId);
+
+    useSessionSwitchStore.getState().setReadyInstance(sessionId, {
+      phase: 'visible',
+      requestId: 0,
+      signature: staleSignature ?? '',
+      settledSignature: staleSettledSignature ?? '',
+      tailProofVersion: 1,
+      instanceGeneration: 1,
+    });
+    mountReadySessionInstance(sessionId);
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Cached Title',
+          updatedAt: 1,
+          messageCount: 1,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+      isLoadingConversation: false,
+      isConversationTransitioning: false,
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(useChatStore.getState().activeSessionId).toBeNull();
+    expect(useUIStore.getState().activeConversationId).toBe('old-session');
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
   });
 
   it('uses the uncached session path for unloaded sessions', async () => {
@@ -183,16 +282,14 @@ describe('claudeUiBridge.select', () => {
 
     await claudeUiBridge.select(sessionId);
 
-    expect(mockLoad).toHaveBeenCalledWith(sessionId);
-    expect(useChatStore.getState().activeSessionId).toBe(sessionId);
-    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('unloaded');
-    expect(useChatStore.getState().sessions[sessionId]?.scrollIntent).toBeNull();
-    expect(useUIStore.getState().activeConversationId).toBe(sessionId);
-    expect(useUIStore.getState().activeConversationTitle).toBe('Fresh Title');
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(useChatStore.getState().activeSessionId).toBeNull();
+    expect(useUIStore.getState().activeConversationId).toBe('old-session');
+    expect(useUIStore.getState().activeConversationTitle).toBe('Old Title');
     expect(useUIStore.getState().isLoadingConversation).toBe(true);
     expect(useUIStore.getState().isConversationTransitioning).toBe(true);
-    expect(useFileStore.getState().currentSessionId).toBe(sessionId);
-    expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(true);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('slow');
   });
 
   it('hydrates directly from a fresh cached conversation', async () => {
@@ -243,9 +340,10 @@ describe('claudeUiBridge.select', () => {
     expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().sessions[sessionId]?.messages).toHaveLength(2);
     expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
-    expect(useUIStore.getState().activeConversationTitle).toBe('Sidebar Title');
-    expect(useUIStore.getState().isLoadingConversation).toBe(false);
-    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useUIStore.getState().activeConversationTitle).toBe('Old Title');
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
   });
 
   it('hydrates direct empty state from a fresh cached empty conversation', async () => {
@@ -279,8 +377,9 @@ describe('claudeUiBridge.select', () => {
     expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().sessions[sessionId]?.messages).toEqual([]);
     expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
-    expect(useUIStore.getState().isLoadingConversation).toBe(false);
-    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
   });
 
   it('joins an in-flight prefetch instead of triggering the slow path load', async () => {
@@ -323,8 +422,10 @@ describe('claudeUiBridge.select', () => {
     expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
     expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().sessions[sessionId]?.messages).toHaveLength(1);
-    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
     expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('query');
   });
 
   it('aborts an in-flight join when conversation generation changes during await', async () => {
@@ -369,7 +470,8 @@ describe('claudeUiBridge.select', () => {
     expect(useUIStore.getState().isLoadingConversation).toBe(false);
     expect(useUIStore.getState().isConversationTransitioning).toBe(false);
     expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
-    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('unloaded');
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
+    expect(useChatStore.getState().sessions[sessionId]).toBeUndefined();
   });
 
   it('aborts an in-flight join when workspace epoch changes during await', async () => {
@@ -414,7 +516,8 @@ describe('claudeUiBridge.select', () => {
     expect(useUIStore.getState().isLoadingConversation).toBe(false);
     expect(useUIStore.getState().isConversationTransitioning).toBe(false);
     expect(useMessageBufferStore.getState().hasLoadPending(sessionId)).toBe(false);
-    expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('unloaded');
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
+    expect(useChatStore.getState().sessions[sessionId]).toBeUndefined();
   });
 
   it('removes query cache before deleting a conversation', async () => {

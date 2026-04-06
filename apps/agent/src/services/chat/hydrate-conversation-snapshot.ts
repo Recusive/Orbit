@@ -42,6 +42,7 @@ export interface HydrateConversationSnapshotInput {
   readonly resolvedMessages?: readonly ChatMessage[] | undefined;
   readonly source: 'event-load' | 'query-fast-path';
   readonly title: string;
+  readonly activateToolSession?: boolean;
 }
 
 export function mapPersistedMessage(message: PersistedChatMessage): ChatMessage {
@@ -249,7 +250,9 @@ export function hydrateConversationSnapshot(
   chatStore.bumpConversationLoadEpoch();
 
   restoreTools(input.sessionId, input.persistedMessages, activeChainIds);
-  useToolStore.getState().switchSession(input.sessionId);
+  if (input.activateToolSession !== false) {
+    useToolStore.getState().switchSession(input.sessionId);
+  }
   seedConversationDetailCache(input);
 
   return messages;

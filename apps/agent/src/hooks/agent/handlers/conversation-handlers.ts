@@ -33,6 +33,7 @@ export function handleConversationCreate(
       type: 'conversation:created',
       uuid: crypto.randomUUID(),
       session_id: sessionId,
+      create_request_id: message.uuid,
       title,
       workspace_path: message.workspace_path,
       worktree_path: message.worktree_path,

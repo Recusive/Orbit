@@ -36,7 +36,7 @@ const logger = createLogger('ChatStore');
 /** Maximum sessions to keep in memory. Beyond this, LRU eviction clears messages. */
 const MAX_IN_MEMORY_SESSIONS = 20;
 
-/** localStorage key for persisting activeSessionId across app restarts */
+/** localStorage key for persisting the last shown session across app restarts */
 const STORAGE_KEY = 'orbit-sessionId';
 
 /**
@@ -74,6 +74,7 @@ export type ScrollIntent =
   | 'history-load'
   | 'compact-reload'
   | 'rewind'
+  | 'pending-verify'
   | 'session-restore'
   | 'session-refresh';
 
@@ -84,6 +85,10 @@ export interface ChatSessionData {
   scrollIntent?: ScrollIntent | null;
   hydrationState: SessionHydrationState;
   layoutVersion: number;
+  layoutPendingCount?: number;
+  layoutSettledVersion?: number;
+  lastLayoutMutationAt?: number | null;
+  layoutLeakDeadlineAt?: number | null;
   virtuosoSizeCache: VirtuosoSizeCache | null;
 }
 
@@ -129,6 +134,9 @@ export interface ChatStoreState {
   setVirtuosoSizeCache: (id: string, cache: VirtuosoSizeCache | null) => void;
   clearVirtuosoSizeCache: (id: string) => void;
   bumpLayoutVersion: (id: string) => void;
+  layoutMutationStart: (sessionId: string, source: string, timeoutMs?: number) => string;
+  layoutMutationEnd: (sessionId: string, mutationToken: string) => void;
+  markLayoutSettled: (id: string) => void;
   appendToLastMessage: (id: string, messageId: string, content: string) => void;
   appendThinking: (id: string, messageId: string, thinking: string) => void;
   addMessage: (id: string, msg: ChatMessage) => void;
@@ -159,18 +167,6 @@ export interface ChatStoreState {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-// Initial localStorage read (synchronous, before store creation)
-// ────────────────────────────────────────────────────────────────────────────
-
-const initialActiveSessionId = ((): string | null => {
-  try {
-    return localStorage.getItem(STORAGE_KEY) ?? null;
-  } catch {
-    return null;
-  }
-})();
-
-// ────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ────────────────────────────────────────────────────────────────────────────
 
@@ -182,8 +178,78 @@ function createEmptySession(): ChatSessionData {
     scrollIntent: null,
     hydrationState: 'unloaded',
     layoutVersion: 0,
+    layoutPendingCount: 0,
+    layoutSettledVersion: 0,
+    lastLayoutMutationAt: null,
+    layoutLeakDeadlineAt: null,
     virtuosoSizeCache: null,
   };
+}
+
+const DEFAULT_LAYOUT_MUTATION_TIMEOUT_MS = 5000;
+
+type LayoutMutationToken = string;
+
+interface LayoutMutationRecord {
+  readonly source: string;
+  readonly startedAt: number;
+  readonly timeoutId: ReturnType<typeof globalThis.setTimeout>;
+  readonly timeoutMs: number;
+}
+
+const layoutMutationRegistry = new Map<string, Map<LayoutMutationToken, LayoutMutationRecord>>();
+let layoutMutationSequence = 0;
+
+function cancelLayoutMutationRecord(record: LayoutMutationRecord | undefined): void {
+  if (!record) {
+    return;
+  }
+
+  globalThis.clearTimeout(record.timeoutId);
+}
+
+function getNextLayoutLeakDeadline(sessionId: string): number | null {
+  const registry = layoutMutationRegistry.get(sessionId);
+  if (!registry || registry.size === 0) {
+    return null;
+  }
+
+  let deadlineAt: number | null = null;
+  for (const record of registry.values()) {
+    const candidate = record.startedAt + record.timeoutMs;
+    deadlineAt = deadlineAt === null ? candidate : Math.min(deadlineAt, candidate);
+  }
+
+  return deadlineAt;
+}
+
+function clearLayoutMutationRuntime(sessionId: string): void {
+  const registry = layoutMutationRegistry.get(sessionId);
+  if (!registry) {
+    return;
+  }
+
+  for (const record of registry.values()) {
+    cancelLayoutMutationRecord(record);
+  }
+
+  layoutMutationRegistry.delete(sessionId);
+}
+
+function noteSynchronousLayoutMutation(session: ChatSessionData, now = Date.now()): void {
+  session.layoutPendingCount ??= 0;
+  session.layoutSettledVersion ??= 0;
+  session.lastLayoutMutationAt = now;
+  if (session.layoutPendingCount === 0) {
+    session.layoutSettledVersion += 1;
+    session.layoutLeakDeadlineAt = null;
+  }
+}
+
+export function clearAllChatLayoutMutationRuntimeState(): void {
+  for (const sessionId of [...layoutMutationRegistry.keys()]) {
+    clearLayoutMutationRuntime(sessionId);
+  }
 }
 
 /**
@@ -266,7 +332,7 @@ export const useChatStore = create<ChatStoreState>()(
     immer((set, get) => ({
       // ── Initial state ───────────────────────────────────────────────
       sessions: {},
-      activeSessionId: initialActiveSessionId,
+      activeSessionId: null,
       lastCreatedSessionId: null,
       pendingMessage: null,
       remappedOrbitIds: {},
@@ -329,6 +395,7 @@ export const useChatStore = create<ChatStoreState>()(
           session.messages = msgs;
           session.scrollIntent = scrollIntent ?? null;
           session.layoutVersion += 1;
+          noteSynchronousLayoutMutation(session);
         });
       },
 
@@ -382,6 +449,84 @@ export const useChatStore = create<ChatStoreState>()(
           const session = draft.sessions[id];
           if (session) {
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
+          }
+        });
+      },
+
+      layoutMutationStart: (sessionId: string, source: string, timeoutMs?: number): string => {
+        const resolvedTimeoutMs = timeoutMs ?? DEFAULT_LAYOUT_MUTATION_TIMEOUT_MS;
+        const token = `layout-mutation-${String(++layoutMutationSequence)}`;
+        const startedAt = Date.now();
+        const deadlineAt = startedAt + resolvedTimeoutMs;
+        const timeoutId = globalThis.setTimeout(() => {
+          logger.warn('Force-closing leaked layout mutation', {
+            mutationToken: token,
+            sessionId,
+            source,
+            timeoutMs: resolvedTimeoutMs,
+          });
+          useChatStore.getState().layoutMutationEnd(sessionId, token);
+        }, resolvedTimeoutMs);
+
+        const sessionRegistry =
+          layoutMutationRegistry.get(sessionId) ?? new Map<string, LayoutMutationRecord>();
+        sessionRegistry.set(token, {
+          source,
+          startedAt,
+          timeoutId,
+          timeoutMs: resolvedTimeoutMs,
+        });
+        layoutMutationRegistry.set(sessionId, sessionRegistry);
+
+        set((draft) => {
+          draft.sessions[sessionId] ??= createEmptySession();
+          const session = draft.sessions[sessionId];
+          session.layoutPendingCount ??= 0;
+          session.layoutPendingCount += 1;
+          session.lastLayoutMutationAt = startedAt;
+          session.layoutLeakDeadlineAt = deadlineAt;
+        });
+
+        return token;
+      },
+
+      layoutMutationEnd: (sessionId: string, mutationToken: string): void => {
+        const sessionRegistry = layoutMutationRegistry.get(sessionId);
+        const record = sessionRegistry?.get(mutationToken);
+        if (!record) {
+          return;
+        }
+
+        cancelLayoutMutationRecord(record);
+        sessionRegistry?.delete(mutationToken);
+        if (sessionRegistry?.size === 0) {
+          layoutMutationRegistry.delete(sessionId);
+        }
+
+        const endedAt = Date.now();
+        set((draft) => {
+          const session = draft.sessions[sessionId];
+          if (!session) {
+            return;
+          }
+
+          session.layoutPendingCount = Math.max(0, (session.layoutPendingCount ?? 0) - 1);
+          session.lastLayoutMutationAt = endedAt;
+          session.layoutLeakDeadlineAt = getNextLayoutLeakDeadline(sessionId);
+          if (session.layoutPendingCount === 0) {
+            session.layoutSettledVersion ??= 0;
+            session.layoutSettledVersion += 1;
+            session.layoutLeakDeadlineAt = null;
+          }
+        });
+      },
+
+      markLayoutSettled: (id: string): void => {
+        set((draft) => {
+          const session = draft.sessions[id];
+          if (session) {
+            noteSynchronousLayoutMutation(session);
           }
         });
       },
@@ -399,6 +544,7 @@ export const useChatStore = create<ChatStoreState>()(
             lastMsg.content += content;
             lastMsg.displayedContent = lastMsg.content;
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
             return;
           }
 
@@ -408,6 +554,7 @@ export const useChatStore = create<ChatStoreState>()(
             target.content += content;
             target.displayedContent = target.content;
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
           }
         });
       },
@@ -426,6 +573,7 @@ export const useChatStore = create<ChatStoreState>()(
 
           target.thinking = (target.thinking ?? '') + thinking;
           session.layoutVersion += 1;
+          noteSynchronousLayoutMutation(session);
         });
       },
 
@@ -437,6 +585,7 @@ export const useChatStore = create<ChatStoreState>()(
           }
           const session = draft.sessions[id];
           session.messages.push(msg);
+          noteSynchronousLayoutMutation(session);
         });
       },
 
@@ -454,6 +603,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (idx >= 0 && existing) {
             session.messages[idx] = updater(existing);
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
           }
         });
       },
@@ -474,6 +624,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (image) {
             image.previewUrl = previewUrl;
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
           }
         });
       },
@@ -494,6 +645,7 @@ export const useChatStore = create<ChatStoreState>()(
             message.attachedImages = undefined;
           }
           session.layoutVersion += 1;
+          noteSynchronousLayoutMutation(session);
         });
       },
 
@@ -506,6 +658,7 @@ export const useChatStore = create<ChatStoreState>()(
           if (msg) {
             msg.id = newId;
             session.layoutVersion += 1;
+            noteSynchronousLayoutMutation(session);
           }
         });
       },
@@ -531,11 +684,16 @@ export const useChatStore = create<ChatStoreState>()(
       },
 
       remapSession: (oldId: string, newId: string): void => {
+        clearLayoutMutationRuntime(oldId);
         set((draft) => {
           // Move session data from old key to new key
           if (draft.sessions[oldId]) {
             draft.sessions[newId] = draft.sessions[oldId];
             Reflect.deleteProperty(draft.sessions, oldId);
+            const session = draft.sessions[newId];
+            session.layoutPendingCount = 0;
+            session.layoutLeakDeadlineAt = null;
+            noteSynchronousLayoutMutation(session);
           }
 
           // Track old ID as remapped (stale ID filter)
@@ -567,6 +725,7 @@ export const useChatStore = create<ChatStoreState>()(
       },
 
       destroySession: (id: string): void => {
+        clearLayoutMutationRuntime(id);
         set((draft) => {
           Reflect.deleteProperty(draft.sessions, id);
           Reflect.deleteProperty(draft.loadedSessions, id);
@@ -750,4 +909,19 @@ export function useSessionHydrationState(sessionId: string): SessionHydrationSta
 /** Layout version for a specific session. */
 export function useSessionLayoutVersion(sessionId: string): number {
   return useChatStore((s) => s.sessions[sessionId]?.layoutVersion ?? 0);
+}
+
+/** Pending async layout work for a specific session. */
+export function useSessionLayoutPendingCount(sessionId: string): number {
+  return useChatStore((s) => s.sessions[sessionId]?.layoutPendingCount ?? 0);
+}
+
+/** Settled layout version for a specific session. */
+export function useSessionLayoutSettledVersion(sessionId: string): number {
+  return useChatStore((s) => s.sessions[sessionId]?.layoutSettledVersion ?? 0);
+}
+
+/** Timestamp of the most recent layout mutation for a specific session. */
+export function useSessionLastLayoutMutationAt(sessionId: string): number | null {
+  return useChatStore((s) => s.sessions[sessionId]?.lastLayoutMutationAt ?? null);
 }

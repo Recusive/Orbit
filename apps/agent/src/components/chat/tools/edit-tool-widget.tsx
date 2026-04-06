@@ -2,13 +2,15 @@ import { FileDiff as PierreFileDiff } from '@pierre/diffs/react';
 import { preloadFileDiff } from '@pierre/diffs/ssr';
 import { AlertCircle, ChevronRight, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import {
   DiffStat,
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useBeginSessionLayoutMutation,
   useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
@@ -48,7 +50,9 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
   const isFailed = success === false;
   const shouldReduceMotion = useReducedMotion();
   const isDarkMode = useIsDarkMode();
+  const sessionId = useContext(ToolWidgetSessionContext);
   const themeType: 'dark' | 'light' = isDarkMode ? 'dark' : 'light';
+  const beginLayoutMutation = useBeginSessionLayoutMutation(sessionId, 'edit-diff-preview');
 
   const fileName = filePath.split('/').pop() ?? filePath;
   const oldLines = oldString.split('\n');
@@ -94,6 +98,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
 
     setPreloaded(null);
     setPreloadError(null);
+    const layoutMutation = beginLayoutMutation();
 
     void preloadFileDiff({ fileDiff: diff, options: pierreOptions })
       .then((result) => {
@@ -105,12 +110,24 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
         if (!cancelled) {
           setPreloadError('Failed to load diff preview.');
         }
+      })
+      .finally(() => {
+        layoutMutation.complete();
       });
 
     return () => {
       cancelled = true;
+      layoutMutation.complete();
     };
-  }, [filePath, isExpanded, newString, oldString, pierreOptions, reloadVersion]);
+  }, [
+    beginLayoutMutation,
+    filePath,
+    isExpanded,
+    newString,
+    oldString,
+    pierreOptions,
+    reloadVersion,
+  ]);
 
   const handleFileClick = (e: React.MouseEvent): void => {
     e.preventDefault();

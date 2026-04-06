@@ -39,9 +39,10 @@ export const claudeConversationRepo: ConversationRepository = {
   create(input): Promise<ConversationSummary> {
     const state = useUIStore.getState();
     const title = input?.title ?? 'Untitled';
+    const createRequestId = input?.createRequestId ?? crypto.randomUUID();
     const sessionId = handleConversationCreate({
       type: 'conversation:create',
-      uuid: crypto.randomUUID(),
+      uuid: createRequestId,
       title,
       workspace_path: state.workspacePath ?? undefined,
       worktree_path: state.activeWorktreePath ?? undefined,
