@@ -303,6 +303,8 @@ describe('claudeUiBridge.select', () => {
         title: 'Pending Title',
         sourceSessionId: 'shown-session',
         loadStrategy: 'query',
+        conversationGeneration: 0,
+        workspaceEpoch: 0,
       },
     });
     useUIStore.setState({
@@ -320,6 +322,33 @@ describe('claudeUiBridge.select', () => {
     expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
     expect(useUIStore.getState().isLoadingConversation).toBe(true);
     expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+  });
+
+  it('cancels a pending switch when selecting the currently shown session', async () => {
+    useSessionSwitchStore.setState({
+      requestId: 9,
+      status: 'hidden-priming',
+      pending: {
+        sessionId: 'pending-session',
+        title: 'Pending Title',
+        sourceSessionId: 'shown-session',
+        loadStrategy: 'query',
+        conversationGeneration: 0,
+        workspaceEpoch: 0,
+      },
+    });
+    useUIStore.setState({
+      activeConversationId: 'shown-session',
+      activeConversationTitle: 'Shown Title',
+      isLoadingConversation: true,
+      isConversationTransitioning: true,
+    });
+
+    await claudeUiBridge.select('shown-session');
+
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
   });
 
   it('hydrates directly from a fresh cached conversation', async () => {

@@ -59,42 +59,44 @@ Every mission follows the same structure:
 
 ### Phase 1: Quick Wins (1-2 days total)
 
-| Order | Mission                                                    | Why First                                                                     |
-| ----- | ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1     | [#04 Component Memoization](./04-component-memoization.md) | 30 minutes for measurable FPS improvement. Lowest effort, highest confidence. |
-| 2     | [#03 Store Performance](./03-store-performance.md)         | Fixes the known Immer stale-get() bug and reduces re-render cascade.          |
-| 3     | [#07 Large File Handling](./07-large-file-handling.md)     | Size guards prevent OOM crashes. Small changes, large safety net.             |
+| Order | Mission                                                        | Why First                                                                     |
+| ----- | -------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1     | [#04 Component Memoization](./04-component-memoization.md)     | 30 minutes for measurable FPS improvement. Lowest effort, highest confidence. |
+| 2     | [#03 Store Performance](./03-store-performance.md)             | Fixes the known Immer stale-get() bug and reduces re-render cascade.          |
+| 3     | [#11 Startup & Lazy Loading](./11-startup-and-lazy-loading.md) | Defer 1.2MB from critical path. Pairs with #04 (tool widgets).                |
+| 4     | [#07 Large File Handling](./07-large-file-handling.md)         | Size guards prevent OOM crashes. Small changes, large safety net.             |
 
 ### Phase 2: Core Architecture (5-8 days total)
 
 | Order | Mission                                                      | Why Now                                                                      |
 | ----- | ------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| 4     | [#02 Streaming Backpressure](./02-streaming-backpressure.md) | Directly improves the most common user experience (watching tokens stream).  |
-| 5     | [#01 Web Workers](./01-web-workers.md)                       | Moves the heaviest main-thread work (Shiki, markdown) off the critical path. |
-| 6     | [#05 Sidecar Resilience](./05-sidecar-resilience.md)         | Health checks and auto-restart prevent "dead app" state.                     |
+| 5     | [#02 Streaming Backpressure](./02-streaming-backpressure.md) | Directly improves the most common user experience (watching tokens stream).  |
+| 6     | [#01 Web Workers](./01-web-workers.md)                       | Moves the heaviest main-thread work (Shiki, markdown) off the critical path. |
+| 7     | [#05 Sidecar Resilience](./05-sidecar-resilience.md)         | Health checks and auto-restart prevent "dead app" state.                     |
 
 ### Phase 3: Production Polish (5-8 days total)
 
 | Order | Mission                                              | Why Last                                                                                   |
 | ----- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 7     | [#06 Error Resilience](./06-error-resilience.md)     | Global error handling catches everything the specific fixes above miss.                    |
-| 8     | [#08 Priority Scheduler](./08-priority-scheduler.md) | Evaluate need after Phases 1-2; may not be necessary if workers + backpressure solve jank. |
-| 9     | [#10 Observability](./10-observability.md)           | Structured logging and tracing make all future debugging faster.                           |
-| 10    | [#09 Memory Discipline](./09-memory-discipline.md)   | Long-session stability; requires observability (#10) to validate.                          |
+| 8     | [#06 Error Resilience](./06-error-resilience.md)     | Global error handling catches everything the specific fixes above miss.                    |
+| 9     | [#08 Priority Scheduler](./08-priority-scheduler.md) | Evaluate need after Phases 1-2; may not be necessary if workers + backpressure solve jank. |
+| 10    | [#10 Observability](./10-observability.md)           | Structured logging and tracing make all future debugging faster.                           |
+| 11    | [#09 Memory Discipline](./09-memory-discipline.md)   | Long-session stability; requires observability (#10) to validate.                          |
 
 ---
 
 ## Mission Index
 
-| #   | Mission                | File                                                           | Complexity               |
-| --- | ---------------------- | -------------------------------------------------------------- | ------------------------ |
-| 01  | Web Workers            | [01-web-workers.md](./01-web-workers.md)                       | Large (3-5 days)         |
-| 02  | Streaming Backpressure | [02-streaming-backpressure.md](./02-streaming-backpressure.md) | Medium (2-3 days)        |
-| 03  | Store Performance      | [03-store-performance.md](./03-store-performance.md)           | Medium (2-3 days)        |
-| 04  | Component Memoization  | [04-component-memoization.md](./04-component-memoization.md)   | Small (30 min - 2 hours) |
-| 05  | Sidecar Resilience     | [05-sidecar-resilience.md](./05-sidecar-resilience.md)         | Large (3-5 days)         |
-| 06  | Error Resilience       | [06-error-resilience.md](./06-error-resilience.md)             | Medium (2-3 days)        |
-| 07  | Large File Handling    | [07-large-file-handling.md](./07-large-file-handling.md)       | Medium (2-3 days)        |
-| 08  | Priority Scheduler     | [08-priority-scheduler.md](./08-priority-scheduler.md)         | Large (3-5 days)         |
-| 09  | Memory Discipline      | [09-memory-discipline.md](./09-memory-discipline.md)           | Medium (2-3 days)        |
-| 10  | Observability          | [10-observability.md](./10-observability.md)                   | Medium (2-3 days)        |
+| #   | Mission                | File                                                               | Complexity               |
+| --- | ---------------------- | ------------------------------------------------------------------ | ------------------------ |
+| 01  | Web Workers            | [01-web-workers.md](./01-web-workers.md)                           | Large (3-5 days)         |
+| 02  | Streaming Backpressure | [02-streaming-backpressure.md](./02-streaming-backpressure.md)     | Medium (2-3 days)        |
+| 03  | Store Performance      | [03-store-performance.md](./03-store-performance.md)               | Medium (2-3 days)        |
+| 04  | Component Memoization  | [04-component-memoization.md](./04-component-memoization.md)       | Small (30 min - 2 hours) |
+| 05  | Sidecar Resilience     | [05-sidecar-resilience.md](./05-sidecar-resilience.md)             | Large (3-5 days)         |
+| 06  | Error Resilience       | [06-error-resilience.md](./06-error-resilience.md)                 | Medium (2-3 days)        |
+| 07  | Large File Handling    | [07-large-file-handling.md](./07-large-file-handling.md)           | Medium (2-3 days)        |
+| 08  | Priority Scheduler     | [08-priority-scheduler.md](./08-priority-scheduler.md)             | Large (3-5 days)         |
+| 09  | Memory Discipline      | [09-memory-discipline.md](./09-memory-discipline.md)               | Medium (2-3 days)        |
+| 10  | Observability          | [10-observability.md](./10-observability.md)                       | Medium (2-3 days)        |
+| 11  | Startup & Lazy Loading | [11-startup-and-lazy-loading.md](./11-startup-and-lazy-loading.md) | Medium (2-3 days)        |

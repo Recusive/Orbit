@@ -1,16 +1,15 @@
-import { createLogger } from '@orbit/common/lib';
-
 import type { SessionSwitchStatus } from '@/stores/chat/session-switch-store';
 
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 
-const logger = createLogger('SessionSwitchTrace');
 const MAX_TRACE_RECORDS = 50;
 const MAX_TRACE_EVENTS = 300;
 const POST_COMMIT_DRIFT_WINDOW_MS = 1000;
+const POST_COMMIT_DRIFT_CORRECTIVE_MS = 500;
 const POST_COMMIT_DRIFT_POLL_MS = 100;
 const MATERIAL_SCROLL_DELTA_PX = 16;
+const DRIFT_BOTTOM_TOLERANCE_PX = 4;
 
 export type SessionSwitchAbortReason =
   | 'superseded_by_new_request'
@@ -85,6 +84,22 @@ function getChatTraceRoot(sessionId: string | null): HTMLElement | null {
   return document.querySelector<HTMLElement>(
     `[data-session-instance="${escapedSessionId}"] [data-switch-trace-root="true"]`
   );
+}
+
+function getSessionScrollerElement(sessionId: string | null): HTMLElement | null {
+  if (!sessionId || typeof document === 'undefined') {
+    return null;
+  }
+
+  const escapedSessionId =
+    typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+      ? CSS.escape(sessionId)
+      : sessionId.replaceAll('"', '\\"');
+  const instance = document.querySelector<HTMLElement>(
+    `[data-session-instance="${escapedSessionId}"]`
+  );
+
+  return instance?.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]') ?? null;
 }
 
 function readTraceRootNumber(traceRoot: HTMLElement | null, key: string): number | null {
@@ -218,8 +233,6 @@ export function recordSessionSwitchTrace(input: {
   if (record.events.length > MAX_TRACE_EVENTS) {
     record.events.shift();
   }
-
-  logger.debug(`event=${traceEvent.event}`, traceEvent as unknown as Record<string, unknown>);
 }
 
 export function setShownSessionTraceRequest(sessionId: string, requestId: number): void {
@@ -280,9 +293,43 @@ function logPostCommitDrift(
 export function startPostCommitDriftMonitor(requestId: number, sessionId: string): void {
   driftMonitorCleanupBySessionId.get(sessionId)?.();
 
-  let previous = getSessionSwitchGeometrySnapshot(sessionId);
+  const startedAt = Date.now();
+  const committed = getSessionSwitchGeometrySnapshot(sessionId);
+  const committedAtBottom =
+    committed.scrollTop !== null &&
+    committed.bottomTop !== null &&
+    committed.scrollTop >= committed.bottomTop - DRIFT_BOTTOM_TOLERANCE_PX;
+  let previous = committed;
   const timerId = window.setInterval(() => {
-    const next = getSessionSwitchGeometrySnapshot(sessionId);
+    let next = getSessionSwitchGeometrySnapshot(sessionId);
+    const withinCorrectiveWindow = Date.now() - startedAt <= POST_COMMIT_DRIFT_CORRECTIVE_MS;
+
+    if (
+      withinCorrectiveWindow &&
+      committedAtBottom &&
+      next.scrollTop !== null &&
+      next.bottomTop !== null &&
+      next.scrollTop < next.bottomTop - DRIFT_BOTTOM_TOLERANCE_PX
+    ) {
+      const scroller = getSessionScrollerElement(sessionId);
+      if (scroller) {
+        const previousScrollTop = next.scrollTop;
+        scroller.scrollTop = next.bottomTop;
+        next = getSessionSwitchGeometrySnapshot(sessionId);
+        recordSessionSwitchTrace({
+          event: 'drift_corrected',
+          requestId,
+          sessionId,
+          geometry: next,
+          data: {
+            previousScrollTop,
+            correctedScrollTop: next.scrollTop,
+            bottomTop: next.bottomTop,
+          },
+        });
+      }
+    }
+
     logPostCommitDrift(requestId, sessionId, previous, next);
     previous = next;
   }, POST_COMMIT_DRIFT_POLL_MS);
@@ -297,6 +344,110 @@ export function startPostCommitDriftMonitor(requestId: number, sessionId: string
     window.clearTimeout(stopTimerId);
     driftMonitorCleanupBySessionId.delete(sessionId);
   });
+}
+
+// ── Session Switch Timeline ──────────────────────────────────────────
+// Clean waterfall log: one grouped output per switch showing each phase
+// and its cumulative timing from click to reveal.
+
+interface TimelineMark {
+  readonly phase: string;
+  readonly elapsed: number;
+  readonly detail: string;
+}
+
+interface ActiveTimeline {
+  readonly requestId: number;
+  readonly sessionId: string;
+  readonly from: string | null;
+  readonly title: string | null;
+  readonly msgCount: number;
+  readonly startedAt: number;
+  readonly marks: TimelineMark[];
+}
+
+let activeTimeline: ActiveTimeline | null = null;
+
+export function startSwitchTimeline(opts: {
+  readonly requestId: number;
+  readonly sessionId: string;
+  readonly from: string | null;
+  readonly title: string | null;
+  readonly msgCount: number;
+}): void {
+  // End any stale timeline (e.g. if abort didn't clean up)
+  if (activeTimeline !== null) {
+    endSwitchTimeline('aborted', 'superseded');
+  }
+  activeTimeline = {
+    ...opts,
+    startedAt: performance.now(),
+    marks: [],
+  };
+}
+
+export function markSwitchTimeline(phase: string, detail?: string): void {
+  if (activeTimeline === null) return;
+  activeTimeline.marks.push({
+    phase,
+    elapsed: performance.now() - activeTimeline.startedAt,
+    detail: detail ?? '',
+  });
+}
+
+export function endSwitchTimeline(
+  result: 'complete' | 'aborted' | 'timeout' | 'instant',
+  detail?: string
+): void {
+  if (activeTimeline === null) return;
+
+  const timeline = activeTimeline;
+  activeTimeline = null;
+
+  const totalMs = performance.now() - timeline.startedAt;
+  const sid = timeline.sessionId.slice(-6);
+
+  const suffix =
+    result === 'instant'
+      ? `instant, ${String(Math.round(totalMs))}ms`
+      : result === 'aborted'
+        ? `aborted @ ${String(Math.round(totalMs))}ms`
+        : result === 'timeout'
+          ? `timeout @ ${String(Math.round(totalMs))}ms`
+          : `${String(Math.round(totalMs))}ms`;
+
+  // Add final mark
+  timeline.marks.push({
+    phase: result === 'complete' ? 'DONE' : result.toUpperCase(),
+    elapsed: totalMs,
+    detail: detail ?? '',
+  });
+
+  // Format marks as aligned table
+  const maxPhaseLen = Math.max(...timeline.marks.map((m) => m.phase.length));
+  const lines = timeline.marks.map((mark) => {
+    const ms = `${String(Math.round(mark.elapsed))}ms`.padStart(7);
+    const phase = mark.phase.padEnd(maxPhaseLen);
+    return mark.detail !== '' ? `  ${ms}  ${phase}  ${mark.detail}` : `  ${ms}  ${phase}`;
+  });
+
+  // eslint-disable-next-line no-console
+  console.groupCollapsed(
+    `%cSessionSwitch %c#${String(timeline.requestId)} → ${sid}%c (${suffix})`,
+    'color: #7c93c3; font-weight: bold',
+    'color: #e0a866; font-weight: bold',
+    'color: #8a8a8a; font-weight: normal'
+  );
+  // eslint-disable-next-line no-console
+  console.log(
+    `from ${timeline.from?.slice(-6) ?? '—'} · ${String(timeline.msgCount)} msgs · ${timeline.title ?? 'untitled'}`
+  );
+  for (const line of lines) {
+    // eslint-disable-next-line no-console
+    console.log(line);
+  }
+  // eslint-disable-next-line no-console
+  console.groupEnd();
 }
 
 function installTraceDebugHelpers(): void {

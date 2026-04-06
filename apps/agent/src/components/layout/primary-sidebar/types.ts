@@ -26,6 +26,7 @@ export interface SidebarItemProps {
 export interface ConversationItemProps {
   readonly conversation: ConversationSummary;
   readonly active?: boolean;
+  readonly pending?: boolean;
   readonly isEditing?: boolean;
   readonly onClick?: () => void;
   readonly onDoubleClick?: () => void;

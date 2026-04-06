@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useSyncExternalStore } from 'react';
 
 export const ToolWidgetSessionContext = createContext<string>('');
+export const ToolWidgetLayoutFrozenContext = createContext(false);
 
 const expandedState = new Map<string, boolean>();
 const listeners = new Set<() => void>();
@@ -14,6 +15,10 @@ function notify(): void {
 export function clearToolWidgetState(): void {
   expandedState.clear();
   notify();
+}
+
+export function useToolWidgetMotionDisabled(): boolean {
+  return useContext(ToolWidgetLayoutFrozenContext);
 }
 
 export function useToolWidgetExpanded(

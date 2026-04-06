@@ -237,6 +237,8 @@ describe('ChatMessageService conversation hydration', () => {
         title: 'Pending Title',
         sourceSessionId: shownSessionId,
         loadStrategy: 'slow',
+        conversationGeneration: 0,
+        workspaceEpoch: 0,
       },
       requestId: 7,
       status: 'hidden-priming',

@@ -12,11 +12,15 @@
  */
 import { ChevronRight, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 
 import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -92,7 +96,10 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
 }) => {
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
+  const sessionId = useContext(ToolWidgetSessionContext);
 
   const isFailed = success === false;
   const isComplete = !isRunning && success !== undefined;
@@ -105,6 +112,12 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
     question: q,
     answer: answerMap.get(q) ?? '',
   }));
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'ask-user-question-output',
+    JSON.stringify(pairs),
+    isExpanded
+  );
 
   // Nothing to show
   if (pairs.length === 0) return null;
@@ -155,6 +168,7 @@ export const AskUserQuestionWidget: FC<AskUserQuestionWidgetProps> = ({
             }
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
+            ref={contentRef}
           >
             {/* Content */}
             <div className="min-w-0 my-1.5 rounded-xl bg-lg-control overflow-hidden">

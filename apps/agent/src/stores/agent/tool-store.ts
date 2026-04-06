@@ -323,6 +323,10 @@ export interface ToolState {
   // Cache of session data per session (plain object for immer compatibility)
   sessionCache: Record<string, CachedSessionData>;
 
+  // Per-session tool revision. Bumped on render-affecting tool mutations,
+  // regardless of whether a tool currently lives in top-level state or sessionCache.
+  toolRevisions: Record<string, number>;
+
   // Session-specific context window resolved from SDK metadata
   currentContextWindow: number | null;
 
@@ -456,6 +460,18 @@ const initialUsage: UsageData = {
   totalCostUsd: 0,
 };
 
+function resolveToolSessionId(tool: ToolExecution, state: ToolState): string | null {
+  return tool.sessionId ?? state.currentSessionId;
+}
+
+function bumpToolRevision(state: ToolState, sessionId: string | null | undefined): void {
+  if (!sessionId) {
+    return;
+  }
+
+  state.toolRevisions[sessionId] = (state.toolRevisions[sessionId] ?? 0) + 1;
+}
+
 export const useToolStore = create<ToolState>()(
   persist(
     immer((set, get) => ({
@@ -470,6 +486,7 @@ export const useToolStore = create<ToolState>()(
       sessionUsage: { ...initialUsage },
       processedMessageIds: new Set<string>(),
       sessionCache: {},
+      toolRevisions: {},
       currentContextWindow: null,
       sessionModel: null,
       sessionTools: null,
@@ -539,6 +556,7 @@ export const useToolStore = create<ToolState>()(
             tool.toolOutput = toolOutput;
             tool.completedAt = Date.now();
             tool.success = success;
+            bumpToolRevision(state, resolveToolSessionId(tool, state));
 
             // Move to completed
             state.completedTools.push({ ...tool });
@@ -570,6 +588,7 @@ export const useToolStore = create<ToolState>()(
           }
 
           state.activeTools[id] = { ...tool, toolInput };
+          bumpToolRevision(state, resolveToolSessionId(tool, state));
         });
       },
 
@@ -605,6 +624,7 @@ export const useToolStore = create<ToolState>()(
           );
           if (tool) {
             tool.toolInput = { ...tool.toolInput, answers };
+            bumpToolRevision(state, resolveToolSessionId(tool, state));
           }
         });
       },
@@ -730,8 +750,6 @@ export const useToolStore = create<ToolState>()(
       switchSession: (newSessionId: string) => {
         set((state) => {
           const isInitLoad = state.currentSessionId === null;
-          const prevId = state.currentSessionId;
-          const prevToolCount = state.completedTools.length;
 
           if (state.currentSessionId) {
             // Filter tools by session ownership to prevent cross-session contamination.
@@ -829,9 +847,6 @@ export const useToolStore = create<ToolState>()(
               cached.sessionMcpServers !== undefined
                 ? 'restored'
                 : null;
-            logger.debug(
-              `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, restored ${String(cached.completedTools.length)} from cache`
-            );
           } else if (isInitLoad) {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
@@ -840,7 +855,6 @@ export const useToolStore = create<ToolState>()(
             state.sessionTools = null;
             state.sessionMcpServers = null;
             state.sessionMetadataState = null;
-            logger.debug(`switchSession: INIT → ${newSessionId} | no cache (initial load)`);
           } else {
             state.sessionUsage = { ...initialUsage };
             state.processedMessageIds = new Set<string>();
@@ -851,9 +865,6 @@ export const useToolStore = create<ToolState>()(
             state.sessionTools = null;
             state.sessionMcpServers = null;
             state.sessionMetadataState = null;
-            logger.debug(
-              `switchSession: ${String(prevId)} → ${newSessionId} | cached ${String(prevToolCount)} tools, RESET (no cache)`
-            );
           }
 
           state.currentSessionId = newSessionId;
@@ -870,6 +881,10 @@ export const useToolStore = create<ToolState>()(
           if (cached) {
             state.sessionCache[newSessionId] = cached;
             Reflect.deleteProperty(state.sessionCache, oldSessionId);
+          }
+          if (state.toolRevisions[oldSessionId] !== undefined) {
+            state.toolRevisions[newSessionId] = state.toolRevisions[oldSessionId] ?? 0;
+            Reflect.deleteProperty(state.toolRevisions, oldSessionId);
           }
 
           // If the store is currently tracking the old session, update the reference
@@ -974,15 +989,13 @@ export const useToolStore = create<ToolState>()(
         }[],
         sessionId?: string
       ) => {
-        logger.debug(
-          `restoreToolsForMessage: msgId=${messageId}, toolCount=${String(tools.length)}, names=[${tools.map((t) => t.name).join(', ')}]`
-        );
         set((state) => {
-          const targetSessionId = sessionId ?? state.currentSessionId ?? undefined;
-          const existingCompletedTools =
-            targetSessionId !== undefined && targetSessionId !== state.currentSessionId
-              ? [...(state.sessionCache[targetSessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS)]
-              : [...state.completedTools];
+          const targetSessionId = sessionId ?? state.currentSessionId ?? null;
+          const writesToLiveSession =
+            targetSessionId === null || targetSessionId === state.currentSessionId;
+          const existingCompletedTools = !writesToLiveSession
+            ? [...(state.sessionCache[targetSessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS)]
+            : [...state.completedTools];
 
           // Convert persisted tool data to ToolExecution format.
           // If a tool already exists (e.g., from localStorage rehydration), UPDATE it
@@ -1004,7 +1017,7 @@ export const useToolStore = create<ToolState>()(
               success: tool.success,
               contentOffset: tool.contentOffset,
               ordinal: tool.ordinal,
-              sessionId: targetSessionId,
+              sessionId: targetSessionId ?? undefined,
             };
 
             if (existingIdx >= 0) {
@@ -1031,11 +1044,11 @@ export const useToolStore = create<ToolState>()(
             }
           }
 
-          if (targetSessionId === state.currentSessionId) {
+          if (writesToLiveSession) {
             state.completedTools = existingCompletedTools;
           }
 
-          if (targetSessionId) {
+          if (targetSessionId !== null) {
             const existingCache = state.sessionCache[targetSessionId];
             state.sessionCache[targetSessionId] = {
               usage: existingCache?.usage ?? { ...initialUsage },
@@ -1047,10 +1060,8 @@ export const useToolStore = create<ToolState>()(
               sessionTools: existingCache?.sessionTools,
               sessionMcpServers: existingCache?.sessionMcpServers,
             };
+            bumpToolRevision(state, targetSessionId);
           }
-          logger.debug(
-            `restoreToolsForMessage DONE: total completedTools=${String(existingCompletedTools.length)}, cached for session=${String(targetSessionId)}`
-          );
         });
       },
 
@@ -1068,6 +1079,7 @@ export const useToolStore = create<ToolState>()(
 
           // Remove from sessionCache (Reflect.deleteProperty avoids eslint no-dynamic-delete)
           Reflect.deleteProperty(state.sessionCache, sessionId);
+          Reflect.deleteProperty(state.toolRevisions, sessionId);
         });
       },
 
@@ -1084,6 +1096,7 @@ export const useToolStore = create<ToolState>()(
           state.sessionUsage = { ...initialUsage };
           state.processedMessageIds = new Set<string>();
           state.sessionCache = {};
+          state.toolRevisions = {};
           state.currentContextWindow = null;
           state.sessionModel = null;
           state.sessionTools = null;

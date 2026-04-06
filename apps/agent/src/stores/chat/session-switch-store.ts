@@ -15,6 +15,8 @@ export interface PendingSessionSwitch {
   title: string | null;
   sourceSessionId: string | null;
   loadStrategy: PendingLoadStrategy;
+  conversationGeneration: number;
+  workspaceEpoch: number;
 }
 
 export interface ReadyInstanceRecord {
@@ -49,7 +51,9 @@ export interface SessionSwitchState {
   beginSessionSwitch: (
     sessionId: string,
     title: string | null,
-    sourceSessionId: string | null
+    sourceSessionId: string | null,
+    conversationGeneration: number,
+    workspaceEpoch: number
   ) => number;
   promotePendingToVisibleVerification: (requestId: number) => boolean;
   setPendingConversationTitle: (title: string | null, requestId?: number) => void;
@@ -57,6 +61,8 @@ export interface SessionSwitchState {
   retargetPendingSession: (
     currentSessionId: string,
     nextSessionId: string,
+    conversationGeneration: number,
+    workspaceEpoch: number,
     title?: string | null,
     requestId?: number
   ) => boolean;
@@ -156,7 +162,13 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
   initialRestorePendingRequestId: null,
   lastInitialRestoreAttemptKey: null,
 
-  beginSessionSwitch: (sessionId, title, sourceSessionId): number => {
+  beginSessionSwitch: (
+    sessionId,
+    title,
+    sourceSessionId,
+    conversationGeneration,
+    workspaceEpoch
+  ): number => {
     let nextRequestId = 0;
     set((state) => {
       nextRequestId = state.requestId + 1;
@@ -168,6 +180,8 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
           title,
           sourceSessionId,
           loadStrategy: 'none',
+          conversationGeneration,
+          workspaceEpoch,
         },
       };
     });
@@ -219,7 +233,14 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
     });
   },
 
-  retargetPendingSession: (currentSessionId, nextSessionId, title, requestId): boolean => {
+  retargetPendingSession: (
+    currentSessionId,
+    nextSessionId,
+    conversationGeneration,
+    workspaceEpoch,
+    title,
+    requestId
+  ): boolean => {
     let retargeted = false;
     set((state) => {
       if (
@@ -234,6 +255,8 @@ export const useSessionSwitchStore = create<SessionSwitchState>((set, get) => ({
         pending: {
           ...state.pending,
           sessionId: nextSessionId,
+          conversationGeneration,
+          workspaceEpoch,
           ...(title !== undefined ? { title } : {}),
         },
       };

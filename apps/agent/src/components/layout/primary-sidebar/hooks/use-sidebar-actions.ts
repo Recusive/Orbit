@@ -279,12 +279,9 @@ export const useSidebarActions = ({
   const handleLoadConversation = useCallback(
     (sessionId: string): void => {
       closeSecondarySurface();
-      if (sessionId === activeConversationId) {
-        return;
-      }
       void bridge.select(sessionId);
     },
-    [activeConversationId, bridge, closeSecondarySurface]
+    [bridge, closeSecondarySurface]
   );
 
   const handleOpenQuickSearch = useCallback((): void => {

@@ -2,7 +2,9 @@ import { createLogger } from '@orbit/common/lib';
 
 import {
   clearShownSessionTraceRequest,
+  endSwitchTimeline,
   getSessionSwitchGeometrySnapshot,
+  markSwitchTimeline,
   recordSessionSwitchTrace,
   setShownSessionTraceRequest,
   startPostCommitDriftMonitor,
@@ -17,6 +19,10 @@ import type {
   SessionSwitchStatus,
 } from '@/stores/chat';
 
+import {
+  getConversationGeneration,
+  getWorkspaceEpoch,
+} from '@/lib/query/conversation-detail-cache';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -49,18 +55,21 @@ export function beginSessionSwitch(targetSessionId: string, title: string | null
   }
 
   const shownSessionId = useChatStore.getState().activeSessionId;
+  const conversationGeneration = getConversationGeneration(targetSessionId);
+  const workspaceEpoch = getWorkspaceEpoch();
   const requestId = useSessionSwitchStore
     .getState()
-    .beginSessionSwitch(targetSessionId, title, shownSessionId);
+    .beginSessionSwitch(
+      targetSessionId,
+      title,
+      shownSessionId,
+      conversationGeneration,
+      workspaceEpoch
+    );
 
   useUIStore.getState().setLoadingConversation(true);
   useUIStore.getState().setConversationTransitioning(true);
 
-  logger.debug('Begin session switch', {
-    requestId,
-    shownSessionId,
-    targetSessionId,
-  });
   recordSessionSwitchTrace({
     event: 'begin_switch',
     requestId,
@@ -87,10 +96,7 @@ export function promotePendingToVisibleVerification(
   useSessionSwitchStore.getState().setPendingConversationTitle(title, requestId);
   const promoted = useSessionSwitchStore.getState().promotePendingToVisibleVerification(requestId);
   if (promoted) {
-    logger.debug('Promote pending session to visible verification', {
-      requestId,
-      sessionId,
-    });
+    markSwitchTimeline('promote', '→ visible');
     recordSessionSwitchTrace({
       event: 'pending_phase_transition',
       requestId,
@@ -121,19 +127,24 @@ export function retargetPendingSession(
   title?: string | null,
   requestId?: number
 ): boolean {
+  const conversationGeneration = getConversationGeneration(nextSessionId);
+  const workspaceEpoch = getWorkspaceEpoch();
   const retargeted = useSessionSwitchStore
     .getState()
-    .retargetPendingSession(currentSessionId, nextSessionId, title, requestId);
+    .retargetPendingSession(
+      currentSessionId,
+      nextSessionId,
+      conversationGeneration,
+      workspaceEpoch,
+      title,
+      requestId
+    );
   if (!retargeted) {
     return false;
   }
 
   useSessionSwitchStore.getState().clearReadyInstances([currentSessionId, nextSessionId]);
-  logger.debug('Retarget pending session', {
-    currentSessionId,
-    nextSessionId,
-    requestId,
-  });
+  markSwitchTimeline('retarget', `${currentSessionId.slice(-6)} → ${nextSessionId.slice(-6)}`);
   return true;
 }
 
@@ -159,10 +170,7 @@ export function abortSessionSwitch(
   useUIStore.getState().setLoadingConversation(false);
   useUIStore.getState().setConversationTransitioning(false);
 
-  logger.debug('Abort session switch', {
-    pendingSessionId,
-    requestId,
-  });
+  endSwitchTimeline('aborted', reason);
   recordSessionSwitchTrace({
     event: 'abort_switch',
     requestId,
@@ -181,6 +189,17 @@ export function commitSessionReveal(
     return false;
   }
 
+  if (switchState.pending.workspaceEpoch !== getWorkspaceEpoch()) {
+    abortSessionSwitch(requestId, 'stale_workspace_epoch');
+    return false;
+  }
+
+  if (switchState.pending.conversationGeneration !== getConversationGeneration(targetSessionId)) {
+    abortSessionSwitch(requestId, 'stale_conversation_generation');
+    return false;
+  }
+
+  markSwitchTimeline('commit', '');
   recordSessionSwitchTrace({
     event: 'commit_reveal_pre',
     requestId,
@@ -196,10 +215,6 @@ export function commitSessionReveal(
   useMessageBufferStore.getState().clearLoadPending(targetSessionId);
   useSessionSwitchStore.getState().clearPendingSwitch(requestId);
 
-  logger.debug('Commit session reveal', {
-    requestId,
-    targetSessionId,
-  });
   setShownSessionTraceRequest(targetSessionId, requestId);
   recordSessionSwitchTrace({
     event: 'commit_reveal_post',
@@ -208,6 +223,7 @@ export function commitSessionReveal(
     geometry: getSessionSwitchGeometrySnapshot(targetSessionId),
   });
   startPostCommitDriftMonitor(requestId, targetSessionId);
+  endSwitchTimeline('complete');
 
   return true;
 }
@@ -329,11 +345,6 @@ export function hasCurrentReadyInstance(sessionId: string, requestId?: number): 
 
   if (!isLiveReadyInstance(sessionId, readyRecord)) {
     clearReadyInstance(sessionId, readyRecord.instanceGeneration);
-    logger.debug('Rejecting stale ready instance', {
-      sessionId,
-      instanceGeneration: readyRecord.instanceGeneration,
-      requestId,
-    });
     recordSessionSwitchTrace({
       event: 'ready_instance_rejected',
       requestId: requestId ?? readyRecord.requestId,

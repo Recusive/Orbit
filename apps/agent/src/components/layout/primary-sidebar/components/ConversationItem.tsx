@@ -41,6 +41,7 @@ const TITLE_HOVER_MASK = 'linear-gradient(to right, black 85%, transparent 98%)'
 export const ConversationItem: FC<ConversationItemProps> = ({
   conversation,
   active = false,
+  pending = false,
   isEditing = false,
   onClick,
   onDoubleClick,
@@ -58,7 +59,7 @@ export const ConversationItem: FC<ConversationItemProps> = ({
   const submittedRef = useRef(false);
 
   // Hide timestamp when hovering OR when menu is open
-  const showTimestamp = !isHovered && !isMenuOpen;
+  const showTimestamp = !isHovered && !isMenuOpen && !pending;
 
   // Focus and select text when entering edit mode
   useEffect(() => {
@@ -166,10 +167,13 @@ export const ConversationItem: FC<ConversationItemProps> = ({
           isHovered ? 'pr-7' : 'pr-9',
           active
             ? 'bg-foreground/10 text-foreground hover:bg-foreground/15'
-            : 'text-lg-text-secondary hover:text-foreground hover:bg-lg-sidebar-hover'
+            : pending
+              ? 'bg-foreground/[0.06] text-foreground ring-1 ring-inset ring-foreground/10 hover:bg-foreground/[0.09]'
+              : 'text-lg-text-secondary hover:text-foreground hover:bg-lg-sidebar-hover'
         )}
         title={isTitleLoading ? undefined : conversation.title}
         aria-label={conversation.title}
+        aria-busy={pending || undefined}
         onClick={onClick}
         onDoubleClick={(e) => {
           e.preventDefault();
@@ -229,6 +233,9 @@ export const ConversationItem: FC<ConversationItemProps> = ({
             onOpenChange={setIsMenuOpen}
           />
         </div>
+        {pending ? (
+          <span className="absolute right-1.5 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-foreground/50 animate-pulse" />
+        ) : null}
       </>
     </div>
   );

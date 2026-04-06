@@ -10,6 +10,8 @@ import { ConversationItem } from './ConversationItem';
 import type { ConversationSummary } from '@/stores/ui/ui-store';
 import type { FC, ReactNode } from 'react';
 
+import { usePendingSessionId } from '@/stores/chat/session-switch-store';
+
 /** Indentation for conversation items nested under workspace (px) */
 const CONVERSATION_INDENT_PX = 19;
 
@@ -54,6 +56,8 @@ export const ConversationList: FC<ConversationListProps> = ({
   onDeleteConversation,
   onDuplicateConversation,
 }) => {
+  const pendingSessionId = usePendingSessionId();
+
   // Render conversation items with animated expand/collapse
   const renderConversations = (convList: ConversationSummary[], isExpanded: boolean): ReactNode => {
     if (convList.length === 0) return null;
@@ -94,6 +98,7 @@ export const ConversationList: FC<ConversationListProps> = ({
                   key={conv.sessionId}
                   conversation={conv}
                   active={conv.sessionId === activeConversationId}
+                  pending={conv.sessionId === pendingSessionId}
                   isEditing={editingConversationId === conv.sessionId}
                   onClick={() => {
                     onLoadConversation(conv.sessionId);

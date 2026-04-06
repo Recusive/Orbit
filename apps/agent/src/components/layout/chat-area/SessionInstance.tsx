@@ -79,7 +79,7 @@ const HOLDOVER_STYLE: CSSProperties = {
   zIndex: 2,
 };
 
-const VELOCITY_SCROLL_ENABLE_QUIET_MS = 120;
+const VELOCITY_SCROLL_ENABLE_QUIET_MS = 500;
 
 let instanceGenerationCounter = 0;
 
@@ -398,6 +398,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
         sessionId={sessionId}
         isVisible={isActuallyVisible}
         enableVelocityScroll={displayMode === 'shown' && velocityScrollEnabled}
+        skipInitialVelocityPrime={true}
         verificationPhase={verificationPhase}
         verificationKey={verificationKey}
         queuedMessage={queuedMessage}

@@ -1,11 +1,14 @@
 import { ChevronRight, Loader2, Wrench, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { useMemo } from 'react';
+import { useContext, useMemo } from 'react';
 
 import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -57,10 +60,19 @@ export const GenericToolWidget: FC<GenericToolWidgetProps> = ({
 }) => {
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
+  const sessionId = useContext(ToolWidgetSessionContext);
   const title = useMemo(() => formatToolName(toolName), [toolName]);
   const input = useMemo(() => formatValue(toolInput), [toolInput]);
   const output = useMemo(() => formatValue(toolOutput), [toolOutput]);
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'generic-tool-output',
+    `${title}\n${input}\n${output}`,
+    isExpanded
+  );
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -103,6 +115,7 @@ export const GenericToolWidget: FC<GenericToolWidgetProps> = ({
             }
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
+            ref={contentRef}
           >
             <div className="my-1.5 overflow-hidden rounded-xl border border-border-tool bg-tool-output-bg">
               <div className="px-3 py-2">

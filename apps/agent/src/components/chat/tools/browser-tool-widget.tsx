@@ -10,11 +10,15 @@ import {
   XCircle,
 } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 
 import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -164,11 +168,20 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
+  const sessionId = useContext(ToolWidgetSessionContext);
 
   const actionName = extractActionName(toolName);
   const stepLabel = getStepLabel(actionName, toolInput, isRunning);
   const stepIcon = getStepIcon(actionName);
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'browser-output',
+    JSON.stringify({ actionName, stepLabel, toolInput }),
+    isExpanded
+  );
 
   return (
     <div className={cn('min-w-0', isFailed && 'opacity-60')}>
@@ -216,6 +229,7 @@ export const BrowserToolWidget: FC<BrowserToolWidgetProps> = ({
             }
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
+            ref={contentRef}
           >
             {/* Step row: action icon + label */}
             <div className="flex items-center py-1">

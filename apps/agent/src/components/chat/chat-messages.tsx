@@ -16,13 +16,12 @@
  * WARNING: Do NOT add `contain: paint`, `content-visibility: auto`, or
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
-import { createLogger } from '@orbit/common/lib';
 import { VirtuosoMessageList, VirtuosoMessageListLicense } from '@virtuoso.dev/message-list';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
-import { ToolWidgetSessionContext } from './tools/shared';
+import { ToolWidgetLayoutFrozenContext, ToolWidgetSessionContext } from './tools/shared';
 
 import type { ChatMessage } from './messages';
 import type { SessionSwitchTraceGeometry } from '@/services/conversations/session-switch-trace';
@@ -40,6 +39,7 @@ import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import {
   getShownSessionTraceRequest,
+  markSwitchTimeline,
   recordSessionSwitchTrace,
 } from '@/services/conversations/session-switch-trace';
 import {
@@ -55,8 +55,6 @@ import {
 } from '@/stores/chat/chat-store';
 import { getRenderCache } from '@/stores/chat/render-cache-store';
 import { useSessionSwitchRequestId } from '@/stores/chat/session-switch-store';
-
-const logger = createLogger('ChatMessages');
 
 /** Constant empty array — prevents a new [] allocation per no-tool message
  *  on every Virtuoso item re-render (e.g., container resize). */
@@ -204,6 +202,7 @@ interface ChatMessagesProps {
   readonly sessionId?: string;
   readonly isVisible?: boolean;
   readonly enableVelocityScroll?: boolean;
+  readonly skipInitialVelocityPrime?: boolean;
   readonly shouldPrime?: boolean;
   readonly readinessKey?: string | null;
   readonly verificationPhase?: 'hidden' | 'visible' | null;
@@ -315,6 +314,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   sessionId,
   isVisible = true,
   enableVelocityScroll = true,
+  skipInitialVelocityPrime = false,
   shouldPrime = false,
   readinessKey = null,
   verificationPhase = null,
@@ -346,6 +346,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     onUserScrollStart: () => {
       setHasUserScrolled(true);
     },
+    skipInitialPrime: skipInitialVelocityPrime,
     traceRequestId: shownTraceRequestId,
     traceSessionId: sessionId ?? null,
   });
@@ -442,8 +443,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return ids;
   }, [messages]);
 
-  const sid = (sessionId ?? '').slice(-6);
-
   const scrollIntent = useChatStore(
     (state) => state.sessions[sessionId ?? '']?.scrollIntent ?? null
   );
@@ -509,44 +508,21 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const store = useChatStore.getState();
     const session = store.sessions[sessionId];
     let cache = session?.virtuosoSizeCache ?? null;
-    let cacheSource: 'session' | 'persistent' | null = cache ? 'session' : null;
-    if (!cache) {
-      cache = getRenderCache(sessionId);
-      if (cache) {
-        cacheSource = 'persistent';
-      }
-    }
+    cache ??= getRenderCache(sessionId);
     if (!cache || !session) return;
     if (cache.layoutVersion !== session.layoutVersion) {
-      logger.debug(`[${sid}] Skip size cache restore: layout version mismatch`, {
-        cacheLayoutVersion: cache.layoutVersion,
-        sessionLayoutVersion: session.layoutVersion,
-      });
       return;
     }
     if (cache.messageCount !== session.messages.length) {
-      logger.debug(`[${sid}] Skip size cache restore: message count mismatch`, {
-        cacheMessageCount: cache.messageCount,
-        sessionMessageCount: session.messages.length,
-      });
       return;
     }
     if (cache.lastMessageId !== (session.messages.at(-1)?.id ?? null)) {
-      logger.debug(`[${sid}] Skip size cache restore: last message mismatch`, {
-        cacheLastMessageId: cache.lastMessageId,
-        sessionLastMessageId: session.messages.at(-1)?.id ?? null,
-      });
       return;
     }
 
     listRef.current?.setSizeRanges([...cache.ranges]);
     restoredSizeCacheRef.current = true;
-    logger.debug(`[${sid}] Restored size cache`, {
-      source: cacheSource,
-      messageCount: cache.messageCount,
-      rangeCount: cache.ranges.length,
-    });
-  }, [sessionId, sid]);
+  }, [sessionId]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -582,7 +558,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // items in an empty array: "Failed binary finding record, searched for 0".
     // This happens during session transitions when messages briefly becomes [].
     if (renderRows.length === 0) {
-      logger.debug(`[${sid}] scrollModifier: empty data`);
       return { data: renderRows };
     }
 
@@ -590,9 +565,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (scrollIntent !== null) {
       switch (scrollIntent) {
         case 'history-load':
-          logger.debug(`[${sid}] scrollModifier: history-load → item-location(0,start)`, {
-            msgCount: messages.length,
-          });
           return {
             data: renderRows,
             scrollModifier: {
@@ -601,16 +573,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             },
           };
         case 'compact-reload':
-          logger.debug(`[${sid}] scrollModifier: compact-reload → items-change(auto)`);
           return {
             data: renderRows,
             scrollModifier: { type: 'items-change', behavior: 'auto' },
           };
         case 'pending-verify':
-          logger.debug(`[${sid}] scrollModifier: pending-verify → plain data`, {
-            msgCount: messages.length,
-            prevCount: prevMessageCount.current,
-          });
           return {
             data: renderRows,
           };
@@ -620,27 +587,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           // the data prop's scrollModifier. The data-prop approach fails
           // because clearing the intent triggers a second render that passes
           // plain data, which can cancel the pending scroll.
-          logger.debug(
-            `[${sid}] scrollModifier: session-restore → plain data (imperative scroll)`,
-            {
-              msgCount: messages.length,
-              prevCount: prevMessageCount.current,
-            }
-          );
           return {
             data: renderRows,
           };
         case 'session-refresh':
           // Session refresh: backend re-sent the same data. Preserve scroll position.
-          logger.debug(`[${sid}] scrollModifier: session-refresh → plain data (no modifier)`, {
-            msgCount: messages.length,
-            prevCount: prevMessageCount.current,
-          });
           return {
             data: renderRows,
           };
         case 'rewind':
-          logger.debug(`[${sid}] scrollModifier: rewind → remove-from-end`);
           return {
             data: renderRows,
             scrollModifier: 'remove-from-end',
@@ -665,9 +620,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (messages.length === prevLength) {
       // Streaming: existing items changed content (same count).
       // The library auto-scrolls if previously at bottom.
-      logger.debug(`[${sid}] scrollModifier: heuristic items-change(smooth)`, {
-        count: messages.length,
-      });
       return {
         data: renderRows,
         scrollModifier: { type: 'items-change', behavior: 'smooth' },
@@ -675,10 +627,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     // Append: new message(s) arrived.
-    logger.debug(`[${sid}] scrollModifier: heuristic auto-scroll-to-bottom`, {
-      prevLength,
-      newLength: messages.length,
-    });
     return {
       data: renderRows,
       scrollModifier: {
@@ -687,7 +635,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           atBottom ? 'smooth' : false,
       },
     };
-  }, [isVerifying, messages, renderRows, scrollIntent, sid]);
+  }, [isVerifying, messages, renderRows, scrollIntent]);
 
   const messageListContext = useMemo(
     (): MessageListContext => ({
@@ -744,18 +692,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     previousOverscanPhaseRef.current = overscanPhase;
-    logger.debug(`[${sid}] Overscan phase`, {
-      overscanPhase,
-      overscan,
-      isReadyForSteady,
-      hasUserScrolled,
-      isVerifying,
-      isVisible,
-    });
     if (import.meta.env.DEV) {
       performance.mark('overscan-phase-change');
     }
-  }, [hasUserScrolled, isReadyForSteady, isVerifying, isVisible, overscan, overscanPhase, sid]);
+  }, [hasUserScrolled, isReadyForSteady, isVerifying, isVisible, overscan, overscanPhase]);
 
   // Stable key function — avoids creating a new closure on each render.
   // Virtuoso compares the function reference; a new ref can force item re-renders.
@@ -851,9 +791,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         childList: true,
         subtree: true,
       });
-      logger.debug(`[${sid}] Waiting for list surface`, {
-        hasScroller: true,
-      });
     }
 
     surfaceWaitRafRef.current ??= requestAnimationFrame(() => {
@@ -865,7 +802,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     });
 
     return false;
-  }, [sid]);
+  }, []);
 
   const getScrollerMetrics = useCallback((): ScrollerMetrics | null => {
     const scroller = listRef.current?.scrollerElement();
@@ -889,11 +826,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         '[data-testid="virtuoso-list"]'
       );
       if (!listElement) {
-        logger.debug(`[${sid}] Render surface missing list element`, {
-          bottomTop: metrics.bottomTop,
-          clientHeight: metrics.clientHeight,
-          scrollHeight: metrics.scrollHeight,
-        });
         return null;
       }
 
@@ -911,7 +843,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         tailSentinelRendered,
       };
     },
-    [getScrollerMetrics, sid]
+    [getScrollerMetrics]
   );
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
@@ -950,9 +882,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       purgeItemSizes: true,
     });
     alignScrollerToBottom();
-    logger.debug(`[${sid}] Forcing tail probe render`, {
-      rowCount: renderRows.length,
-    });
     recordSessionSwitchTrace({
       event: 'tail_probe_start',
       requestId: currentTraceRequestId,
@@ -981,7 +910,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     currentTraceRequestId,
     renderRows,
     sessionId,
-    sid,
   ]);
 
   const emitVerificationResult = useCallback(
@@ -1020,20 +948,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const signalReady = useCallback(
     (reason: 'stabilized'): void => {
+      void reason;
       if (!effectiveVerificationPhase) {
         return;
       }
 
-      logger.debug(`[${sid}] Verification ready`, {
-        hasUserScrolled,
-        isPremeasuring,
-        overscanPhase,
-        phase: effectiveVerificationPhase,
-        reason,
-        msgCount: messages.length,
-        restoredSizeCache: restoredSizeCacheRef.current,
-        scrollTop: getScrollerMetrics()?.scroller.scrollTop ?? null,
-      });
+      markSwitchTimeline(
+        effectiveVerificationPhase === 'hidden' ? 'hidden-ready' : 'visible-ready',
+        `stable · ${String(messages.length)} msgs`
+      );
       if (import.meta.env.DEV) {
         const readyMarkName = sessionKey !== '' ? `session-ready:${sessionKey}` : 'session-ready';
         performance.mark('session-ready');
@@ -1054,17 +977,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         tailProofVersionRef.current
       );
     },
-    [
-      emitVerificationResult,
-      getScrollerMetrics,
-      hasUserScrolled,
-      isPremeasuring,
-      messages.length,
-      overscanPhase,
-      sessionKey,
-      sid,
-      effectiveVerificationPhase,
-    ]
+    [emitVerificationResult, messages.length, sessionKey, effectiveVerificationPhase]
   );
 
   const startTemporaryResizeStabilityWindow = useCallback(
@@ -1084,9 +997,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         ?.scrollerElement()
         ?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
       if (!listElement) {
-        logger.debug(`[${sid}] Stability window has no list element`, {
-          phase,
-        });
         return;
       }
 
@@ -1098,10 +1008,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           if (restorePhaseRef.current !== phase) {
             return;
           }
-          logger.debug(`[${sid}] Stability window settled`, {
-            phase,
-            stableMs,
-          });
           onStable();
         }, stableMs);
       };
@@ -1120,7 +1026,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       observer.observe(listElement);
       readinessResizeObserverRef.current = observer;
     },
-    [sid]
+    []
   );
 
   const progressPositioningRef = useRef<(rendered: ChatRenderRow[]) => void>(() => undefined);
@@ -1138,9 +1044,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         window.clearTimeout(readinessTimeoutRef.current);
       }
       readinessTimeoutRef.current = window.setTimeout(() => {
-        logger.debug(`[${sid}] Readiness timeout`, {
-          phase: restorePhaseRef.current,
-        });
+        markSwitchTimeline('timeout', `phase=${restorePhaseRef.current}`);
         if (effectiveVerificationPhase) {
           emitVerificationResult(
             effectiveVerificationPhase,
@@ -1150,7 +1054,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         }
       }, READY_TIMEOUT_MS);
     },
-    [effectiveVerificationPhase, emitVerificationResult, sid]
+    [effectiveVerificationPhase, emitVerificationResult]
   );
   const queuePositioningRecheck = useCallback((): void => {
     if (positioningRecheckTimerRef.current !== null) {
@@ -1300,9 +1204,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           return;
         }
         alignScrollerToBottom();
-        logger.debug(`[${sid}] Hidden verification awaiting tail sentinel`, {
-          renderedRowCount: latestRendered.length,
-        });
         progressPositioningRef.current(latestRendered);
         return;
       }
@@ -1325,10 +1226,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         restorePhaseRef.current = 'positioning';
         hiddenCandidateSnapshotRef.current = null;
         alignScrollerToBottom();
-        logger.debug(`[${sid}] Hidden verification awaiting bottom settle`, {
-          renderedRowCount: latestRendered.length,
-          scrollTop: latestMetrics.scrollTop,
-        });
         progressPositioningRef.current(latestRendered);
         return;
       }
@@ -1358,7 +1255,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     layoutPendingCount,
     layoutSettledVersion,
     refreshReadinessTimeout,
-    sid,
     signalReady,
     startTemporaryResizeStabilityWindow,
   ]);
@@ -1388,9 +1284,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         restorePhaseRef.current = 'positioning';
         visibleCandidateSnapshotRef.current = null;
         alignScrollerToBottom();
-        logger.debug(`[${sid}] Visible verification awaiting tail sentinel`, {
-          renderedRowCount: latestRendered.length,
-        });
         progressPositioningRef.current(latestRendered);
         return;
       }
@@ -1399,10 +1292,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         restorePhaseRef.current = 'positioning';
         visibleCandidateSnapshotRef.current = null;
         alignScrollerToBottom();
-        logger.debug(`[${sid}] Visible verification awaiting bottom settle`, {
-          renderedRowCount: latestRendered.length,
-          scrollTop: latestMetrics.scrollTop,
-        });
         scheduleVisibleVerificationCheckRef.current();
         progressPositioningRef.current(latestRendered);
         return;
@@ -1430,7 +1319,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     layoutPendingCount,
     layoutSettledVersion,
     refreshReadinessTimeout,
-    sid,
     signalReady,
     startTemporaryResizeStabilityWindow,
   ]);
@@ -1452,9 +1340,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (!metrics) {
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
-          logger.debug(`[${sid}] Reasserting bottom placement`, {
-            renderedRowCount: rendered.length,
-          });
         }
         return false;
       }
@@ -1462,9 +1347,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (!metrics.tailSentinelRendered) {
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
-          logger.debug(`[${sid}] Awaiting tail sentinel render`, {
-            renderedRowCount: rendered.length,
-          });
         }
         return false;
       }
@@ -1482,11 +1364,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (!metrics.isAtBottom) {
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
-          logger.debug(`[${sid}] Awaiting bottom alignment before stabilization`, {
-            bottomTop: metrics.bottomTop,
-            scrollTop: metrics.scrollTop,
-            renderedRowCount: metrics.renderedRowCount,
-          });
         }
         return false;
       }
@@ -1496,14 +1373,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       restorePhaseRef.current = 'stabilizing';
-      logger.debug(`[${sid}] Entering stabilization`, {
-        bottomTop: metrics.bottomTop,
-        clientHeight: metrics.clientHeight,
-        isAtBottom: metrics.isAtBottom,
-        renderedRowCount: metrics.renderedRowCount,
-        scrollHeight: metrics.scrollHeight,
-        tailSentinelRendered: metrics.tailSentinelRendered,
-      });
+      markSwitchTimeline(
+        'stabilizing',
+        `rows=${String(metrics.renderedRowCount)} tail=${String(metrics.tailSentinelRendered)}`
+      );
       if (effectiveVerificationPhase === 'visible') {
         scheduleVisibleVerificationCheck();
       } else {
@@ -1520,7 +1393,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       layoutPendingCount,
       scheduleHiddenVerificationCheck,
       scheduleVisibleVerificationCheck,
-      sid,
     ]
   );
 
@@ -1541,9 +1413,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     alignScrollerToBottom();
-    logger.debug(`[${sid}] Returning from premeasure`, {
-      renderedCount: handle.data.getCurrentlyRendered().length,
-    });
     const rendered = handle.data.getCurrentlyRendered();
     if (beginStabilizationIfTargetRendered(rendered)) {
       return;
@@ -1559,7 +1428,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     beginStabilizationIfTargetRendered,
     ensureListSurfaceReady,
     forceTailProbeRender,
-    sid,
   ]);
 
   const continuePremeasure = useCallback((): void => {
@@ -1582,22 +1450,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     metrics.scroller.scrollTop = nextTop;
-    logger.debug(`[${sid}] Continuing premeasure`, {
-      nextTop,
-      previousTop: currentTop,
-    });
     startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
     premeasureTimeoutRef.current = window.setTimeout(() => {
       if (restorePhaseRef.current !== 'premeasuring') {
         return;
       }
 
-      logger.debug(`[${sid}] Premeasure timeout`, {
-        scrollTop: metrics.scroller.scrollTop,
-      });
       continuePremeasure();
     }, PREMEASURE_TIMEOUT_MS);
-  }, [finishPremeasure, getScrollerMetrics, sid, startTemporaryResizeStabilityWindow]);
+  }, [finishPremeasure, getScrollerMetrics, startTemporaryResizeStabilityWindow]);
 
   const startPremeasureIfNeeded = useCallback((): boolean => {
     if (hasAttemptedPremeasureRef.current) {
@@ -1605,29 +1466,19 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     if (hasAttemptedTailProbeRef.current) {
-      logger.debug(`[${sid}] Skip premeasure: tail probe already active`);
       return false;
     }
 
     if (isVisible || restoredSizeCacheRef.current) {
-      logger.debug(`[${sid}] Skip premeasure`, {
-        isVisible,
-        restoredSizeCache: restoredSizeCacheRef.current,
-      });
       return false;
     }
 
     const metrics = getScrollerMetrics();
     if (!metrics) {
-      logger.debug(`[${sid}] Skip premeasure: no scroller metrics`);
       return false;
     }
 
     if (metrics.bottomTop <= metrics.clientHeight) {
-      logger.debug(`[${sid}] Skip premeasure: short bottom range`, {
-        bottomTop: metrics.bottomTop,
-        clientHeight: metrics.clientHeight,
-      });
       return false;
     }
 
@@ -1638,22 +1489,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     if (warmupTop === 0) {
       hasAttemptedPremeasureRef.current = true;
-      logger.debug(`[${sid}] Skip premeasure: single-pass bottom warmup already exhausted`, {
-        bottomTop: metrics.bottomTop,
-        clientHeight: metrics.clientHeight,
-      });
       return false;
     }
 
     restorePhaseRef.current = 'premeasuring';
     setIsPremeasuring(true);
     metrics.scroller.scrollTop = warmupTop;
-    logger.debug(`[${sid}] Starting premeasure`, {
-      bottomTop: metrics.bottomTop,
-      clientHeight: metrics.clientHeight,
-      scrollHeight: metrics.scrollHeight,
-      warmupTop,
-    });
 
     startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
     premeasureTimeoutRef.current = window.setTimeout(() => {
@@ -1661,15 +1502,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      logger.debug(`[${sid}] Premeasure timeout`, {
-        scrollTop: metrics.scroller.scrollTop,
-        warmupTop,
-      });
       continuePremeasure();
     }, PREMEASURE_TIMEOUT_MS);
 
     return true;
-  }, [continuePremeasure, getScrollerMetrics, isVisible, sid, startTemporaryResizeStabilityWindow]);
+  }, [continuePremeasure, getScrollerMetrics, isVisible, startTemporaryResizeStabilityWindow]);
 
   const progressPositioning = useCallback(
     (rendered: ChatRenderRow[]): void => {
@@ -1684,13 +1521,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      logger.debug(`[${sid}] Starting readiness timeout`, {
-        bottomTop: metrics.bottomTop,
-        clientHeight: metrics.clientHeight,
-        renderedRowCount: metrics.renderedRowCount,
-        scrollHeight: metrics.scrollHeight,
-        tailSentinelRendered: metrics.tailSentinelRendered,
-      });
       refreshReadinessTimeout(
         buildReadinessProgressSignature({
           phase: 'positioning',
@@ -1730,7 +1560,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       layoutPendingCount,
       layoutSettledVersion,
       refreshReadinessTimeout,
-      sid,
       startPremeasureIfNeeded,
     ]
   );
@@ -1742,19 +1571,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (import.meta.env.DEV && overscanPhase === 'entry') {
         performance.mark('rendered-item-count');
       }
-      if (overscanPhase === 'entry') {
-        logger.debug(`[${sid}] Rendered item count`, {
-          count: rendered.length,
-        });
-      }
-
       if (restorePhaseRef.current !== 'positioning') {
         return;
       }
 
       progressPositioning(rendered);
     },
-    [overscanPhase, progressPositioning, sid]
+    [overscanPhase, progressPositioning]
   );
 
   useLayoutEffect(() => {
@@ -1901,14 +1724,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       performance.mark(startMarkName);
     }
 
-    logger.debug(`[${sid}] Starting readiness`, {
-      isVisible,
-      lastMessageId: lastMessageIdRef.current,
-      msgCount: messages.length,
-      restoredSizeCache: restoredSizeCacheRef.current,
-      scrollIntent,
-      effectiveVerificationPhase,
-    });
+    markSwitchTimeline(
+      isVisible ? 'visible-start' : 'hidden-start',
+      `${String(messages.length)} msgs`
+    );
 
     cancelReadinessWork();
     progressPositioning(handle.data.getCurrentlyRendered());
@@ -1921,7 +1740,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     progressPositioning,
     scrollIntent,
     isVerifying,
-    sid,
     signalReady,
     ensureListSurfaceReady,
     effectiveVerificationPhase,
@@ -1939,10 +1757,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // Clear consumed scroll intent (safe — poll is ref-driven, not affected)
   useEffect(() => {
     if (scrollIntent !== null && sessionId !== undefined) {
-      logger.debug(`[${sid}] Clearing scrollIntent: ${scrollIntent}`);
       useChatStore.getState().clearScrollIntent(sessionId);
     }
-  }, [scrollIntent, sessionId, sid]);
+  }, [scrollIntent, sessionId]);
 
   const previousIsVerifyingRef = useRef(isVerifying);
   useEffect(() => {
@@ -1976,9 +1793,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       scrollIntent === 'session-restore' ||
       scrollIntent === 'session-refresh'
     ) {
-      logger.debug(`[${sid}] Pinning lastPlacedMessages (${scrollIntent})`, {
-        msgCount: messages.length,
-      });
       lastPlacedMessagesRef.current = renderRows;
       return;
     }
@@ -1986,7 +1800,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (lastPlacedMessagesRef.current !== renderRows) {
       lastPlacedMessagesRef.current = null;
     }
-  }, [messages.length, renderRows, scrollIntent, sid]);
+  }, [messages.length, renderRows, scrollIntent]);
 
   // New user message: animate and force scroll to bottom.
   // The library's auto-scroll-to-bottom modifier handles subsequent messages.
@@ -2005,39 +1819,41 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   return (
     <ToolWidgetSessionContext.Provider value={sessionKey}>
-      <div className="flex-1 flex flex-col min-h-0">
-        <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
-          <VirtuosoMessageList<ChatRenderRow, MessageListContext>
-            ref={listRef}
-            initialData={renderRows}
-            data={messageListData}
-            context={messageListContext}
-            itemIdentity={(row) => row.id}
-            computeItemKey={computeItemKey}
-            ItemContent={MessageItemContent}
-            onRenderedDataChange={handleRenderedDataChange}
-            increaseViewportBy={overscan}
-            shortSizeAlign="top"
-            className="flex-1 overflow-x-hidden overscroll-y-contain"
-            style={LIST_STYLE}
-          />
-        </VirtuosoMessageListLicense>
+      <ToolWidgetLayoutFrozenContext.Provider value={isVerifying}>
+        <div className="flex-1 flex flex-col min-h-0">
+          <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
+            <VirtuosoMessageList<ChatRenderRow, MessageListContext>
+              ref={listRef}
+              initialData={renderRows}
+              data={messageListData}
+              context={messageListContext}
+              itemIdentity={(row) => row.id}
+              computeItemKey={computeItemKey}
+              ItemContent={MessageItemContent}
+              onRenderedDataChange={handleRenderedDataChange}
+              increaseViewportBy={overscan}
+              shortSizeAlign="top"
+              className="flex-1 overflow-x-hidden overscroll-y-contain"
+              style={LIST_STYLE}
+            />
+          </VirtuosoMessageListLicense>
 
-        {/* Shimmer + queued message are OUTSIDE the list so the library's
-            isAtBottom detection (4px threshold) isn't broken by Footer content. */}
-        {isAgentRunning ? (
-          <div className="shrink-0 mx-auto px-4 pb-8 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-            <div className="flex items-center gap-2 px-[9px] py-2">
-              <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
+          {/* Shimmer + queued message are OUTSIDE the list so the library's
+              isAtBottom detection (4px threshold) isn't broken by Footer content. */}
+          {isAgentRunning ? (
+            <div className="shrink-0 mx-auto px-4 pb-8 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+              <div className="flex items-center gap-2 px-[9px] py-2">
+                <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
+              </div>
             </div>
-          </div>
-        ) : null}
-        {queuedMessage !== null ? (
-          <div className="shrink-0 mx-auto px-4 pb-2 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-            <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />
-          </div>
-        ) : null}
-      </div>
+          ) : null}
+          {queuedMessage !== null ? (
+            <div className="shrink-0 mx-auto px-4 pb-2 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+              <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />
+            </div>
+          ) : null}
+        </div>
+      </ToolWidgetLayoutFrozenContext.Provider>
     </ToolWidgetSessionContext.Provider>
   );
 };

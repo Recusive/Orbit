@@ -11,6 +11,7 @@ import {
   TOOL_EXPAND_TRANSITION_NONE,
   ToolWidgetSessionContext,
   useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -89,7 +90,9 @@ export const TaskToolWidget: FC<TaskToolWidgetProps> = ({
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
   const sessionId = useContext(ToolWidgetSessionContext);
   const renderedOutput = output ? parseTaskOutput(output) : '';
   const outputRef = useObservedSessionLayoutMutation<HTMLDivElement>(

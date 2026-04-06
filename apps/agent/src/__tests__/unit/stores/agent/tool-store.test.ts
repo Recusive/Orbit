@@ -262,6 +262,17 @@ describe('tool-store', () => {
 
       expect(useToolStore.getState().completedTools).toEqual([]);
     });
+
+    it('bumps the owning session tool revision for foreign-session completions', () => {
+      const { startTool, completeTool } = useToolStore.getState();
+
+      switchToSession('session-1');
+      startTool('tool-1', 'msg-1', 'bash', createMockToolInput(), undefined, 'session-2');
+      completeTool('tool-1', 'output text', true);
+
+      expect(useToolStore.getState().toolRevisions['session-2']).toBe(1);
+      expect(useToolStore.getState().toolRevisions['session-1']).toBeUndefined();
+    });
   });
 
   describe('updateToolInput', () => {
@@ -783,6 +794,18 @@ describe('tool-store', () => {
       restoreToolsForMessage('msg-1', [{ id: 'tool-1', name: 'bash', input: {}, success: true }]);
 
       expect(useToolStore.getState().completedTools).toHaveLength(1);
+    });
+
+    it('bumps the target session tool revision when restoring into a cached session', () => {
+      const { restoreToolsForMessage } = useToolStore.getState();
+
+      restoreToolsForMessage(
+        'msg-1',
+        [{ id: 'tool-1', name: 'bash', input: {}, success: true }],
+        'session-2'
+      );
+
+      expect(useToolStore.getState().toolRevisions['session-2']).toBe(1);
     });
   });
 

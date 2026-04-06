@@ -9,6 +9,7 @@ import {
   TOOL_EXPAND_TRANSITION_NONE,
   ToolWidgetSessionContext,
   useBeginSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
@@ -44,7 +45,9 @@ export const BashToolWidget: FC<BashToolWidgetProps> = ({
 }) => {
   const isDarkMode = useIsDarkMode();
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
   const sessionId = useContext(ToolWidgetSessionContext);
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);

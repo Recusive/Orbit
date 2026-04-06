@@ -1,10 +1,14 @@
 import { ChevronRight, ExternalLink, Loader2, XCircle } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useContext } from 'react';
 
 import {
   TOOL_EXPAND_ENTER,
   TOOL_EXPAND_EXIT,
   TOOL_EXPAND_TRANSITION_NONE,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -42,7 +46,16 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
+  const sessionId = useContext(ToolWidgetSessionContext);
+  const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
+    sessionId,
+    'web-fetch-output',
+    `${url}\n${prompt}\n${output ?? ''}`,
+    isExpanded
+  );
 
   const hostname = getHostname(url);
   const statusLabel = isRunning ? 'Fetching URL' : 'Web Fetch';
@@ -95,6 +108,7 @@ export const WebFetchToolWidget: FC<WebFetchToolWidgetProps> = ({
             }
             transition={shouldReduceMotion ? TOOL_EXPAND_TRANSITION_NONE : TOOL_EXPAND_ENTER}
             style={{ overflow: 'hidden' }}
+            ref={contentRef}
           >
             {/* Content box */}
             <div className="min-w-0 my-1.5 rounded-xl border border-border-tool bg-tool-output-bg overflow-hidden">

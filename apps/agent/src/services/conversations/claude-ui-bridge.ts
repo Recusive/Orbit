@@ -1,7 +1,9 @@
-import { createLogger } from '@orbit/common/lib';
-
 import { claudeConversationRepo } from './claude-conversation-repo';
-import { recordSessionSwitchTrace } from './session-switch-trace';
+import {
+  markSwitchTimeline,
+  recordSessionSwitchTrace,
+  startSwitchTimeline,
+} from './session-switch-trace';
 
 import type {
   ConversationListContext,
@@ -41,8 +43,6 @@ import { useChatStore } from '@/stores/chat/chat-store';
 import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
-const logger = createLogger('UiBridge');
-
 type RevealableConversationDetail = Exclude<ConversationDetailResult, { kind: 'error' }>;
 
 function isRevealableConversationDetail(value: unknown): value is RevealableConversationDetail {
@@ -72,15 +72,15 @@ export const claudeUiBridge: ConversationUiBridge = {
 
   async select(sessionId): Promise<void> {
     if (sessionId === useUIStore.getState().activeConversationId) {
+      const switchState = useSessionSwitchStore.getState();
+      if (switchState.pending !== null) {
+        abortSessionSwitch(switchState.requestId, 'explicit_phase_reset');
+      }
       return;
     }
 
     const switchState = useSessionSwitchStore.getState();
     if (switchState.pending?.sessionId === sessionId) {
-      logger.debug(`select(${sessionId.slice(-6)})`, {
-        path: 'COALESCE_PENDING',
-        requestId: switchState.requestId,
-      });
       recordSessionSwitchTrace({
         event: 'select_coalesced',
         requestId: switchState.requestId,
@@ -96,19 +96,19 @@ export const claudeUiBridge: ConversationUiBridge = {
       null;
     const prevActive = uiState.activeConversationId;
     const msgCount = chatStore.sessions[sessionId]?.messages.length ?? 0;
-    const sid = sessionId.slice(-6);
-
-    logger.debug(`select(${sid})`, {
-      from: prevActive?.slice(-6) ?? '(none)',
-      msgCount,
-      path: 'BEGIN SWITCH',
-    });
 
     const requestId = beginSessionSwitch(sessionId, title);
+    startSwitchTimeline({
+      requestId,
+      sessionId,
+      from: prevActive,
+      title,
+      msgCount,
+    });
 
     if (hasCurrentReadyInstance(sessionId, requestId)) {
+      markSwitchTimeline('select', 'ready-instance-reuse');
       void commitSessionReveal(requestId, sessionId, title);
-      logger.debug(`[${sid}] Instant reveal from current ready instance`);
       recordSessionSwitchTrace({
         event: 'hydrate_source_chosen',
         requestId,
@@ -135,6 +135,7 @@ export const claudeUiBridge: ConversationUiBridge = {
       });
 
       if (freshResult.kind === 'data') {
+        markSwitchTimeline('select', 'query-fast-path');
         hydrateConversationSnapshot({
           sessionId,
           persistedMessages: freshResult.conversation.messages,
@@ -144,10 +145,12 @@ export const claudeUiBridge: ConversationUiBridge = {
           title: title ?? freshResult.conversation.title,
           activateToolSession: false,
         });
+        markSwitchTimeline('hydrate', `${String(freshResult.conversation.messages.length)} msgs`);
         if (hasCurrentReadyInstance(sessionId, requestId)) {
           void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
         }
       } else {
+        markSwitchTimeline('select', 'query-fast-empty');
         chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
         chatStore.markSessionLoaded(sessionId);
@@ -157,7 +160,6 @@ export const claudeUiBridge: ConversationUiBridge = {
         }
       }
 
-      logger.debug(`[${sid}] FAST PATH: ${freshResult.kind}`);
       return;
     }
 
@@ -188,11 +190,11 @@ export const claudeUiBridge: ConversationUiBridge = {
                 ? 'superseded_by_new_request'
                 : 'unexpected_pending_clear'
         );
-        logger.debug(`[${sid}] JOIN PATH: stale, aborting`);
         return;
       }
 
       if (result.kind === 'data') {
+        markSwitchTimeline('select', 'join-path');
         setPendingConversationTitle(title ?? result.conversation.title, requestId);
         hydrateConversationSnapshot({
           sessionId,
@@ -203,14 +205,15 @@ export const claudeUiBridge: ConversationUiBridge = {
           title: title ?? result.conversation.title,
           activateToolSession: false,
         });
+        markSwitchTimeline('hydrate', `${String(result.conversation.messages.length)} msgs`);
         if (hasCurrentReadyInstance(sessionId, requestId)) {
           void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
         }
-        logger.debug(`[${sid}] JOIN PATH: data`);
         return;
       }
 
       if (result.kind === 'empty') {
+        markSwitchTimeline('select', 'join-path-empty');
         setPendingConversationTitle(title ?? result.conversation.title, requestId);
         chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
@@ -219,15 +222,14 @@ export const claudeUiBridge: ConversationUiBridge = {
         if (hasCurrentReadyInstance(sessionId, requestId)) {
           void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
         }
-        logger.debug(`[${sid}] JOIN PATH: empty`);
         return;
       }
 
-      logger.debug(`[${sid}] JOIN PATH: loader error, falling through`);
+      markSwitchTimeline('select', 'join-error → slow');
     }
 
     setPendingLoadStrategy('slow', requestId);
-    logger.debug(`[${sid}] SLOW PATH scheduled`);
+    markSwitchTimeline('select', 'slow-path');
     recordSessionSwitchTrace({
       event: 'hydrate_source_chosen',
       requestId,

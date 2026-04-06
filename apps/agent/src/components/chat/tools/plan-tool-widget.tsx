@@ -17,6 +17,7 @@ import {
   TOOL_EXPAND_TRANSITION_NONE,
   ToolWidgetSessionContext,
   useObservedSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
 } from './shared';
 
@@ -55,7 +56,9 @@ export const PlanToolWidget: FC<PlanToolWidgetProps> = ({
 }) => {
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId, true);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
   const sessionId = useContext(ToolWidgetSessionContext);
   const contentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
     sessionId,

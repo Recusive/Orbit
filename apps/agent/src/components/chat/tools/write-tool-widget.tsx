@@ -11,6 +11,7 @@ import {
   TOOL_EXPAND_TRANSITION_NONE,
   ToolWidgetSessionContext,
   useBeginSessionLayoutMutation,
+  useToolWidgetMotionDisabled,
   useToolWidgetExpanded,
   useIsDarkMode,
 } from './shared';
@@ -46,7 +47,9 @@ export const WriteToolWidget: FC<WriteToolWidgetProps> = ({
   // Always start collapsed — user expands manually if they want the full view
   const [isExpanded, toggleExpanded] = useToolWidgetExpanded(toolId);
   const isFailed = success === false;
-  const shouldReduceMotion = useReducedMotion();
+  const layoutFrozen = useToolWidgetMotionDisabled();
+  const reduceMotionPreference = useReducedMotion();
+  const shouldReduceMotion = (reduceMotionPreference ?? false) || layoutFrozen;
   const isDarkMode = useIsDarkMode();
   const sessionId = useContext(ToolWidgetSessionContext);
   const themeType: 'dark' | 'light' = isDarkMode ? 'dark' : 'light';

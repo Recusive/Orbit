@@ -59,10 +59,12 @@
  *   - Decrease `maxPxPerFrame` (default 50 → 35).
  * ───────────────────────────────────────────────────────────────────────
  */
-import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
-import { recordSessionSwitchTrace } from '@/services/conversations/session-switch-trace';
+import {
+  markSwitchTimeline,
+  recordSessionSwitchTrace,
+} from '@/services/conversations/session-switch-trace';
 
 interface VelocityScrollOptions {
   /** Max pixels per frame. Caps speed for virtualization buffer. Default 50. */
@@ -77,13 +79,14 @@ interface VelocityScrollOptions {
   enabled?: boolean;
   /** Fired on the first wheel event after warmup for the current attachment. */
   onUserScrollStart?: () => void;
+  /** Skip the synthetic 1px prime nudge for this attachment. */
+  skipInitialPrime?: boolean;
   traceRequestId?: number | null;
   traceSessionId?: string | null;
 }
 
 /** Selector for Virtuoso's inner list container. */
 const LIST_SELECTOR = '[data-testid="virtuoso-list"]';
-const logger = createLogger('VelocityScroll');
 
 /**
  * Compensate scrollTop to maintain the scrollbar ratio when scrollHeight
@@ -125,6 +128,7 @@ export function useVelocityScroll(
   const sensitivity = options?.sensitivity ?? 0.55;
   const warmupEvents = options?.warmupEvents ?? 3;
   const enabled = options?.enabled ?? true;
+  const skipInitialPrime = options?.skipInitialPrime ?? false;
   const traceRequestId = options?.traceRequestId ?? null;
   const traceSessionId = options?.traceSessionId ?? null;
   const onUserScrollStartRef = useRef(options?.onUserScrollStart);
@@ -150,24 +154,11 @@ export function useVelocityScroll(
       let lastScrollHeight = 0;
       let hasFiredUserScroll = false;
       let warmupCompensating = false;
-      let wheelLogCount = 0;
-      let scrollLogCount = 0;
-      let compensationLogCount = 0;
-      let tickLogCount = 0;
 
       if (import.meta.env.DEV) {
         performance.mark('velocity-scroll-attach');
       }
-      logger.debug('Attached velocity scroll', {
-        enabled,
-        clientHeight: node.clientHeight,
-        friction,
-        maxPx,
-        scrollHeight: node.scrollHeight,
-        scrollTop: node.scrollTop,
-        sensitivity,
-        warmupEvents,
-      });
+      markSwitchTimeline('velocity', 'attached');
       recordSessionSwitchTrace({
         event: 'velocity_scroll_attach',
         requestId: traceRequestId,
@@ -199,18 +190,7 @@ export function useVelocityScroll(
 
       const onScrollHeightChange = (): void => {
         if ((!animating && !warmupCompensating) || lastScrollHeight <= 0) return;
-        const compensation = compensateScrollHeight(node, lastScrollHeight);
-        if (compensation !== 0 && compensationLogCount < 12) {
-          compensationLogCount++;
-          logger.debug('Scroll height compensation applied', {
-            compensation,
-            count: compensationLogCount,
-            lastScrollHeight,
-            nextScrollHeight: node.scrollHeight,
-            scrollTop: node.scrollTop,
-            warmupCompensating,
-          });
-        }
+        compensateScrollHeight(node, lastScrollHeight);
         lastScrollHeight = node.scrollHeight;
       };
 
@@ -263,22 +243,20 @@ export function useVelocityScroll(
       // cause the scrollbar thumb to jitter until the second gesture.
       const maxScrollTop = node.scrollHeight - node.clientHeight;
       const originalScrollTop = node.scrollTop;
-      if (maxScrollTop > 0) {
+      if (skipInitialPrime) {
+        recordSessionSwitchTrace({
+          event: 'velocity_scroll_warmup_skipped',
+          requestId: traceRequestId,
+          sessionId: traceSessionId,
+        });
+      } else if (maxScrollTop > 0) {
         const nudgedScrollTop =
           originalScrollTop < maxScrollTop ? originalScrollTop + 1 : originalScrollTop - 1;
 
         if (nudgedScrollTop !== originalScrollTop) {
-          logger.debug('Priming scroll position', {
-            maxScrollTop,
-            nudgedScrollTop,
-            originalScrollTop,
-          });
           node.scrollTop = nudgedScrollTop;
           primeRaf = requestAnimationFrame(() => {
             node.scrollTop = originalScrollTop;
-            logger.debug('Restored primed scroll position', {
-              restoredScrollTop: originalScrollTop,
-            });
           });
         }
       }
@@ -314,17 +292,6 @@ export function useVelocityScroll(
         node.scrollTop = Math.round(
           Math.max(0, Math.min(node.scrollTop + velocity + compensation, max))
         );
-        if ((compensation !== 0 || Math.abs(velocity) >= maxPx) && tickLogCount < 12) {
-          tickLogCount++;
-          logger.debug('Velocity tick', {
-            compensation,
-            count: tickLogCount,
-            max,
-            scrollHeight: curScrollHeight,
-            scrollTop: node.scrollTop,
-            velocity,
-          });
-        }
         velocity *= friction;
         raf = requestAnimationFrame(tick);
       };
@@ -344,16 +311,6 @@ export function useVelocityScroll(
               lastScrollHeight = 0;
             }
           }, 120);
-          if (wheelLogCount < 8) {
-            wheelLogCount++;
-            logger.debug('Warmup wheel event', {
-              count: wheelLogCount,
-              deltaY: e.deltaY,
-              nativeCount,
-              scrollHeight: node.scrollHeight,
-              scrollTop: node.scrollTop,
-            });
-          }
           return;
         }
 
@@ -366,16 +323,6 @@ export function useVelocityScroll(
         }
         velocity += e.deltaY * sensitivity;
         velocity = Math.max(-maxPx, Math.min(velocity, maxPx));
-        if (wheelLogCount < 8) {
-          wheelLogCount++;
-          logger.debug('Damped wheel event', {
-            count: wheelLogCount,
-            deltaY: e.deltaY,
-            nextVelocity: velocity,
-            scrollHeight: node.scrollHeight,
-            scrollTop: node.scrollTop,
-          });
-        }
         if (!animating) {
           animating = true;
           lastScrollHeight = node.scrollHeight;
@@ -386,16 +333,6 @@ export function useVelocityScroll(
       // Reset velocity when external code scrolls (library auto-scroll,
       // scrollToItem) so the next wheel input starts fresh.
       const onScroll = (): void => {
-        if (scrollLogCount < 8) {
-          scrollLogCount++;
-          logger.debug('Scroller scroll event', {
-            animating,
-            count: scrollLogCount,
-            scrollHeight: node.scrollHeight,
-            scrollTop: node.scrollTop,
-            warmupCompensating,
-          });
-        }
         if (!animating) velocity = 0;
       };
 
@@ -414,7 +351,7 @@ export function useVelocityScroll(
         if (import.meta.env.DEV) {
           performance.mark('velocity-scroll-detach');
         }
-        logger.debug('Detached velocity scroll');
+        markSwitchTimeline('velocity', 'detached');
         recordSessionSwitchTrace({
           event: 'velocity_scroll_detach',
           requestId: traceRequestId,
@@ -425,7 +362,16 @@ export function useVelocityScroll(
         });
       };
     },
-    [maxPx, friction, sensitivity, warmupEvents, enabled, traceRequestId, traceSessionId]
+    [
+      maxPx,
+      friction,
+      sensitivity,
+      warmupEvents,
+      enabled,
+      skipInitialPrime,
+      traceRequestId,
+      traceSessionId,
+    ]
   );
 
   // Cleanup on unmount
