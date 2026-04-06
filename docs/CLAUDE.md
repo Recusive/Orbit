@@ -4,23 +4,24 @@ Use this to find the right file. Read the file directly — no links needed.
 
 ## Folder Guide
 
-| Folder                  | What's in it                         | When to look                     |
-| ----------------------- | ------------------------------------ | -------------------------------- |
-| `decisions/`            | ADRs, why we chose X over Y          | Understanding past trade-offs    |
-| `architecture/`         | System design, technical decisions   | How something works internally   |
-| `design/`               | UI/UX guidelines, visual systems     | Typography, icons, themes        |
-| `development/`          | Build workflow, CI/CD, debugging     | Setup, builds, fixing issues     |
-| `plans/`                | Feature proposals, refactor plans    | What's been planned or proposed  |
-| `plans/tracked/todo/`   | Plans queued for implementation      | What needs to be built next      |
-| `plans/tracked/done/`   | Completed plans                      | What's already been shipped      |
-| `plans/others/<topic>/` | Uncategorized plans by topic         | Plans with unknown status        |
-| `strategy/`             | Product roadmap, vision, positioning | Where the product is headed      |
-| `quality/`              | Linting, audits, health metrics      | Code standards, audit results    |
-| `reference/`            | SDK docs, prompts, external guides   | API references, prompt templates |
-| `specs/`                | Behavior specs, acceptance criteria  | What "done" looks like           |
-| `skills/`               | Agent skill creation and publishing  | Creating/publishing skills       |
-| `changelog/`            | Release notes per version            | What shipped in each version     |
-| `orbitweb/`             | Marketing site context               | Orbitweb-specific (read-only)    |
+| Folder                  | What's in it                         | When to look                                        |
+| ----------------------- | ------------------------------------ | --------------------------------------------------- |
+| `decisions/`            | ADRs, why we chose X over Y          | Understanding past trade-offs                       |
+| `architecture/`         | System design, technical decisions   | How something works internally                      |
+| `design/`               | UI/UX guidelines, visual systems     | Typography, icons, themes                           |
+| `development/`          | Build workflow, CI/CD, debugging     | Setup, builds, fixing issues                        |
+| `plans/`                | Feature proposals, refactor plans    | What's been planned or proposed                     |
+| `plans/tracked/todo/`   | Plans queued for implementation      | What needs to be built next                         |
+| `plans/tracked/done/`   | Completed plans                      | What's already been shipped                         |
+| `plans/others/<topic>/` | Uncategorized plans by topic         | Plans with unknown status                           |
+| `strategy/`             | Product roadmap, vision, positioning | Where the product is headed                         |
+| `quality/`              | Linting, audits, health metrics      | Code standards, audit results                       |
+| `production/`           | Battle-tested hardening playbook     | Performance, resilience, observability improvements |
+| `reference/`            | SDK docs, prompts, external guides   | API references, prompt templates                    |
+| `specs/`                | Behavior specs, acceptance criteria  | What "done" looks like                              |
+| `skills/`               | Agent skill creation and publishing  | Creating/publishing skills                          |
+| `changelog/`            | Release notes per version            | What shipped in each version                        |
+| `orbitweb/`             | Marketing site context               | Orbitweb-specific (read-only)                       |
 
 ## decisions/ (7 files)
 
@@ -197,6 +198,22 @@ Use this to find the right file. Read the file directly — no links needed.
 - `skill-guide.md` — Definitive guide to building agent skills (compiled from Anthropic's official guide, AgentSkills spec, and skills-ref library)
 - `SKILLS-PUBLISHING-GUIDE.md` — How to create skills, publish to Recusive/Skills repo, CLI commands, skills.sh leaderboard mechanics, well-known endpoint hosting
 - `PLUGIN-PUBLISHING-GUIDE.md` — How to create Claude Code plugins, package skills into plugins, plugin.json manifest, marketplace distribution, Orbit-plugin reference
+
+## production/ (11 files)
+
+Production hardening playbook — pick one, plan it, execute it.
+
+- `INDEX.md` — Master index with priority tiers, execution order, current state summary
+- `01-web-workers.md` — Move Shiki, markdown, search off the main thread (worker pool architecture)
+- `02-streaming-backpressure.md` — Frame-aligned rendering: RAF batching, string builder, layout throttle
+- `03-store-performance.md` — Split god stores (tool: 1254L, ui: 1111L), fix Immer persist bug, batch set() calls
+- `04-component-memoization.md` — Memoize 19 unmemoized tool widgets (30-min quick win)
+- `05-sidecar-resilience.md` — Health checks, auto-restart with backoff, session resume, stderr capture
+- `06-error-resilience.md` — Error classifier expansion, circuit breakers, timeout wrappers, event isolation
+- `07-large-file-handling.md` — File size guards, terminal ring buffer, git status pagination, binary detection
+- `08-priority-scheduler.md` — Cooperative task scheduler: user input > visible > background > idle
+- `09-memory-discipline.md` — Bound all caches, reduce GC pressure, leak detection monitor
+- `10-observability.md` — Frontend structured logger, request tracing, perf metrics, Sentry integration
 
 ## orbitweb/ (1 file)
 

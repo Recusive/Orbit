@@ -489,6 +489,10 @@ Use specific API names in queries (e.g., "canUseTool", "permissionMode", "PreToo
 Search SDK docs whenever working on agent-bridge, SDK integration, permissions, hooks, MCP, sessions, or tools.
 </sdk_documentation>
 
+<pending_tasks>
+<task name="Re-enable React StrictMode">React StrictMode is currently disabled in `apps/agent/src/main.tsx`. When the user says to turn it back on, re-wrap the root render in `<StrictMode>` and restore the import.</task>
+</pending_tasks>
+
 <git_policy importance="critical">
 <rule name="PR merge method">NEVER use squash merge. Use "Rebase and merge" (preferred) or "Create a merge commit". Squash merge collapses all branch commits into one, losing individual contributions from the GitHub graph. Squash merge is disabled in repo settings.</rule>
 </git_policy>

@@ -292,6 +292,36 @@ describe('claudeUiBridge.select', () => {
     expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('slow');
   });
 
+  it('coalesces repeated selects for the same pending target instead of restarting the switch', async () => {
+    const sessionId = 'pending-session';
+
+    useSessionSwitchStore.setState({
+      requestId: 7,
+      status: 'hidden-priming',
+      pending: {
+        sessionId,
+        title: 'Pending Title',
+        sourceSessionId: 'shown-session',
+        loadStrategy: 'query',
+      },
+    });
+    useUIStore.setState({
+      activeConversationId: 'shown-session',
+      activeConversationTitle: 'Shown Title',
+      isLoadingConversation: true,
+      isConversationTransitioning: true,
+    });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoad).not.toHaveBeenCalled();
+    expect(mockLoadConversationDetailFresh).not.toHaveBeenCalled();
+    expect(useSessionSwitchStore.getState().requestId).toBe(7);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+  });
+
   it('hydrates directly from a fresh cached conversation', async () => {
     const sessionId = 'fresh-cache-session';
     mockGetFreshConversationDetail.mockReturnValue({

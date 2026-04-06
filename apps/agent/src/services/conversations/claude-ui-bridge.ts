@@ -75,6 +75,20 @@ export const claudeUiBridge: ConversationUiBridge = {
       return;
     }
 
+    const switchState = useSessionSwitchStore.getState();
+    if (switchState.pending?.sessionId === sessionId) {
+      logger.debug(`select(${sessionId.slice(-6)})`, {
+        path: 'COALESCE_PENDING',
+        requestId: switchState.requestId,
+      });
+      recordSessionSwitchTrace({
+        event: 'select_coalesced',
+        requestId: switchState.requestId,
+        sessionId,
+      });
+      return;
+    }
+
     const uiState = useUIStore.getState();
     const chatStore = useChatStore.getState();
     const title =
