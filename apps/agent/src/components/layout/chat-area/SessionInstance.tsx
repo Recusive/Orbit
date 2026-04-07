@@ -46,35 +46,34 @@ export interface SessionInstanceProps {
   readonly onVerificationResult?: (result: SessionVerificationResult) => void;
 }
 
-const ACTIVE_STYLE: CSSProperties = {
-  position: 'relative',
-  flex: 1,
-  display: 'flex',
-  flexDirection: 'column',
-  minHeight: 0,
-  overflow: 'hidden',
-  zIndex: 1,
-};
-
-const HIDDEN_STYLE: CSSProperties = {
+// All instances use absolute positioning so switching is a pure z-index change
+// with no layout recalculation. `contain: layout paint` limits paint/layout
+// recalc to this subtree without `contain: size` which prevents Virtuoso
+// from measuring row heights during the hidden positioning pass.
+const BASE_STYLE: CSSProperties = {
   position: 'absolute',
   inset: 0,
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
   overflow: 'hidden',
+  contain: 'layout paint',
+};
+
+const ACTIVE_STYLE: CSSProperties = {
+  ...BASE_STYLE,
+  zIndex: 1,
+};
+
+const HIDDEN_STYLE: CSSProperties = {
+  ...BASE_STYLE,
   transform: 'translateX(-200vw)',
   pointerEvents: 'none',
   zIndex: 0,
 };
 
 const HOLDOVER_STYLE: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  flexDirection: 'column',
-  minHeight: 0,
-  overflow: 'hidden',
+  ...BASE_STYLE,
   pointerEvents: 'none',
   zIndex: 2,
 };

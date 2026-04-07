@@ -1721,7 +1721,9 @@ class ChatMessageService {
     }
 
     // Complete the tool
-    useToolStore.getState().completeTool(message.tool_id, message.tool_output, message.success);
+    useToolStore
+      .getState()
+      .completeTool(message.tool_id, message.tool_output, message.success, message.session_id);
   }
 
   private handlePermissionRequest(
@@ -1789,7 +1791,7 @@ class ChatMessageService {
         `Force-completing ${String(orphanIds.length)} orphaned tool(s) for session ${sessionId}`
       );
       for (const id of orphanIds) {
-        toolStore.completeTool(id, undefined, true);
+        toolStore.completeTool(id, undefined, true, sessionId);
       }
     }
   }

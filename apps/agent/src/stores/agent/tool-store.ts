@@ -37,7 +37,7 @@ const logger = createLogger('ToolStore');
 // ============================================
 
 /** Version for persisted state - increment when schema changes to trigger migrations */
-const STORE_VERSION = 1;
+const STORE_VERSION = 2;
 
 /**
  * Maximum tools to persist in localStorage to prevent storage bloat.
@@ -52,9 +52,6 @@ const MAX_PERSISTED_TOOLS = 500;
  * of 50, we only trim once per 50 completions. (Code review: Opus cycle 2, issue #7)
  */
 const TRIM_BUFFER = 50;
-
-/** Maximum cached sessions to prevent unbounded memory growth */
-const MAX_CACHED_SESSIONS = 10;
 
 /**
  * Default thinking budget for adaptive thinking models (Opus 4.6, Sonnet 4.6).
@@ -288,6 +285,61 @@ interface CachedSessionData {
   sessionMcpServers?: SessionMcpServer[] | undefined;
 }
 
+// ============================================
+// Session-Keyed Data Model (120fps migration)
+// ============================================
+
+/**
+ * Per-session tool data bucket. The target architecture: all per-session state
+ * lives here. ToolStore.sessions is Record<string, PerSessionToolData>.
+ *
+ * Uses string[] for processedIds (not Set) because Sets break Immer structural
+ * sharing — Immer can't diff opaque Set contents, so it always marks as changed.
+ */
+export interface PerSessionToolData {
+  activeTools: Record<string, ToolExecution>;
+  completedTools: ToolExecution[];
+  usage: UsageData;
+  processedIds: string[];
+  contextWindow: number | null;
+  sessionModel: string | null;
+  sessionTools: string[] | null;
+  sessionMcpServers: SessionMcpServer[] | null;
+  metadataState: SessionMetadataState | null;
+  toolRevision: number;
+}
+
+function createEmptySessionToolData(): PerSessionToolData {
+  return {
+    activeTools: {},
+    completedTools: [],
+    usage: { ...initialUsage },
+    processedIds: [],
+    contextWindow: null,
+    sessionModel: null,
+    sessionTools: null,
+    sessionMcpServers: null,
+    metadataState: null,
+    toolRevision: 0,
+  };
+}
+
+/**
+ * Ensure a session bucket exists, creating an empty one if needed.
+ * Called inside Immer set() callbacks — mutates the draft directly.
+ */
+function ensureSessionBucket(
+  sessions: Record<string, PerSessionToolData>,
+  sessionId: string
+): PerSessionToolData {
+  let bucket = sessions[sessionId];
+  if (!bucket) {
+    bucket = createEmptySessionToolData();
+    sessions[sessionId] = bucket;
+  }
+  return bucket;
+}
+
 export interface ToolState {
   // Input mode (synced with extension)
   inputMode: InputMode;
@@ -336,6 +388,13 @@ export interface ToolState {
   sessionMcpServers: SessionMcpServer[] | null;
   sessionMetadataState: SessionMetadataState | null;
 
+  // ── Session-keyed data (120fps migration) ─────────────────────────────
+  // Shadow structure: mirrors flat fields above, keyed by session ID.
+  // During migration, both flat fields and sessions are written.
+  // After migration completes, flat fields are removed.
+  sessions: Record<string, PerSessionToolData>;
+  activeSessionId: string | null;
+
   // Actions
   setInputMode: (mode: InputMode) => void;
   setThinkingMode: (mode: ThinkingMode) => void;
@@ -352,7 +411,7 @@ export interface ToolState {
     sessionId?: string,
     ordinal?: number
   ) => void;
-  completeTool: (id: string, toolOutput: unknown, success: boolean) => void;
+  completeTool: (id: string, toolOutput: unknown, success: boolean, sessionId?: string) => void;
   updateToolInput: (id: string, toolInput: Record<string, unknown>) => void;
 
   // Permission management
@@ -493,6 +552,10 @@ export const useToolStore = create<ToolState>()(
       sessionMcpServers: null,
       sessionMetadataState: null,
 
+      // Session-keyed data (120fps migration — shadow structure)
+      sessions: {},
+      activeSessionId: null,
+
       setInputMode: (mode: InputMode) => {
         set((state) => {
           state.inputMode = mode;
@@ -540,10 +603,18 @@ export const useToolStore = create<ToolState>()(
             sessionId,
           };
           state.activeTools[id] = tool;
+
+          // Shadow write to session-keyed structure
+          const sid = sessionId ?? state.currentSessionId;
+          if (sid) {
+            const bucket = ensureSessionBucket(state.sessions, sid);
+            bucket.activeTools[id] = tool;
+            bucket.toolRevision += 1;
+          }
         });
       },
 
-      completeTool: (id: string, toolOutput: unknown, success: boolean) => {
+      completeTool: (id: string, toolOutput: unknown, success: boolean, sessionId?: string) => {
         if (!success) {
           logger.warn(`Tool failed: ${id}`);
         } else {
@@ -556,10 +627,13 @@ export const useToolStore = create<ToolState>()(
             tool.toolOutput = toolOutput;
             tool.completedAt = Date.now();
             tool.success = success;
-            bumpToolRevision(state, resolveToolSessionId(tool, state));
+            // Resolve session: explicit param > tool.sessionId > currentSessionId
+            const resolvedSid = sessionId ?? resolveToolSessionId(tool, state);
+            bumpToolRevision(state, resolvedSid);
 
             // Move to completed
-            state.completedTools.push({ ...tool });
+            const completedCopy = { ...tool };
+            state.completedTools.push(completedCopy);
 
             // Cap in-memory array to prevent unbounded growth in long sessions.
             // Uses a buffer to avoid O(n) slice on every completion past the limit.
@@ -570,6 +644,19 @@ export const useToolStore = create<ToolState>()(
 
             // Remove from active tools (Reflect.deleteProperty avoids eslint no-dynamic-delete)
             Reflect.deleteProperty(state.activeTools, id);
+
+            // Shadow write to session-keyed structure
+            if (resolvedSid) {
+              const bucket = state.sessions[resolvedSid];
+              if (bucket) {
+                Reflect.deleteProperty(bucket.activeTools, id);
+                bucket.completedTools.push(completedCopy);
+                bucket.toolRevision += 1;
+                if (bucket.completedTools.length > MAX_PERSISTED_TOOLS + TRIM_BUFFER) {
+                  bucket.completedTools = bucket.completedTools.slice(-MAX_PERSISTED_TOOLS);
+                }
+              }
+            }
           }
         });
       },
@@ -587,8 +674,19 @@ export const useToolStore = create<ToolState>()(
             return;
           }
 
-          state.activeTools[id] = { ...tool, toolInput };
+          const updated = { ...tool, toolInput };
+          state.activeTools[id] = updated;
           bumpToolRevision(state, resolveToolSessionId(tool, state));
+
+          // Shadow write to session-keyed structure
+          const sid = resolveToolSessionId(tool, state);
+          if (sid) {
+            const bucket = state.sessions[sid];
+            if (bucket) {
+              bucket.activeTools[id] = updated;
+              bucket.toolRevision += 1;
+            }
+          }
         });
       },
 
@@ -625,6 +723,17 @@ export const useToolStore = create<ToolState>()(
           if (tool) {
             tool.toolInput = { ...tool.toolInput, answers };
             bumpToolRevision(state, resolveToolSessionId(tool, state));
+
+            // Shadow write to session-keyed structure
+            const sid = resolveToolSessionId(tool, state);
+            if (sid) {
+              const bucket = state.sessions[sid];
+              const shadowTool = bucket?.activeTools[tool.id];
+              if (shadowTool) {
+                shadowTool.toolInput = { ...shadowTool.toolInput, answers };
+                bucket.toolRevision += 1;
+              }
+            }
           }
         });
       },
@@ -651,6 +760,9 @@ export const useToolStore = create<ToolState>()(
           if (state.currentSessionId === sessionId) {
             state.currentContextWindow = contextWindow;
           }
+
+          // Shadow write to session-keyed structure
+          ensureSessionBucket(state.sessions, sessionId).contextWindow = contextWindow;
         });
       },
 
@@ -678,6 +790,15 @@ export const useToolStore = create<ToolState>()(
             state.sessionTools = tools !== null ? [...tools] : null;
             state.sessionMcpServers = mcpServers !== null ? [...mcpServers] : null;
             state.sessionMetadataState = 'live';
+          }
+
+          // Shadow write to session-keyed structure
+          const bucket = ensureSessionBucket(state.sessions, sessionId);
+          bucket.sessionModel = model;
+          bucket.sessionTools = tools !== null ? [...tools] : null;
+          bucket.sessionMcpServers = mcpServers !== null ? [...mcpServers] : null;
+          if (state.currentSessionId === sessionId) {
+            bucket.metadataState = 'live';
           }
         });
       },
@@ -717,6 +838,9 @@ export const useToolStore = create<ToolState>()(
           if (state.currentSessionId === sessionId) {
             state.sessionUsage = nextUsage;
           }
+
+          // Shadow write to session-keyed structure
+          ensureSessionBucket(state.sessions, sessionId).usage = nextUsage;
         });
       },
 
@@ -743,131 +867,65 @@ export const useToolStore = create<ToolState>()(
                 sessionMcpServers: undefined,
               };
             }
+
+            // Shadow write to session-keyed structure
+            const bucket = state.sessions[state.currentSessionId];
+            if (bucket) {
+              bucket.usage = { ...initialUsage };
+              bucket.processedIds = [];
+              bucket.contextWindow = null;
+              bucket.sessionModel = null;
+              bucket.sessionTools = null;
+              bucket.sessionMcpServers = null;
+              bucket.metadataState = null;
+            }
           }
         });
       },
 
       switchSession: (newSessionId: string) => {
+        // Fast path: already on this session
+        if (get().activeSessionId === newSessionId) return;
+
         set((state) => {
-          const isInitLoad = state.currentSessionId === null;
+          // Ensure a bucket exists for the target session
+          const bucket = ensureSessionBucket(state.sessions, newSessionId);
 
-          if (state.currentSessionId) {
-            // Filter tools by session ownership to prevent cross-session contamination.
-            // Tools that arrived for a background streaming session (different sessionId)
-            // must NOT be cached under the leaving session's key — they'd be lost.
-            const ownedCompleted = state.completedTools.filter(
-              (t) => !t.sessionId || t.sessionId === state.currentSessionId
-            );
-            const ownedActive: Record<string, ToolExecution> = {};
-            const foreignActive: Record<string, ToolExecution> = {};
-            for (const [tid, tool] of Object.entries(state.activeTools)) {
-              if (!tool.sessionId || tool.sessionId === state.currentSessionId) {
-                ownedActive[tid] = tool;
-              } else {
-                foreignActive[tid] = tool;
-              }
-            }
-
-            state.sessionCache[state.currentSessionId] = {
-              usage: { ...state.sessionUsage },
-              processedIds: Array.from(state.processedMessageIds),
-              activeTools: { ...ownedActive },
-              completedTools: [...ownedCompleted],
-              contextWindow: state.currentContextWindow ?? undefined,
-              sessionModel: state.sessionModel ?? undefined,
-              sessionTools: state.sessionTools !== null ? [...state.sessionTools] : undefined,
-              sessionMcpServers:
-                state.sessionMcpServers !== null ? [...state.sessionMcpServers] : undefined,
-            };
-
-            // Stash foreign tools into their respective session caches so they
-            // survive the switch. Completed tools for other sessions are merged.
-            const foreignCompleted = state.completedTools.filter(
-              (t) => t.sessionId !== undefined && t.sessionId !== state.currentSessionId
-            );
-            // Group foreign tools by sessionId
-            const foreignBySession = new Map<
-              string,
-              { active: Record<string, ToolExecution>; completed: ToolExecution[] }
-            >();
-            for (const [tid, tool] of Object.entries(foreignActive)) {
-              const sid = tool.sessionId ?? '';
-              let group = foreignBySession.get(sid);
-              if (!group) {
-                group = { active: {}, completed: [] };
-                foreignBySession.set(sid, group);
-              }
-              group.active[tid] = tool;
-            }
-            for (const tool of foreignCompleted) {
-              const sid = tool.sessionId ?? '';
-              let group = foreignBySession.get(sid);
-              if (!group) {
-                group = { active: {}, completed: [] };
-                foreignBySession.set(sid, group);
-              }
-              group.completed.push(tool);
-            }
-            for (const [sid, group] of foreignBySession) {
-              const existing = state.sessionCache[sid];
-              state.sessionCache[sid] = {
-                usage: existing?.usage ?? { ...initialUsage },
-                processedIds: existing?.processedIds ?? [],
-                activeTools: { ...(existing?.activeTools ?? {}), ...group.active },
-                completedTools: [...(existing?.completedTools ?? []), ...group.completed],
-                contextWindow: existing?.contextWindow,
-                sessionModel: existing?.sessionModel,
-                sessionTools: existing?.sessionTools,
-                sessionMcpServers: existing?.sessionMcpServers,
-              };
-            }
-
-            const cacheKeys = Object.keys(state.sessionCache);
-            if (cacheKeys.length > MAX_CACHED_SESSIONS) {
-              const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
-              for (const key of cacheKeys.slice(0, evictCount)) {
-                Reflect.deleteProperty(state.sessionCache, key);
-              }
-            }
-          }
-
-          const cached = state.sessionCache[newSessionId];
-          if (cached) {
-            state.sessionUsage = { ...cached.usage };
-            state.processedMessageIds = new Set(cached.processedIds);
-            state.activeTools = { ...cached.activeTools };
-            state.completedTools = [...cached.completedTools];
-            state.currentContextWindow = cached.contextWindow ?? null;
-            state.sessionModel = cached.sessionModel ?? null;
-            state.sessionTools = cached.sessionTools ?? null;
-            state.sessionMcpServers = cached.sessionMcpServers ?? null;
-            state.sessionMetadataState =
-              cached.sessionModel !== undefined ||
-              cached.sessionTools !== undefined ||
-              cached.sessionMcpServers !== undefined
-                ? 'restored'
-                : null;
-          } else if (isInitLoad) {
-            state.sessionUsage = { ...initialUsage };
-            state.processedMessageIds = new Set<string>();
-            state.currentContextWindow = null;
-            state.sessionModel = null;
-            state.sessionTools = null;
-            state.sessionMcpServers = null;
-            state.sessionMetadataState = null;
-          } else {
-            state.sessionUsage = { ...initialUsage };
-            state.processedMessageIds = new Set<string>();
-            state.activeTools = {};
-            state.completedTools = [];
-            state.currentContextWindow = null;
-            state.sessionModel = null;
-            state.sessionTools = null;
-            state.sessionMcpServers = null;
-            state.sessionMetadataState = null;
-          }
-
+          // Update session pointers (O(1))
+          state.activeSessionId = newSessionId;
           state.currentSessionId = newSessionId;
+
+          // Sync flat fields from session bucket for get()-based readers
+          // (getContextPercentage, getToolsForMessage, persistence).
+          // These flat fields are removed in Step 1.5.
+          state.activeTools = bucket.activeTools;
+          state.completedTools = bucket.completedTools;
+          state.sessionUsage = bucket.usage;
+          state.processedMessageIds = new Set(bucket.processedIds);
+          state.currentContextWindow = bucket.contextWindow;
+          state.sessionModel = bucket.sessionModel;
+          state.sessionTools = bucket.sessionTools;
+          state.sessionMcpServers = bucket.sessionMcpServers;
+          // When restoring from a session bucket, metadata state becomes 'restored'
+          // (it was originally 'live' from system:init, but is now reconstructed from cache)
+          const hasMetadata =
+            bucket.sessionModel !== null ||
+            bucket.sessionTools !== null ||
+            bucket.sessionMcpServers !== null;
+          state.sessionMetadataState = hasMetadata ? 'restored' : null;
+          bucket.metadataState = state.sessionMetadataState;
+
+          // Sync sessionCache for legacy readers (removed in Step 1.5)
+          state.sessionCache[newSessionId] = {
+            usage: bucket.usage,
+            processedIds: bucket.processedIds,
+            activeTools: bucket.activeTools,
+            completedTools: bucket.completedTools,
+            contextWindow: bucket.contextWindow ?? undefined,
+            sessionModel: bucket.sessionModel ?? undefined,
+            sessionTools: bucket.sessionTools ?? undefined,
+            sessionMcpServers: bucket.sessionMcpServers ?? undefined,
+          };
         });
       },
 
@@ -905,6 +963,26 @@ export const useToolStore = create<ToolState>()(
             if (tool.sessionId === oldSessionId) {
               tool.sessionId = newSessionId;
             }
+          }
+
+          // Shadow write: rename key in sessions, rewrite tool.sessionId in the bucket
+          const sessionBucket = state.sessions[oldSessionId];
+          if (sessionBucket) {
+            for (const tool of Object.values(sessionBucket.activeTools)) {
+              if (tool.sessionId === oldSessionId) {
+                tool.sessionId = newSessionId;
+              }
+            }
+            for (const tool of sessionBucket.completedTools) {
+              if (tool.sessionId === oldSessionId) {
+                tool.sessionId = newSessionId;
+              }
+            }
+            state.sessions[newSessionId] = sessionBucket;
+            Reflect.deleteProperty(state.sessions, oldSessionId);
+          }
+          if (state.activeSessionId === oldSessionId) {
+            state.activeSessionId = newSessionId;
           }
         });
       },
@@ -947,22 +1025,44 @@ export const useToolStore = create<ToolState>()(
               }
             }
           }
+
+          // Shadow write to session-keyed structure (same richer-wins logic)
+          const bucket = ensureSessionBucket(state.sessions, sessionId);
+          const bucketTotal = getContextUsedTokens(bucket.usage);
+          if (incomingTotal >= bucketTotal) {
+            bucket.usage = { ...usage };
+            if (processedIds) {
+              bucket.processedIds = [...processedIds];
+            }
+          }
         });
       },
 
       getContextPercentage: () => {
         const state = get();
-        const maxTokens = resolveMaxTokens(state);
-        const usedTokens = getContextUsedTokens(state.sessionUsage);
+        const bucket = state.sessions[state.activeSessionId ?? ''];
+        const maxTokens = resolveMaxTokens({
+          currentContextWindow: bucket?.contextWindow ?? null,
+          model: state.model,
+        });
+        const usedTokens = getContextUsedTokens(bucket?.usage ?? initialUsage);
         return Math.min(100, Math.round((usedTokens / maxTokens) * 100));
       },
 
       getMaxTokens: () => {
         const state = get();
-        return resolveMaxTokens(state);
+        const bucket = state.sessions[state.activeSessionId ?? ''];
+        return resolveMaxTokens({
+          currentContextWindow: bucket?.contextWindow ?? null,
+          model: state.model,
+        });
       },
 
-      getUsedTokens: () => getContextUsedTokens(get().sessionUsage),
+      getUsedTokens: () => {
+        const state = get();
+        const bucket = state.sessions[state.activeSessionId ?? ''];
+        return getContextUsedTokens(bucket?.usage ?? initialUsage);
+      },
 
       // ⚠️  DO NOT use this for rendering — get() returns stale state.
       // See file-level comment. For rendering, use useActiveTools() +
@@ -970,8 +1070,14 @@ export const useToolStore = create<ToolState>()(
       // Kept for non-rendering callers (e.g., restoreToolsForMessage).
       getToolsForMessage: (messageId: string) => {
         const state = get();
-        const active = Object.values(state.activeTools).filter((t) => t.messageId === messageId);
-        const completed = state.completedTools.filter((t) => t.messageId === messageId);
+        const bucket = state.sessions[state.activeSessionId ?? ''];
+        // Read from session bucket if available, fall back to flat fields for compat
+        const activeToolValues = bucket
+          ? Object.values(bucket.activeTools)
+          : Object.values(state.activeTools);
+        const completedToolList = bucket ? bucket.completedTools : state.completedTools;
+        const active = activeToolValues.filter((t) => t.messageId === messageId);
+        const completed = completedToolList.filter((t) => t.messageId === messageId);
 
         return deduplicateAndSortTools(active, completed);
       },
@@ -1061,6 +1167,11 @@ export const useToolStore = create<ToolState>()(
               sessionMcpServers: existingCache?.sessionMcpServers,
             };
             bumpToolRevision(state, targetSessionId);
+
+            // Shadow write to session-keyed structure
+            const bucket = ensureSessionBucket(state.sessions, targetSessionId);
+            bucket.completedTools = existingCompletedTools;
+            bucket.toolRevision += 1;
           }
         });
       },
@@ -1080,6 +1191,9 @@ export const useToolStore = create<ToolState>()(
           // Remove from sessionCache (Reflect.deleteProperty avoids eslint no-dynamic-delete)
           Reflect.deleteProperty(state.sessionCache, sessionId);
           Reflect.deleteProperty(state.toolRevisions, sessionId);
+
+          // Shadow write: evict from session-keyed structure
+          Reflect.deleteProperty(state.sessions, sessionId);
         });
       },
 
@@ -1102,40 +1216,33 @@ export const useToolStore = create<ToolState>()(
           state.sessionTools = null;
           state.sessionMcpServers = null;
           state.sessionMetadataState = null;
+
+          // Shadow write: reset session-keyed structure
+          state.sessions = {};
+          state.activeSessionId = null;
         });
       },
     })),
     {
       name: 'orbit-tool-store',
       version: STORE_VERSION,
-      // Only persist recent tools - prevents localStorage bloat
-      // localStorage has ~5MB limit; unbounded persistence would eventually fail
+      // Only persist the active session's recent tools (session-keyed)
       partialize: (state) => {
-        // Cap at MAX_PERSISTED_TOOLS most recent tools to prevent unbounded growth
-        // Tools from other sessions will be restored from backend on conversation load
-        // Only slice if we exceed the cap (avoids array allocation when unnecessary)
-        const toolsToProcess =
-          state.completedTools.length > MAX_PERSISTED_TOOLS
-            ? state.completedTools.slice(-MAX_PERSISTED_TOOLS)
-            : state.completedTools;
-
-        // Sanitize tools to remove sensitive data before localStorage persistence
-        // toolOutput and large toolInput values are stripped for security
-        const sanitizedTools = toolsToProcess.map(sanitizeToolForPersistence);
+        const bucket = state.sessions[state.activeSessionId ?? ''];
+        const tools = bucket?.completedTools ?? [];
+        const capped =
+          tools.length > MAX_PERSISTED_TOOLS ? tools.slice(-MAX_PERSISTED_TOOLS) : tools;
+        const sanitizedTools = capped.map(sanitizeToolForPersistence);
 
         return {
           completedTools: sanitizedTools,
-          // Don't persist sessionCache - usage is restored from backend on conversation load
-          sessionCache: {},
+          activeSessionId: state.activeSessionId,
+          // Legacy compat: persist currentSessionId for V1 readers
           currentSessionId: state.currentSessionId,
         };
       },
-      // Handle hydration - merge persisted tools with fresh state
-      // Version migrations can be added here when STORE_VERSION changes
+      // Handle hydration — V1→V2 migration: flat completedTools → sessions bucket
       merge: (persistedState, currentState) => {
-        // CRITICAL: Guard against corrupted localStorage returning non-objects or arrays
-        // localStorage corruption can happen from: user tampering, storage limits, browser bugs
-        // Note: typeof [] === 'object' is true, so we need explicit Array.isArray check
         if (
           persistedState === null ||
           typeof persistedState !== 'object' ||
@@ -1144,39 +1251,44 @@ export const useToolStore = create<ToolState>()(
           logger.warn('Persisted state is invalid (not a plain object) - starting fresh');
           return currentState;
         }
-        const persisted = persistedState as Partial<ToolState>;
+        const persisted = persistedState as Partial<ToolState & { completedTools?: unknown }>;
 
-        // Validate persisted tools to prevent localStorage corruption from crashing the app
-        // This follows the same pattern as message-state.ts (StoredChatMessageArraySchema)
+        // Validate persisted tools
         let completedTools: ToolExecution[] = [];
         if (persisted.completedTools) {
           const result = StoredToolExecutionArraySchema.safeParse(persisted.completedTools);
           if (result.success) {
-            // Transform validated data to ToolExecution[] using type-safe transformation
-            // This handles the Zod vs TypeScript optional property type mismatch
             completedTools = result.data.map(toToolExecution);
           } else {
-            // Log validation failure for debugging but don't crash
             logger.warn(
               `Failed to validate persisted tools - starting fresh: ${result.error.message}`
             );
           }
         }
 
-        // Validate currentSessionId is a string (not corrupted)
-        const currentSessionId =
-          typeof persisted.currentSessionId === 'string' ? persisted.currentSessionId : null;
+        // Resolve session ID (V2 uses activeSessionId, V1 uses currentSessionId)
+        const sessionId =
+          (typeof persisted.activeSessionId === 'string' ? persisted.activeSessionId : null) ??
+          (typeof persisted.currentSessionId === 'string' ? persisted.currentSessionId : null);
 
-        // Future version migrations would go here:
-        // if (persistedVersion === 1) { /* migrate v1 -> v2 */ }
+        // Reconstruct sessions bucket from persisted tools
+        const sessions: Record<string, PerSessionToolData> = {};
+        if (sessionId) {
+          sessions[sessionId] = {
+            ...createEmptySessionToolData(),
+            ...(completedTools.length > 0 ? { completedTools } : {}),
+          };
+        }
 
         return {
           ...currentState,
-          // Restore validated persisted tools (already capped by partialize)
+          // Restore into session-keyed structure
+          sessions,
+          activeSessionId: sessionId,
+          // Legacy compat: sync flat fields for backward-compat readers
           completedTools,
-          // Start with empty cache - usage is restored from backend on conversation load
           sessionCache: {},
-          currentSessionId,
+          currentSessionId: sessionId,
         };
       },
     }
@@ -1189,14 +1301,17 @@ export const useThinkingMode = (): ThinkingMode => useToolStore((state) => state
 export const useEffortLevel = (): EffortLevel => useToolStore((state) => state.effortLevel);
 export const useModel = (): Model => useToolStore((state) => state.model);
 export const useActiveTools = (): Record<string, ToolExecution> =>
-  useToolStore((state) => state.activeTools);
+  useToolStore(
+    (state) => state.sessions[state.activeSessionId ?? '']?.activeTools ?? EMPTY_ACTIVE_TOOLS
+  );
 export const usePendingPermissions = (): PermissionRequest[] =>
   useToolStore((state) => state.pendingPermissions);
 
-// Completed tools selector - used by ChatMessages to compute tools-for-message
-// from selector values rather than the store's internal get() which lags behind
+// Completed tools selector - reads from session-keyed structure
 export const useCompletedTools = (): ToolExecution[] =>
-  useToolStore((state) => state.completedTools);
+  useToolStore(
+    (state) => state.sessions[state.activeSessionId ?? '']?.completedTools ?? EMPTY_COMPLETED_TOOLS
+  );
 
 // ────────────────────────────────────────────────────────────────────────────
 // Per-Session Tool Selectors (Multi-Instance Keep-Alive)
@@ -1205,8 +1320,7 @@ export const useCompletedTools = (): ToolExecution[] =>
 // the global active session. This prevents all mounted instances from
 // re-rendering when switchSession() swaps the global completedTools array.
 //
-// If sessionId === currentSessionId → read from global (live data).
-// Else → read from sessionCache (frozen at last switch-away).
+// Reads directly from sessions[sessionId] — no hybrid current/cache check needed.
 // ────────────────────────────────────────────────────────────────────────────
 
 const EMPTY_ACTIVE_TOOLS: Record<string, ToolExecution> = {};
@@ -1214,36 +1328,31 @@ const EMPTY_COMPLETED_TOOLS: ToolExecution[] = [];
 
 /** Completed tools for a specific session. */
 export function useSessionCompletedTools(sessionId: string): ToolExecution[] {
-  return useToolStore((state) => {
-    if (state.currentSessionId === sessionId) {
-      return state.completedTools;
-    }
-    return state.sessionCache[sessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS;
-  });
+  return useToolStore(
+    (state) => state.sessions[sessionId]?.completedTools ?? EMPTY_COMPLETED_TOOLS
+  );
 }
 
 /** Active (in-progress) tools for a specific session. */
 export function useSessionActiveTools(sessionId: string): Record<string, ToolExecution> {
-  return useToolStore((state) => {
-    if (state.currentSessionId === sessionId) {
-      return state.activeTools;
-    }
-    return state.sessionCache[sessionId]?.activeTools ?? EMPTY_ACTIVE_TOOLS;
-  });
+  return useToolStore((state) => state.sessions[sessionId]?.activeTools ?? EMPTY_ACTIVE_TOOLS);
 }
 
-// Usage selectors
-export const useSessionUsage = (): UsageData => useToolStore((state) => state.sessionUsage);
+// Usage selectors — read from session-keyed structure
+export const useSessionUsage = (): UsageData =>
+  useToolStore((state) => state.sessions[state.activeSessionId ?? '']?.usage ?? initialUsage);
 export const useContextPercentage = (): number =>
   useToolStore((state) => state.getContextPercentage());
 export const useMaxTokens = (): number => useToolStore((state) => state.getMaxTokens());
 export const useUsedTokens = (): number => useToolStore((state) => state.getUsedTokens());
-export const useSessionModel = (): string | null => useToolStore((state) => state.sessionModel);
-export const useSessionTools = (): string[] | null => useToolStore((state) => state.sessionTools);
+export const useSessionModel = (): string | null =>
+  useToolStore((state) => state.sessions[state.activeSessionId ?? '']?.sessionModel ?? null);
+export const useSessionTools = (): string[] | null =>
+  useToolStore((state) => state.sessions[state.activeSessionId ?? '']?.sessionTools ?? null);
 export const useSessionMcpServers = (): SessionMcpServer[] | null =>
-  useToolStore((state) => state.sessionMcpServers);
+  useToolStore((state) => state.sessions[state.activeSessionId ?? '']?.sessionMcpServers ?? null);
 export const useSessionMetadataState = (): SessionMetadataState | null =>
-  useToolStore((state) => state.sessionMetadataState);
+  useToolStore((state) => state.sessions[state.activeSessionId ?? '']?.metadataState ?? null);
 
 /**
  * @deprecated Do not use for rendering — get() returns stale state in persist(immer(...)).
@@ -1262,6 +1371,7 @@ export const useGetToolsForMessage = (): ((messageId: string) => ToolExecution[]
  */
 export const useRunningTool = (): ToolExecution | undefined =>
   useToolStore((state) => {
-    const tools = Object.values(state.activeTools);
-    return tools.find((t) => t.status === 'running');
+    const activeTools = state.sessions[state.activeSessionId ?? '']?.activeTools;
+    if (!activeTools) return undefined;
+    return Object.values(activeTools).find((t) => t.status === 'running');
   });

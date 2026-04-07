@@ -439,8 +439,10 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
 
         // Include tool data so rewind 2+ can restore tool widgets
         const toolState = useToolStore.getState();
+        const sessionTools =
+          toolState.sessions[sessionId]?.completedTools ?? toolState.completedTools;
         const truncatedMessages = messages.slice(0, messageIndex + 1).map((m) => {
-          const tools = toolState.completedTools
+          const tools = sessionTools
             .filter((t) => t.messageId === m.id)
             .map((t) => ({
               id: t.id,

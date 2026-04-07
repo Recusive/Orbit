@@ -999,6 +999,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
+    // Skip expensive alignment when Virtuoso has accurate cached heights
+    // and scroller is already at the bottom — saves 6+ DOM round trips
+    if (restoredSizeCacheRef.current) {
+      const precheck = getScrollerMetrics();
+      if (precheck && precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX) {
+        return precheck;
+      }
+    }
+
     const handle = listRef.current;
     if (!handle) return null;
 

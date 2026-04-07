@@ -274,12 +274,19 @@ export function hydrateConversationSnapshot(
     chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
   }
 
+  // Lifecycle calls — always run regardless of layout equivalence
   chatStore.markSessionHydrated(input.sessionId);
   chatStore.markSessionLoaded(input.sessionId);
   chatStore.bumpConversationLoadEpoch();
 
-  restoreTools(input.sessionId, input.persistedMessages, activeChainIds);
+  // On layout-equivalent warm revisits, tools are already in the session bucket
+  // from the previous hydration. Skip the restore + switch to avoid redundant work.
+  if (!isLayoutEquivalent) {
+    restoreTools(input.sessionId, input.persistedMessages, activeChainIds);
+  }
   if (input.activateToolSession !== false) {
+    // switchSession is O(1) with session-keyed stores and short-circuits
+    // when activeSessionId already matches — safe to always call.
     useToolStore.getState().switchSession(input.sessionId);
   }
   seedConversationDetailCache(input);

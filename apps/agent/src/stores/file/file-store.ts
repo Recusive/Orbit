@@ -10,8 +10,8 @@ import { getParentPath } from '@/lib/utils/path-utils';
 
 const logger = createLogger('FileStore');
 
-/** Maximum cached sessions to prevent unbounded memory growth */
-const MAX_CACHED_SESSIONS = 10;
+/** Maximum session buckets in session-keyed store */
+const MAX_FILE_SESSIONS = 20;
 
 // Enable Immer support for Map and Set
 enableMapSet();
@@ -30,21 +30,6 @@ enableMapSet();
  */
 function createDict<T>(): Record<string, T> {
   return Object.create(null) as Record<string, T>;
-}
-
-/**
- * Creates a shallow copy of a dictionary while preserving the null-prototype guarantee.
- *
- * Using object spread `{ ...dict }` creates a regular object with Object.prototype,
- * which would reintroduce the prototype pollution vulnerability. This function
- * ensures copies remain safe for arbitrary string keys.
- *
- * @example
- * const copy = cloneDict(original);  // Safe copy with no prototype
- * copy['__proto__'] = value;         // Still safe
- */
-function cloneDict<T>(source: Record<string, T>): Record<string, T> {
-  return Object.assign(createDict<T>(), source);
 }
 
 const WINDOWS_DRIVE_ROOT_RE = /^[A-Za-z]:\/$/;
@@ -136,12 +121,36 @@ interface CachedFileData {
   selectedFile: string | null;
 }
 
+/**
+ * Per-session file data bucket (120fps migration).
+ * Uses createDict() for filesById/pathToId to preserve null-prototype safety.
+ */
+interface SessionFileData {
+  filesById: Record<string, FileChange>;
+  pathToId: Record<string, string>;
+  selectedFile: string | null;
+}
+
+function createEmptySessionFileData(): SessionFileData {
+  return {
+    filesById: createDict<FileChange>(),
+    pathToId: createDict<string>(),
+    selectedFile: null,
+  };
+}
+
 export interface FileState {
   // Session tracking for per-conversation file changes
   /** Current conversation session ID */
   currentSessionId: string | null;
   /** Cache of file changes per session */
   sessionCache: Record<string, CachedFileData>;
+
+  // ── Session-keyed data (120fps migration) ─────────────────────────────
+  /** Per-session file data buckets — source of truth for session-keyed reads */
+  fileSessions: Record<string, SessionFileData>;
+  /** Active session pointer */
+  activeFileSessionId: string | null;
 
   // File changes (refactored from array+Map to Record-based)
   /** Primary storage: file ID → FileChange object */
@@ -209,6 +218,8 @@ export const useFileStore = create<FileState>()(
     // Session tracking
     currentSessionId: null,
     sessionCache: {},
+    fileSessions: {},
+    activeFileSessionId: null,
 
     // File changes (refactored from array+Map to Record-based)
     filesById: createDict<FileChange>(),
@@ -434,67 +445,70 @@ export const useFileStore = create<FileState>()(
     switchSession: (newSessionId: string) => {
       logger.debug(`Switching file session to: ${newSessionId}`);
       set((state) => {
-        // Skip if already on this session (avoids unnecessary cache operations)
-        if (state.currentSessionId === newSessionId) {
+        if (state.activeFileSessionId === newSessionId) {
           return;
         }
 
-        // Detect initial load (first time setting currentSessionId)
-        // This handles the edge case where buffered tool events add file changes
-        // before the first switchSession call (e.g., auto-start agent flow)
-        const isInitialLoad = state.currentSessionId === null;
+        // Save current files to session bucket before switching
+        const isInitialLoad = state.activeFileSessionId === null;
         const hasExistingFiles = Object.keys(state.filesById).length > 0;
 
-        // Save current session's file changes to cache (if we have a current session with files)
-        if (state.currentSessionId !== null) {
-          if (hasExistingFiles) {
-            // Use cloneDict to preserve null-prototype guarantee for safe arbitrary key handling
-            state.sessionCache[state.currentSessionId] = {
-              filesById: cloneDict(state.filesById),
-              pathToId: cloneDict(state.pathToId),
-              selectedFile: state.selectedFile,
-            };
-
-            // Evict oldest sessions to prevent unbounded memory growth.
-            // Object.keys preserves insertion order for non-integer string keys.
-            const cacheKeys = Object.keys(state.sessionCache);
-            if (cacheKeys.length > MAX_CACHED_SESSIONS) {
-              const evictCount = cacheKeys.length - MAX_CACHED_SESSIONS;
-              for (const key of cacheKeys.slice(0, evictCount)) {
-                Reflect.deleteProperty(state.sessionCache, key);
-              }
-            }
-          } else {
-            // No files - remove from cache if it exists (clean up empty sessions).
-            // Empty sessions don't need cached state since they have nothing to restore.
-            // Note: selectedFile is intentionally not preserved for empty sessions.
-            Reflect.deleteProperty(state.sessionCache, state.currentSessionId);
-          }
+        if (state.activeFileSessionId !== null && hasExistingFiles) {
+          state.fileSessions[state.activeFileSessionId] = {
+            filesById: state.filesById,
+            pathToId: state.pathToId,
+            selectedFile: state.selectedFile,
+          };
         }
 
-        // Update current session ID
+        // Ensure bucket exists for target session
+        if (!state.fileSessions[newSessionId]) {
+          if (isInitialLoad && hasExistingFiles) {
+            // Initial load: adopt existing files (from buffered tool events)
+            state.fileSessions[newSessionId] = {
+              filesById: state.filesById,
+              pathToId: state.pathToId,
+              selectedFile: state.selectedFile,
+            };
+            logger.debug(
+              `Initial load: adopting ${String(Object.keys(state.filesById).length)} existing files`
+            );
+          } else {
+            state.fileSessions[newSessionId] = createEmptySessionFileData();
+            logger.debug('No cached files, starting fresh');
+          }
+        } else {
+          logger.debug(
+            `Restored ${String(Object.keys(state.fileSessions[newSessionId].filesById).length)} files from session`
+          );
+        }
+
+        // O(1) pointer swap + flat field sync for backward compat
+        state.activeFileSessionId = newSessionId;
         state.currentSessionId = newSessionId;
 
-        // Check if we have cached data for the new session
-        const cached = state.sessionCache[newSessionId];
-        if (cached) {
-          // Restore cached session data (cloneDict preserves null-prototype guarantee)
-          state.filesById = cloneDict(cached.filesById);
-          state.pathToId = cloneDict(cached.pathToId);
-          state.selectedFile = cached.selectedFile;
-          logger.debug(`Restored ${String(Object.keys(cached.filesById).length)} files from cache`);
-        } else if (isInitialLoad && hasExistingFiles) {
-          // Initial load with existing files (from buffered tool events before session was set)
-          // Adopt these files as belonging to the new session - don't clear them
-          logger.debug(
-            `Initial load: adopting ${String(Object.keys(state.filesById).length)} existing files`
-          );
-        } else {
-          // No cached data and no existing files to adopt - start fresh
-          state.filesById = createDict<FileChange>();
-          state.pathToId = createDict<string>();
-          state.selectedFile = null;
-          logger.debug('No cached files, starting fresh');
+        const bucket = state.fileSessions[newSessionId];
+        state.filesById = bucket.filesById;
+        state.pathToId = bucket.pathToId;
+        state.selectedFile = bucket.selectedFile;
+
+        // Also sync legacy sessionCache for backward compat
+        state.sessionCache[newSessionId] = {
+          filesById: bucket.filesById,
+          pathToId: bucket.pathToId,
+          selectedFile: bucket.selectedFile,
+        };
+
+        // Evict old session buckets
+        const bucketKeys = Object.keys(state.fileSessions);
+        if (bucketKeys.length > MAX_FILE_SESSIONS) {
+          const evictCount = bucketKeys.length - MAX_FILE_SESSIONS;
+          for (const key of bucketKeys.slice(0, evictCount)) {
+            if (key !== newSessionId) {
+              Reflect.deleteProperty(state.fileSessions, key);
+              Reflect.deleteProperty(state.sessionCache, key);
+            }
+          }
         }
       });
     },
@@ -503,6 +517,7 @@ export const useFileStore = create<FileState>()(
       logger.debug(`Clearing file cache for deleted session: ${sessionId}`);
       set((state) => {
         Reflect.deleteProperty(state.sessionCache, sessionId);
+        Reflect.deleteProperty(state.fileSessions, sessionId);
       });
     },
 

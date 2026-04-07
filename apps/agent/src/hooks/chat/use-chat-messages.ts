@@ -499,16 +499,10 @@ export function useChatMessages(): UseChatMessagesReturn {
     };
   }, [sessionId]);
 
-  // ── 7. Sync ToolStore session on activeSessionId change ───────────────
-  // Ensures token usage tracking follows the active session.
-  useEffect(() => {
-    if (sessionId) {
-      const toolState = useToolStore.getState();
-      if (toolState.currentSessionId !== sessionId) {
-        toolState.switchSession(sessionId);
-      }
-    }
-  }, [sessionId]);
+  // ── 7. (REMOVED) ToolStore session sync ──────────────────────────────
+  // Previously synced ToolStore.currentSessionId on active session change.
+  // No longer needed: session-keyed ToolStore reads directly from
+  // sessions[sessionId] — no pointer swap required.
 
   // ── 8. Dev-mode debug interface ─────────────────────────────────────
   // Exposes chatActions on window.__orbit_debug for DevTools console access.

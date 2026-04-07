@@ -1915,8 +1915,29 @@ describe('ChatMessages', () => {
 
     useToolStore.setState({
       currentSessionId: 'session-a',
+      activeSessionId: 'session-a',
       activeTools: {},
       completedTools: [tool],
+      sessions: {
+        'session-a': {
+          activeTools: {},
+          completedTools: [tool],
+          usage: {
+            inputTokens: 0,
+            outputTokens: 0,
+            cacheReadInputTokens: 0,
+            cacheCreationInputTokens: 0,
+            totalCostUsd: 0,
+          },
+          processedIds: [],
+          contextWindow: null,
+          sessionModel: null,
+          sessionTools: null,
+          sessionMcpServers: null,
+          metadataState: null,
+          toolRevision: 0,
+        },
+      },
     });
 
     renderChatMessages({
