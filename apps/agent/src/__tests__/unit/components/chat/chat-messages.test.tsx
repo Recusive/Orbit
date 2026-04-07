@@ -861,6 +861,84 @@ describe('ChatMessages', () => {
     }
   });
 
+  it('pre-seeds visible verification even when layoutPendingCount > 0', async () => {
+    vi.useFakeTimers();
+
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+      buildMessage({ id: 'assistant-3', role: 'assistant' }),
+    ];
+
+    try {
+      mockScrollerElement.clientHeight = 800;
+      mockScrollerElement.scrollHeight = 1200;
+      mockScrollerElement.scrollTop = 400;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+
+      const onVerificationResult = vi.fn();
+      const view = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        verificationPhase: 'hidden',
+        verificationKey: 'preseed-with-pending-layout',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'hidden',
+        result: 'hidden-ready',
+        tailProofVersion: 1,
+      });
+
+      onVerificationResult.mockClear();
+
+      // Simulate an in-flight layout mutation (layoutPendingCount > 0).
+      // Before the fix, the preseed check gated on layoutPendingCount === 0,
+      // which would block instant visible verification here.
+      const chatStore = useChatStore.getState();
+      chatStore.layoutMutationStart('session-a', 'test-pending-mutation');
+
+      act(() => {
+        view.rerender(
+          <ChatMessages
+            messages={messages}
+            isAgentRunning={false}
+            sessionId="session-a"
+            isVisible={true}
+            verificationPhase="visible"
+            verificationKey="preseed-with-pending-layout"
+            queuedMessage={null}
+            onRewind={vi.fn()}
+            onOpenFile={vi.fn()}
+            onOpenUrl={vi.fn()}
+            onCancelQueue={vi.fn()}
+            onFeedback={vi.fn()}
+            onVerificationResult={onVerificationResult}
+          />
+        );
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(180);
+      });
+
+      expect(onVerificationResult).toHaveBeenCalledTimes(1);
+      expect(onVerificationResult).toHaveBeenCalledWith({
+        phase: 'visible',
+        result: 'visible-ready',
+        tailProofVersion: 1,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('marks hidden verification ready after one animation frame when a restored cache stays stable', async () => {
     vi.useFakeTimers();
 

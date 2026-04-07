@@ -1505,7 +1505,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // without waiting.
     if (
       visiblePreseedPendingRef.current &&
-      layoutPendingCount === 0 &&
       restorePhaseRef.current === 'stabilizing' &&
       effectiveVerificationPhase === 'visible'
     ) {
@@ -1629,6 +1628,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         // phase's 48ms window catches any remaining layout drift.
         const sentinelInRenderRange = rendered.some((r) => r.kind === 'tail-sentinel');
         if (!sentinelInRenderRange) {
+          markSwitchTimeline(
+            'positioning:no-sentinel',
+            `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)}`
+          );
           if (restorePhaseRef.current === 'positioning') {
             alignScrollerToBottom();
           }
@@ -1638,15 +1641,24 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       if (effectiveVerificationPhase === 'hidden') {
         if (isHiddenPlaceholderShortSurface(metrics)) {
+          markSwitchTimeline(
+            'positioning:placeholder-short',
+            `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)}`
+          );
           return false;
         }
 
         if (!hasObservedPostProbeSurface(metrics)) {
+          markSwitchTimeline('positioning:no-post-probe');
           return false;
         }
       }
 
       if (!metrics.isAtBottom) {
+        markSwitchTimeline(
+          'positioning:not-at-bottom',
+          `rows=${String(rendered.length)} scrollTop=${String(metrics.scrollTop)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)}`
+        );
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
         }
@@ -1654,13 +1666,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (layoutPendingCount > 0) {
+        markSwitchTimeline(
+          'positioning:layout-pending',
+          `count=${String(layoutPendingCount)} sources=[${sessionId ? getActiveLayoutMutationSources(sessionId).join(',') : ''}]`
+        );
         return false;
       }
 
       restorePhaseRef.current = 'stabilizing';
       markSwitchTimeline(
         'stabilizing',
-        `rows=${String(metrics.renderedRowCount)} tail=${String(metrics.tailSentinelRendered)}`
+        `rows=${String(metrics.renderedRowCount)} tail=${String(metrics.tailSentinelRendered)} pending=${String(layoutPendingCount)}`
       );
       if (effectiveVerificationPhase === 'visible') {
         scheduleVisibleVerificationCheck();
@@ -1678,6 +1694,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       layoutPendingCount,
       scheduleHiddenVerificationCheck,
       scheduleVisibleVerificationCheck,
+      sessionId,
     ]
   );
 

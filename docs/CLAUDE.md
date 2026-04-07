@@ -98,7 +98,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `AGENT-BRIDGE-HTTP-SSE-MIGRATION.md` — Replace stdin/stdout Rust proxy with HTTP+SSE direct frontend↔sidecar communication (5→2 serialization boundaries)
 - `fix-virtuoso-cold-mount-performance.md` — VirtuosoMessageList cold-mount performance: three-phase adaptive overscan, observer gating, event-driven readiness, size caching
 
-## plans/tracked/done/ (51 entries)
+## plans/tracked/done/ (53 entries)
 
 - `virtualize-chat-react-virtuoso.md` — Virtualize chat with react-virtuoso (original plan, superseded by VirtuosoMessageList migration)
 - `virtuoso-message-list-migration.md` — Migrate to VirtuosoMessageList: purpose-built chat virtualization with built-in auto-scroll, velocity wheel damping, WKWebView scroll fixes
@@ -157,6 +157,8 @@ Use this to find the right file. Read the file directly — no links needed.
 - `auth-method-picker.md` — Auth method picker for Claude backend (radio-card selector in Account Settings, Rust preference persistence, bootstrap respect)
 - `react-grab-fix.md` — Fix React-grab element selection (sync handler returns true, deferred enrichment via separate URL scheme, textContent capture, epoch-based staleness)
 - `element-chip-detail-dialog.md` — Element context chip click-to-inspect dialog (syntax-highlighted HTML, copy buttons, click-to-open file, keyboard accessible)
+- `COLD-SWITCH-VISIBLE-STABILIZATION.md` — Cold switch visible-phase overscan fix, hidden→visible promotion fast path, startup prefetch, session switch trace instrumentation
+- `HIDDEN-PHASE-LAYOUT-PENDING-STALLS.md` — Disable assistant-markdown 250ms settle window during verification, remove layoutPendingCount gate from visible preseed
 
 ## plans/others/ (58 files in 14 topic subfolders)
 

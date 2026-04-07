@@ -12,7 +12,11 @@ import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
 import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
-import { ToolWidgetSessionContext, useObservedSessionLayoutMutation } from '../tools/shared';
+import {
+  ToolWidgetLayoutFrozenContext,
+  ToolWidgetSessionContext,
+  useObservedSessionLayoutMutation,
+} from '../tools/shared';
 
 import { ImageAttachmentTiles } from './ImageAttachmentTiles';
 import { ToolWidgetRenderer } from './ToolWidgetRenderer';
@@ -360,11 +364,12 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
     () => segments.some((segment) => segment.type === 'content'),
     [segments]
   );
+  const isLayoutFrozen = useContext(ToolWidgetLayoutFrozenContext);
   const assistantContentRef = useObservedSessionLayoutMutation<HTMLDivElement>(
     sessionId,
     'assistant-markdown',
     `${message.id}:${String(animatedContent.length)}:${String(segments.length)}`,
-    hasMarkdownSegments,
+    hasMarkdownSegments && !isLayoutFrozen,
     STREAMDOWN_LAYOUT_STABLE_MS
   );
 
