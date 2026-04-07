@@ -395,6 +395,10 @@ export function markSwitchTimeline(phase: string, detail?: string): void {
   });
 }
 
+export function isActiveTimelineSession(sessionId: string): boolean {
+  return activeTimeline !== null && activeTimeline.sessionId === sessionId;
+}
+
 export function endSwitchTimeline(
   result: 'complete' | 'aborted' | 'timeout' | 'instant',
   detail?: string

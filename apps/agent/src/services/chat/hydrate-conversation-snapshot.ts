@@ -11,6 +11,10 @@ import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
 import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
 import { queryClient, queryKeys } from '@/lib/query';
+import {
+  isActiveTimelineSession,
+  markSwitchTimeline,
+} from '@/services/conversations/session-switch-trace';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
 
@@ -271,6 +275,12 @@ export function hydrateConversationSnapshot(
   if (isLayoutEquivalent) {
     chatStore.setScrollIntent(input.sessionId, input.scrollIntent);
   } else {
+    if (isActiveTimelineSession(input.sessionId)) {
+      markSwitchTimeline(
+        'setMessages:hydrate',
+        `session=${input.sessionId.slice(-6)} msgs=${String(messages.length)} source=${input.source} layoutV=${String(existingSession?.layoutVersion ?? 0)}`
+      );
+    }
     chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
   }
 

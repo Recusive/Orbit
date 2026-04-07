@@ -6,6 +6,8 @@ import '@fontsource-variable/geist-mono';
 import './globals.css';
 import App from './App';
 
+import { loadConversationDetailFresh } from '@/lib/query/conversation-detail';
+import { claudeConversationRepo } from '@/services/conversations/claude-conversation-repo';
 import { warmMemoryCacheFromIdb } from '@/stores/chat/render-cache-store';
 
 // Enable React Scan in development to visualize component re-renders.
@@ -74,6 +76,14 @@ if (localStorage.getItem('orbit-backend-mode') !== null) {
 }
 
 void warmMemoryCacheFromIdb();
+
+// Pre-fetch the last-active conversation into TanStack Query cache so that
+// restoreSelection() → select() finds cached data (query-fast-path) or joins
+// this in-flight fetch (join-path) instead of falling through to slow-path.
+const lastActiveSessionId = claudeConversationRepo.restoreActiveSession();
+if (lastActiveSessionId) {
+  void loadConversationDetailFresh(lastActiveSessionId);
+}
 
 const rootElement = document.getElementById('root');
 

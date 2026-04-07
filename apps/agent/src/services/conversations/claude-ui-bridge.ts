@@ -151,6 +151,10 @@ export const claudeUiBridge: ConversationUiBridge = {
         }
       } else {
         markSwitchTimeline('select', 'query-fast-empty');
+        markSwitchTimeline(
+          'setMessages:bridge-empty',
+          `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
+        );
         chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
         chatStore.markSessionLoaded(sessionId);
@@ -215,6 +219,10 @@ export const claudeUiBridge: ConversationUiBridge = {
       if (result.kind === 'empty') {
         markSwitchTimeline('select', 'join-path-empty');
         setPendingConversationTitle(title ?? result.conversation.title, requestId);
+        markSwitchTimeline(
+          'setMessages:bridge-empty',
+          `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
+        );
         chatStore.setMessages(sessionId, [], 'pending-verify');
         chatStore.markSessionHydrated(sessionId);
         chatStore.markSessionLoaded(sessionId);

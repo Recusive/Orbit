@@ -816,11 +816,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       ? 'parked'
       : effectiveVerificationPhase === 'hidden'
         ? 'entry'
-        : isPremeasuring || isReadyForSteady || hasUserScrolled
-          ? 'steady'
-          : isVerifying
-            ? 'entry'
-            : 'steady';
+        : 'steady';
   const overscan =
     overscanPhase === 'parked'
       ? OVERSCAN_PARKED
@@ -834,11 +830,22 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
+    const prev = previousOverscanPhaseRef.current;
     previousOverscanPhaseRef.current = overscanPhase;
-    if (import.meta.env.DEV) {
-      performance.mark('overscan-phase-change');
-    }
-  }, [hasUserScrolled, isReadyForSteady, isVerifying, isVisible, overscan, overscanPhase]);
+    markSwitchTimeline(
+      'overscan-change',
+      `${prev ?? 'null'} -> ${overscanPhase} (${String(overscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} premeasure=${String(isPremeasuring)} scroll=${String(hasUserScrolled)}`
+    );
+  }, [
+    effectiveVerificationPhase,
+    hasUserScrolled,
+    isPremeasuring,
+    isReadyForSteady,
+    isVerifying,
+    isVisible,
+    overscan,
+    overscanPhase,
+  ]);
 
   // Stable key function — avoids creating a new closure on each render.
   // Virtuoso compares the function reference; a new ref can force item re-renders.
@@ -1209,7 +1216,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         window.clearTimeout(readinessTimeoutRef.current);
       }
       readinessTimeoutRef.current = window.setTimeout(() => {
-        markSwitchTimeline('timeout', `phase=${restorePhaseRef.current}`);
+        markSwitchTimeline(
+          'timeout',
+          [
+            `phase=${restorePhaseRef.current}`,
+            `vPhase=${String(effectiveVerificationPhase)}`,
+            `tailProbe=${String(hasAttemptedTailProbeRef.current)}`,
+            `premeasure=${String(hasAttemptedPremeasureRef.current)}`,
+            `sizeCache=${String(restoredSizeCacheRef.current)}`,
+            `visPreseed=${String(visiblePreseedPendingRef.current)}`,
+            `started=${String(readinessStartedRef.current)}`,
+          ].join(' ')
+        );
         if (effectiveVerificationPhase) {
           emitVerificationResult(
             effectiveVerificationPhase,
@@ -1397,6 +1415,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
 
       if (!latestMetrics?.tailSentinelRendered) {
+        markSwitchTimeline(
+          'hidden-backtrack:tail-sentinel-lost',
+          `rows=${String(latestRendered.length)}`
+        );
         restorePhaseRef.current = 'positioning';
         hiddenCandidateSnapshotRef.current = null;
         if (!hasAttemptedTailProbeRef.current) {
@@ -1409,6 +1431,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (isHiddenPlaceholderShortSurface(latestMetrics)) {
+        markSwitchTimeline(
+          'hidden-backtrack:placeholder-short',
+          `rows=${String(latestRendered.length)} scrollH=${String(latestMetrics.scrollHeight)} clientH=${String(latestMetrics.clientHeight)}`
+        );
         hiddenCandidateSnapshotRef.current = null;
         restorePhaseRef.current = 'positioning';
         progressPositioningRef.current(latestRendered);
@@ -1416,6 +1442,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (!hasObservedPostProbeSurface(latestMetrics)) {
+        markSwitchTimeline('hidden-backtrack:no-post-probe-surface');
         hiddenCandidateSnapshotRef.current = null;
         restorePhaseRef.current = 'positioning';
         progressPositioningRef.current(latestRendered);
@@ -1423,6 +1450,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (!latestMetrics.isAtBottom) {
+        markSwitchTimeline(
+          'hidden-backtrack:not-at-bottom',
+          `scrollTop=${String(latestMetrics.scrollTop)} scrollH=${String(latestMetrics.scrollHeight)} clientH=${String(latestMetrics.clientHeight)}`
+        );
         restorePhaseRef.current = 'positioning';
         hiddenCandidateSnapshotRef.current = null;
         alignScrollerToBottom();
@@ -1431,6 +1462,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (layoutPendingCount > 0) {
+        markSwitchTimeline(
+          'hidden-backtrack:layout-pending',
+          `count=${String(layoutPendingCount)}`
+        );
         hiddenCandidateSnapshotRef.current = null;
         scheduleHiddenVerificationCheckRef.current();
         return;
@@ -1438,6 +1473,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       const currentSnapshot = buildReadinessSurfaceSnapshot(latestMetrics, layoutSettledVersion);
       if (!isSameReadinessSurfaceSnapshot(hiddenCandidateSnapshotRef.current, currentSnapshot)) {
+        markSwitchTimeline('hidden-backtrack:snapshot-changed');
         hiddenCandidateSnapshotRef.current = currentSnapshot;
         scheduleHiddenVerificationCheckRef.current();
         return;
@@ -1911,6 +1947,17 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
+    markSwitchTimeline(
+      'verification-key-change',
+      [
+        `prev-key=${String(previousVerificationKeyRef.current)}`,
+        `next-key=${effectiveVerificationKey}`,
+        `prev-phase=${String(previousVerificationPhaseRef.current)}`,
+        `next-phase=${effectiveVerificationPhase}`,
+        `msgs=${String(messages.length)}`,
+      ].join(' ')
+    );
+
     if (
       previousVerificationKeyRef.current !== null &&
       previousVerificationPhaseRef.current !== null &&
@@ -1921,6 +1968,36 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         'aborted',
         tailProofVersionRef.current
       );
+    }
+
+    // Lightweight hidden→visible promotion: the hidden phase already proved
+    // layout stability, so preserve Virtuoso's render state and let the
+    // preseed match fire immediately instead of restarting from positioning.
+    // Skipping setRestoreVersion / setIsReadyForSteady / setIsPremeasuring
+    // avoids the React re-render cycle that collapses Virtuoso to 2 rows.
+    if (
+      previousVerificationPhaseRef.current === 'hidden' &&
+      effectiveVerificationPhase === 'visible'
+    ) {
+      previousVerificationKeyRef.current = effectiveVerificationKey;
+      previousVerificationPhaseRef.current = effectiveVerificationPhase;
+      hasResolvedVerificationRef.current = false;
+      tailProofVersionRef.current = 0;
+
+      const preseededVisibleSnapshot = hiddenReadySnapshotRef.current;
+      hiddenCandidateSnapshotRef.current = null;
+      if (preseededVisibleSnapshot !== null) {
+        visibleCandidateSnapshotRef.current = preseededVisibleSnapshot;
+        visiblePreseedPendingRef.current = true;
+      } else {
+        clearVisibleVerificationCandidate();
+      }
+      hiddenReadySnapshotRef.current = null;
+
+      restorePhaseRef.current = 'stabilizing';
+      markSwitchTimeline('visible-start', `${String(messages.length)} msgs`);
+      scheduleVisibleVerificationCheckRef.current();
+      return;
     }
 
     previousVerificationKeyRef.current = effectiveVerificationKey;
