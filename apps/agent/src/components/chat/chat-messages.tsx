@@ -1583,10 +1583,19 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (!metrics.tailSentinelRendered) {
-        if (restorePhaseRef.current === 'positioning') {
-          alignScrollerToBottom();
+        // The DOM query for [data-tail-sentinel] can lag behind Virtuoso's
+        // internal render state by 1+ frames. For short sessions, this causes
+        // the positioning phase to loop for 1500ms then timeout.
+        // Trust Virtuoso's render data: if the sentinel row is in the rendered
+        // range, it WILL appear in the DOM within 1 frame. The stabilizing
+        // phase's 48ms window catches any remaining layout drift.
+        const sentinelInRenderRange = rendered.some((r) => r.kind === 'tail-sentinel');
+        if (!sentinelInRenderRange) {
+          if (restorePhaseRef.current === 'positioning') {
+            alignScrollerToBottom();
+          }
+          return false;
         }
-        return false;
       }
 
       if (effectiveVerificationPhase === 'hidden') {
@@ -1779,7 +1788,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (effectiveVerificationPhase === 'hidden' && !hasAttemptedTailProbeRef.current) {
-        if (forceTailProbeRender()) {
+        // Only probe if the sentinel is genuinely missing from Virtuoso's render
+        // range. If it's already rendered (just not in the DOM yet), probing is
+        // counterproductive: it sets hasAttemptedTailProbeRef which gates
+        // hasObservedPostProbeSurface, and for short lists the surface snapshot
+        // never changes → positioning stalls until timeout.
+        const sentinelAlreadyInRange = rendered.some((r) => r.kind === 'tail-sentinel');
+        if (!sentinelAlreadyInRange && forceTailProbeRender()) {
           queuePositioningRecheck();
           return;
         }
