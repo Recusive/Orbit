@@ -49,6 +49,7 @@ import {
   useSessionCompletedTools,
 } from '@/stores/agent/tool-store';
 import {
+  getActiveLayoutMutationSources,
   useChatStore,
   useSessionLastLayoutMutationAt,
   useSessionLayoutPendingCount,
@@ -1464,7 +1465,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (layoutPendingCount > 0) {
         markSwitchTimeline(
           'hidden-backtrack:layout-pending',
-          `count=${String(layoutPendingCount)}`
+          `count=${String(layoutPendingCount)} sources=[${sessionId ? getActiveLayoutMutationSources(sessionId).join(',') : ''}]`
         );
         hiddenCandidateSnapshotRef.current = null;
         scheduleHiddenVerificationCheckRef.current();
@@ -1491,6 +1492,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     layoutPendingCount,
     layoutSettledVersion,
     refreshReadinessTimeout,
+    sessionId,
     signalReady,
     startTemporaryResizeStabilityWindow,
   ]);

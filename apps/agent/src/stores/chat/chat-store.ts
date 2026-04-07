@@ -248,6 +248,14 @@ function noteSynchronousLayoutMutation(session: ChatSessionData, now = Date.now(
   }
 }
 
+export function getActiveLayoutMutationSources(sessionId: string): string[] {
+  const registry = layoutMutationRegistry.get(sessionId);
+  if (!registry || registry.size === 0) {
+    return [];
+  }
+  return [...registry.values()].map((record) => record.source);
+}
+
 export function clearAllChatLayoutMutationRuntimeState(): void {
   for (const sessionId of [...layoutMutationRegistry.keys()]) {
     clearLayoutMutationRuntime(sessionId);
