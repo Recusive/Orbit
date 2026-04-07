@@ -140,13 +140,27 @@ completeTool: (sessionId: string, toolId: string, output, success) => {
 
 ### Step 1.4: remapSession for SDK session forks
 
+The current `remapSession` at `tool-store.ts:874-908` does three things: (a) moves the `sessionCache` key, (b) updates `currentSessionId`, and (c) **rewrites embedded `tool.sessionId` on every tool** (lines 899-908). This rewrite is necessary because consumers like `todo-bar.tsx:181` filter tools by `tool.sessionId`. After migration, the same three operations apply to session buckets:
+
 ```typescript
 remapSession: (oldId: string, newId: string) => {
   set((draft) => {
-    if (draft.sessions[oldId]) {
-      draft.sessions[newId] = draft.sessions[oldId];
-      delete draft.sessions[oldId];
+    const bucket = draft.sessions[oldId];
+    if (!bucket) return;
+
+    // Rewrite embedded sessionId on all tools in the bucket
+    for (const tool of Object.values(bucket.activeTools)) {
+      if (tool.sessionId === oldId) tool.sessionId = newId;
     }
+    for (const tool of bucket.completedTools) {
+      if (tool.sessionId === oldId) tool.sessionId = newId;
+    }
+
+    // Move the bucket key
+    draft.sessions[newId] = bucket;
+    delete draft.sessions[oldId];
+
+    // Update pointer if active
     if (draft.activeSessionId === oldId) {
       draft.activeSessionId = newId;
     }
@@ -156,27 +170,133 @@ remapSession: (oldId: string, newId: string) => {
 
 ### Step 1.5: Eviction policy (separate from keep-alive pool)
 
-**Audit finding**: Keep-alive pool eviction is a view concern. ChatStore uses its own LRU with different rules (pins active session, protects active agents, clears heavy payloads while keeping the key).
+**Audit finding**: Keep-alive pool eviction is a view concern. ChatStore uses its own LRU with different rules (pins active session, protects active agents, clears heavy payloads while keeping the key at `chat-store.ts:269`).
 
-ToolStore eviction follows ChatStore's pattern, NOT the keep-alive pool:
+ToolStore eviction is triggered by **two concrete events**, not a generic hook:
+
+**Event 1 — Conversation delete** (`use-sidebar-actions.ts:396`): Already calls `clearSessionTools(sessionId)`. After migration this becomes `evictSession(sessionId)`.
+
+**Event 2 — ToolStore self-eviction on bucket growth**: When a new session bucket is created and `Object.keys(sessions).length > MAX_TOOL_SESSIONS`, evict the least-recently-switched session (tracked by an `accessOrder` array, same LRU pattern as `render-cache-store.ts`).
 
 ```typescript
-const MAX_TOOL_SESSIONS = 20;  // Higher than keep-alive pool (10)
+const MAX_TOOL_SESSIONS = 20;
 
-// Called from ChatStore's eviction hook or on explicit session delete
+// Internal LRU tracking
+accessOrder: string[],  // Most recent at end
+
+// Called internally when creating a new session bucket
+function touchToolLru(draft: ToolState, sessionId: string): void {
+  const idx = draft.accessOrder.indexOf(sessionId);
+  if (idx >= 0) draft.accessOrder.splice(idx, 1);
+  draft.accessOrder.push(sessionId);
+
+  // Evict oldest if over limit — single pass, bounded by accessOrder length
+  if (draft.accessOrder.length > MAX_TOOL_SESSIONS) {
+    const candidates = [...draft.accessOrder];
+    for (const candidate of candidates) {
+      if (draft.accessOrder.length <= MAX_TOOL_SESSIONS) break;
+      if (candidate === draft.activeSessionId || isSessionRunning(candidate)) continue;
+      const idx = draft.accessOrder.indexOf(candidate);
+      if (idx >= 0) draft.accessOrder.splice(idx, 1);
+      delete draft.sessions[candidate];
+    }
+    // If still over limit, all remaining are protected — accept the overflow.
+    // They'll be evicted when their agents complete and the next touch triggers LRU.
+  }
+}
+
+// Check running state from ChatStore — the source of truth for agent activity.
+// ToolStore's activeTools is NOT reliable: text-only streaming sessions have
+// zero tools but are still running.
+function isSessionRunning(sessionId: string): boolean {
+  const session = useChatStore.getState().sessions[sessionId];
+  return session?.isAgentRunning === true;
+}
+
+// Explicit eviction (conversation delete) — always succeeds, even for active session.
+// The delete flow in use-sidebar-actions.ts switches to another session BEFORE calling
+// this, but if the caller deletes the active session without switching first, we still
+// clean up. The next switchSession call will set a new activeSessionId.
 evictSession: (sessionId: string) => {
   set((draft) => {
-    if (sessionId === draft.activeSessionId) return; // Never evict active
     delete draft.sessions[sessionId];
+    const idx = draft.accessOrder.indexOf(sessionId);
+    if (idx >= 0) draft.accessOrder.splice(idx, 1);
+    if (draft.activeSessionId === sessionId) {
+      draft.activeSessionId = null;
+    }
   });
 },
 ```
 
-- Sessions survive keep-alive pool eviction (sidebar revisit still finds tools)
-- Sessions are evicted when ChatStore evicts them or on explicit conversation delete
-- `clearSessionTools(sessionId)` at `use-sidebar-actions.ts:396` triggers eviction on delete
+**Guards**: Active session is never evicted. Sessions where `ChatStore.sessions[id].isAgentRunning === true` are skipped — this covers text-only streaming sessions with zero tools. Skipped sessions are moved to the end of the LRU (protected until the agent completes).
 
-### Step 1.6: Delete the hook-level sync
+**No ChatStore hook needed**: ToolStore manages its own lifecycle. ChatStore's eviction of heavy payloads (clearing messages while keeping the session key) is a separate concern — ToolStore doesn't need to mirror it.
+
+### Step 1.6: Metadata selectors migration
+
+Active-session metadata selectors (`useSessionModel`, `useSessionTools`, `useSessionMcpServers`, `useSessionMetadataState`) currently read from top-level state. After migration they read through the pointer:
+
+```typescript
+// Before: useToolStore((s) => s.sessionModel)
+// After:
+export function useSessionModel(): string | null {
+  return useToolStore((s) => s.sessions[s.activeSessionId ?? '']?.sessionModel ?? null);
+}
+```
+
+Same pattern for `useSessionTools`, `useSessionMcpServers`, `useSessionMetadataState`. Consumers like `context-detail-dialog.tsx:103` don't change — they call the same hook, the hook internals change.
+
+### Step 1.7: Persistence migration
+
+The current `partialize` at `tool-store.ts:1113` persists flat `completedTools` + `currentSessionId`. After migration:
+
+```typescript
+partialize: (state) => {
+  // Persist only the active session's recent tools (same cap as before)
+  const activeSession = state.sessions[state.activeSessionId ?? ''];
+  const toolsToProcess = activeSession?.completedTools ?? [];
+  const capped = toolsToProcess.length > MAX_PERSISTED_TOOLS
+    ? toolsToProcess.slice(-MAX_PERSISTED_TOOLS)
+    : toolsToProcess;
+  return {
+    completedTools: capped.map(sanitizeToolForPersistence),
+    activeSessionId: state.activeSessionId,
+  };
+},
+
+merge: (persistedState, currentState) => {
+  // Validate + restore into session bucket
+  const persisted = persistedState as Partial<{ completedTools: unknown[]; activeSessionId: string }>;
+  const validated = validatePersistedTools(persisted.completedTools);
+  const sessionId = typeof persisted.activeSessionId === 'string' ? persisted.activeSessionId : null;
+
+  // Always restore the pointer — even when no tools were persisted.
+  // Without this, consumers like ChatInput and context-detail-dialog read
+  // null session data until an explicit switch. The session bucket is created
+  // empty if needed — usage/metadata arrive later via system:init.
+  if (sessionId) {
+    return {
+      ...currentState,
+      activeSessionId: sessionId,
+      sessions: {
+        ...currentState.sessions,
+        [sessionId]: {
+          ...createEmptySessionToolData(),
+          ...(validated.length > 0 ? { completedTools: validated } : {}),
+        },
+      },
+    };
+  }
+  return currentState;
+},
+```
+
+**What survives app reload**: The active session's most recent tools (capped at `MAX_PERSISTED_TOOLS`). Same as today. Other sessions' tools are restored from the backend on conversation load via `restoreToolsForMessage`.
+
+**STORE_VERSION**: Bump to trigger migration. Old persisted shape (flat `completedTools`) is handled by the `merge` function — tools land in `sessions[persistedSessionId]`.
+
+### Step 1.8: Delete the hook-level sync
 
 Remove `use-chat-messages.ts:504-511`. With session-keyed data, there's nothing to propagate to ToolStore when `activeSessionId` changes.
 
@@ -278,15 +398,27 @@ Track for adoption once Virtuoso compatibility is confirmed. Does NOT replace th
 
 ## Edge Cases
 
-**Temp-ID → SDK-ID remap**: `remapSession(oldId, newId)` moves the session bucket key. If `activeSessionId === oldId`, it updates to `newId`. No data loss.
+**Temp-ID → SDK-ID remap**: `remapSession(oldId, newId)` moves the bucket key AND rewrites embedded `tool.sessionId` on all tools in the bucket. Consumers like `todo-bar.tsx:181` that filter by `tool.sessionId` continue to work.
 
-**Rewind/fork inheriting tools**: Rewind at `chat-actions.ts:441` reads `sessions[sessionId].completedTools` for the current session. Fork creates a new session bucket via `remapSession`. Tools from the old session are available under the new key.
+**Rewind/fork inheriting tools**: Rewind at `chat-actions.ts:441` reads `sessions[sessionId].completedTools` for the current session. Fork creates a new session bucket via `remapSession`. Tools from the old session are available under the new key with updated embedded IDs.
 
 **Background file changes**: After Phase 2, `addFileChange(sessionId, change)` routes to the correct session bucket. Background streaming for session B while viewing A writes to `sessions["B"]` — no conflict.
 
-**Session aging out of keep-alive but revisited later**: ToolStore keeps `sessions[id]` alive independently of the keep-alive pool (MAX_TOOL_SESSIONS = 20 > MAX_ALIVE_INSTANCES = 10). Sidebar click finds tools already in the store. Only evicted when ChatStore evicts or conversation is deleted.
+**Session aging out of keep-alive but revisited later**: ToolStore keeps `sessions[id]` alive via its own LRU (MAX_TOOL_SESSIONS = 20 > MAX_ALIVE_INSTANCES = 10). Sidebar click finds tools already in the store. Evicted only by LRU overflow or conversation delete.
 
-**Persisted tool data growth**: ToolStore eviction mirrors ChatStore's LRU — oldest accessed sessions evicted beyond MAX_TOOL_SESSIONS. Active session and sessions with running agents are pinned.
+**Sessions with running agents**: LRU eviction checks `ChatStore.sessions[id].isAgentRunning` (the source of truth for agent activity), NOT `ToolStore.sessions[id].activeTools`. This covers text-only streaming sessions that have zero tools but are actively generating. Skipped sessions move to the end of the LRU and are re-evaluated on the next eviction cycle.
+
+**LRU access order touched on**: session switch (`switchSession`), bucket creation (new session started), and remap (`remapSession`). NOT touched on background writes (tool events from non-active sessions) — background sessions shouldn't climb the LRU just because they're streaming.
+
+**App reload + immediate revisit**: Only the active session's tools survive reload. If the user immediately revisits another session, `restoreToolsForMessage` (called from `hydrateConversationSnapshot`) populates the bucket from persisted conversation data. This is the same behavior as today — no regression.
+
+**Transitional `activeSessionId` fallback in FileStore**: During the gap between Phase 1 (ToolStore) and Phase 2 (FileStore), `addFileChange` callers without `sessionId` use `activeSessionId` as fallback. This is identical to today's implicit routing. The fallback is removed when Phase 2 makes `sessionId` required.
+
+**App reload persistence**: Only the active session's recent completed tools survive reload (same as today, capped at `MAX_PERSISTED_TOOLS`). Other sessions are restored from the backend via `restoreToolsForMessage` on conversation load. STORE_VERSION is bumped to trigger migration from the flat persisted shape.
+
+**Metadata before restore**: On fresh app load, selectors like `useSessionModel()` return `null` until the backend sends `system:init` with the session model. This is the same behavior as today — no regression.
+
+**Partial FileStore migration**: If Phase 2 is delayed, `addFileChange` callers that don't pass `sessionId` fall back to `activeSessionId`. This is the same implicit routing as today. Session-keyed reads work immediately; session-routed writes are an incremental improvement.
 
 ## Verification
 

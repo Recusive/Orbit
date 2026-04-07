@@ -696,7 +696,16 @@ const App: FC = () => {
       // resizes (sidebar toggle/drag, window resize, actions bar). No JS clamping
       // needed — the layout engine handles it natively, just like the chat column's
       // flex:1 + minWidth. The 404px = CHAT_PANEL.MIN_WIDTH (400) + CONTENT_CARD.gap (4).
-      maxWidth: `calc(100% - ${String(CHAT_PANEL.MIN_WIDTH + CONTENT_CARD.gap)}px)`,
+      //
+      // Only applied when the panel is open. When closed, the panel slides off via
+      // marginRight: -reviewPanelWidth — width and margin must cancel exactly (both
+      // use reviewPanelWidth) so the net flex contribution is 0. Applying maxWidth
+      // when closed caps the rendered width below reviewPanelWidth while marginRight
+      // stays uncapped, creating excess negative space that inflates the chat column
+      // beyond 100vw on narrow viewports (e.g., demo iframes).
+      maxWidth: activityOpen
+        ? `calc(100% - ${String(CHAT_PANEL.MIN_WIDTH + CONTENT_CARD.gap)}px)`
+        : undefined,
       marginRight: activityOpen ? 0 : -reviewPanelWidth,
       flexShrink: 0,
       // marginRight alone drives both the slide and space-reclaim — the parent's
