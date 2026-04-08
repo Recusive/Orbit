@@ -1447,7 +1447,12 @@ describe('ChatMessages', () => {
       mockScrollerElement.scrollHeight = 647;
       mockScrollerElement.scrollTop = 0;
       mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+      // Return rows WITHOUT the tail sentinel so the sentinel-in-render-range
+      // guard in the stabilization backtrack doesn't prevent the probe.
+      // This simulates the case where the tail sentinel is genuinely absent.
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
+        fallback.filter((r) => r.kind !== 'tail-sentinel')
+      );
 
       const onVerificationResult = vi.fn();
       renderChatMessages({

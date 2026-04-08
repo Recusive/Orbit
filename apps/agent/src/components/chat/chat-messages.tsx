@@ -166,6 +166,38 @@ function isSameReadinessSurfaceSnapshot(
   );
 }
 
+/**
+ * Relaxed snapshot comparison for visible-phase preseed matching.
+ *
+ * After hidden→visible promotion, the overscan changes from entry (800px) to
+ * steady (8000px). Virtuoso recalculates its render range, changing
+ * renderedRowCount even though the CONTENT is identical. The strict comparator
+ * (isSameReadinessSurfaceSnapshot) fails because it compares renderedRowCount.
+ *
+ * This comparator checks only content-geometry fields:
+ * - scrollHeight: total content height (proves content didn't change)
+ * - bottomTop: scrollHeight - clientHeight (viewport-independent content metric)
+ * - layoutSettledVersion: confirms no layout mutations between snapshots
+ *
+ * Ignores:
+ * - renderedRowCount: expected to differ across overscan transitions
+ * - scrollTop: may differ after alignScrollerToBottom during promotion
+ */
+function isVisiblePreseedGeometryMatch(
+  left: ReadinessSurfaceSnapshot | null,
+  right: ReadinessSurfaceSnapshot
+): boolean {
+  if (!left) {
+    return false;
+  }
+
+  return (
+    left.scrollHeight === right.scrollHeight &&
+    left.bottomTop === right.bottomTop &&
+    left.layoutSettledVersion === right.layoutSettledVersion
+  );
+}
+
 function buildReadinessProgressSignature(input: {
   readonly phase: RestorePhase;
   readonly verificationPhase: 'hidden' | 'visible' | null;
@@ -1416,13 +1448,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
 
       if (!latestMetrics?.tailSentinelRendered) {
+        // Check if the sentinel is in Virtuoso's render data but not yet in the DOM.
+        // The DOM query lags by 1-2 frames. Same guard exists in progressPositioning.
+        // Without this, a stale DOM query triggers a destructive purged probe that
+        // throws away all cached heights — costing 300ms+ for re-measurement.
+        const sentinelInRenderRange = latestRendered.some((row) => row.kind === 'tail-sentinel');
         markSwitchTimeline(
           'hidden-backtrack:tail-sentinel-lost',
-          `rows=${String(latestRendered.length)}`
+          `rows=${String(latestRendered.length)} inRange=${String(sentinelInRenderRange)}`
         );
         restorePhaseRef.current = 'positioning';
         hiddenCandidateSnapshotRef.current = null;
-        if (!hasAttemptedTailProbeRef.current) {
+        if (!hasAttemptedTailProbeRef.current && !sentinelInRenderRange) {
           forceTailProbeRender();
           return;
         }
@@ -1516,9 +1553,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           immediateMetrics,
           layoutSettledVersion
         );
-        if (
-          isSameReadinessSurfaceSnapshot(visibleCandidateSnapshotRef.current, immediateSnapshot)
-        ) {
+        if (isVisiblePreseedGeometryMatch(visibleCandidateSnapshotRef.current, immediateSnapshot)) {
           markSwitchTimeline('visible-preseed', 'snapshot-match-instant');
           visiblePreseedPendingRef.current = false;
           signalReady('stabilized');
@@ -1613,6 +1648,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     (rendered: ChatRenderRow[]): boolean => {
       const metrics = getRenderSurfaceMetrics(rendered);
       if (!metrics) {
+        markSwitchTimeline('no-metrics:stabilization-gate', `rows=${String(rendered.length)}`);
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
         }
@@ -1818,6 +1854,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       const metrics = getRenderSurfaceMetrics(rendered);
       if (!metrics) {
+        markSwitchTimeline('positioning:no-metrics', `rows=${String(rendered.length)}`);
         alignScrollerToBottom();
         queuePositioningRecheck();
         return;

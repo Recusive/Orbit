@@ -72,7 +72,7 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (22 entries)
+## plans/tracked/todo/ (21 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
@@ -97,6 +97,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `TUI-CLI/ORBIT-TUI-RATATUI.md` — Orbit TUI (Ratatui): extract agent-bridge crate, port Codex TUI widgets, build CLI chat interface
 - `AGENT-BRIDGE-HTTP-SSE-MIGRATION.md` — Replace stdin/stdout Rust proxy with HTTP+SSE direct frontend↔sidecar communication (5→2 serialization boundaries)
 - `fix-virtuoso-cold-mount-performance.md` — VirtuosoMessageList cold-mount performance: three-phase adaptive overscan, observer gating, event-driven readiness, size caching
+- `COLD-SWITCH-REMAINING-BOTTLENECKS.md` — Large cold-session render gap (132 msgs, silent positioning gap) and visible-phase tail-sentinel collapse after overscan expansion (19 msgs)
 
 ## plans/tracked/done/ (53 entries)
 
