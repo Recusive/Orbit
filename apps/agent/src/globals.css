@@ -1723,7 +1723,6 @@ html.dark .vault-editor-shell .milkdown .milkdown-code-block .list-wrapper {
     pointer-events: none;
     position: absolute;
   }
-
   /* Cursor blink — CSS-only, no React re-renders */
   @keyframes blink {
     0%,

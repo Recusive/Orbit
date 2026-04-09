@@ -347,12 +347,17 @@ interface MessageRow {
   readonly message: ChatMessage;
 }
 
+interface ThinkingRow {
+  readonly id: string;
+  readonly kind: 'thinking';
+}
+
 interface TailSentinelRow {
   readonly id: string;
   readonly kind: 'tail-sentinel';
 }
 
-export type ChatRenderRow = MessageRow | TailSentinelRow;
+export type ChatRenderRow = MessageRow | ThinkingRow | TailSentinelRow;
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -412,6 +417,7 @@ const ITEM_WRAPPER_STYLE = {
 /** Stable style for the VirtuosoMessageList scroller. */
 const LIST_STYLE = { scrollbarGutter: 'stable both-edges' as const };
 
+const THINKING_ROW_ID = '__thinking__';
 const TAIL_SENTINEL_ROW_ID = '__tail_sentinel__';
 
 const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext> = ({
@@ -422,6 +428,16 @@ const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext>
   const row = data as ChatRenderRow | undefined;
   if (!row) {
     return null;
+  }
+
+  if (row.kind === 'thinking') {
+    return (
+      <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+        <div className="flex items-center gap-2 px-[9px] py-2">
+          <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
+        </div>
+      </div>
+    );
   }
 
   if (row.kind === 'tail-sentinel') {
@@ -625,6 +641,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       message,
     }));
 
+    if (isAgentRunning) {
+      rows.push({
+        id: THINKING_ROW_ID,
+        kind: 'thinking',
+      });
+    }
+
     if (messages.length > 0 || isVerifying) {
       rows.push({
         id: TAIL_SENTINEL_ROW_ID,
@@ -633,7 +656,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     return rows;
-  }, [isVerifying, messages]);
+  }, [isAgentRunning, isVerifying, messages]);
 
   const getCurrentViewportWidth = useCallback((): number | null => {
     const scrollerWidth = listRef.current?.scrollerElement()?.clientWidth ?? 0;
@@ -2424,15 +2447,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             />
           </VirtuosoMessageListLicense>
 
-          {/* Shimmer + queued message are OUTSIDE the list so the library's
+          {/* Queued message stays OUTSIDE the list so the library's
               isAtBottom detection (4px threshold) isn't broken by Footer content. */}
-          {isAgentRunning ? (
-            <div className="shrink-0 mx-auto px-4 pb-8 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-              <div className="flex items-center gap-2 px-[9px] py-2">
-                <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
-              </div>
-            </div>
-          ) : null}
           {queuedMessage !== null ? (
             <div className="shrink-0 mx-auto px-4 pb-2 w-full" style={CHAT_MAX_WIDTH_STYLE}>
               <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />

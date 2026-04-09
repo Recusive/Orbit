@@ -133,7 +133,7 @@ export const CHAT_WIDTH_VAR = {
  * Input and textarea dimensions
  */
 export const INPUT_SIZES = {
-  textareaMinHeight: 44,
+  textareaMinHeight: 57,
   textareaMaxHeight: 300,
   editorMinHeight: 80,
   editorMaxHeight: 200,
