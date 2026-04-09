@@ -338,6 +338,21 @@ export function useChatMessages(): UseChatMessagesReturn {
     workspacePath,
   ]);
 
+  // ── 3b. Prefetch sidebar sessions after initial restore ──────────────────
+  useEffect(() => {
+    if (!initialRestoreCompleted || !workspacePath) {
+      return;
+    }
+    const conversations = useUIStore.getState().conversations;
+    if (conversations.length === 0) {
+      return;
+    }
+    const snapshotKey = `${workspacePath}:${activeWorktreePath ?? ''}:${String(conversations.length)}`;
+    void import('@/lib/query/prefetch-sidebar-sessions').then(({ prefetchSidebarSessions }) => {
+      prefetchSidebarSessions(conversations, sessionId, snapshotKey);
+    });
+  }, [activeWorktreePath, initialRestoreCompleted, sessionId, workspacePath]);
+
   // ── 4. Load messages from backend when the current load strategy is slow ─
   useEffect(() => {
     const targetSessionId = pendingSessionId ?? sessionId;
