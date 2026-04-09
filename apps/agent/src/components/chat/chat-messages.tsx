@@ -590,7 +590,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const effectiveVerificationKey =
     verificationKey ??
     readinessKey ??
-    (effectiveVerificationPhase !== null ? `${effectiveVerificationPhase}:legacy` : null);
+    (effectiveVerificationPhase !== null && messages.length > 0
+      ? `${effectiveVerificationPhase}:legacy`
+      : null);
   const previousVerificationKeyRef = useRef<string | null>(effectiveVerificationKey);
   const previousVerificationPhaseRef = useRef<'hidden' | 'visible' | null>(
     effectiveVerificationPhase
