@@ -1082,19 +1082,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return false;
     }
 
+    // Never purge item sizes. The probe's purpose is scroll positioning via
+    // initialLocation, not height correction. purgeItemSizes: true destroys all
+    // cached heights and forces Virtuoso to rebuild from scratch — 400ms+ for
+    // 8 msgs, 1200ms+ for 134 msgs. Even with a restored size cache,
+    // restoredSizeCacheRef.current is already true by the time the probe fires
+    // (the hidden pre-render instance saves the cache before verification starts),
+    // so conditioning on it never selects the soft path. The 48ms hidden
+    // stabilization window validates final geometry independently.
     hasAttemptedTailProbeRef.current = true;
     tailProbePlaceholderScrollHeightRef.current = null;
     tailProbePlaceholderSnapshotRef.current = null;
     tailProbeRealSurfaceSnapshotRef.current = null;
     hiddenCandidateSnapshotRef.current = null;
     tailProbeStartedAtRef.current = Date.now();
-    purgeItemSizesUsedRef.current = true;
+    purgeItemSizesUsedRef.current = false;
     handle.data.replace(renderRows, {
       initialLocation: {
         index: renderRows.length - 1,
         align: 'end',
       },
-      purgeItemSizes: true,
+      purgeItemSizes: false,
     });
     alignScrollerToBottom();
     recordSessionSwitchTrace({
@@ -1352,6 +1360,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const hasObservedPostProbeSurface = useCallback(
     (metrics: RenderSurfaceMetrics): boolean => {
       if (!hasAttemptedTailProbeRef.current) {
+        return true;
+      }
+
+      // Soft probe (no purge) doesn't need placeholder→real verification.
+      // Without purging, heights are preserved (estimates or cached), so the
+      // surface after replace() is immediately trustworthy. The 48ms hidden
+      // stabilization window still validates final geometry independently.
+      if (!purgeItemSizesUsedRef.current) {
         return true;
       }
 
@@ -2007,6 +2023,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       readinessStartedRef.current = false;
       tailProofVersionRef.current = 0;
       hasAttemptedTailProbeRef.current = false;
+      purgeItemSizesUsedRef.current = false;
       hiddenCandidateSnapshotRef.current = null;
       tailProbePlaceholderScrollHeightRef.current = null;
       tailProbePlaceholderSnapshotRef.current = null;
@@ -2093,6 +2110,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     hasEverHadMessagesRef.current = messages.length > 0;
     hasAttemptedPremeasureRef.current = false;
     hasAttemptedTailProbeRef.current = false;
+    purgeItemSizesUsedRef.current = false;
     const preseededVisibleSnapshot =
       effectiveVerificationPhase === 'visible' ? hiddenReadySnapshotRef.current : null;
     hiddenCandidateSnapshotRef.current = null;

@@ -1306,7 +1306,7 @@ describe('ChatMessages', () => {
     }
   });
 
-  it('forces a purged tail probe render when hidden verification remains starved after premeasure', async () => {
+  it('forces a soft tail probe render (no purge) when hidden verification remains starved after premeasure on a cold session', async () => {
     vi.useFakeTimers();
 
     const messages = Array.from({ length: 20 }, (_, index) =>
@@ -1334,10 +1334,13 @@ describe('ChatMessages', () => {
         await vi.advanceTimersByTimeAsync(120);
       });
 
+      // Cold session (no restored size cache) → soft probe without purge.
+      // Purging estimates to re-estimate is self-inflicted cost; the soft probe
+      // achieves scroll positioning via initialLocation without the rebuild.
       expect(replaceDataMock).toHaveBeenCalledWith(
         buildRenderRows(messages),
         expect.objectContaining({
-          purgeItemSizes: true,
+          purgeItemSizes: false,
         })
       );
     } finally {
@@ -1498,6 +1501,80 @@ describe('ChatMessages', () => {
         result: 'hidden-ready',
         tailProofVersion: 1,
       });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('uses soft probe without purge even when a restored size cache exists, bypassing the post-probe placeholder contract', async () => {
+    vi.useFakeTimers();
+
+    const messages = Array.from({ length: 10 }, (_, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+
+    try {
+      mockScrollerElement.clientHeight = 647;
+      mockScrollerElement.scrollHeight = 647;
+      mockScrollerElement.scrollTop = 0;
+      mockTailSentinelAvailable.current = false;
+      // Sentinel genuinely absent — forces probe to fire.
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
+        fallback.filter((r) => r.kind !== 'tail-sentinel')
+      );
+
+      // Set up a restored size cache — the probe should still use soft mode.
+      const chatStore = useChatStore.getState();
+      chatStore.getOrCreateSession('session-a');
+      chatStore.setMessages('session-a', messages, 'session-restore');
+      chatStore.setVirtuosoSizeCache('session-a', {
+        ranges: [{ k: 0, v: 120 }],
+        messageCount: messages.length,
+        lastMessageId: messages.at(-1)?.id ?? null,
+        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+      });
+
+      const onVerificationResult = vi.fn();
+      renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        shouldPrime: true,
+        verificationPhase: 'hidden',
+        verificationKey: 'hidden-stale-cache-probe',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120);
+      });
+
+      // Probe fires with soft mode (no purge) even with a restored cache.
+      expect(replaceDataMock).toHaveBeenCalledWith(
+        buildRenderRows(messages),
+        expect.objectContaining({
+          purgeItemSizes: false,
+        })
+      );
+
+      // Make sentinel available and stabilize the surface.
+      mockTailSentinelAvailable.current = true;
+      mockScrollerElement.scrollHeight = 5000;
+      mockScrollerElement.scrollTop = 4353;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
+
+      await act(async () => {
+        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
+        await vi.advanceTimersByTimeAsync(120);
+      });
+
+      // The post-probe placeholder contract is bypassed — hidden-ready fires
+      // without waiting for a surface delta from the purged placeholder.
+      expect(onVerificationResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          result: 'hidden-ready',
+        })
+      );
     } finally {
       vi.useRealTimers();
     }
