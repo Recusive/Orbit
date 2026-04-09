@@ -29,6 +29,7 @@ import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-st
 import type { MegaStressTestConfig } from '@/stress-tests/rewind-mega-stress-test';
 import type { StressTestConfig } from '@/stress-tests/rewind-stress-test';
 import type { SessionStressTestConfig } from '@/stress-tests/session-stress-test';
+import type { SwitchThrashTestConfig } from '@/stress-tests/session-switch-thrash-test';
 import type { ToolGauntletStressTestConfig } from '@/stress-tests/tool-gauntlet-stress-test';
 import type { UpdateSimulationConfig } from '@/stress-tests/update-simulation';
 import type { VerifiedReviewCycle1StressTestConfig } from '@/stress-tests/verified-review-cycle1-stress-test';
@@ -74,6 +75,7 @@ declare global {
           runRewindStressTest?: (config?: StressTestConfig) => Promise<unknown>;
           runMegaStressTest?: (config?: MegaStressTestConfig) => Promise<unknown>;
           runSessionStressTest?: (config?: SessionStressTestConfig) => Promise<unknown>;
+          runSwitchThrashTest?: (config?: SwitchThrashTestConfig) => Promise<unknown>;
           runReviewFixesStressTest?: (config?: ReviewFixesStressTestConfig) => Promise<unknown>;
           runToolGauntletStressTest?: (config?: ToolGauntletStressTestConfig) => Promise<unknown>;
           runGitScalingStressTest?: (config?: GitScalingStressTestConfig) => Promise<unknown>;
@@ -575,6 +577,10 @@ export function useChatMessages(): UseChatMessagesReturn {
           },
           config
         );
+      },
+      runSwitchThrashTest: async (config?: SwitchThrashTestConfig) => {
+        const { runSwitchThrashTest } = await import('@/stress-tests/session-switch-thrash-test');
+        return runSwitchThrashTest(config);
       },
       runReviewFixesStressTest: async (config?: ReviewFixesStressTestConfig) => {
         const { runReviewFixesStressTest } =
