@@ -382,7 +382,6 @@ export const ModelSelector: FC<ModelSelectorProps> = ({ onModelChange }) => {
           isOpen && 'bg-lg-control text-foreground'
         )}
       >
-        {selectedModelData ? <selectedModelData.icon /> : null}
         <span className="model-name-full text-md font-medium">
           {selectedModelData?.name ?? 'Select Model'}
         </span>

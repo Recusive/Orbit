@@ -1,9 +1,10 @@
-import { ArrowUp, Image, Square } from 'lucide-react';
+import { ArrowUp, Square } from 'lucide-react';
 import { memo, useEffect, useRef } from 'react';
 
 import { EffortLevelSelector } from './EffortLevelSelector';
 import { MoreActionsMenu } from './MoreActionsMenu';
 import { ThinkingModeButton } from './ThinkingModeButton';
+import { AddContextMenu } from './add-context-menu';
 import { INPUT_MODE_LABELS } from './constants';
 import {
   Context,
@@ -60,7 +61,6 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
   const showThinkingControl = !isAdaptiveModel;
   const showCompactMenu = showThinkingControl;
   const shouldShowContext = maxTokens > 0;
-  const imageTooltip = 'Attach image';
 
   // Width is 0 before first measurement; avoid entering compact mode prematurely
   const hasMeasured = width > 0;
@@ -79,18 +79,16 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
       ref={containerRef}
       className="input-controls-container flex w-full items-center justify-between gap-1 px-1 pb-1"
     >
-      {/* Left Controls - Model / Effort / Mode */}
+      {/* Left Controls - Plus / Model / Effort / Mode */}
       <div className="flex items-center gap-0.5">
+        {/* Add Context Menu (images, etc.) */}
+        <AddContextMenu onImageClick={handleImageClick} />
         {/* Model Picker */}
         <ModelSelector onModelChange={onModelChange} />
         {/* Effort Level Selector — only for adaptive models */}
         {showEffortControl ? (
-          <>
-            <div aria-hidden="true" className="auto-hide-separator h-4 w-px bg-border/60" />
-            <EffortLevelSelector effortLevel={effortLevel} onEffortChange={onEffortChange} />
-          </>
+          <EffortLevelSelector effortLevel={effortLevel} onEffortChange={onEffortChange} />
         ) : null}
-        <div aria-hidden="true" className="auto-hide-separator h-4 w-px bg-border/60" />
         {/* Mode Picker */}
         <Tooltip>
           <TooltipTrigger asChild>
@@ -137,29 +135,6 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 getEffortInfo={getEffortInfo}
               />
             ) : null}
-
-            {/* Image Button - stays visible in compact mode */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex">
-                  <button
-                    onClick={handleImageClick}
-                    aria-label="Attach image"
-                    className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                      'bg-transparent text-muted-foreground/70',
-                      TRANSITION_CLASSES.button,
-                      'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                      'active:scale-95',
-                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                    )}
-                  >
-                    <Image className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{imageTooltip}</TooltipContent>
-            </Tooltip>
           </>
         ) : (
           // Expanded mode: all buttons inline
@@ -175,29 +150,6 @@ export const InputControls: FC<InputControlsProps> = memo(function InputControls
                 getActiveDots={getActiveDots}
               />
             ) : null}
-
-            {/* Image Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="inline-flex">
-                  <button
-                    onClick={handleImageClick}
-                    aria-label="Attach image"
-                    className={cn(
-                      'h-7 w-7 flex items-center justify-center rounded-[9px]',
-                      'bg-transparent text-muted-foreground/70',
-                      TRANSITION_CLASSES.button,
-                      'hover:bg-lg-control-hover hover:text-foreground hover:scale-[1.08]',
-                      'active:scale-95',
-                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/50'
-                    )}
-                  >
-                    <Image className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{imageTooltip}</TooltipContent>
-            </Tooltip>
           </>
         )}
 
