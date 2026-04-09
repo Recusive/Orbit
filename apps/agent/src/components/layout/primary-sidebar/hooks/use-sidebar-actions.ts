@@ -27,6 +27,13 @@ import { useUIStore } from '@/stores/ui/ui-store';
 const logger = createLogger('PrimarySidebar');
 
 /**
+ * Tracks whether the worktree sync has completed at least once. Distinguishes
+ * "initial boot" (null worktree = never set → don't clear session) from
+ * "workspace change" (null worktree = reset by initializeWorkspace → do clear).
+ */
+let worktreeBootstrapDone = false;
+
+/**
  * Checks if a conversation belongs to the currently active worktree context.
  *
  * This handles three scenarios:
@@ -153,6 +160,7 @@ export const useSidebarActions = ({
           discoveredRoot: worktreeList[0]?.path,
         });
         setWorktrees([]);
+        worktreeBootstrapDone = true;
         return;
       }
 
@@ -185,6 +193,7 @@ export const useSidebarActions = ({
           switchToWorktree(null);
           useChatStore.getState().clearActiveSession();
         }
+        worktreeBootstrapDone = true;
         return;
       }
 
@@ -202,10 +211,11 @@ export const useSidebarActions = ({
       if (!isActiveWorktreeValid) {
         // Reset to main worktree (or first available) when active is invalid/stale
         const fallbackWorktree = mainWorktree ?? worktreeList[0];
-        const isInitialWorktreeBootstrap =
-          currentActiveWorktree === null &&
-          useChatStore.getState().activeSessionId === null &&
-          useSessionSwitchStore.getState().pending !== null;
+        // On initial boot, activeWorktreePath is null because it was never set.
+        // On workspace change, it's also null (reset by initializeWorkspace).
+        // We distinguish via worktreeBootstrapDone: false on first-ever sync,
+        // true after. Only skip clearActiveSession on first-ever sync.
+        const isInitialWorktreeBootstrap = currentActiveWorktree === null && !worktreeBootstrapDone;
 
         if (fallbackWorktree) {
           logger.info('Resetting stale activeWorktreePath', {
@@ -235,7 +245,9 @@ export const useSidebarActions = ({
           switchToWorktree(currentActiveWorktree);
         }
       }
+      worktreeBootstrapDone = true;
     } catch {
+      worktreeBootstrapDone = true;
       logger.warn('Failed to load worktrees (may not be a git repo)');
       // Not a git repo or error - clear the worktree list.
       setWorktrees([]);

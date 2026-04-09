@@ -47,15 +47,12 @@ import { StreamingRevealController } from '@/services/chat/streaming-reveal-cont
 import {
   abortPendingCreate,
   abortSessionSwitch,
-  beginSessionSwitch,
   clearReadyInstances,
-  commitSessionReveal,
   finishPendingCreate,
   getCreateRequestIdBySessionId,
   getPendingCreate,
   getPendingCreateBySessionId,
   getPendingSessionTitle,
-  hasCurrentReadyInstance,
   isPendingSessionRequest,
   remapPendingCreateSession,
   resolvePendingCreateDraft,
@@ -1196,28 +1193,45 @@ class ChatMessageService {
       return;
     }
 
+    // Bridge creates (Cmd+N / "New Session" button) activate the session
+    // synchronously in claudeUiBridge.create(), so activeSessionId is already
+    // set to `sid` by the time this async handler fires. But other create paths
+    // (e.g., first-message-in-empty-chat via chat-actions.ts) still rely on this
+    // handler to activate the session. Guard: skip if already active.
     const chatStore = useChatStore.getState();
-    chatStore.getOrCreateSession(sid);
-    chatStore.setMessages(sid, []);
-    chatStore.markSessionLoaded(sid);
-    chatStore.markSessionHydrated(sid);
+    if (chatStore.activeSessionId !== sid) {
+      // Abort any stale pending switch — a restore or slow load may be in flight.
+      // Without this, the old switch's commitSessionReveal could later override.
+      const switchState = useSessionSwitchStore.getState();
+      if (switchState.pending !== null) {
+        abortSessionSwitch(switchState.requestId, 'superseded_by_new_request');
+      }
+
+      chatStore.getOrCreateSession(sid);
+      chatStore.setMessages(sid, []);
+      chatStore.setActiveSession(sid);
+      chatStore.markSessionLoaded(sid);
+      chatStore.markSessionHydrated(sid);
+
+      const uiStore = useUIStore.getState();
+      uiStore.addConversation({
+        sessionId: sid,
+        title: message.title,
+        updatedAt: Date.now(),
+        messageCount: 0,
+        ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
+        ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
+      });
+
+      useFileStore.getState().switchSession(sid);
+      useToolStore.getState().switchSession(sid);
+      useUIStore.getState().setActiveConversation(sid, message.title);
+      useUIStore.getState().setLoadingConversation(false);
+      useUIStore.getState().setConversationTransitioning(false);
+    }
+
     chatStore.bumpConversationLoadEpoch();
     useChatStore.setState({ lastCreatedSessionId: sid });
-
-    const uiStore = useUIStore.getState();
-    uiStore.addConversation({
-      sessionId: sid,
-      title: message.title,
-      updatedAt: Date.now(),
-      messageCount: 0,
-      ...(message.workspace_path ? { workspacePath: message.workspace_path } : {}),
-      ...(message.worktree_path ? { worktreePath: message.worktree_path } : {}),
-    });
-
-    const requestId = beginSessionSwitch(sid, pendingCreate?.title ?? message.title);
-    if (hasCurrentReadyInstance(sid, requestId)) {
-      void commitSessionReveal(requestId, sid, pendingCreate?.title ?? message.title);
-    }
   }
 
   private handleConversationList(

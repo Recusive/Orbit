@@ -39,8 +39,10 @@ import {
   setPendingLoadStrategy,
 } from '@/services/conversations/session-switch-coordinator';
 import { applyManualSessionTitle } from '@/services/session';
+import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
+import { useFileStore } from '@/stores/file/file-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 type RevealableConversationDetail = Exclude<ConversationDetailResult, { kind: 'error' }>;
@@ -155,18 +157,20 @@ export const claudeUiBridge: ConversationUiBridge = {
           void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
         }
       } else {
-        markSwitchTimeline('select', 'query-fast-empty');
-        markSwitchTimeline(
-          'setMessages:bridge-empty',
-          `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
-        );
-        chatStore.setMessages(sessionId, [], 'pending-verify');
-        chatStore.markSessionHydrated(sessionId);
-        chatStore.markSessionLoaded(sessionId);
-        chatStore.bumpConversationLoadEpoch();
-        if (hasCurrentReadyInstance(sessionId, requestId)) {
-          void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
+        // "Empty" in TanStack = no persisted JSONL. But the ChatStore may have
+        // in-memory messages (user message sent optimistically, active streaming)
+        // whose JSONL hasn't been written yet. Don't overwrite those.
+        const existingMessages = chatStore.sessions[sessionId]?.messages ?? [];
+        if (existingMessages.length > 0) {
+          markSwitchTimeline('select', 'query-fast-empty-has-memory');
+        } else {
+          markSwitchTimeline('select', 'query-fast-empty');
+          chatStore.setMessages(sessionId, []);
+          chatStore.markSessionHydrated(sessionId);
+          chatStore.markSessionLoaded(sessionId);
         }
+        chatStore.bumpConversationLoadEpoch();
+        void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
       }
 
       return;
@@ -225,19 +229,18 @@ export const claudeUiBridge: ConversationUiBridge = {
     }
 
     if (result.kind === 'empty') {
-      markSwitchTimeline('select', 'query-load-empty');
       setPendingConversationTitle(title ?? result.conversation.title, requestId);
-      markSwitchTimeline(
-        'setMessages:bridge-empty',
-        `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
-      );
-      chatStore.setMessages(sessionId, [], 'pending-verify');
-      chatStore.markSessionHydrated(sessionId);
-      chatStore.markSessionLoaded(sessionId);
-      chatStore.bumpConversationLoadEpoch();
-      if (hasCurrentReadyInstance(sessionId, requestId)) {
-        void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+      const existingMessages = chatStore.sessions[sessionId]?.messages ?? [];
+      if (existingMessages.length > 0) {
+        markSwitchTimeline('select', 'query-load-empty-has-memory');
+      } else {
+        markSwitchTimeline('select', 'query-load-empty');
+        chatStore.setMessages(sessionId, []);
+        chatStore.markSessionHydrated(sessionId);
+        chatStore.markSessionLoaded(sessionId);
       }
+      chatStore.bumpConversationLoadEpoch();
+      void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
       return;
     }
 
@@ -326,11 +329,45 @@ export const claudeUiBridge: ConversationUiBridge = {
 
     beginPendingCreate(createRequestId, title, null);
     try {
-      await claudeConversationRepo.create({
+      const result = await claudeConversationRepo.create({
         ...input,
         title,
         createRequestId,
       });
+
+      // Activate the new session synchronously. The old code relied on
+      // handleConversationCreated (async via window.postMessage) but that
+      // fires AFTER React processes state changes, allowing phantom sidebar
+      // clicks to supersede the new session via select(). By activating
+      // here, the session is active before any subsequent events fire.
+      //
+      // Abort any stale pending switch first — a restore or slow conversation
+      // load may still be in flight. Without this, the old switch's
+      // commitSessionReveal could later override the new session.
+      const switchState = useSessionSwitchStore.getState();
+      if (switchState.pending !== null) {
+        abortSessionSwitch(switchState.requestId, 'superseded_by_new_request');
+      }
+      const sid = result.sessionId;
+      const chatStore = useChatStore.getState();
+      chatStore.getOrCreateSession(sid);
+      chatStore.setMessages(sid, []);
+      chatStore.setActiveSession(sid);
+      chatStore.markSessionLoaded(sid);
+      chatStore.markSessionHydrated(sid);
+      useFileStore.getState().switchSession(sid);
+      useToolStore.getState().switchSession(sid);
+      useUIStore.getState().addConversation({
+        sessionId: sid,
+        title,
+        updatedAt: Date.now(),
+        messageCount: 0,
+        ...(result.workspacePath ? { workspacePath: result.workspacePath } : {}),
+        ...(result.worktreePath ? { worktreePath: result.worktreePath } : {}),
+      });
+      useUIStore.getState().setActiveConversation(sid, title);
+      useUIStore.getState().setLoadingConversation(false);
+      useUIStore.getState().setConversationTransitioning(false);
     } catch (error) {
       abortPendingCreate(createRequestId);
       throw error;
