@@ -167,8 +167,13 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     instanceGenerationRef.current = instanceGenerationCounter;
   }
   const instanceGeneration = instanceGenerationRef.current;
+  // Don't emit a verification key until the session has messages. An empty
+  // session (pre-hydration or genuinely new) has nothing to position or
+  // stabilize. Without this guard, the startup path starts verification on
+  // the empty state (layoutVersion=0, msgs=0), then setMessages:hydrate
+  // bumps layoutVersion → key changes → verification restarts, wasting ~74ms.
   const verificationKey =
-    verificationPhase !== null && readinessSignature !== null
+    verificationPhase !== null && readinessSignature !== null && messages.length > 0
       ? `${String(verificationRequestId ?? 0)}:${verificationPhase}:${readinessSignature}`
       : null;
   const containerRef = useRef<HTMLDivElement>(null);
