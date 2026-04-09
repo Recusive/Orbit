@@ -78,11 +78,12 @@ const ESTIMATED_USER_BASE_HEIGHT = 48;
 const ESTIMATED_USER_LINE_HEIGHT = 24;
 const ESTIMATED_ASSISTANT_BASE_HEIGHT = 68;
 const ESTIMATED_ASSISTANT_LINE_HEIGHT = 22;
+const ESTIMATED_CODE_LINE_HEIGHT = 20;
+const ESTIMATED_CODE_BLOCK_PADDING = 40;
 const ESTIMATED_THINKING_HEIGHT = 96;
 const ESTIMATED_IMAGE_GRID_HEIGHT = 144;
 const ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT = 24;
-const ESTIMATED_COMPLEX_MARKDOWN_BONUS = 48;
-const MAX_ESTIMATED_MESSAGE_HEIGHT = 640;
+const MAX_ESTIMATED_MESSAGE_HEIGHT = 4000;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
 type RestorePhase = 'idle' | 'positioning' | 'premeasuring' | 'stabilizing' | 'done';
@@ -241,32 +242,50 @@ function estimateWrappedLines(text: string, charsPerLine: number): number {
 
 function estimateMessageHeight(message: ChatMessage): number {
   const content = message.displayedContent.length > 0 ? message.displayedContent : message.content;
-  const baseHeight =
+  let height =
     message.role === 'user' ? ESTIMATED_USER_BASE_HEIGHT : ESTIMATED_ASSISTANT_BASE_HEIGHT;
-  const lineHeight =
-    message.role === 'user' ? ESTIMATED_USER_LINE_HEIGHT : ESTIMATED_ASSISTANT_LINE_HEIGHT;
 
-  let estimatedHeight =
-    baseHeight + estimateWrappedLines(content, ESTIMATED_CHARS_PER_LINE) * lineHeight;
+  if (message.role === 'user') {
+    height += estimateWrappedLines(content, ESTIMATED_CHARS_PER_LINE) * ESTIMATED_USER_LINE_HEIGHT;
+  } else {
+    // Split by code fences: even indices are prose, odd indices are code blocks.
+    // This is O(n) on content length and handles nested/unmatched fences gracefully.
+    const parts = content.split('```');
+    let proseLines = 0;
+    let codeLines = 0;
+    let codeBlockCount = 0;
 
-  if (
-    message.role === 'assistant' &&
-    (content.includes('```') || content.includes('|') || content.includes('!['))
-  ) {
-    estimatedHeight += ESTIMATED_COMPLEX_MARKDOWN_BONUS;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i] ?? '';
+      if (i % 2 === 0) {
+        const trimmed = part.trim();
+        if (trimmed.length > 0) {
+          proseLines += estimateWrappedLines(trimmed, ESTIMATED_CHARS_PER_LINE);
+        }
+      } else {
+        // Code block: first line is the language tag (e.g. "typescript\n...")
+        const blockLineCount = part.split('\n').length;
+        codeLines += Math.max(1, blockLineCount - 1);
+        codeBlockCount += 1;
+      }
+    }
+
+    height += proseLines * ESTIMATED_ASSISTANT_LINE_HEIGHT;
+    height +=
+      codeLines * ESTIMATED_CODE_LINE_HEIGHT + codeBlockCount * ESTIMATED_CODE_BLOCK_PADDING;
   }
 
   if ((message.thinkingBlocks?.length ?? 0) > 0 || message.thinking) {
-    estimatedHeight += ESTIMATED_THINKING_HEIGHT;
+    height += ESTIMATED_THINKING_HEIGHT;
   }
 
   if ((message.attachedImages?.length ?? 0) > 0) {
-    estimatedHeight += ESTIMATED_IMAGE_GRID_HEIGHT;
-    estimatedHeight +=
+    height += ESTIMATED_IMAGE_GRID_HEIGHT;
+    height +=
       Math.max(0, (message.attachedImages?.length ?? 1) - 1) * ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT;
   }
 
-  return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, estimatedHeight);
+  return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, height);
 }
 
 function buildEstimatedSizeRanges(messages: ChatMessage[]): { k: number; v: number }[] {
