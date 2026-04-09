@@ -1260,10 +1260,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       lastSurfaceResizeAtRef.current = Date.now();
       scheduleStabilityCheck();
 
+      let resizeCount = 0;
       const observer = new ResizeObserver(() => {
         if (restorePhaseRef.current !== phase) {
           return;
         }
+        resizeCount += 1;
+        markSwitchTimeline(
+          'resize-observer-reset',
+          `phase=${phase} count=${String(resizeCount)} stableMs=${String(stableMs)}`
+        );
         lastSurfaceResizeAtRef.current = Date.now();
         scheduleStabilityCheck();
       });
@@ -1617,6 +1623,57 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           signalReady('stabilized');
           return;
         }
+        markSwitchTimeline(
+          'visible-preseed-mismatch',
+          `hScrollH=${String(visibleCandidateSnapshotRef.current?.scrollHeight)} vScrollH=${String(immediateSnapshot.scrollHeight)} hBottom=${String(visibleCandidateSnapshotRef.current?.bottomTop)} vBottom=${String(immediateSnapshot.bottomTop)} hLSV=${String(visibleCandidateSnapshotRef.current?.layoutSettledVersion)} vLSV=${String(immediateSnapshot.layoutSettledVersion)}`
+        );
+      } else if (
+        immediateMetrics?.tailSentinelRendered === true &&
+        !immediateMetrics.isAtBottom &&
+        layoutPendingCount === 0
+      ) {
+        // Sentinel rendered but not at bottom: Virtuoso applied cached heights
+        // after hidden-ready captured the snapshot, growing scrollHeight.
+        // The hidden phase already proved content stability — scroll to bottom
+        // and verify in one frame instead of the 200ms quiet window.
+        markSwitchTimeline(
+          'visible-preseed-scroll-fix',
+          `scrollH=${String(immediateMetrics.scrollHeight)} clientH=${String(immediateMetrics.clientHeight)} scrollTop=${String(immediateMetrics.scrollTop)}`
+        );
+        alignScrollerToBottom();
+        requestAnimationFrame(() => {
+          if (restorePhaseRef.current !== 'stabilizing') {
+            return;
+          }
+          const retryHandle = listRef.current;
+          const retryRendered = retryHandle?.data.getCurrentlyRendered() ?? [];
+          const retryMetrics = getRenderSurfaceMetrics(retryRendered);
+          const freshPending = sessionId
+            ? (useChatStore.getState().sessions[sessionId]?.layoutPendingCount ?? 0)
+            : 0;
+          if (
+            retryMetrics?.tailSentinelRendered === true &&
+            retryMetrics.isAtBottom &&
+            freshPending === 0
+          ) {
+            markSwitchTimeline('visible-preseed', 'scroll-fix-ready');
+            visiblePreseedPendingRef.current = false;
+            signalReady('stabilized');
+            return;
+          }
+          // Still not stable — fall to slow path
+          markSwitchTimeline(
+            'visible-preseed-scroll-fix-miss',
+            `sentinel=${String(retryMetrics?.tailSentinelRendered)} bottom=${String(retryMetrics?.isAtBottom)} pending=${String(freshPending)}`
+          );
+          scheduleVisibleVerificationCheckRef.current();
+        });
+        return;
+      } else {
+        markSwitchTimeline(
+          'visible-preseed-gate-fail',
+          `sentinel=${String(immediateMetrics?.tailSentinelRendered)} bottom=${String(immediateMetrics?.isAtBottom)} rows=${String(immediateRendered.length)} scrollH=${String(immediateMetrics?.scrollHeight ?? 0)} clientH=${String(immediateMetrics?.clientHeight ?? 0)}`
+        );
       }
     }
 
@@ -1665,6 +1722,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       const currentSnapshot = buildReadinessSurfaceSnapshot(latestMetrics, layoutSettledVersion);
       if (!isSameReadinessSurfaceSnapshot(visibleCandidateSnapshotRef.current, currentSnapshot)) {
+        markSwitchTimeline(
+          'visible-snapshot-changed',
+          `prevScrollH=${String(visibleCandidateSnapshotRef.current?.scrollHeight)} curScrollH=${String(currentSnapshot.scrollHeight)} prevTop=${String(visibleCandidateSnapshotRef.current?.scrollTop)} curTop=${String(currentSnapshot.scrollTop)} prevBottom=${String(visibleCandidateSnapshotRef.current?.bottomTop)} curBottom=${String(currentSnapshot.bottomTop)} prevRows=${String(visibleCandidateSnapshotRef.current?.renderedRowCount)} curRows=${String(currentSnapshot.renderedRowCount)} prevLSV=${String(visibleCandidateSnapshotRef.current?.layoutSettledVersion)} curLSV=${String(currentSnapshot.layoutSettledVersion)}`
+        );
         visibleCandidateSnapshotRef.current = currentSnapshot;
         hiddenReadySnapshotRef.current = null;
         visiblePreseedPendingRef.current = false;
@@ -1687,6 +1748,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     layoutPendingCount,
     layoutSettledVersion,
     refreshReadinessTimeout,
+    sessionId,
     signalReady,
     startTemporaryResizeStabilityWindow,
   ]);
