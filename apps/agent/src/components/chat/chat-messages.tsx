@@ -844,12 +844,26 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ]
   );
 
+  // Overscan strategy:
+  // - parked: not verifying, not visible → no buffer
+  // - entry (800px): hidden verification OR cold visible verification (no size cache)
+  // - steady (8000px): warm visible (size cache hit) or post-commit (not verifying)
+  //
+  // Cold visible sessions keep entry overscan during verification to avoid a
+  // main-thread-blocking Virtuoso re-render (200-500ms) from the 800→8000px
+  // expansion. Overscan expands to steady after commit when isVerifying becomes false.
+  //
+  // Note: isReadyForSteady is NOT used here because hidden-ready sets it to true
+  // (line 1102), and the hidden→visible promotion path preserves it. For cold sessions
+  // this would immediately expand to steady, defeating the deferral.
   const overscanPhase: OverscanPhase =
     !isVerifying && !isVisible
       ? 'parked'
       : effectiveVerificationPhase === 'hidden'
         ? 'entry'
-        : 'steady';
+        : restoredSizeCacheRef.current || hasUserScrolled
+          ? 'steady'
+          : 'entry';
   const overscan =
     overscanPhase === 'parked'
       ? OVERSCAN_PARKED
@@ -1461,6 +1475,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         hiddenCandidateSnapshotRef.current = null;
         if (!hasAttemptedTailProbeRef.current && !sentinelInRenderRange) {
           forceTailProbeRender();
+          queuePositioningRecheck();
           return;
         }
         alignScrollerToBottom();
@@ -1528,6 +1543,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     isHiddenPlaceholderShortSurface,
     layoutPendingCount,
     layoutSettledVersion,
+    queuePositioningRecheck,
     refreshReadinessTimeout,
     sessionId,
     signalReady,
@@ -1673,6 +1689,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           }
           return false;
         }
+        // Sentinel is in Virtuoso's render range but not yet in the DOM.
+        // Fall through to subsequent checks — trace this path so the
+        // positioning gap is observable in session switch timelines.
+        markSwitchTimeline(
+          'positioning:sentinel-in-range-not-dom',
+          `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)} bottom=${String(metrics.isAtBottom)}`
+        );
       }
 
       if (effectiveVerificationPhase === 'hidden') {
@@ -1756,8 +1779,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
-    if (!hasAttemptedTailProbeRef.current && forceTailProbeRender()) {
-      return;
+    if (!hasAttemptedTailProbeRef.current) {
+      const sentinelAlreadyInRange = rendered.some((r) => r.kind === 'tail-sentinel');
+      if (!sentinelAlreadyInRange && forceTailProbeRender()) {
+        return;
+      }
     }
 
     progressPositioningRef.current(rendered);
@@ -1848,6 +1874,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const progressPositioning = useCallback(
     (rendered: ChatRenderRow[]): void => {
+      markSwitchTimeline(
+        'positioning:poll',
+        `phase=${restorePhaseRef.current} rows=${String(rendered.length)}`
+      );
       if (restorePhaseRef.current !== 'positioning') {
         return;
       }
