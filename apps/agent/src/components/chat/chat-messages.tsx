@@ -1751,6 +1751,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       restorePhaseRef.current = 'stabilizing';
+      // Pre-seed the hidden candidate snapshot at stabilization entry so the
+      // first 48ms stability window can confirm it immediately. Without this,
+      // the first window always captures (candidate is null) and reschedules,
+      // costing an extra ~48ms on every cold switch.
+      if (effectiveVerificationPhase === 'hidden') {
+        hiddenCandidateSnapshotRef.current = buildReadinessSurfaceSnapshot(
+          metrics,
+          layoutSettledVersion
+        );
+      }
       markSwitchTimeline(
         'stabilizing',
         `rows=${String(metrics.renderedRowCount)} tail=${String(metrics.tailSentinelRendered)} pending=${String(layoutPendingCount)}`
@@ -1769,6 +1779,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       hasObservedPostProbeSurface,
       isHiddenPlaceholderShortSurface,
       layoutPendingCount,
+      layoutSettledVersion,
       scheduleHiddenVerificationCheck,
       scheduleVisibleVerificationCheck,
       sessionId,
