@@ -122,6 +122,11 @@ export const claudeUiBridge: ConversationUiBridge = {
 
     const freshResultValue = getFreshConversationDetail(sessionId) as unknown;
     const freshResult = isRevealableConversationDetail(freshResultValue) ? freshResultValue : null;
+    const queryStateAtSelect = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
+    markSwitchTimeline(
+      'select:gate-1',
+      `fresh=${freshResult ? freshResult.kind : 'null'} qStatus=${queryStateAtSelect?.status ?? 'none'} qFetch=${queryStateAtSelect?.fetchStatus ?? 'none'} inv=${String(queryStateAtSelect?.isInvalidated ?? 'n/a')} updAt=${queryStateAtSelect?.dataUpdatedAt !== undefined && queryStateAtSelect.dataUpdatedAt > 0 ? String(Date.now() - queryStateAtSelect.dataUpdatedAt) + 'ms-ago' : 'n/a'} hasData=${String(queryStateAtSelect?.data !== undefined && queryStateAtSelect.data !== null)}`
+    );
     if (freshResult) {
       setPendingLoadStrategy('query', requestId);
       setPendingConversationTitle(title ?? freshResult.conversation.title, requestId);
@@ -168,7 +173,17 @@ export const claudeUiBridge: ConversationUiBridge = {
     }
 
     const queryState = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
-    if (queryState?.fetchStatus === 'fetching') {
+    markSwitchTimeline(
+      'select:gate-2',
+      `qStatus=${queryState?.status ?? 'none'} qFetch=${queryState?.fetchStatus ?? 'none'}`
+    );
+    // Recover when getFreshConversationDetail() rejected a query that React
+    // Query still considers usable. This happens on startup: the prefetch
+    // completed (status=success, fetchStatus=idle) but the freshness check
+    // rejected it. loadConversationDetailFresh() goes through fetchQuery()
+    // which returns cached data if usable, refetches if stale, or shares
+    // in-flight work — covering all three cases.
+    if (queryState?.fetchStatus === 'fetching' || queryState?.status === 'success') {
       setPendingLoadStrategy('query', requestId);
 
       const epochBefore = getWorkspaceEpoch();
@@ -250,6 +265,10 @@ export const claudeUiBridge: ConversationUiBridge = {
 
   async restoreSelection(): Promise<RestoreSelectionResult> {
     const sessionId = claudeConversationRepo.restoreActiveSession();
+    // eslint-disable-next-line no-console
+    console.debug(
+      `[RestoreSelection] sessionId=${sessionId?.slice(-6) ?? 'null'} t=${String(Math.round(performance.now()))}ms`
+    );
     if (!sessionId) {
       recordSessionSwitchTrace({
         event: 'restore_selection',

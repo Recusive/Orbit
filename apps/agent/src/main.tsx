@@ -81,8 +81,17 @@ void warmMemoryCacheFromIdb();
 // restoreSelection() → select() finds cached data (query-fast-path) or joins
 // this in-flight fetch (join-path) instead of falling through to slow-path.
 const lastActiveSessionId = claudeConversationRepo.restoreActiveSession();
+// eslint-disable-next-line no-console
+console.debug(
+  `[StartupPrefetch] lastActive=${lastActiveSessionId?.slice(-6) ?? 'null'} t=${String(Math.round(performance.now()))}ms`
+);
 if (lastActiveSessionId) {
-  void loadConversationDetailFresh(lastActiveSessionId);
+  void loadConversationDetailFresh(lastActiveSessionId).then((result) => {
+    // eslint-disable-next-line no-console
+    console.debug(
+      `[StartupPrefetch] resolved kind=${result.kind} t=${String(Math.round(performance.now()))}ms`
+    );
+  });
 }
 
 const rootElement = document.getElementById('root');
