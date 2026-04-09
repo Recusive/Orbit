@@ -172,95 +172,81 @@ export const claudeUiBridge: ConversationUiBridge = {
       return;
     }
 
-    const queryState = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
-    markSwitchTimeline(
-      'select:gate-2',
-      `qStatus=${queryState?.status ?? 'none'} qFetch=${queryState?.fetchStatus ?? 'none'}`
-    );
-    // Recover when getFreshConversationDetail() rejected a query that React
-    // Query still considers usable. This happens on startup: the prefetch
-    // completed (status=success, fetchStatus=idle) but the freshness check
-    // rejected it. loadConversationDetailFresh() goes through fetchQuery()
-    // which returns cached data if usable, refetches if stale, or shares
-    // in-flight work — covering all three cases.
-    if (queryState?.fetchStatus === 'fetching' || queryState?.status === 'success') {
-      setPendingLoadStrategy('query', requestId);
+    // Single query-backed load path: if the sync cache missed, always go
+    // through loadConversationDetailFresh(). TanStack Query handles caching,
+    // dedup, and refetch internally — no need to inspect fetchStatus/status
+    // manually. This eliminates the old multi-gate branching (join-path vs
+    // slow-path) that created startup edge cases.
+    setPendingLoadStrategy('query', requestId);
 
-      const epochBefore = getWorkspaceEpoch();
-      const generationBefore = getConversationGeneration(sessionId);
-      const result = await loadConversationDetailFresh(sessionId);
-      const epochAfter = getWorkspaceEpoch();
-      const generationAfter = getConversationGeneration(sessionId);
-      const currentRequestId = useSessionSwitchStore.getState().requestId;
+    const epochBefore = getWorkspaceEpoch();
+    const generationBefore = getConversationGeneration(sessionId);
+    const result = await loadConversationDetailFresh(sessionId);
+    const epochAfter = getWorkspaceEpoch();
+    const generationAfter = getConversationGeneration(sessionId);
+    const currentRequestId = useSessionSwitchStore.getState().requestId;
 
-      if (
-        epochBefore !== epochAfter ||
-        generationBefore !== generationAfter ||
-        currentRequestId !== requestId ||
-        !isPendingSessionRequest(sessionId, requestId)
-      ) {
-        abortSessionSwitch(
-          requestId,
-          epochBefore !== epochAfter
-            ? 'stale_workspace_epoch'
-            : generationBefore !== generationAfter
-              ? 'stale_conversation_generation'
-              : currentRequestId !== requestId
-                ? 'superseded_by_new_request'
-                : 'unexpected_pending_clear'
-        );
-        return;
-      }
-
-      if (result.kind === 'data') {
-        markSwitchTimeline('select', 'join-path');
-        setPendingConversationTitle(title ?? result.conversation.title, requestId);
-        hydrateConversationSnapshot({
-          sessionId,
-          persistedMessages: result.conversation.messages,
-          sessionUsage: result.conversation.sessionUsage,
-          scrollIntent: 'pending-verify',
-          source: 'query-fast-path',
-          title: title ?? result.conversation.title,
-          activateToolSession: false,
-        });
-        markSwitchTimeline('hydrate', `${String(result.conversation.messages.length)} msgs`);
-        if (hasCurrentReadyInstance(sessionId, requestId)) {
-          void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
-        }
-        return;
-      }
-
-      if (result.kind === 'empty') {
-        markSwitchTimeline('select', 'join-path-empty');
-        setPendingConversationTitle(title ?? result.conversation.title, requestId);
-        markSwitchTimeline(
-          'setMessages:bridge-empty',
-          `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
-        );
-        chatStore.setMessages(sessionId, [], 'pending-verify');
-        chatStore.markSessionHydrated(sessionId);
-        chatStore.markSessionLoaded(sessionId);
-        chatStore.bumpConversationLoadEpoch();
-        if (hasCurrentReadyInstance(sessionId, requestId)) {
-          void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
-        }
-        return;
-      }
-
-      markSwitchTimeline('select', 'join-error → slow');
+    if (
+      epochBefore !== epochAfter ||
+      generationBefore !== generationAfter ||
+      currentRequestId !== requestId ||
+      !isPendingSessionRequest(sessionId, requestId)
+    ) {
+      abortSessionSwitch(
+        requestId,
+        epochBefore !== epochAfter
+          ? 'stale_workspace_epoch'
+          : generationBefore !== generationAfter
+            ? 'stale_conversation_generation'
+            : currentRequestId !== requestId
+              ? 'superseded_by_new_request'
+              : 'unexpected_pending_clear'
+      );
+      return;
     }
 
+    if (result.kind === 'data') {
+      markSwitchTimeline('select', 'query-load');
+      setPendingConversationTitle(title ?? result.conversation.title, requestId);
+      hydrateConversationSnapshot({
+        sessionId,
+        persistedMessages: result.conversation.messages,
+        sessionUsage: result.conversation.sessionUsage,
+        scrollIntent: 'pending-verify',
+        source: 'query-fast-path',
+        title: title ?? result.conversation.title,
+        activateToolSession: false,
+      });
+      markSwitchTimeline('hydrate', `${String(result.conversation.messages.length)} msgs`);
+      if (hasCurrentReadyInstance(sessionId, requestId)) {
+        void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+      }
+      return;
+    }
+
+    if (result.kind === 'empty') {
+      markSwitchTimeline('select', 'query-load-empty');
+      setPendingConversationTitle(title ?? result.conversation.title, requestId);
+      markSwitchTimeline(
+        'setMessages:bridge-empty',
+        `session=${sessionId.slice(-6)} layoutV=${String(chatStore.sessions[sessionId]?.layoutVersion ?? 0)}`
+      );
+      chatStore.setMessages(sessionId, [], 'pending-verify');
+      chatStore.markSessionHydrated(sessionId);
+      chatStore.markSessionLoaded(sessionId);
+      chatStore.bumpConversationLoadEpoch();
+      if (hasCurrentReadyInstance(sessionId, requestId)) {
+        void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+      }
+      return;
+    }
+
+    // query-load returned an error — fall back to the slow backend load
+    // path so use-chat-messages triggers conversation:load via Tauri event.
+    // Without this, the pending switch strands with loadStrategy='query'
+    // and nothing resolves it.
+    markSwitchTimeline('select', 'query-load-error → slow');
     setPendingLoadStrategy('slow', requestId);
-    markSwitchTimeline('select', 'slow-path');
-    recordSessionSwitchTrace({
-      event: 'hydrate_source_chosen',
-      requestId,
-      sessionId,
-      data: {
-        source: 'slow-path',
-      },
-    });
   },
 
   async restoreSelection(): Promise<RestoreSelectionResult> {

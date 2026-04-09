@@ -255,6 +255,21 @@ describe('claudeUiBridge.select', () => {
       isConversationTransitioning: false,
     });
 
+    // When sync cache misses, select() falls through to the query-backed
+    // load path which always calls loadConversationDetailFresh().
+    mockLoadConversationDetailFresh.mockResolvedValueOnce({
+      kind: 'data',
+      conversation: {
+        sessionId,
+        title: 'Cached Title',
+        messages: [
+          { id: 'message-1', role: 'assistant', content: 'ready', displayedContent: 'ready' },
+        ],
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+
     await claudeUiBridge.select(sessionId);
 
     expect(useChatStore.getState().activeSessionId).toBeNull();
@@ -262,7 +277,7 @@ describe('claudeUiBridge.select', () => {
     expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
   });
 
-  it('uses the uncached session path for unloaded sessions', async () => {
+  it('uses the query-backed load path for unloaded sessions', async () => {
     const sessionId = 'unloaded-session';
 
     useUIStore.setState({
@@ -280,14 +295,53 @@ describe('claudeUiBridge.select', () => {
       isConversationTransitioning: false,
     });
 
+    // When no sync cache exists, select() goes through the single
+    // query-backed load path instead of falling to slow-path.
+    mockLoadConversationDetailFresh.mockResolvedValueOnce({
+      kind: 'empty',
+      conversation: {
+        sessionId,
+        title: 'Fresh Title',
+        messages: [],
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    });
+
     await claudeUiBridge.select(sessionId);
 
-    expect(mockLoad).not.toHaveBeenCalled();
-    expect(useChatStore.getState().activeSessionId).toBeNull();
-    expect(useUIStore.getState().activeConversationId).toBe('old-session');
-    expect(useUIStore.getState().activeConversationTitle).toBe('Old Title');
+    expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
     expect(useUIStore.getState().isLoadingConversation).toBe(true);
     expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('query');
+  });
+
+  it('falls back to slow loadStrategy when query-load returns an error', async () => {
+    const sessionId = 'error-session';
+
+    useUIStore.setState({
+      conversations: [
+        {
+          sessionId,
+          title: 'Error Title',
+          updatedAt: 1,
+          messageCount: 0,
+        },
+      ],
+      activeConversationId: 'old-session',
+      activeConversationTitle: 'Old Title',
+      isLoadingConversation: false,
+      isConversationTransitioning: false,
+    });
+
+    // Query-backed load fails — should fall back to slow strategy so
+    // use-chat-messages triggers the Tauri conversation:load event.
+    mockLoadConversationDetailFresh.mockResolvedValueOnce({ kind: 'error' });
+
+    await claudeUiBridge.select(sessionId);
+
+    expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
     expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
     expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('slow');
   });
