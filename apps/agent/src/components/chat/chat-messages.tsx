@@ -1056,10 +1056,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
     // Skip expensive alignment when Virtuoso has accurate cached heights
-    // and scroller is already at the bottom — saves 6+ DOM round trips
+    // and scroller is already at the bottom — saves 6+ DOM round trips.
+    // But don't skip when scrollHeight <= clientHeight (content fits viewport):
+    // that means setSizeRanges hasn't been processed yet and "at bottom" is
+    // a false positive. Calling scrollToItem(LAST) primes Virtuoso's render
+    // target so it renders from the end when heights load.
     if (restoredSizeCacheRef.current) {
       const precheck = getScrollerMetrics();
-      if (precheck && precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX) {
+      if (
+        precheck &&
+        precheck.scrollHeight > precheck.clientHeight &&
+        precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX
+      ) {
         return precheck;
       }
     }
@@ -1074,8 +1082,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const metrics = getScrollerMetrics();
     if (!metrics) return null;
 
+    const prevTop = metrics.scroller.scrollTop;
     metrics.scroller.scrollTop = metrics.bottomTop;
-    return getScrollerMetrics();
+    const afterMetrics = getScrollerMetrics();
+    if (afterMetrics && prevTop !== afterMetrics.scrollTop) {
+      markSwitchTimeline(
+        'align-bottom',
+        `${String(Math.round(prevTop))} → ${String(Math.round(afterMetrics.scrollTop))} scrollH=${String(afterMetrics.scrollHeight)}`
+      );
+    }
+    return afterMetrics;
   }, [getScrollerMetrics, renderRows.length]);
 
   const forceTailProbeRender = useCallback((): boolean => {
@@ -1445,8 +1461,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       const handle = listRef.current;
       const immediateRendered = handle?.data.getCurrentlyRendered() ?? [];
       const immediateMetrics = getRenderSurfaceMetrics(immediateRendered);
+      // Accept either sentinel in DOM or sentinel in Virtuoso's render range.
+      // Cold-cached sessions enter stabilizing with the sentinel in the render
+      // range but not yet painted (~1 frame lag). Requiring DOM presence forces
+      // them into the 48ms ResizeObserver window unnecessarily.
+      const sentinelConfirmed =
+        immediateMetrics?.tailSentinelRendered === true ||
+        immediateRendered.some((r) => r.kind === 'tail-sentinel');
       if (
-        immediateMetrics?.tailSentinelRendered === true &&
+        sentinelConfirmed &&
+        immediateMetrics !== null &&
         immediateMetrics.isAtBottom &&
         !isHiddenPlaceholderShortSurface(immediateMetrics) &&
         hasObservedPostProbeSurface(immediateMetrics)
@@ -1700,7 +1724,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         if (!sentinelInRenderRange) {
           markSwitchTimeline(
             'positioning:no-sentinel',
-            `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)}`
+            `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)} scrollTop=${String(metrics.scrollTop)} cache=${String(restoredSizeCacheRef.current)} bottom=${String(metrics.isAtBottom)}`
           );
           if (restorePhaseRef.current === 'positioning') {
             alignScrollerToBottom();
