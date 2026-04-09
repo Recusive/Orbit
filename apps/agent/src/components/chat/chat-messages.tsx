@@ -47,6 +47,7 @@ import {
   deduplicateAndSortTools,
   useSessionActiveTools,
   useSessionCompletedTools,
+  useToolStore,
 } from '@/stores/agent/tool-store';
 import {
   getActiveLayoutMutationSources,
@@ -84,6 +85,13 @@ const ESTIMATED_THINKING_HEIGHT = 96;
 const ESTIMATED_IMAGE_GRID_HEIGHT = 144;
 const ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT = 24;
 const MAX_ESTIMATED_MESSAGE_HEIGHT = 4000;
+// Tool widgets start collapsed on first render (header-only) except Plan which
+// is expanded by default. Heights are from the actual rendered collapsed state:
+// button with py-1.5, text-base (~24px line-height) + padding ≈ 36px per tool.
+const ESTIMATED_COLLAPSED_TOOL_HEIGHT = 36;
+// Plan is the only tool that starts expanded — estimate its markdown content.
+const ESTIMATED_PLAN_BASE_HEIGHT = 80;
+const ESTIMATED_PLAN_LINE_HEIGHT = 20;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
 type RestorePhase = 'idle' | 'positioning' | 'premeasuring' | 'stabilizing' | 'done';
@@ -240,7 +248,44 @@ function estimateWrappedLines(text: string, charsPerLine: number): number {
   return Math.max(1, wrappedLines);
 }
 
-function estimateMessageHeight(message: ChatMessage): number {
+function estimateToolHeight(tool: ToolExecution): number {
+  // Plan is the only widget expanded by default — estimate its markdown content.
+  if (tool.toolName === 'Plan') {
+    const content =
+      typeof tool.toolOutput === 'string'
+        ? tool.toolOutput
+        : typeof tool.toolInput['content'] === 'string'
+          ? tool.toolInput['content']
+          : '';
+    if (content.length > 0) {
+      const lineCount = content.split('\n').length;
+      return ESTIMATED_PLAN_BASE_HEIGHT + lineCount * ESTIMATED_PLAN_LINE_HEIGHT;
+    }
+    return ESTIMATED_PLAN_BASE_HEIGHT;
+  }
+  // All other widgets start collapsed — header-only height.
+  return ESTIMATED_COLLAPSED_TOOL_HEIGHT;
+}
+
+function buildToolHeightByMessage(sessionId: string): Map<string, number> {
+  const map = new Map<string, number>();
+  const toolState = useToolStore.getState();
+  const bucket = toolState.sessions[sessionId];
+  if (!bucket) {
+    return map;
+  }
+
+  for (const tool of Object.values(bucket.activeTools)) {
+    map.set(tool.messageId, (map.get(tool.messageId) ?? 0) + estimateToolHeight(tool));
+  }
+  for (const tool of bucket.completedTools) {
+    map.set(tool.messageId, (map.get(tool.messageId) ?? 0) + estimateToolHeight(tool));
+  }
+
+  return map;
+}
+
+function estimateMessageHeight(message: ChatMessage, toolHeight: number): number {
   const content = message.displayedContent.length > 0 ? message.displayedContent : message.content;
   let height =
     message.role === 'user' ? ESTIMATED_USER_BASE_HEIGHT : ESTIMATED_ASSISTANT_BASE_HEIGHT;
@@ -273,6 +318,7 @@ function estimateMessageHeight(message: ChatMessage): number {
     height += proseLines * ESTIMATED_ASSISTANT_LINE_HEIGHT;
     height +=
       codeLines * ESTIMATED_CODE_LINE_HEIGHT + codeBlockCount * ESTIMATED_CODE_BLOCK_PADDING;
+    height += toolHeight;
   }
 
   if ((message.thinkingBlocks?.length ?? 0) > 0 || message.thinking) {
@@ -288,12 +334,15 @@ function estimateMessageHeight(message: ChatMessage): number {
   return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, height);
 }
 
-function buildEstimatedSizeRanges(messages: ChatMessage[]): { k: number; v: number }[] {
+function buildEstimatedSizeRanges(
+  messages: ChatMessage[],
+  toolHeightByMessage: Map<string, number>
+): { k: number; v: number }[] {
   const ranges: { k: number; v: number }[] = [];
   let previousHeight: number | null = null;
 
   messages.forEach((message, index) => {
-    const nextHeight = estimateMessageHeight(message);
+    const nextHeight = estimateMessageHeight(message, toolHeightByMessage.get(message.id) ?? 0);
     if (previousHeight === nextHeight) {
       return;
     }
@@ -688,7 +737,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     if (session && session.messages.length > 0) {
-      const estimatedRanges = buildEstimatedSizeRanges(session.messages);
+      const toolHeights = sessionId
+        ? buildToolHeightByMessage(sessionId)
+        : new Map<string, number>();
+      const estimatedRanges = buildEstimatedSizeRanges(session.messages, toolHeights);
       if (estimatedRanges.length > 0) {
         listRef.current?.setSizeRanges(estimatedRanges);
       }
