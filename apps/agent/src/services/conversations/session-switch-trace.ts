@@ -524,17 +524,17 @@ export function endSwitchTimeline(
     console.log(line);
   }
 
-  // Frame budget report
-  const droppedFrames = flushFrameBudgetReport();
-  if (droppedFrames.length > 0) {
-    const worst = Math.max(...droppedFrames.map((f) => f.durationMs));
-    const totalDropped = droppedFrames.length;
+  // Frame budget report (during switch)
+  const switchFrames = [...frameBudgetSamples];
+  const switchDropped = switchFrames.filter((f) => f.elapsedMs <= totalMs);
+  if (switchDropped.length > 0) {
+    const worst = Math.max(...switchDropped.map((f) => f.durationMs));
     // eslint-disable-next-line no-console
     console.log(
-      `  %c[warn] ${String(totalDropped)} dropped frames (>${String(Math.round(FRAME_BUDGET_120FPS_MS))}ms) - worst: ${String(worst)}ms`,
+      `  %c[warn] ${String(switchDropped.length)} dropped frames during switch (>${String(Math.round(FRAME_BUDGET_120FPS_MS))}ms) - worst: ${String(worst)}ms`,
       'color: #e06c75'
     );
-    for (const frame of droppedFrames) {
+    for (const frame of switchDropped) {
       // eslint-disable-next-line no-console
       console.log(
         `    frame #${String(frame.frameIndex)} @ ${String(frame.elapsedMs)}ms → ${String(frame.durationMs)}ms`
@@ -542,11 +542,47 @@ export function endSwitchTimeline(
     }
   } else {
     // eslint-disable-next-line no-console
-    console.log('  %c✓ no dropped frames (all <8.3ms)', 'color: #98c379');
+    console.log('  %c✓ no dropped frames during switch (all <8.3ms)', 'color: #98c379');
   }
 
   // eslint-disable-next-line no-console
   console.groupEnd();
+
+  // Keep frame monitor running 500ms after commit to capture post-commit drops
+  // (overscan entry→steady, VelocityScroll attach, prefetch sidebar work)
+  const postCommitSid = sid;
+  const postCommitTotalMs = totalMs;
+  setTimeout(() => {
+    const allFrames = flushFrameBudgetReport();
+    const postFrames = allFrames.filter((f) => f.elapsedMs > postCommitTotalMs);
+    if (postFrames.length > 0) {
+      const worst = Math.max(...postFrames.map((f) => f.durationMs));
+      // eslint-disable-next-line no-console
+      console.groupCollapsed(
+        `%cPostCommit %c${postCommitSid}%c ${String(postFrames.length)} dropped frames - worst: ${String(worst)}ms`,
+        'color: #7c93c3; font-weight: bold',
+        'color: #e0a866; font-weight: bold',
+        'color: #e06c75; font-weight: normal'
+      );
+      for (const frame of postFrames) {
+        const offsetMs = Math.round((frame.elapsedMs - postCommitTotalMs) * 10) / 10;
+        // eslint-disable-next-line no-console
+        console.log(
+          `    +${String(offsetMs)}ms  frame #${String(frame.frameIndex)} → ${String(frame.durationMs)}ms`
+        );
+      }
+      // eslint-disable-next-line no-console
+      console.groupEnd();
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        `%cPostCommit %c${postCommitSid}%c ✓ no dropped frames 500ms after commit`,
+        'color: #7c93c3; font-weight: bold',
+        'color: #e0a866; font-weight: bold',
+        'color: #98c379; font-weight: normal'
+      );
+    }
+  }, 500);
 }
 
 function installTraceDebugHelpers(): void {

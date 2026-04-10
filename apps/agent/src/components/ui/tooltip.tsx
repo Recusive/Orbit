@@ -35,6 +35,20 @@ interface TooltipProviderProps {
   disableHoverableContent?: boolean;
 }
 
+/**
+ * Memoized children barrier that prevents Radix's internal TooltipProvider
+ * state changes (isOpenDelayed useState) from cascading re-renders into
+ * the entire app tree. When Radix updates its internal state on tooltip
+ * hover, this component short-circuits the propagation.
+ */
+const ChildrenBarrier = React.memo(function ChildrenBarrier({
+  children,
+}: {
+  readonly children: React.ReactNode;
+}): React.ReactElement {
+  return <>{children}</>;
+});
+
 const TooltipProvider: React.FC<TooltipProviderProps> = ({
   children,
   delayDuration = 400,
@@ -68,7 +82,7 @@ const TooltipProvider: React.FC<TooltipProviderProps> = ({
         skipDelayDuration={skipDelayDuration}
         disableHoverableContent={disableHoverableContent}
       >
-        {children}
+        <ChildrenBarrier>{children}</ChildrenBarrier>
       </TooltipPrimitive.Provider>
     </OptimizedTooltipContext.Provider>
   );
