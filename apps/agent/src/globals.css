@@ -752,17 +752,36 @@ html.dark [data-streamdown='code-block-container'] {
   background-color: oklch(23% 0 0) !important;
 }
 
-/* Header — no visual bar, label flows into code */
+/* Header — dissolve as layout box so children position in code-block.
+   When no language detected, the header strip collapses to zero height
+   instead of rendering an empty bg-muted/80 bar. */
 [data-streamdown='code-block-header'] {
-  padding: 0.5rem 0.5rem 0 !important;
-  background-color: transparent !important;
-  border-bottom: none !important;
+  display: contents !important;
 }
 
-/* Language label — Radix step 11: canonical secondary text */
-[data-streamdown='code-block-header'] span {
+/* Language label — visible only when populated */
+[data-streamdown='code-block-header'] > span:first-child {
+  display: block !important;
+  padding: 0.5rem 0.75rem 0 !important;
   font-size: 0.6875rem !important; /* 11px */
+  line-height: 1 !important;
   color: var(--orbit-900) !important;
+}
+
+/* Collapse empty language label — no ghost strip */
+[data-streamdown='code-block-header'] > span:first-child:empty {
+  display: none !important;
+}
+
+/* Button tray — anchor top-right of code-block container */
+[data-streamdown='code-block-header'] > div:last-child {
+  position: absolute !important;
+  top: 0.375rem !important;
+  right: 0.375rem !important;
+  z-index: 10 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
 }
 
 /* Hide download button */
@@ -824,25 +843,22 @@ html.dark [data-streamdown='code-block-container'] {
   word-break: break-word !important;
 }
 
-/* Line spans — CM6-style gutter layout.
-   Block + padding-left creates the content column.
-   ::before is absolutely positioned in the padding area (gutter). */
+/* Line spans — no gutter, no line numbers */
 [data-streamdown='code-block-body'] code > span {
-  position: relative !important;
-  padding-left: 1.75rem !important;
   min-height: 1lh !important;
+  padding-left: 0 !important;
 }
 
-/* Line numbers — fixed gutter, absolutely positioned.
-   Wrapped text never flows under line numbers. */
+/* Hide line numbers — Streamdown bakes counter ::before via Tailwind classes;
+   suppress them entirely so code sits flush-left. */
 [data-streamdown='code-block-body'] code > span::before {
-  position: absolute !important;
-  left: 0 !important;
-  width: 1.25rem !important;
-  text-align: right !important;
-  margin-right: 0 !important;
-  font-size: 0.75rem !important;
-  color: var(--orbit-700) !important;
+  display: none !important;
+}
+
+/* Trim trailing blank line — Streamdown always appends one empty <span>
+   for the final newline. Removing min-height lets it collapse to zero. */
+[data-streamdown='code-block-body'] code > span:last-child {
+  min-height: 0 !important;
 }
 
 /* ============================================

@@ -71,6 +71,19 @@ export function rehypeFlowTokens(): (tree: HastRoot) => void {
 
       for (const child of source) {
         if (isTextNode(child)) {
+          // Inside skip tags (code, pre, etc.), preserve the text node as-is.
+          // Splitting into per-word nodes breaks Streamdown's code content
+          // extraction which expects a single string child on <code> elements.
+          // We still count words so ordinals stay stable for surrounding prose.
+          if (inSkip) {
+            const words = child.value.split(WORD_BOUNDARY);
+            for (const w of words) {
+              if (w.length > 0 && !/^\s+$/.test(w)) wordIndex++;
+            }
+            result.push(child);
+            continue;
+          }
+
           const parts = child.value.split(WORD_BOUNDARY);
 
           for (const part of parts) {
@@ -81,19 +94,15 @@ export function rehypeFlowTokens(): (tree: HastRoot) => void {
               continue;
             }
 
-            if (inSkip) {
-              result.push({ type: 'text', value: part });
-            } else {
-              result.push({
-                type: 'element',
-                tagName: 'span',
-                properties: {
-                  className: ['flow-token'],
-                  'data-flow-ord': wordIndex,
-                },
-                children: [{ type: 'text', value: part }],
-              });
-            }
+            result.push({
+              type: 'element',
+              tagName: 'span',
+              properties: {
+                className: ['flow-token'],
+                'data-flow-ord': wordIndex,
+              },
+              children: [{ type: 'text', value: part }],
+            });
 
             wordIndex++;
           }

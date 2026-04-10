@@ -30,11 +30,7 @@ describe('rehypeFlowTokens', () => {
       {
         type: 'element',
         tagName: 'code',
-        children: [
-          { type: 'text', value: 'beta' },
-          { type: 'text', value: ' ' },
-          { type: 'text', value: 'gamma' },
-        ],
+        children: [{ type: 'text', value: 'beta gamma' }],
       },
       { type: 'text', value: ' ' },
       {
@@ -44,6 +40,46 @@ describe('rehypeFlowTokens', () => {
         children: [{ type: 'text', value: 'delta' }],
       },
     ]);
+  });
+
+  it('preserves single text node inside pre>code for Streamdown code extraction', () => {
+    const tree: FlowTokenTree = {
+      type: 'root',
+      children: [
+        { type: 'text', value: 'before ' },
+        {
+          type: 'element',
+          tagName: 'pre',
+          children: [
+            {
+              type: 'element',
+              tagName: 'code',
+              children: [{ type: 'text', value: 'const x = 1;\nconst y = 2;\n' }],
+            },
+          ],
+        },
+        { type: 'text', value: ' after' },
+      ],
+    };
+
+    rehypeFlowTokens()(tree);
+
+    // Code content must remain a single text node — Streamdown's CodeComponent
+    // expects `typeof children === "string"`, which fails if hast-util-to-jsx-runtime
+    // receives multiple text children (it passes them as an array).
+    // tree.children: [flow-token("before"), " ", <pre>, " ", flow-token("after")]
+    const pre = tree.children[2] as { type: 'element'; tagName: string; children: unknown[] };
+    expect(pre.tagName).toBe('pre');
+    const code = pre.children[0] as { type: 'element'; tagName: string; children: unknown[] };
+    expect(code.children).toEqual([{ type: 'text', value: 'const x = 1;\nconst y = 2;\n' }]);
+
+    // Words inside code still counted for stable ordinals:
+    // "before"=0, code words (const,x,=,1;,const,y,=,2;)=1..8, "after"=9
+    const afterToken = tree.children[4] as {
+      type: 'element';
+      properties: { 'data-flow-ord': number };
+    };
+    expect(afterToken.properties['data-flow-ord']).toBe(9);
   });
 
   it('keeps ordinals stable through nested non-skipped elements', () => {
