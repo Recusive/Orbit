@@ -3,7 +3,7 @@
 **Status:** TODO
 **Priority:** P0
 **Dependencies:** TanStack Virtual migration (in progress)
-**Revision:** v5 (active chain parity, hydration state flag)
+**Revision:** v6 (hook lifecycle split, fallback semantics)
 
 ## Problem
 
@@ -265,43 +265,87 @@ The function is already defined (lines 105-116). Just add the `export` keyword. 
 
 Reactive driver that watches `preWarmSessionId` and performs lightweight hydration with epoch safety and active-chain parity.
 
-```
-useEffect([preWarmSessionId, preWarmWorkspaceEpoch]):
-  if preWarmSessionId === null → return
+**CRITICAL lifecycle split**: two separate effects. The per-item effect must NOT call `resetPreWarmState()` in its cleanup — doing so would wipe the queue every time `advancePreWarm()` changes `preWarmSessionId`, killing the queue on the first transition. The full reset lives in a separate unmount-only effect.
+
+```typescript
+// EFFECT 1: per-item work (re-runs on every preWarmSessionId / epoch change)
+// Cleanup only cancels the current iteration's in-flight work.
+useEffect(() => {
+  if (preWarmSessionId === null) return;
+
+  let cancelled = false;
+  const localRequestId = preWarmRequestId;
 
   // GUARD 1: epoch check before any work
-  if preWarmWorkspaceEpoch !== getWorkspaceEpoch() → clearPreWarm(), return
+  if (preWarmWorkspaceEpoch !== getWorkspaceEpoch()) {
+    clearPreWarm();
+    return;
+  }
 
   // READ: sync Query cache (populated by PrefetchSidebar)
-  const result = getFreshConversationDetail(preWarmSessionId)
-  if result === null || result.kind !== 'data' → advancePreWarm(), return
+  const result = getFreshConversationDetail(preWarmSessionId);
 
-  // GUARD 2: re-check epoch after read (paranoia — read could theoretically yield)
-  if preWarmWorkspaceEpoch !== getWorkspaceEpoch() → clearPreWarm(), return
+  // Bail if cancelled during the (synchronous) read, or if the queue advanced
+  // past this item via another code path
+  if (cancelled || preWarmRequestId !== localRequestId) return;
+
+  if (result === null || result.kind !== 'data') {
+    advancePreWarm();
+    return;
+  }
+
+  // GUARD 2: re-check epoch after read (paranoia — read must not commit stale)
+  if (preWarmWorkspaceEpoch !== getWorkspaceEpoch()) {
+    clearPreWarm();
+    return;
+  }
 
   // GUARD 3: skip if already hydrated by another path
-  const existingSession = useChatStore.getState().sessions[preWarmSessionId]
-  if existingSession?.hydrationState === 'hydrated' && existingSession.messages.length > 0:
-    advancePreWarm()   // Already done, move on
-    return
+  const existingSession = useChatStore.getState().sessions[preWarmSessionId];
+  if (existingSession?.hydrationState === 'hydrated' && existingSession.messages.length > 0) {
+    advancePreWarm();
+    return;
+  }
 
   // TRANSFORM: identical pipeline to hydrateConversationSnapshot
-  const activeChain = buildActiveChainMessages(result.conversation.messages)
+  const activeChain = buildActiveChainMessages(result.conversation.messages);
 
-  if activeChain.length === 0:
-    advancePreWarm()   // 0 messages → verification would skip anyway
-    return
+  if (activeChain.length === 0) {
+    advancePreWarm();
+    return;
+  }
 
   // MUTATE: two calls, in order
-  const chatStore = useChatStore.getState()
-  chatStore.setMessages(preWarmSessionId, activeChain, 'pending-verify')
-  chatStore.markSessionHydrated(preWarmSessionId)
+  const chatStore = useChatStore.getState();
+  chatStore.setMessages(preWarmSessionId, activeChain, 'pending-verify');
+  chatStore.markSessionHydrated(preWarmSessionId);
 
-  // SessionInstanceManager reacts to preWarmSessionId → mounts + verifies → calls advancePreWarm on hidden-ready
+  // SessionInstanceManager reacts to preWarmSessionId → mounts + verifies
+  // → calls advancePreWarm on hidden-ready
 
-cleanup:
-  resetPreWarmState()
+  // CLEANUP: ONLY cancels in-flight work for THIS iteration.
+  // DO NOT call resetPreWarmState() here — it runs on every dep change.
+  return () => {
+    cancelled = true;
+  };
+}, [preWarmSessionId, preWarmWorkspaceEpoch, preWarmRequestId]);
+
+// EFFECT 2: unmount-only full reset (empty deps)
+useEffect(() => {
+  return () => {
+    resetPreWarmState();
+  };
+}, []);
 ```
+
+**Why the split matters**: React's `useEffect` cleanup runs on every dependency change. If `resetPreWarmState()` were in Effect 1's cleanup, calling `advancePreWarm()` would change `preWarmSessionId` → Effect 1 re-runs → cleanup fires → queue wiped. The queue would die on the first advance.
+
+**Cancellation boundaries**:
+
+- `cancelled` flag is closure-captured per iteration
+- The Query cache read is synchronous, so there's no async gap where cancellation matters in practice
+- If future changes add async work (e.g., fallback to async load), the `cancelled` check at line `if (cancelled || preWarmRequestId !== localRequestId)` prevents stale commits
+- `preWarmRequestId` comparison is a second-line defense: if another code path advances the queue out-of-band, the stored local ID won't match
 
 This hook lives in ChatContent. It does NOT call `hydrateConversationSnapshot()`.
 
@@ -350,25 +394,28 @@ New trace events:
 
 ## Edge Cases
 
-| Scenario                                                           | Handling                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------- |
-| **In-flight `conversation:load` during pre-warm**                  | Pre-warm does NOT call `bumpConversationLoadEpoch()`. Only `setMessages()` + `markSessionHydrated()`. In-flight loads' deferred callbacks check their own epoch against the store's — pre-warm doesn't interfere because it doesn't touch the epoch counter.                                                                                                                                                                     |
-| **Rewind branches (active chain smaller than raw list)**           | Pre-warm uses `buildActiveChainMessages()` (shared with real path) which calls `getActiveChain()` to walk the parentUuid tree and select only the active branch. Orphaned messages from old rewind branches are excluded. Measurement matches click path exactly.                                                                                                                                                                |
-| **Persisted `system` messages in DTO**                             | `buildActiveChainMessages()` filters to `role === 'user'                                                                                                                                                                                                                                                                                                                                                                         |     | 'assistant'`. System messages are dropped before mapping. Render set matches real path. |
-| **Session double-hydrated before click (e.g., another code path)** | Driver checks `existingSession?.hydrationState === 'hydrated' && messages.length > 0` before mutating. If already hydrated, skips and calls `advancePreWarm()`.                                                                                                                                                                                                                                                                  |
-| **Click on pre-warmed session: layout-equivalence must pass**      | Pre-warm calls `markSessionHydrated()` AFTER `setMessages()`. On click, `hydrateConversationSnapshot()` checks `hydrationState === 'hydrated'` AND element-wise equality (id, content.length, thinking.length, thinkingBlocks.length, attachedImages.length). Since pre-warm used the same `buildActiveChainMessages()` + `mapPersistedMessage()`, all lengths match exactly → skip `setMessages()` → `layoutVersion` preserved. |
-| **Resume after long interrupt (LRU changed)**                      | `resumePreWarm()` recomputes capacity from current `ChatStore.lruOrder.length`, not from cached value at `startPreWarm` time. Queue rebuilt with fresh capacity math.                                                                                                                                                                                                                                                            |
-| **Workspace changes mid-hydration**                                | Driver checks epoch BEFORE `setMessages()` (step 1 + step 4 in driver sequence). If stale, `clearPreWarm()` fires without any store mutation. ChatContent unmount also calls `resetPreWarmState()`.                                                                                                                                                                                                                              |
-| **ChatStore eviction from pre-warm pressure**                      | Capacity-aware sizing: `min(candidates, availableSlots, 10)`. Each `setMessages` touches LRU so pre-warmed sessions are at the end (protected). Oldest non-mounted sessions are evicted — acceptable. Even if a pre-warmed session is later evicted, `saveRenderCache()` persists measurements before clearing (chat-store.ts:325).                                                                                              |
-| **Mounted instance sees evicted (empty) session**                  | Instance re-renders with 0 messages → overscan parked → dormant. On click: full hydration restores messages → cache-match-instant from persisted measurements.                                                                                                                                                                                                                                                                   |
-| **Tool/usage state not restored during pre-warm**                  | Intentional. Pre-warm only provides DOM measurements. Full `hydrateConversationSnapshot()` runs on actual click, restoring tools/usage/epoch/loaded. Layout-equivalence check detects messages match → skips re-render → preserves measurement cache.                                                                                                                                                                            |
-| **User clicks during pre-warm**                                    | `beginSessionSwitch` calls `clearPreWarm()`. Normal switch proceeds. After `commitSessionReveal()`, `resumePreWarm()` restarts from `preWarmCandidates` minus `preWarmedSessions`.                                                                                                                                                                                                                                               |
-| **User clicks the session being pre-warmed**                       | `clearPreWarm()` nulls `preWarmSessionId`. Instance already mounted and has messages. `beginSessionSwitch(B)` sets `pendingSessionId=B`. Instance reassigned from pre-warm to pending. Verification continues with real measurements.                                                                                                                                                                                            |
-| **User hovers sidebar during pre-warm**                            | `preMountSessionId` is completely separate. Both coexist.                                                                                                                                                                                                                                                                                                                                                                        |
-| **Rapid workspace switches**                                       | Each `resetPreWarmState()` on ChatContent unmount fully wipes all state. New workspace triggers fresh `prefetchSidebarSessions()` → fresh `startPreWarm()` with new epoch. Stale completions from old workspace are gated by epoch check before every mutation.                                                                                                                                                                  |
-| **Pre-warm session has 0 messages**                                | Driver reads from Query cache, sees empty conversation → `advancePreWarm()` without mounting.                                                                                                                                                                                                                                                                                                                                    |
-| **PrefetchSidebar reruns (sidebar reorder)**                       | `snapshotKey` dedup prevents re-run. `startPreWarm` is separately guarded: no-op if queue non-empty.                                                                                                                                                                                                                                                                                                                             |
-| **Sidebar list churn (deletion, new sessions)**                    | Best-effort: pre-warm runs once from launch snapshot. Deleted sessions hit 0-messages gate. New sessions use normal first-visit path or hover prefetch.                                                                                                                                                                                                                                                                          |
+| Scenario                                                           | Handling                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- | --------------------------------------------------------------------------------------- |
+| **In-flight `conversation:load` during pre-warm**                  | Pre-warm does NOT call `bumpConversationLoadEpoch()`. Only `setMessages()` + `markSessionHydrated()`. In-flight loads' deferred callbacks check their own epoch against the store's — pre-warm doesn't interfere because it doesn't touch the epoch counter.                                                                                                                                                                                                                                                                                                                                    |
+| **Rewind branches (active chain smaller than raw list)**           | Pre-warm uses `buildActiveChainMessages()` (shared with real path) which calls `getActiveChain()` to walk the parentUuid tree and select only the active branch. Orphaned messages from old rewind branches are excluded. Measurement matches click path exactly.                                                                                                                                                                                                                                                                                                                               |
+| **Persisted `system` messages in DTO**                             | `buildActiveChainMessages()` filters to `role === 'user'                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |     | 'assistant'`. System messages are dropped before mapping. Render set matches real path. |
+| **Session double-hydrated before click (e.g., another code path)** | Driver checks `existingSession?.hydrationState === 'hydrated' && messages.length > 0` before mutating. If already hydrated, skips and calls `advancePreWarm()`.                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **Click on pre-warmed session: layout-equivalence must pass**      | Pre-warm calls `markSessionHydrated()` AFTER `setMessages()`. On click, `hydrateConversationSnapshot()` checks `hydrationState === 'hydrated'` AND element-wise equality (id, content.length, thinking.length, thinkingBlocks.length, attachedImages.length). Since pre-warm used the same `buildActiveChainMessages()` + `mapPersistedMessage()`, all lengths match exactly → skip `setMessages()` → `layoutVersion` preserved.                                                                                                                                                                |
+| **Resume after long interrupt (LRU changed)**                      | `resumePreWarm()` recomputes capacity from current `ChatStore.lruOrder.length` AND current SessionInstanceManager mount count, not from cached values at `startPreWarm` time. Queue rebuilt with fresh capacity math.                                                                                                                                                                                                                                                                                                                                                                           |
+| **Query data changes between pre-warm and click**                  | Rare but possible: conversation reloaded from backend between pre-warm and click (e.g., assistant added new message). On click, `hydrateConversationSnapshot()` layout-equivalence check fails (length or content differs) → falls through to `setMessages()` → `layoutVersion` bumped → pre-warm measurements invalidated. **Fallback**: render cache store still has persisted measurements from pre-warm snapshot. Cache restore finds WARM path (not EXACT) → estimated sizes seeded from cached → still faster than pure cold. Total: ~200-300ms instead of ~80ms. Acceptable degradation. |
+| **`advancePreWarm()` transitions don't wipe queue**                | Per-item effect cleanup only sets `cancelled = true` (local closure flag). Full `resetPreWarmState()` lives in a separate unmount-only effect with empty deps. Advancing from session A to session B is a normal dependency change — queue survives.                                                                                                                                                                                                                                                                                                                                            |
+| **Cancellation during mid-item work**                              | `cancelled` closure flag + `preWarmRequestId` identity check both guard against stale commits. Sync Query cache read has no async gap in practice; guards are defensive for future async extensions.                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Workspace changes mid-hydration**                                | Driver checks epoch BEFORE `setMessages()` (step 1 + step 4 in driver sequence). If stale, `clearPreWarm()` fires without any store mutation. ChatContent unmount also calls `resetPreWarmState()`.                                                                                                                                                                                                                                                                                                                                                                                             |
+| **ChatStore eviction from pre-warm pressure**                      | Capacity-aware sizing: `min(candidates, availableSlots, 10)`. Each `setMessages` touches LRU so pre-warmed sessions are at the end (protected). Oldest non-mounted sessions are evicted — acceptable. Even if a pre-warmed session is later evicted, `saveRenderCache()` persists measurements before clearing (chat-store.ts:325).                                                                                                                                                                                                                                                             |
+| **Mounted instance sees evicted (empty) session**                  | Instance re-renders with 0 messages → overscan parked → dormant. On click: full hydration restores messages → cache-match-instant from persisted measurements.                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Tool/usage state not restored during pre-warm**                  | Intentional. Pre-warm only provides DOM measurements. Full `hydrateConversationSnapshot()` runs on actual click, restoring tools/usage/epoch/loaded. Layout-equivalence check detects messages match → skips re-render → preserves measurement cache.                                                                                                                                                                                                                                                                                                                                           |
+| **User clicks during pre-warm**                                    | `beginSessionSwitch` calls `clearPreWarm()`. Normal switch proceeds. After `commitSessionReveal()`, `resumePreWarm()` restarts from `preWarmCandidates` minus `preWarmedSessions`.                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **User clicks the session being pre-warmed**                       | `clearPreWarm()` nulls `preWarmSessionId`. Instance already mounted and has messages. `beginSessionSwitch(B)` sets `pendingSessionId=B`. Instance reassigned from pre-warm to pending. Verification continues with real measurements.                                                                                                                                                                                                                                                                                                                                                           |
+| **User hovers sidebar during pre-warm**                            | `preMountSessionId` is completely separate. Both coexist.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Rapid workspace switches**                                       | Each `resetPreWarmState()` on ChatContent unmount fully wipes all state. New workspace triggers fresh `prefetchSidebarSessions()` → fresh `startPreWarm()` with new epoch. Stale completions from old workspace are gated by epoch check before every mutation.                                                                                                                                                                                                                                                                                                                                 |
+| **Pre-warm session has 0 messages**                                | Driver reads from Query cache, sees empty conversation → `advancePreWarm()` without mounting.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **PrefetchSidebar reruns (sidebar reorder)**                       | `snapshotKey` dedup prevents re-run. `startPreWarm` is separately guarded: no-op if queue non-empty.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Sidebar list churn (deletion, new sessions)**                    | Best-effort: pre-warm runs once from launch snapshot. Deleted sessions hit 0-messages gate. New sessions use normal first-visit path or hover prefetch.                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Performance Budget
 
