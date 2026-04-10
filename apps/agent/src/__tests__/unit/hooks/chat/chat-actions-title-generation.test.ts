@@ -45,6 +45,7 @@ vi.mock('@/services/chat/image-attachment-cache', () => ({
 
 import { useVaultStore } from '@/features/vault/stores';
 import { createChatActions } from '@/hooks/chat/handlers/chat-actions';
+import { resetSessionSettingsSyncState } from '@/services/chat/session-settings-sync';
 import { useCheckpointStore } from '@/stores/agent/checkpoint-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -52,6 +53,7 @@ import { useQueuedMessageStore } from '@/stores/chat/queued-message-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 function resetStores(): void {
+  resetSessionSettingsSyncState();
   useVaultStore.getState().clearWorkspaceState();
   useToolStore.getState().reset();
   useCheckpointStore.getState().clearAll();

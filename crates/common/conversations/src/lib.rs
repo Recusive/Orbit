@@ -1533,6 +1533,9 @@ impl ParseContext {
         let ts = parse_iso_timestamp(timestamp);
         self.track_timestamp(ts);
         let text = payload.content.to_text();
+        if is_internal_model_command(&text) || is_local_command_stdout(&text) {
+            return;
+        }
         let attached_images = payload
             .content
             .extract_and_cache_images(&self.image_cache_root, &self.session_id);
@@ -2434,6 +2437,27 @@ fn extract_xml_tag<'a>(s: &'a str, open: &str, close: &str) -> Option<&'a str> {
 fn clean_user_text(s: &str) -> String {
     let stripped = strip_file_context_prefix(s);
     strip_sdk_command_xml(&stripped)
+}
+
+fn is_internal_model_command(s: &str) -> bool {
+    let mut parts = s.split_whitespace();
+    let Some(command) = parts.next() else {
+        return false;
+    };
+    if command != "/model" {
+        return false;
+    }
+    // Must have exactly one argument (the model name) and nothing else.
+    // The model name itself is already validated by the SDK before being
+    // written to JSONL — no need to hardcode specific model IDs here.
+    parts.next().is_some() && parts.next().is_none()
+}
+
+/// SDK wraps slash-command output in `<local-command-stdout>` tags.
+/// These are internal protocol artifacts that should not render as user messages.
+fn is_local_command_stdout(s: &str) -> bool {
+    let trimmed = s.trim();
+    trimmed.starts_with("<local-command-stdout>")
 }
 
 /// Find the largest byte index at or before `index` that is a valid char boundary.
@@ -4100,6 +4124,43 @@ mod tests {
 
         // No args → just the command name
         assert_eq!(conv.messages[0].content, "/web-animation-design");
+    }
+
+    #[test]
+    fn test_internal_model_commands_filtered_out_after_restore() {
+        let (manager, _temp) = create_test_manager();
+        let ws_dir = manager.workspace_dir(None);
+        fs::create_dir_all(&ws_dir).expect("mkdir");
+
+        let path = ws_dir.join("model-command-session.jsonl");
+        let lines = [
+            r#"{"parentUuid":null,"type":"user","uuid":"u1","message":{"role":"user","content":"<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args>claude-sonnet-4-6</command-args>"},"cwd":"/test","sessionId":"model-command-session","timestamp":"2026-02-07T12:00:00.000Z"}"#,
+            r#"{"parentUuid":"u1","type":"user","uuid":"u2","message":{"role":"user","content":"<local-command-stdout>Set model to claude-sonnet-4-6</local-command-stdout>"},"cwd":"/test","sessionId":"model-command-session","timestamp":"2026-02-07T12:00:00.100Z"}"#,
+            r#"{"parentUuid":"u2","type":"user","uuid":"u3","message":{"role":"user","content":"real user message"},"cwd":"/test","sessionId":"model-command-session","timestamp":"2026-02-07T12:00:00.200Z"}"#,
+            r#"{"parentUuid":"u3","type":"assistant","uuid":"a1","message":{"role":"assistant","content":[{"type":"text","text":"real assistant reply"}]},"cwd":"/test","sessionId":"model-command-session","timestamp":"2026-02-07T12:00:01.000Z"}"#,
+        ];
+        fs::write(&path, jsonl_content(&lines)).expect("write");
+
+        let conv = manager
+            .load_from_workspace("model-command-session", None)
+            .expect("load")
+            .expect("not found");
+
+        // Only the real user message + assistant reply should survive.
+        // Both the /model command and its <local-command-stdout> companion must be filtered.
+        assert_eq!(conv.messages.len(), 2);
+        assert!(!conv
+            .messages
+            .iter()
+            .any(|message| message.content == "/model claude-sonnet-4-6"));
+        assert!(!conv
+            .messages
+            .iter()
+            .any(|message| message.content.contains("local-command-stdout")));
+        assert_eq!(conv.messages[0].content, "real user message");
+        assert_eq!(conv.messages[0].role, MessageRole::User);
+        assert_eq!(conv.messages[1].content, "real assistant reply");
+        assert_eq!(conv.messages[1].role, MessageRole::Assistant);
     }
 
     #[test]

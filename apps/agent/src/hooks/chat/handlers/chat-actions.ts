@@ -19,6 +19,10 @@ import {
   cacheAttachedImagesForMessage,
 } from '@/services/chat/image-attachment-cache';
 import {
+  markSessionSettingsSynced,
+  syncSessionSettings,
+} from '@/services/chat/session-settings-sync';
+import {
   beginPendingCreate,
   getPendingCreateBySessionId,
   markPendingCreateAwaitingSystemInit,
@@ -209,30 +213,12 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
           markPendingCreateAwaitingSystemInit(pendingCreate.createRequestId);
         }
 
-        // Always send current thinking mode and model BEFORE message:send
         const toolState = useToolStore.getState();
-        if (!isAdaptiveThinkingModel(toolState.model)) {
-          postMessage({
-            type: 'thinking:set',
-            uuid: crypto.randomUUID(),
-            session_id: sessionId,
-            mode: toolState.thinkingMode,
-          });
-        }
-        postMessage({
-          type: 'model:set',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
+        syncSessionSettings(postMessage, sessionId, {
           model: toolState.model,
+          thinkingMode: toolState.thinkingMode,
+          effortLevel: toolState.effortLevel,
         });
-        if (isAdaptiveThinkingModel(toolState.model)) {
-          postMessage({
-            type: 'effort:set',
-            uuid: crypto.randomUUID(),
-            session_id: sessionId,
-            effort: toolState.effortLevel,
-          });
-        }
 
         // Get parentUuid for Claude Code-style rewind (linked list of messages)
         const checkpointStore = useCheckpointStore.getState();
@@ -616,20 +602,27 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
   };
 
   const handleThinkingModeChange = (mode: ThinkingMode): void => {
-    useToolStore.getState().setThinkingMode(mode);
+    const toolStore = useToolStore.getState();
+    toolStore.setThinkingMode(mode);
     const sessionId = useChatStore.getState().activeSessionId ?? '';
-    if (sessionId && !isAdaptiveThinkingModel(useToolStore.getState().model)) {
+    if (sessionId && !isAdaptiveThinkingModel(toolStore.model)) {
       postMessage({
         type: 'thinking:set',
         uuid: crypto.randomUUID(),
         session_id: sessionId,
         mode,
       });
+      markSessionSettingsSynced(sessionId, {
+        model: toolStore.model,
+        thinkingMode: mode,
+        effortLevel: toolStore.effortLevel,
+      });
     }
   };
 
   const handleEffortLevelChange = (level: EffortLevel): void => {
-    useToolStore.getState().setEffortLevel(level);
+    const toolStore = useToolStore.getState();
+    toolStore.setEffortLevel(level);
     const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId) {
       postMessage({
@@ -638,18 +631,23 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         session_id: sessionId,
         effort: level,
       });
+      markSessionSettingsSynced(sessionId, {
+        model: toolStore.model,
+        thinkingMode: toolStore.thinkingMode,
+        effortLevel: level,
+      });
     }
   };
 
   const handleModelChange = (model: Model): void => {
-    useToolStore.getState().setModel(model);
+    const toolStore = useToolStore.getState();
+    toolStore.setModel(model);
     const sessionId = useChatStore.getState().activeSessionId ?? '';
     if (sessionId) {
-      postMessage({
-        type: 'model:set',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
+      syncSessionSettings(postMessage, sessionId, {
         model,
+        thinkingMode: toolStore.thinkingMode,
+        effortLevel: toolStore.effortLevel,
       });
     }
   };

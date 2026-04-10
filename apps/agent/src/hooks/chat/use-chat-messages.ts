@@ -49,12 +49,13 @@ import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
 } from '@/services/chat/image-attachment-cache';
+import { syncSessionSettings } from '@/services/chat/session-settings-sync';
 import { getConversationUiBridge } from '@/services/conversations';
 import { markPendingCreateAwaitingSystemInit } from '@/services/conversations/session-switch-coordinator';
 import { recordSessionSwitchTrace } from '@/services/conversations/session-switch-trace';
 import { applySessionTitle, generateAITitle, generateFallbackTitle } from '@/services/session';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
-import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
+import { useToolStore } from '@/stores/agent/tool-store';
 import {
   useActiveMessages,
   useActiveSessionId,
@@ -402,30 +403,12 @@ export function useChatMessages(): UseChatMessagesReturn {
         : []
     );
 
-    // Send thinking mode, model, and effort BEFORE the message
     const toolState = useToolStore.getState();
-    if (!isAdaptiveThinkingModel(toolState.model)) {
-      postMessage({
-        type: 'thinking:set',
-        uuid: crypto.randomUUID(),
-        session_id: targetSessionId,
-        mode: toolState.thinkingMode,
-      });
-    }
-    postMessage({
-      type: 'model:set',
-      uuid: crypto.randomUUID(),
-      session_id: targetSessionId,
+    syncSessionSettings(postMessage, targetSessionId, {
       model: toolState.model,
+      thinkingMode: toolState.thinkingMode,
+      effortLevel: toolState.effortLevel,
     });
-    if (isAdaptiveThinkingModel(toolState.model)) {
-      postMessage({
-        type: 'effort:set',
-        uuid: crypto.randomUUID(),
-        session_id: targetSessionId,
-        effort: toolState.effortLevel,
-      });
-    }
 
     // Update title immediately, then kick off async title generation.
     applySessionTitle(targetSessionId, generateFallbackTitle(text || 'Image conversation'));

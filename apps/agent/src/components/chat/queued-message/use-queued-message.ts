@@ -7,7 +7,8 @@ import {
   buildOptimisticAttachedImages,
   cacheAttachedImagesForMessage,
 } from '@/services/chat/image-attachment-cache';
-import { isAdaptiveThinkingModel, useToolStore } from '@/stores/agent/tool-store';
+import { syncSessionSettings } from '@/services/chat/session-settings-sync';
+import { useToolStore } from '@/stores/agent/tool-store';
 import { useQueuedMessageStore, useQueuedMessage } from '@/stores/chat/queued-message-store';
 
 interface UseQueuedMessageOptions {
@@ -42,22 +43,11 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
       const { text, contextFiles, images, elements } = queuedMessage;
       clearQueue();
 
-      // Send thinking mode and model settings.
-      // Skip thinking:set for adaptive thinking models (Opus 4.6) — effort controls thinking.
       const toolState = useToolStore.getState();
-      if (!isAdaptiveThinkingModel(toolState.model)) {
-        postMessage({
-          type: 'thinking:set',
-          uuid: crypto.randomUUID(),
-          session_id: sessionId,
-          mode: toolState.thinkingMode,
-        });
-      }
-      postMessage({
-        type: 'model:set',
-        uuid: crypto.randomUUID(),
-        session_id: sessionId,
+      syncSessionSettings(postMessage, sessionId, {
         model: toolState.model,
+        thinkingMode: toolState.thinkingMode,
+        effortLevel: toolState.effortLevel,
       });
 
       const sendableImages = (images ?? []).flatMap((image) =>

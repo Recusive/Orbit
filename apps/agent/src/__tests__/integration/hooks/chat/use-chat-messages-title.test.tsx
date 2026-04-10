@@ -53,6 +53,7 @@ vi.mock('@/services/chat/image-attachment-cache', () => ({
 }));
 
 import { useChatMessages } from '@/hooks/chat/use-chat-messages';
+import { resetSessionSettingsSyncState } from '@/services/chat/session-settings-sync';
 import { useMessageBufferStore } from '@/stores/agent/message-buffer-store';
 import { useToolStore } from '@/stores/agent/tool-store';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -60,6 +61,7 @@ import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 function resetStores(): void {
+  resetSessionSettingsSyncState();
   useToolStore.getState().reset();
   useMessageBufferStore.setState({ pendingLoads: new Map() });
   useChatStore.setState({
