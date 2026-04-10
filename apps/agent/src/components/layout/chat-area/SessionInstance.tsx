@@ -224,12 +224,6 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
 
   const handleVerificationResult = useCallback(
     (result: ChatMessagesVerificationResult): void => {
-      logger.info(`[${sid}] ChatMessages verification: ${result.result}`, {
-        phase: result.phase,
-        tailProofVersion: result.tailProofVersion,
-        displayMode,
-        instanceGeneration,
-      });
       if (!readinessSignature || !settledSignature) {
         return;
       }
@@ -259,13 +253,11 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       onVerificationResult?.(fullResult);
     },
     [
-      displayMode,
       instanceGeneration,
       onVerificationResult,
       readinessSignature,
       sessionId,
       settledSignature,
-      sid,
       verificationRequestId,
     ]
   );
@@ -293,30 +285,18 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     if (isActuallyVisible && !prevVisibleRef.current && scroller) {
       const savedTop = savedScrollTopRef.current;
       if (savedWasAtBottomRef.current) {
-        logger.info(`[${sid}] reveal → restore scroll to BOTTOM`, {
-          scrollHeight: scroller.scrollHeight,
-        });
         requestAnimationFrame(() => {
           scroller.scrollTop = scroller.scrollHeight;
         });
       } else if (savedTop !== null && savedTop > 0) {
-        logger.info(`[${sid}] reveal → restore scroll to saved position`, {
-          savedTop,
-          scrollHeight: scroller.scrollHeight,
-        });
         requestAnimationFrame(() => {
           scroller.scrollTop = savedTop;
-        });
-      } else {
-        logger.debug(`[${sid}] reveal → no saved scroll position`, {
-          displayMode,
-          msgCount: messages.length,
         });
       }
     }
 
     prevVisibleRef.current = isActuallyVisible;
-  }, [displayMode, isActuallyVisible, messages.length, sid]);
+  }, [isActuallyVisible]);
 
   useLayoutEffect(() => {
     if (displayMode !== 'holdover') {

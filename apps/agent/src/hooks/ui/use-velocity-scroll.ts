@@ -131,14 +131,6 @@ function compensateScrollHeight(scroller: HTMLElement, lastScrollHeight: number)
 
   const compensation = Math.round(scroller.scrollTop * (delta / scrollRange));
   if (compensation !== 0) {
-    logger.debug('[compensateScrollHeight]', {
-      delta,
-      compensation,
-      scrollTopBefore: Math.round(scroller.scrollTop),
-      scrollTopAfter: Math.round(scroller.scrollTop + compensation),
-      lastScrollHeight,
-      curScrollHeight,
-    });
     scroller.scrollTop += compensation;
   }
   return compensation;
@@ -222,11 +214,7 @@ export function useVelocityScroll(
       // yet if the data is empty (the library conditionally renders it).
       const observeListContainer = (): void => {
         const listEl = node.querySelector(CHAT_LIST_SURFACE_SELECTOR);
-        if (listEl === null) {
-          logger.debug('[observeListContainer] list surface not found yet');
-          return;
-        }
-        logger.info('[observeListContainer] list surface found, attaching observers');
+        if (listEl === null) return;
 
         // Primary: MutationObserver on style attribute — earliest signal.
         // Fires as a microtask after React updates height/margin/padding.
@@ -330,13 +318,6 @@ export function useVelocityScroll(
         // compositor/main-thread position disagreement → scrollbar jitter.
         if (nativeCount < warmupEvents) {
           nativeCount++;
-          logger.debug('[wheel] warmup passthrough', {
-            nativeCount,
-            warmupEvents,
-            deltaY: Math.round(e.deltaY),
-            scrollTop: Math.round(node.scrollTop),
-            scrollHeight: node.scrollHeight,
-          });
           warmupCompensating = true;
           lastScrollHeight = node.scrollHeight;
           window.clearTimeout(warmupResetTimer);
@@ -354,7 +335,6 @@ export function useVelocityScroll(
         e.preventDefault();
         if (!hasFiredUserScroll) {
           hasFiredUserScroll = true;
-          logger.info('[wheel] first user scroll after warmup');
           onUserScrollStartRef.current?.();
         }
         velocity += e.deltaY * sensitivity;
@@ -362,11 +342,6 @@ export function useVelocityScroll(
         if (!animating) {
           animating = true;
           lastScrollHeight = node.scrollHeight;
-          logger.debug('[wheel] animation start', {
-            velocity: Math.round(velocity * 100) / 100,
-            scrollTop: Math.round(node.scrollTop),
-            scrollHeight: node.scrollHeight,
-          });
           raf = requestAnimationFrame(tick);
         }
       };

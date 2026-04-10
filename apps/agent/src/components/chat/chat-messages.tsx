@@ -16,7 +16,6 @@
  * WARNING: Do NOT add `contain: paint`, `content-visibility: auto`, or
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
-import { createLogger } from '@orbit/common/lib';
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
@@ -31,8 +30,6 @@ import type { ChatMeasurementCache } from '@/stores/chat/chat-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { VirtualItem } from '@tanstack/react-virtual';
 import type { FC, Key, ReactNode } from 'react';
-
-const logger = createLogger('ChatMessages');
 
 import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
@@ -914,19 +911,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const session = store.sessions[sessionId];
     if (!session) return;
 
-    const sid = sessionId.slice(-6);
     const cache = buildCurrentMeasurementCache({
       messageCount: session.messages.length,
       lastMessageId: session.messages.at(-1)?.id ?? null,
       layoutVersion: session.layoutVersion,
       viewportWidth: getCurrentViewportWidth(),
-    });
-    logger.info(`[${sid}] snapshotMeasurementCache`, {
-      messageCount: cache.messageCount,
-      measurements: cache.measurements.length,
-      layoutVersion: cache.layoutVersion,
-      viewportWidth: cache.viewportWidth,
-      restorePhase: restorePhaseRef.current,
     });
     store.setMeasurementCache(sessionId, cache);
   }, [buildCurrentMeasurementCache, getCurrentViewportWidth, sessionId]);
@@ -950,27 +939,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     let cache = session?.measurementCache ?? null;
     cache ??= getRenderCache(sessionId);
     const viewportWidth = getCurrentViewportWidth();
-    const sid = sessionId.slice(-6);
-
-    logger.info(`[${sid}] cache restore START`, {
-      hasMemoryCache: session?.measurementCache !== null,
-      hasIdbCache: cache !== null,
-      cacheMeasurements: cache?.measurements.length ?? 0,
-      cacheMessageCount: cache?.messageCount ?? 0,
-      renderRowCount: renderRows.length,
-      viewportWidth,
-      sessionMessages: session?.messages.length ?? 0,
-    });
 
     if (
       cache &&
       session &&
       isExactMeasurementCache(session, cache, renderRows.length, viewportWidth)
     ) {
-      logger.info(`[${sid}] cache restore → EXACT path`, {
-        measurements: cache.measurements.length,
-        layoutVersion: cache.layoutVersion,
-      });
       // Seed TanStack's initialMeasurementsCache so that when measure()
       // clears the internal cache, the next getMeasurements() call loads
       // pre-computed positions instead of calling estimateSize() per item.
@@ -991,26 +965,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     if (cache) {
-      logger.info(`[${sid}] cache restore → WARM path`, {
-        measurements: cache.measurements.length,
-        renderRowCount: renderRows.length,
-        reason: 'exact validation failed',
-      });
       updateEstimatedSizes(buildEstimatedSizesFromMeasurementCache(renderRows.length, cache));
       restorePathRef.current = 'warm';
       return;
     }
 
     if (session && session.messages.length > 0) {
-      logger.info(`[${sid}] cache restore → COLD path (content-based estimates)`, {
-        messageCount: session.messages.length,
-      });
       const estimatedSizes = buildEstimatedMessageSizes(session.messages);
       if (estimatedSizes.length > 0) {
         updateEstimatedSizes(estimatedSizes);
       }
     } else {
-      logger.info(`[${sid}] cache restore → COLD path (no cache, no messages)`);
+      // COLD path — no cache, no messages
     }
   }, [
     applyMeasurementCacheToEstimates,
@@ -1076,12 +1042,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const scroller = scrollContainerRef.current;
     if (!scroller) return;
 
-    const sid = sessionKey.slice(-6);
-    logger.info(`[${sid}] scrollIntent: ${scrollIntent}`, {
-      messageCount: messages.length,
-      renderRowCount: renderRows.length,
-    });
-
     switch (scrollIntent) {
       case 'history-load':
         scroller.scrollTo({ top: 0 });
@@ -1102,7 +1062,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         }
         break;
     }
-  }, [scrollIntent, renderRows.length, messages.length, sessionKey, scheduleStickToBottom]);
+  }, [scrollIntent, renderRows.length, messages.length, scheduleStickToBottom]);
 
   const messageListContext = useMemo(
     (): MessageListContext => ({
@@ -1142,12 +1102,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     const prev = previousOverscanPhaseRef.current;
     previousOverscanPhaseRef.current = overscanPhase;
-    logger.info(`[${sessionKey.slice(-6)}] overscan: ${String(prev)} → ${overscanPhase}`, {
-      overscanItems: overscan,
-      isVerifying,
-      isVisible,
-      messageCount: messages.length,
-    });
     markSwitchTimeline(
       'overscan-change',
       `${prev ?? 'null'} -> ${overscanPhase} (${String(overscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} scroll=${String(hasUserScrolled)}`
@@ -1158,10 +1112,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     isReadyForSteady,
     isVerifying,
     isVisible,
-    messages.length,
     overscan,
     overscanPhase,
-    sessionKey,
   ]);
 
   // ── Event-driven readiness ──────────────────────────────────────────
@@ -1308,7 +1260,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
-    const sid = sessionKey.slice(-6);
     if (restoredSizeCacheRef.current) {
       const precheck = getScrollerMetrics();
       if (
@@ -1316,15 +1267,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         precheck.scrollHeight > precheck.clientHeight &&
         precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX
       ) {
-        logger.debug(`[${sid}] alignScrollerToBottom → already at bottom (cache shortcut)`);
         return precheck;
       }
     }
 
-    logger.debug(`[${sid}] alignScrollerToBottom → scrollToLocation(LAST, end)`, {
-      rowCount: renderRows.length,
-      sizeCacheRestored: restoredSizeCacheRef.current,
-    });
     scrollToLocation({
       index: renderRows.length > 0 ? renderRows.length - 1 : 'LAST',
       align: 'end',
@@ -1342,7 +1288,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
     }
     return afterMetrics;
-  }, [getScrollerMetrics, renderRows.length, scrollToLocation, sessionKey]);
+  }, [getScrollerMetrics, renderRows.length, scrollToLocation]);
 
   const forceTailProbeRender = useCallback((): boolean => {
     if (renderRows.length === 0) {
@@ -1398,20 +1344,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
     ): void => {
       if (hasResolvedVerificationRef.current && result !== 'aborted') {
-        logger.debug(`[${sessionKey.slice(-6)}] emitVerification SKIPPED (already resolved)`, {
-          phase,
-          result,
-        });
         return;
       }
-
-      logger.info(`[${sessionKey.slice(-6)}] VERIFICATION RESULT: ${result}`, {
-        phase,
-        tailProofVersion,
-        alignBottomOnReady: options?.alignBottomOnReady ?? true,
-        restorePath: restorePathRef.current,
-        sizeCacheRestored: restoredSizeCacheRef.current,
-      });
 
       hasResolvedVerificationRef.current = true;
       readinessStartedRef.current = false;
@@ -1435,13 +1369,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         onReady();
       }
     },
-    [
-      alignScrollerToBottom,
-      cancelReadinessWork,
-      onReady,
-      sessionKey,
-      snapshotStableMeasurementCache,
-    ]
+    [alignScrollerToBottom, cancelReadinessWork, onReady, snapshotStableMeasurementCache]
   );
 
   const signalReady = useCallback(
@@ -1912,12 +1840,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const handleVisibleVerificationScroll = useCallback(
     (location: { readonly isAtBottom: boolean }): void => {
-      logger.debug(`[${sessionKey.slice(-6)}] onScroll (verification)`, {
-        isAtBottom: location.isAtBottom,
-        verificationPhase: effectiveVerificationPhase,
-        hasResolved: hasResolvedVerificationRef.current,
-        userScrollIntent: userScrollIntentDuringVisibleVerificationRef.current,
-      });
       if (
         effectiveVerificationPhase !== 'visible' ||
         hasResolvedVerificationRef.current ||
@@ -1927,9 +1849,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      logger.info(
-        `[${sessionKey.slice(-6)}] USER SCROLLED during visible verification → early commit`
-      );
       markSwitchTimeline('visible-user-scroll', 'commit-without-bottom-align');
       userScrollIntentDuringVisibleVerificationRef.current = false;
       tailProofVersionRef.current += 1;
@@ -1937,7 +1856,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         alignBottomOnReady: false,
       });
     },
-    [effectiveVerificationPhase, emitVerificationResult, sessionKey]
+    [effectiveVerificationPhase, emitVerificationResult]
   );
 
   useEffect(() => {
@@ -2335,19 +2254,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   useLayoutEffect(() => {
     if (!isVerifying || !needsRestoreRef.current || hasResolvedVerificationRef.current) return;
     if (!ensureListSurfaceReady()) {
-      logger.debug(`[${sessionKey.slice(-6)}] verification start BLOCKED — list surface not ready`);
       return;
     }
 
     needsRestoreRef.current = false;
-
-    logger.info(`[${sessionKey.slice(-6)}] VERIFICATION START`, {
-      phase: effectiveVerificationPhase,
-      messageCount: messages.length,
-      restorePath: restorePathRef.current,
-      sizeCacheRestored: restoredSizeCacheRef.current,
-      isVisible,
-    });
 
     restorePhaseRef.current = 'positioning';
     alignScrollerToBottom();
@@ -2433,29 +2343,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (messages.length === prevCount + 1) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'user') {
-        logger.info(
-          `[${sessionKey.slice(-6)}] new user message → animate + smooth scroll to bottom`,
-          {
-            messageId: lastMessage.id.slice(-6),
-            prevCount,
-            newCount: messages.length,
-          }
-        );
         setAnimatingMessageIds((prev) => new Set(prev).add(lastMessage.id));
         scrollToLocation({ index: 'LAST', align: 'end', behavior: 'smooth' });
-      } else if (lastMessage) {
-        logger.debug(`[${sessionKey.slice(-6)}] new ${lastMessage.role} message appended`, {
-          messageId: lastMessage.id.slice(-6),
-          prevCount,
-          newCount: messages.length,
-        });
       }
-    } else if (messages.length !== prevCount) {
-      logger.debug(
-        `[${sessionKey.slice(-6)}] message count changed: ${String(prevCount)} → ${String(messages.length)}`
-      );
     }
-  }, [messages, scrollToLocation, sessionKey]);
+  }, [messages, scrollToLocation]);
 
   // Wire the verification scroll callback
   onScrollCallbackRef.current = handleVisibleVerificationScroll;

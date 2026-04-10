@@ -220,7 +220,6 @@ export function isExactMeasurementCache(
   viewportWidth: number | null
 ): boolean {
   if (virtualizedRowCount === 0) {
-    logger.debug('[isExactMeasurementCache] FALSE — virtualizedRowCount=0');
     return false;
   }
 
@@ -232,23 +231,7 @@ export function isExactMeasurementCache(
   // faster than calling estimateSize() per item from scratch.
   const sizeMatch = cacheEntry.measurements.length >= virtualizedRowCount;
   const widthMatch = isMeasurementViewportWidthCompatible(cacheEntry, viewportWidth);
-  const isExact = layoutMatch && countMatch && lastIdMatch && sizeMatch && widthMatch;
-
-  logger.info(`[isExactMeasurementCache] ${isExact ? 'EXACT' : 'NOT EXACT'}`, {
-    layoutMatch,
-    countMatch: countMatch
-      ? true
-      : `cache=${String(cacheEntry.messageCount)} vs session=${String(session.messages.length)}`,
-    lastIdMatch,
-    sizeMatch: sizeMatch
-      ? true
-      : `cached=${String(cacheEntry.measurements.length)} vs needed=${String(virtualizedRowCount)}`,
-    widthMatch: widthMatch
-      ? true
-      : `cache=${String(cacheEntry.viewportWidth)} vs current=${String(viewportWidth)}`,
-  });
-
-  return isExact;
+  return layoutMatch && countMatch && lastIdMatch && sizeMatch && widthMatch;
 }
 
 export function buildMeasurementSizeMap(cacheEntry: ChatMeasurementCache): Map<string, number> {
@@ -473,17 +456,9 @@ export function saveRenderCache(sessionId: string, measurementCache: ChatMeasure
 export function getRenderCache(sessionId: string): ChatMeasurementCache | null {
   const entry = cache.get(sessionId);
   if (!entry) {
-    logger.debug(`[getRenderCache] MISS (memory)`, { sessionId: sessionId.slice(-6) });
     return null;
   }
 
-  logger.debug(`[getRenderCache] HIT (memory)`, {
-    sessionId: sessionId.slice(-6),
-    measurements: entry.measurements.length,
-    messageCount: entry.messageCount,
-    layoutVersion: entry.layoutVersion,
-    viewportWidth: entry.viewportWidth,
-  });
   touchLru(sessionId);
   return cloneMeasurementCache(entry);
 }
@@ -491,7 +466,6 @@ export function getRenderCache(sessionId: string): ChatMeasurementCache | null {
 export async function preloadRenderCacheFromIdb(
   sessionId: string
 ): Promise<ChatMeasurementCache | null> {
-  const sid = sessionId.slice(-6);
   const existing = getRenderCache(sessionId);
   if (existing) {
     return existing;
@@ -500,26 +474,15 @@ export async function preloadRenderCacheFromIdb(
   await getQueuedMutation(sessionId).catch(() => undefined);
   const raw = await getPersistenceAdapter().load(sessionId);
   if (raw === null || raw === undefined) {
-    logger.debug(`[preloadFromIdb] no IDB entry`, { sessionId: sid });
     return null;
   }
 
   const entry = parsePersistedEntry(raw);
   if (!entry || isExpired(entry)) {
-    logger.debug(`[preloadFromIdb] entry invalid or expired`, {
-      sessionId: sid,
-      parsed: entry !== null,
-      expired: entry ? isExpired(entry) : false,
-    });
     removeFromIdb(sessionId);
     return null;
   }
 
-  logger.info(`[preloadFromIdb] IDB HIT`, {
-    sessionId: sid,
-    measurements: entry.cache.measurements.length,
-    messageCount: entry.cache.messageCount,
-  });
   setMemoryCache(sessionId, entry.cache);
   persistToIdb(sessionId, entry.cache);
   return cloneMeasurementCache(entry.cache);
@@ -580,21 +543,17 @@ export function ensureWarmedUp(): Promise<void> {
 }
 
 export async function getRenderCacheAsync(sessionId: string): Promise<ChatMeasurementCache | null> {
-  const sid = sessionId.slice(-6);
   const memoryEntry = getRenderCache(sessionId);
   if (memoryEntry) {
-    logger.debug(`[getRenderCacheAsync] resolved from memory`, { sessionId: sid });
     return memoryEntry;
   }
 
   await ensureWarmedUp();
   const warmedEntry = getRenderCache(sessionId);
   if (warmedEntry) {
-    logger.debug(`[getRenderCacheAsync] resolved after warmup`, { sessionId: sid });
     return warmedEntry;
   }
 
-  logger.debug(`[getRenderCacheAsync] falling through to IDB preload`, { sessionId: sid });
   return preloadRenderCacheFromIdb(sessionId);
 }
 
