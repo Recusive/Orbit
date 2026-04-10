@@ -33,7 +33,7 @@ describe('useConversationPrefetch', () => {
           layoutSettledVersion: 0,
           lastLayoutMutationAt: null,
           layoutLeakDeadlineAt: null,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
       activeSessionId: null,

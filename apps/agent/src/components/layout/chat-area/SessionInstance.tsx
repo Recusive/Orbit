@@ -7,6 +7,7 @@ import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { CSSProperties, FC } from 'react';
 
 import { ChatMessages } from '@/components/chat';
+import { findChatScroller } from '@/lib/chat/chat-selectors';
 import {
   clearReadyInstance,
   recordReadyInstance,
@@ -48,8 +49,9 @@ export interface SessionInstanceProps {
 
 // All instances use absolute positioning so switching is a pure z-index change
 // with no layout recalculation. `contain: layout paint` limits paint/layout
-// recalc to this subtree without `contain: size` which prevents Virtuoso
-// from measuring row heights during the hidden positioning pass.
+// recalc to this subtree without `contain: size` which prevents the
+// virtualized message list from measuring row heights during the hidden
+// positioning pass.
 const BASE_STYLE: CSSProperties = {
   position: 'absolute',
   inset: 0,
@@ -146,7 +148,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     layoutSettledVersion,
     lastLayoutMutationAt: null,
     layoutLeakDeadlineAt: null,
-    virtuosoSizeCache: null,
+    measurementCache: null,
   });
   const settledSignature = buildSessionSettledSignature({
     messages,
@@ -159,7 +161,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     layoutSettledVersion,
     lastLayoutMutationAt: null,
     layoutLeakDeadlineAt: null,
-    virtuosoSizeCache: null,
+    measurementCache: null,
   });
   const instanceGenerationRef = useRef(0);
   if (instanceGenerationRef.current === 0) {
@@ -222,6 +224,12 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
 
   const handleVerificationResult = useCallback(
     (result: ChatMessagesVerificationResult): void => {
+      logger.info(`[${sid}] ChatMessages verification: ${result.result}`, {
+        phase: result.phase,
+        tailProofVersion: result.tailProofVersion,
+        displayMode,
+        instanceGeneration,
+      });
       if (!readinessSignature || !settledSignature) {
         return;
       }
@@ -251,11 +259,13 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       onVerificationResult?.(fullResult);
     },
     [
+      displayMode,
       instanceGeneration,
       onVerificationResult,
       readinessSignature,
       sessionId,
       settledSignature,
+      sid,
       verificationRequestId,
     ]
   );
@@ -270,7 +280,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     }
 
     const container = containerRef.current;
-    const scroller = container?.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]');
+    const scroller = container ? findChatScroller(container) : null;
 
     if (!isActuallyVisible && prevVisibleRef.current) {
       if (scroller) {
@@ -283,19 +293,24 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
     if (isActuallyVisible && !prevVisibleRef.current && scroller) {
       const savedTop = savedScrollTopRef.current;
       if (savedWasAtBottomRef.current) {
+        logger.info(`[${sid}] reveal → restore scroll to BOTTOM`, {
+          scrollHeight: scroller.scrollHeight,
+        });
         requestAnimationFrame(() => {
           scroller.scrollTop = scroller.scrollHeight;
         });
       } else if (savedTop !== null && savedTop > 0) {
+        logger.info(`[${sid}] reveal → restore scroll to saved position`, {
+          savedTop,
+          scrollHeight: scroller.scrollHeight,
+        });
         requestAnimationFrame(() => {
           scroller.scrollTop = savedTop;
         });
       } else {
-        requestAnimationFrame(() => {
-          logger.debug(`[${sid}] Reveal with no saved scroll`, {
-            displayMode,
-            msgCount: messages.length,
-          });
+        logger.debug(`[${sid}] reveal → no saved scroll position`, {
+          displayMode,
+          msgCount: messages.length,
         });
       }
     }
@@ -309,8 +324,15 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       return;
     }
 
+    const bgStart = performance.now();
     setHoldoverBackgroundColor(findInheritedBackgroundColor(containerRef.current));
-  }, [displayMode]);
+    const bgDuration = performance.now() - bgStart;
+    if (bgDuration > 1) {
+      logger.debug(
+        `[${sid}] holdover background lookup: ${String(Math.round(bgDuration * 10) / 10)}ms`
+      );
+    }
+  }, [displayMode, sid]);
 
   useEffect(() => {
     if (displayMode !== 'shown') {

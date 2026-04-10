@@ -1,5 +1,6 @@
 import type { SessionSwitchStatus } from '@/stores/chat/session-switch-store';
 
+import { findChatScroller } from '@/lib/chat/chat-selectors';
 import { useChatStore } from '@/stores/chat/chat-store';
 import { useSessionSwitchStore } from '@/stores/chat/session-switch-store';
 
@@ -36,7 +37,7 @@ export interface SessionSwitchTraceGeometry {
   readonly lastLayoutMutationAt: number | null;
   readonly overscanPhase: string | null;
   readonly sizeCacheRestored: boolean | null;
-  readonly purgeItemSizesUsed: boolean | null;
+  readonly restorePath: 'exact' | 'warm' | 'cold' | null;
 }
 
 interface SessionSwitchTraceEvent {
@@ -99,7 +100,7 @@ function getSessionScrollerElement(sessionId: string | null): HTMLElement | null
     `[data-session-instance="${escapedSessionId}"]`
   );
 
-  return instance?.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]') ?? null;
+  return instance ? findChatScroller(instance) : null;
 }
 
 function readTraceRootNumber(traceRoot: HTMLElement | null, key: string): number | null {
@@ -134,7 +135,7 @@ export function getSessionSwitchGeometrySnapshot(
       lastLayoutMutationAt: null,
       overscanPhase: null,
       sizeCacheRestored: null,
-      purgeItemSizesUsed: null,
+      restorePath: null,
     };
   }
 
@@ -145,8 +146,7 @@ export function getSessionSwitchGeometrySnapshot(
   const instance = document.querySelector<HTMLElement>(
     `[data-session-instance="${escapedSessionId}"]`
   );
-  const scroller =
-    instance?.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]') ?? null;
+  const scroller = instance ? findChatScroller(instance) : null;
   const traceRoot = getChatTraceRoot(sessionId);
   const session = useChatStore.getState().sessions[sessionId];
   const scrollHeight = scroller?.scrollHeight ?? null;
@@ -166,7 +166,8 @@ export function getSessionSwitchGeometrySnapshot(
     lastLayoutMutationAt: session?.lastLayoutMutationAt ?? null,
     overscanPhase: traceRoot?.dataset['overscanPhase'] ?? null,
     sizeCacheRestored: readTraceRootBoolean(traceRoot, 'sizeCacheRestored'),
-    purgeItemSizesUsed: readTraceRootBoolean(traceRoot, 'purgeItemSizesUsed'),
+    restorePath:
+      (traceRoot?.dataset['restorePath'] as SessionSwitchTraceGeometry['restorePath']) ?? null,
   };
 }
 
@@ -368,6 +369,77 @@ interface ActiveTimeline {
 
 let activeTimeline: ActiveTimeline | null = null;
 
+// ── Frame Budget Monitor ─────────────────────────────────────────────
+// Measures actual frame durations during a session switch using rAF.
+// Reports every frame that exceeds the 120fps budget (8.3ms) so we can
+// see exactly which frames drop and correlate with timeline marks.
+
+interface FrameSample {
+  readonly frameIndex: number;
+  readonly durationMs: number;
+  readonly elapsedMs: number;
+}
+
+let frameBudgetRafId: number | null = null;
+let frameBudgetSamples: FrameSample[] = [];
+let frameBudgetStartedAt = 0;
+let frameBudgetLastFrameAt = 0;
+let frameBudgetFrameIndex = 0;
+
+const FRAME_BUDGET_120FPS_MS = 8.33;
+const FRAME_BUDGET_MONITOR_MAX_MS = 3000;
+
+function frameBudgetTick(now: number): void {
+  if (activeTimeline === null) {
+    stopFrameBudgetMonitor();
+    return;
+  }
+
+  const elapsed = now - frameBudgetStartedAt;
+  if (elapsed > FRAME_BUDGET_MONITOR_MAX_MS) {
+    stopFrameBudgetMonitor();
+    return;
+  }
+
+  if (frameBudgetLastFrameAt > 0) {
+    const duration = now - frameBudgetLastFrameAt;
+    if (duration > FRAME_BUDGET_120FPS_MS) {
+      frameBudgetSamples.push({
+        frameIndex: frameBudgetFrameIndex,
+        durationMs: Math.round(duration * 100) / 100,
+        elapsedMs: Math.round(elapsed * 100) / 100,
+      });
+    }
+  }
+
+  frameBudgetLastFrameAt = now;
+  frameBudgetFrameIndex += 1;
+  frameBudgetRafId = requestAnimationFrame(frameBudgetTick);
+}
+
+function startFrameBudgetMonitor(): void {
+  stopFrameBudgetMonitor();
+  frameBudgetSamples = [];
+  frameBudgetStartedAt = performance.now();
+  frameBudgetLastFrameAt = 0;
+  frameBudgetFrameIndex = 0;
+  frameBudgetRafId = requestAnimationFrame(frameBudgetTick);
+}
+
+function stopFrameBudgetMonitor(): void {
+  if (frameBudgetRafId !== null) {
+    cancelAnimationFrame(frameBudgetRafId);
+    frameBudgetRafId = null;
+  }
+}
+
+function flushFrameBudgetReport(): FrameSample[] {
+  stopFrameBudgetMonitor();
+  const samples = frameBudgetSamples;
+  frameBudgetSamples = [];
+  return samples;
+}
+
 export function startSwitchTimeline(opts: {
   readonly requestId: number;
   readonly sessionId: string;
@@ -384,6 +456,7 @@ export function startSwitchTimeline(opts: {
     startedAt: performance.now(),
     marks: [],
   };
+  startFrameBudgetMonitor();
 }
 
 export function markSwitchTimeline(phase: string, detail?: string): void {
@@ -450,6 +523,28 @@ export function endSwitchTimeline(
     // eslint-disable-next-line no-console
     console.log(line);
   }
+
+  // Frame budget report
+  const droppedFrames = flushFrameBudgetReport();
+  if (droppedFrames.length > 0) {
+    const worst = Math.max(...droppedFrames.map((f) => f.durationMs));
+    const totalDropped = droppedFrames.length;
+    // eslint-disable-next-line no-console
+    console.log(
+      `  %c[warn] ${String(totalDropped)} dropped frames (>${String(Math.round(FRAME_BUDGET_120FPS_MS))}ms) - worst: ${String(worst)}ms`,
+      'color: #e06c75'
+    );
+    for (const frame of droppedFrames) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `    frame #${String(frame.frameIndex)} @ ${String(frame.elapsedMs)}ms → ${String(frame.durationMs)}ms`
+      );
+    }
+  } else {
+    // eslint-disable-next-line no-console
+    console.log('  %c✓ no dropped frames (all <8.3ms)', 'color: #98c379');
+  }
+
   // eslint-disable-next-line no-console
   console.groupEnd();
 }

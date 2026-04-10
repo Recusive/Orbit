@@ -19,6 +19,7 @@ import type {
   SessionSwitchStatus,
 } from '@/stores/chat';
 
+import { findChatScroller } from '@/lib/chat/chat-selectors';
 import {
   getConversationGeneration,
   getWorkspaceEpoch,
@@ -234,6 +235,7 @@ export function commitSessionReveal(
     sessionId: targetSessionId,
     geometry: getSessionSwitchGeometrySnapshot(targetSessionId),
   });
+  const commitStart = performance.now();
   useChatStore.getState().setActiveSession(targetSessionId);
   useFileStore.getState().switchSession(targetSessionId);
   useToolStore.getState().switchSession(targetSessionId);
@@ -242,6 +244,8 @@ export function commitSessionReveal(
   useUIStore.getState().setConversationTransitioning(false);
   useMessageBufferStore.getState().clearLoadPending(targetSessionId);
   useSessionSwitchStore.getState().clearPendingSwitch(requestId);
+  const commitDuration = performance.now() - commitStart;
+  markSwitchTimeline('commit:stores', `${String(Math.round(commitDuration * 10) / 10)}ms sync`);
 
   setShownSessionTraceRequest(targetSessionId, requestId);
   recordSessionSwitchTrace({
@@ -341,7 +345,7 @@ function isLiveReadyInstance(sessionId: string, readyRecord: ReadyInstanceRecord
     return false;
   }
 
-  const scroller = instance.querySelector<HTMLElement>('[data-testid="virtuoso-scroller"]');
+  const scroller = findChatScroller(instance);
   if (!scroller) {
     return false;
   }

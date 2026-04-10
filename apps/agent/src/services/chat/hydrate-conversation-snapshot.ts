@@ -239,6 +239,8 @@ function seedConversationDetailCache(input: HydrateConversationSnapshotInput): v
 export function hydrateConversationSnapshot(
   input: HydrateConversationSnapshotInput
 ): ChatMessage[] {
+  const hydrateStart = performance.now();
+
   const messages = [
     ...(input.resolvedMessages ?? buildActiveChainMessages(input.persistedMessages)),
   ];
@@ -252,7 +254,7 @@ export function hydrateConversationSnapshot(
 
   // Detect layout-equivalent rehydration: if the session already has the same
   // messages with identical height-affecting fields, skip setMessages() to
-  // preserve layoutVersion. This prevents the Virtuoso size cache from being
+  // preserve layoutVersion. This prevents the measurement cache from being
   // invalidated on warm revisits where the data hasn't actually changed.
   // Compares IDs, content length, thinking presence, and image count — all
   // fields that affect rendered row height.
@@ -300,6 +302,14 @@ export function hydrateConversationSnapshot(
     useToolStore.getState().switchSession(input.sessionId);
   }
   seedConversationDetailCache(input);
+
+  const hydrateDuration = performance.now() - hydrateStart;
+  if (isActiveTimelineSession(input.sessionId) && hydrateDuration > 1) {
+    markSwitchTimeline(
+      'hydrate:total',
+      `${String(Math.round(hydrateDuration * 10) / 10)}ms msgs=${String(messages.length)} layoutEq=${String(isLayoutEquivalent)}`
+    );
+  }
 
   return messages;
 }

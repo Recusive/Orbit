@@ -9,7 +9,8 @@ import type { ComponentProps, ReactNode } from 'react';
 
 const {
   mockGetCurrentlyRendered,
-  getSizeRangesMock,
+  applyMeasurementCacheMock,
+  getMeasurementCacheMock,
   messageItemPropsById,
   mockListSurfaceAvailable,
   mockTailSentinelAvailable,
@@ -21,7 +22,7 @@ const {
   mockVirtuosoMessageListProps,
   queuedMessageBubbleProps,
   replaceDataMock,
-  setSizeRangesMock,
+  setEstimatedItemSizesMock,
   scrollerScrollToMock,
   scrollToItemMock,
   velocityScrollAttachMock,
@@ -29,8 +30,15 @@ const {
   const scrollerScrollToMock = vi.fn();
 
   return {
+    applyMeasurementCacheMock: vi.fn(),
     mockGetCurrentlyRendered: vi.fn(),
-    getSizeRangesMock: vi.fn(() => [{ k: 0, v: 120 }]),
+    getMeasurementCacheMock: vi.fn(() => ({
+      measurements: [],
+      messageCount: 0,
+      lastMessageId: null,
+      layoutVersion: 0,
+      viewportWidth: null,
+    })),
     messageItemPropsById: new Map<string, unknown>(),
     mockListSurfaceAvailable: { current: true },
     mockTailSentinelAvailable: { current: true },
@@ -50,7 +58,7 @@ const {
     mockVirtuosoMessageListProps: vi.fn(),
     queuedMessageBubbleProps: [] as unknown[],
     replaceDataMock: vi.fn(),
-    setSizeRangesMock: vi.fn(),
+    setEstimatedItemSizesMock: vi.fn(),
     scrollerScrollToMock,
     scrollToItemMock: vi.fn(),
     velocityScrollAttachMock: vi.fn(),
@@ -115,8 +123,9 @@ interface MockVirtuosoMessageListMethods<TData> {
     readonly bottomOffset: number;
     readonly visibleListHeight: number;
   };
-  readonly getSizeRanges: () => { k: number; v: number }[];
-  readonly setSizeRanges: (ranges: { k: number; v: number }[]) => void;
+  readonly getMeasurementCache: () => unknown;
+  readonly applyMeasurementCache: (cache: unknown) => void;
+  readonly setEstimatedItemSizes: (sizes: number[]) => void;
 }
 
 interface MockVirtuosoMessageListProps<TData, TContext> {
@@ -164,12 +173,14 @@ interface MockVirtuosoMessageListProps<TData, TContext> {
   readonly style?: React.CSSProperties | undefined;
 }
 
-vi.mock('@virtuoso.dev/message-list', async () => {
+vi.mock('@/components/chat/virtualized-message-list', async () => {
   const React = await import('react');
 
   return {
-    VirtuosoMessageListLicense: ({ children }: { readonly children: ReactNode }) => <>{children}</>,
-    VirtuosoMessageList: React.forwardRef(function MockVirtuosoMessageList<TData, TContext>(
+    VirtualizedMessageListLicense: ({ children }: { readonly children: ReactNode }) => (
+      <>{children}</>
+    ),
+    VirtualizedMessageList: React.forwardRef(function MockVirtuosoMessageList<TData, TContext>(
       props: MockVirtuosoMessageListProps<TData, TContext>,
       ref: React.ForwardedRef<MockVirtuosoMessageListMethods<TData>>
     ) {
@@ -187,8 +198,9 @@ vi.mock('@virtuoso.dev/message-list', async () => {
           bottomOffset: 0,
           visibleListHeight: 800,
         }),
-        getSizeRanges: getSizeRangesMock,
-        setSizeRanges: setSizeRangesMock,
+        getMeasurementCache: getMeasurementCacheMock,
+        applyMeasurementCache: applyMeasurementCacheMock,
+        setEstimatedItemSizes: setEstimatedItemSizesMock,
       }));
 
       mockVirtuosoMessageListProps(props);
@@ -370,6 +382,39 @@ function buildRenderRows(
   }));
 }
 
+function buildMeasurementCacheForMessages(
+  messages: readonly ChatMessage[],
+  size = 120
+): {
+  measurements: {
+    key: string;
+    index: number;
+    start: number;
+    size: number;
+    end: number;
+    lane: number;
+  }[];
+  messageCount: number;
+  lastMessageId: string | null;
+  layoutVersion: number;
+  viewportWidth: null;
+} {
+  return {
+    measurements: messages.map((message, index) => ({
+      key: `session-a:${message.id}`,
+      index,
+      start: index * size,
+      size,
+      end: (index + 1) * size,
+      lane: 0,
+    })),
+    messageCount: messages.length,
+    lastMessageId: messages.at(-1)?.id ?? null,
+    layoutVersion: 0,
+    viewportWidth: null,
+  };
+}
+
 function buildQueuedMessage(overrides: Partial<QueuedMessage> = {}): QueuedMessage {
   return {
     id: overrides.id ?? 'queued-1',
@@ -499,14 +544,15 @@ describe('ChatMessages', () => {
     messageItemPropsById.clear();
     mockGetCurrentlyRendered.mockReset();
     queuedMessageBubbleProps.length = 0;
-    getSizeRangesMock.mockClear();
+    applyMeasurementCacheMock.mockClear();
+    getMeasurementCacheMock.mockClear();
     mockResizeObserverDisconnect.mockClear();
     mockResizeObserverObserve.mockClear();
     mockListSurfaceAvailable.current = true;
     mockTailSentinelAvailable.current = true;
     mockScrollerElement.addEventListener.mockClear();
     mockScrollerElement.querySelector.mockImplementation((selector: string) => {
-      if (selector === '[data-testid="virtuoso-list"]') {
+      if (selector.includes('chat-list-inner') || selector.includes('virtuoso-list')) {
         return mockListSurfaceAvailable.current === true ? mockVirtuosoListElement : null;
       }
       if (selector.includes('[data-tail-sentinel')) {
@@ -521,7 +567,7 @@ describe('ChatMessages', () => {
     mockUseVelocityScroll.mockClear();
     mockVirtuosoMessageListProps.mockClear();
     replaceDataMock.mockClear();
-    setSizeRangesMock.mockClear();
+    setEstimatedItemSizesMock.mockClear();
     scrollerScrollToMock.mockClear();
     scrollToItemMock.mockClear();
     velocityScrollAttachMock.mockClear();
@@ -643,7 +689,7 @@ describe('ChatMessages', () => {
             scrollIntent: 'session-restore',
             hydrationState: 'hydrated',
             layoutVersion: 0,
-            virtuosoSizeCache: null,
+            measurementCache: null,
           },
         },
       });
@@ -693,7 +739,7 @@ describe('ChatMessages', () => {
             scrollIntent: 'session-restore',
             hydrationState: 'hydrated',
             layoutVersion: 0,
-            virtuosoSizeCache: null,
+            measurementCache: null,
           },
         },
       });
@@ -852,6 +898,71 @@ describe('ChatMessages', () => {
     }
   });
 
+  it('keeps visible verification on entry overscan for long restored chats', async () => {
+    vi.useFakeTimers();
+
+    const messages = Array.from({ length: 116 }, (_value, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+
+    try {
+      mockScrollerElement.clientHeight = 629;
+      mockScrollerElement.scrollHeight = 63437;
+      mockScrollerElement.scrollTop = 62808;
+      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
+        fallback.slice(0, 7)
+      );
+
+      const chatStore = useChatStore.getState();
+      chatStore.getOrCreateSession('session-a');
+      chatStore.setMessages('session-a', messages, 'session-restore');
+      chatStore.setMeasurementCache('session-a', {
+        ...buildMeasurementCacheForMessages(messages, 547),
+        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
+      });
+
+      const onVerificationResult = vi.fn();
+      const view = renderChatMessages({
+        messages,
+        sessionId: 'session-a',
+        isVisible: false,
+        verificationPhase: 'hidden',
+        verificationKey: 'visible-overscan-regression',
+        onVerificationResult,
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60);
+      });
+
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+
+      act(() => {
+        view.rerender(
+          <ChatMessages
+            messages={messages}
+            isAgentRunning={false}
+            sessionId="session-a"
+            isVisible={true}
+            verificationPhase="visible"
+            verificationKey="visible-overscan-regression"
+            queuedMessage={null}
+            onRewind={vi.fn()}
+            onOpenFile={vi.fn()}
+            onOpenUrl={vi.fn()}
+            onCancelQueue={vi.fn()}
+            onFeedback={vi.fn()}
+            onVerificationResult={onVerificationResult}
+          />
+        );
+      });
+
+      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('pre-seeds visible verification even when layoutPendingCount > 0', async () => {
     vi.useFakeTimers();
 
@@ -930,6 +1041,47 @@ describe('ChatMessages', () => {
     }
   });
 
+  it('commits visible verification without bottom re-alignment after user scroll intent', () => {
+    const messages = Array.from({ length: 15 }, (_value, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+    const onVerificationResult = vi.fn();
+
+    mockScrollerElement.scrollHeight = 56253;
+    mockScrollerElement.clientHeight = 629;
+    mockScrollerElement.scrollTop = 43153;
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+      isVisible: true,
+      verificationPhase: 'visible',
+      verificationKey: 'visible-user-scroll-escape',
+      onVerificationResult,
+    });
+
+    scrollToItemMock.mockClear();
+
+    const wheelHandler = mockScrollerElement.addEventListener.mock.calls.find(
+      ([eventName]: [string]) => eventName === 'wheel'
+    )?.[1] as (() => void) | undefined;
+    if (wheelHandler === undefined) {
+      throw new Error('Expected wheel handler to be registered during visible verification');
+    }
+
+    act(() => {
+      wheelHandler();
+      getLatestVirtuosoMessageListProps().onScroll?.({ isAtBottom: false });
+    });
+
+    expect(onVerificationResult).toHaveBeenCalledWith({
+      phase: 'visible',
+      result: 'visible-ready',
+      tailProofVersion: 1,
+    });
+    expect(scrollToItemMock).not.toHaveBeenCalled();
+  });
+
   it('marks hidden verification ready after one animation frame when a restored cache stays stable', async () => {
     vi.useFakeTimers();
 
@@ -948,9 +1100,8 @@ describe('ChatMessages', () => {
       const chatStore = useChatStore.getState();
       chatStore.getOrCreateSession('session-a');
       chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setVirtuosoSizeCache('session-a', {
-        ranges: [{ k: 0, v: 120 }],
-        messageCount: messages.length,
+      chatStore.setMeasurementCache('session-a', {
+        ...buildMeasurementCacheForMessages(messages, 120),
         lastMessageId: 'assistant-3',
         layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
       });
@@ -1518,10 +1669,8 @@ describe('ChatMessages', () => {
       const chatStore = useChatStore.getState();
       chatStore.getOrCreateSession('session-a');
       chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setVirtuosoSizeCache('session-a', {
-        ranges: [{ k: 0, v: 120 }],
-        messageCount: messages.length,
-        lastMessageId: messages.at(-1)?.id ?? null,
+      chatStore.setMeasurementCache('session-a', {
+        ...buildMeasurementCacheForMessages(messages, 120),
         layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
       });
 
@@ -1586,10 +1735,8 @@ describe('ChatMessages', () => {
       const chatStore = useChatStore.getState();
       chatStore.getOrCreateSession('session-a');
       chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setVirtuosoSizeCache('session-a', {
-        ranges: [{ k: 0, v: 120 }],
-        messageCount: messages.length,
-        lastMessageId: messages.at(-1)?.id ?? null,
+      chatStore.setMeasurementCache('session-a', {
+        ...buildMeasurementCacheForMessages(messages, 120),
         layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
       });
 
@@ -1606,7 +1753,11 @@ describe('ChatMessages', () => {
         await vi.advanceTimersByTimeAsync(120);
       });
 
-      expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 120 }]);
+      expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 120 })]),
+        })
+      );
       expect(scrollTracker.writes).not.toContain(800);
       expect(new Set(scrollTracker.writes)).toEqual(new Set([3200]));
       expect(onReady).toHaveBeenCalledTimes(1);
@@ -1636,7 +1787,7 @@ describe('ChatMessages', () => {
             scrollIntent: 'session-restore',
             hydrationState: 'hydrated',
             layoutVersion: 0,
-            virtuosoSizeCache: null,
+            measurementCache: null,
           },
         },
       });
@@ -1749,7 +1900,7 @@ describe('ChatMessages', () => {
           scrollIntent: 'history-load',
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -1807,7 +1958,7 @@ describe('ChatMessages', () => {
           scrollIntent: 'session-restore',
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -1848,7 +1999,7 @@ describe('ChatMessages', () => {
           scrollIntent: 'session-refresh',
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -1884,9 +2035,8 @@ describe('ChatMessages', () => {
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession('session-a');
     chatStore.setMessages('session-a', messages);
-    chatStore.setVirtuosoSizeCache('session-a', {
-      ranges: [{ k: 0, v: 64 }],
-      messageCount: messages.length,
+    chatStore.setMeasurementCache('session-a', {
+      ...buildMeasurementCacheForMessages(messages, 64),
       lastMessageId: 'assistant-2',
       layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
     });
@@ -1896,7 +2046,11 @@ describe('ChatMessages', () => {
       sessionId: 'session-a',
     });
 
-    expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 64 }]);
+    expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 64 })]),
+      })
+    );
   });
 
   it('restores persistent size ranges when the Zustand cache was evicted', () => {
@@ -1906,10 +2060,11 @@ describe('ChatMessages', () => {
     ];
 
     saveRenderCache('session-a', {
-      ranges: [{ k: 0, v: 96 }],
+      measurements: buildMeasurementCacheForMessages(messages, 96).measurements,
       messageCount: messages.length,
       lastMessageId: 'assistant-2',
       layoutVersion: 0,
+      viewportWidth: null,
     });
 
     useChatStore.setState({
@@ -1921,7 +2076,7 @@ describe('ChatMessages', () => {
           scrollIntent: null,
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -1931,7 +2086,11 @@ describe('ChatMessages', () => {
       sessionId: 'session-a',
     });
 
-    expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 96 }]);
+    expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 96 })]),
+      })
+    );
   });
 
   it('applies estimated size ranges when no real cache is available', () => {
@@ -1954,7 +2113,7 @@ describe('ChatMessages', () => {
           scrollIntent: null,
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -1964,12 +2123,9 @@ describe('ChatMessages', () => {
       sessionId: 'session-a',
     });
 
-    expect(setSizeRangesMock).toHaveBeenCalled();
-    const estimatedRanges = setSizeRangesMock.mock.calls[0]?.[0] as
-      | { k: number; v: number }[]
-      | undefined;
-    expect(estimatedRanges?.[0]?.k).toBe(0);
-    expect(estimatedRanges?.[0]?.v).toBeGreaterThan(0);
+    expect(setEstimatedItemSizesMock).toHaveBeenCalled();
+    const estimatedSizes = setEstimatedItemSizesMock.mock.calls[0]?.[0] as number[] | undefined;
+    expect(estimatedSizes?.[0]).toBeGreaterThan(0);
   });
 
   it('restores persistent size ranges asynchronously when startup warmup misses the first pass', async () => {
@@ -1982,10 +2138,10 @@ describe('ChatMessages', () => {
       createPersistenceAdapter({
         'session-a': {
           sessionId: 'session-a',
-          schemaVersion: 1,
+          kind: 'tanstack-v2',
           accessedAt: Date.now(),
           cache: {
-            ranges: [{ k: 0, v: 96 }],
+            measurements: buildMeasurementCacheForMessages(messages, 96).measurements,
             messageCount: messages.length,
             lastMessageId: 'assistant-2',
             layoutVersion: 0,
@@ -2004,7 +2160,7 @@ describe('ChatMessages', () => {
           scrollIntent: null,
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -2015,8 +2171,13 @@ describe('ChatMessages', () => {
     });
 
     await waitFor(() => {
-      expect(setSizeRangesMock).toHaveBeenCalledWith([{ k: 0, v: 96 }]);
+      expect(useChatStore.getState().sessions['session-a']?.measurementCache).toEqual(
+        expect.objectContaining({
+          measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 96 })]),
+        })
+      );
     });
+    expect(applyMeasurementCacheMock).not.toHaveBeenCalled();
   });
 
   it('does not snapshot size ranges when the session stops priming before ready', () => {
@@ -2046,7 +2207,7 @@ describe('ChatMessages', () => {
       />
     );
 
-    expect(useChatStore.getState().sessions['session-a']?.virtuosoSizeCache).toBeNull();
+    expect(useChatStore.getState().sessions['session-a']?.measurementCache).toBeNull();
   });
 
   it('wires item content props and tool lookup into MessageItem correctly', () => {

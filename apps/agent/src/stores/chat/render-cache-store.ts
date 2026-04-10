@@ -1,20 +1,21 @@
 import { createLogger } from '@orbit/common/lib';
 
-import type { VirtuosoSizeCache } from './chat-store';
+import type { ChatMeasurementCache, PersistedMeasurement } from './chat-store';
 
 const logger = createLogger('RenderCacheStore');
 
 const MAX_CACHED_SESSIONS = 50;
 const MAX_CACHE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const DB_NAME = 'orbit-render-cache';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'size-caches';
-const SCHEMA_VERSION = 1;
+const TANSTACK_RENDER_CACHE_KIND = 'tanstack-v2';
+const VIEWPORT_WIDTH_TOLERANCE_PX = 16;
 
 interface PersistedEntry {
+  kind: typeof TANSTACK_RENDER_CACHE_KIND;
   sessionId: string;
-  schemaVersion: number;
-  cache: VirtuosoSizeCache;
+  cache: ChatMeasurementCache;
   accessedAt: number;
 }
 
@@ -25,7 +26,7 @@ export interface RenderCachePersistenceAdapter {
   remove: (sessionId: string) => Promise<void>;
 }
 
-const cache = new Map<string, VirtuosoSizeCache>();
+const cache = new Map<string, ChatMeasurementCache>();
 const accessOrder: string[] = [];
 const sessionMutationQueue = new Map<string, Promise<void>>();
 
@@ -44,13 +45,28 @@ function buildErrorMeta(error: unknown): { error: string } {
   return { error: 'Unknown error' };
 }
 
-function cloneSizeCache(sizeCache: VirtuosoSizeCache): VirtuosoSizeCache {
+function clonePersistedMeasurement(measurement: PersistedMeasurement): PersistedMeasurement {
+  const clone: PersistedMeasurement = {
+    key: measurement.key,
+    index: measurement.index,
+    start: measurement.start,
+    size: measurement.size,
+    end: measurement.end,
+    lane: measurement.lane,
+  };
+  if (measurement.measured !== undefined) {
+    clone.measured = measurement.measured;
+  }
+  return clone;
+}
+
+function cloneMeasurementCache(cacheEntry: ChatMeasurementCache): ChatMeasurementCache {
   return {
-    ranges: sizeCache.ranges.map((range) => ({ ...range })),
-    messageCount: sizeCache.messageCount,
-    lastMessageId: sizeCache.lastMessageId,
-    layoutVersion: sizeCache.layoutVersion,
-    viewportWidth: sizeCache.viewportWidth ?? null,
+    measurements: cacheEntry.measurements.map(clonePersistedMeasurement),
+    messageCount: cacheEntry.messageCount,
+    lastMessageId: cacheEntry.lastMessageId,
+    layoutVersion: cacheEntry.layoutVersion,
+    viewportWidth: cacheEntry.viewportWidth,
   };
 }
 
@@ -74,8 +90,8 @@ function touchLru(sessionId: string): void {
   }
 }
 
-function setMemoryCache(sessionId: string, sizeCache: VirtuosoSizeCache): void {
-  cache.set(sessionId, cloneSizeCache(sizeCache));
+function setMemoryCache(sessionId: string, measurementCache: ChatMeasurementCache): void {
+  cache.set(sessionId, cloneMeasurementCache(measurementCache));
   touchLru(sessionId);
 }
 
@@ -96,17 +112,50 @@ function isNonNegativeFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
-function isValidSizeRanges(value: unknown): value is VirtuosoSizeCache['ranges'] {
-  return (
-    Array.isArray(value) &&
-    value.every((range) => {
-      if (range === null || range === undefined || typeof range !== 'object') {
-        return false;
-      }
+export function isPersistedMeasurement(value: unknown): value is PersistedMeasurement {
+  if (value === null || value === undefined || typeof value !== 'object') {
+    return false;
+  }
 
-      const candidate = range as { k?: unknown; v?: unknown };
-      return isNonNegativeInteger(candidate.k) && isNonNegativeFiniteNumber(candidate.v);
-    })
+  const candidate = value as {
+    key?: unknown;
+    index?: unknown;
+    start?: unknown;
+    size?: unknown;
+    end?: unknown;
+    lane?: unknown;
+  };
+
+  return (
+    typeof candidate.key === 'string' &&
+    isNonNegativeInteger(candidate.index) &&
+    isNonNegativeFiniteNumber(candidate.start) &&
+    isNonNegativeFiniteNumber(candidate.size) &&
+    isNonNegativeFiniteNumber(candidate.end) &&
+    isNonNegativeInteger(candidate.lane)
+  );
+}
+
+export function isChatMeasurementCache(value: unknown): value is ChatMeasurementCache {
+  if (value === null || value === undefined || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as {
+    measurements?: unknown;
+    messageCount?: unknown;
+    lastMessageId?: unknown;
+    layoutVersion?: unknown;
+    viewportWidth?: unknown;
+  };
+
+  return (
+    Array.isArray(candidate.measurements) &&
+    candidate.measurements.every(isPersistedMeasurement) &&
+    isNonNegativeInteger(candidate.messageCount) &&
+    (candidate.lastMessageId === null || typeof candidate.lastMessageId === 'string') &&
+    isNonNegativeInteger(candidate.layoutVersion) &&
+    (candidate.viewportWidth === null || isNonNegativeFiniteNumber(candidate.viewportWidth))
   );
 }
 
@@ -116,14 +165,14 @@ function parsePersistedEntry(raw: unknown): PersistedEntry | null {
   }
 
   const candidate = raw as {
+    kind?: unknown;
     sessionId?: unknown;
-    schemaVersion?: unknown;
     accessedAt?: unknown;
     cache?: unknown;
   };
   if (
+    candidate.kind !== TANSTACK_RENDER_CACHE_KIND ||
     typeof candidate.sessionId !== 'string' ||
-    candidate.schemaVersion !== SCHEMA_VERSION ||
     !isNonNegativeFiniteNumber(candidate.accessedAt)
   ) {
     return null;
@@ -138,39 +187,72 @@ function parsePersistedEntry(raw: unknown): PersistedEntry | null {
     return null;
   }
 
-  const cacheEntry = cacheCandidate as {
-    ranges?: unknown;
-    messageCount?: unknown;
-    lastMessageId?: unknown;
-    layoutVersion?: unknown;
-    viewportWidth?: unknown;
-  };
-  if (
-    !isValidSizeRanges(cacheEntry.ranges) ||
-    !isNonNegativeInteger(cacheEntry.messageCount) ||
-    (cacheEntry.lastMessageId !== null && typeof cacheEntry.lastMessageId !== 'string') ||
-    !isNonNegativeInteger(cacheEntry.layoutVersion) ||
-    !(
-      cacheEntry.viewportWidth === undefined ||
-      cacheEntry.viewportWidth === null ||
-      isNonNegativeFiniteNumber(cacheEntry.viewportWidth)
-    )
-  ) {
+  if (!isChatMeasurementCache(cacheCandidate)) {
     return null;
   }
 
   return {
+    kind: TANSTACK_RENDER_CACHE_KIND,
     sessionId: candidate.sessionId,
-    schemaVersion: SCHEMA_VERSION,
     accessedAt: candidate.accessedAt,
-    cache: {
-      ranges: cacheEntry.ranges.map((range) => ({ ...range })),
-      messageCount: cacheEntry.messageCount,
-      lastMessageId: cacheEntry.lastMessageId,
-      layoutVersion: cacheEntry.layoutVersion,
-      viewportWidth: cacheEntry.viewportWidth ?? null,
-    },
+    cache: cloneMeasurementCache(cacheCandidate),
   };
+}
+
+function isMeasurementViewportWidthCompatible(
+  cacheEntry: ChatMeasurementCache,
+  viewportWidth: number | null
+): boolean {
+  if (cacheEntry.viewportWidth === null || viewportWidth === null) {
+    return true;
+  }
+
+  return Math.abs(cacheEntry.viewportWidth - viewportWidth) <= VIEWPORT_WIDTH_TOLERANCE_PX;
+}
+
+export function isExactMeasurementCache(
+  session: {
+    layoutVersion: number;
+    messages: readonly { id: string }[];
+  },
+  cacheEntry: ChatMeasurementCache,
+  virtualizedRowCount: number,
+  viewportWidth: number | null
+): boolean {
+  if (virtualizedRowCount === 0) {
+    logger.debug('[isExactMeasurementCache] FALSE — virtualizedRowCount=0');
+    return false;
+  }
+
+  const layoutMatch = cacheEntry.layoutVersion === session.layoutVersion;
+  const countMatch = cacheEntry.messageCount === session.messages.length;
+  const lastIdMatch = cacheEntry.lastMessageId === (session.messages.at(-1)?.id ?? null);
+  // Check that the cache covers every virtualized row. Entries may be either
+  // pixel-perfect (measured: true) or gap-filled estimates — both are vastly
+  // faster than calling estimateSize() per item from scratch.
+  const sizeMatch = cacheEntry.measurements.length >= virtualizedRowCount;
+  const widthMatch = isMeasurementViewportWidthCompatible(cacheEntry, viewportWidth);
+  const isExact = layoutMatch && countMatch && lastIdMatch && sizeMatch && widthMatch;
+
+  logger.info(`[isExactMeasurementCache] ${isExact ? 'EXACT' : 'NOT EXACT'}`, {
+    layoutMatch,
+    countMatch: countMatch
+      ? true
+      : `cache=${String(cacheEntry.messageCount)} vs session=${String(session.messages.length)}`,
+    lastIdMatch,
+    sizeMatch: sizeMatch
+      ? true
+      : `cached=${String(cacheEntry.measurements.length)} vs needed=${String(virtualizedRowCount)}`,
+    widthMatch: widthMatch
+      ? true
+      : `cache=${String(cacheEntry.viewportWidth)} vs current=${String(viewportWidth)}`,
+  });
+
+  return isExact;
+}
+
+export function buildMeasurementSizeMap(cacheEntry: ChatMeasurementCache): Map<string, number> {
+  return new Map(cacheEntry.measurements.map((measurement) => [measurement.key, measurement.size]));
 }
 
 function isExpired(entry: PersistedEntry): boolean {
@@ -217,12 +299,18 @@ function createIndexedDbAdapter(): RenderCachePersistenceAdapter {
     dbPromise = new Promise((resolve) => {
       try {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
+        request.onupgradeneeded = (event) => {
           const db = request.result;
-          if (db.objectStoreNames.contains(STORE_NAME)) {
-            db.deleteObjectStore(STORE_NAME);
+          if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME, { keyPath: 'sessionId' });
+            return;
           }
-          db.createObjectStore(STORE_NAME, { keyPath: 'sessionId' });
+
+          // DB_VERSION=2 keeps the existing store intact. Old v1 entries are
+          // allowed to age out naturally and parse as misses.
+          if (event.oldVersion < 2) {
+            return;
+          }
         };
         request.onsuccess = () => {
           resolve(request.result);
@@ -338,11 +426,11 @@ async function waitForAllQueuedMutations(): Promise<void> {
   await Promise.all(pending.map((entry) => entry.catch(() => undefined)));
 }
 
-function persistToIdb(sessionId: string, sizeCache: VirtuosoSizeCache): void {
+function persistToIdb(sessionId: string, measurementCache: ChatMeasurementCache): void {
   const entry: PersistedEntry = {
+    kind: TANSTACK_RENDER_CACHE_KIND,
     sessionId,
-    schemaVersion: SCHEMA_VERSION,
-    cache: cloneSizeCache(sizeCache),
+    cache: cloneMeasurementCache(measurementCache),
     accessedAt: Date.now(),
   };
 
@@ -371,30 +459,39 @@ async function prunePersistedSessions(sessionIds: string[]): Promise<void> {
   );
 }
 
-export function saveRenderCache(sessionId: string, sizeCache: VirtuosoSizeCache): void {
-  setMemoryCache(sessionId, sizeCache);
-  persistToIdb(sessionId, sizeCache);
+export function saveRenderCache(sessionId: string, measurementCache: ChatMeasurementCache): void {
+  setMemoryCache(sessionId, measurementCache);
+  persistToIdb(sessionId, measurementCache);
   logger.debug('Saved render cache', {
     sessionId: sessionId.slice(-6),
-    rangeCount: sizeCache.ranges.length,
-    messageCount: sizeCache.messageCount,
-    viewportWidth: sizeCache.viewportWidth ?? null,
+    measurementCount: measurementCache.measurements.length,
+    messageCount: measurementCache.messageCount,
+    viewportWidth: measurementCache.viewportWidth ?? null,
   });
 }
 
-export function getRenderCache(sessionId: string): VirtuosoSizeCache | null {
+export function getRenderCache(sessionId: string): ChatMeasurementCache | null {
   const entry = cache.get(sessionId);
   if (!entry) {
+    logger.debug(`[getRenderCache] MISS (memory)`, { sessionId: sessionId.slice(-6) });
     return null;
   }
 
+  logger.debug(`[getRenderCache] HIT (memory)`, {
+    sessionId: sessionId.slice(-6),
+    measurements: entry.measurements.length,
+    messageCount: entry.messageCount,
+    layoutVersion: entry.layoutVersion,
+    viewportWidth: entry.viewportWidth,
+  });
   touchLru(sessionId);
-  return cloneSizeCache(entry);
+  return cloneMeasurementCache(entry);
 }
 
 export async function preloadRenderCacheFromIdb(
   sessionId: string
-): Promise<VirtuosoSizeCache | null> {
+): Promise<ChatMeasurementCache | null> {
+  const sid = sessionId.slice(-6);
   const existing = getRenderCache(sessionId);
   if (existing) {
     return existing;
@@ -403,18 +500,29 @@ export async function preloadRenderCacheFromIdb(
   await getQueuedMutation(sessionId).catch(() => undefined);
   const raw = await getPersistenceAdapter().load(sessionId);
   if (raw === null || raw === undefined) {
+    logger.debug(`[preloadFromIdb] no IDB entry`, { sessionId: sid });
     return null;
   }
 
   const entry = parsePersistedEntry(raw);
   if (!entry || isExpired(entry)) {
+    logger.debug(`[preloadFromIdb] entry invalid or expired`, {
+      sessionId: sid,
+      parsed: entry !== null,
+      expired: entry ? isExpired(entry) : false,
+    });
     removeFromIdb(sessionId);
     return null;
   }
 
+  logger.info(`[preloadFromIdb] IDB HIT`, {
+    sessionId: sid,
+    measurements: entry.cache.measurements.length,
+    messageCount: entry.cache.messageCount,
+  });
   setMemoryCache(sessionId, entry.cache);
   persistToIdb(sessionId, entry.cache);
-  return cloneSizeCache(entry.cache);
+  return cloneMeasurementCache(entry.cache);
 }
 
 async function warmMemoryCacheFromIdbInternal(): Promise<void> {
@@ -471,18 +579,22 @@ export function ensureWarmedUp(): Promise<void> {
   return warmMemoryCacheFromIdb();
 }
 
-export async function getRenderCacheAsync(sessionId: string): Promise<VirtuosoSizeCache | null> {
+export async function getRenderCacheAsync(sessionId: string): Promise<ChatMeasurementCache | null> {
+  const sid = sessionId.slice(-6);
   const memoryEntry = getRenderCache(sessionId);
   if (memoryEntry) {
+    logger.debug(`[getRenderCacheAsync] resolved from memory`, { sessionId: sid });
     return memoryEntry;
   }
 
   await ensureWarmedUp();
   const warmedEntry = getRenderCache(sessionId);
   if (warmedEntry) {
+    logger.debug(`[getRenderCacheAsync] resolved after warmup`, { sessionId: sid });
     return warmedEntry;
   }
 
+  logger.debug(`[getRenderCacheAsync] falling through to IDB preload`, { sessionId: sid });
   return preloadRenderCacheFromIdb(sessionId);
 }
 

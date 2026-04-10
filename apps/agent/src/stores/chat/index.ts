@@ -16,8 +16,10 @@ export {
 } from './chat-store';
 export type {
   ActiveCompaction,
+  ChatMeasurementCache,
   ChatSessionData,
   ChatStoreState,
+  PersistedMeasurement,
   PendingMessage,
 } from './chat-store';
 export {

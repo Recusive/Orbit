@@ -16,7 +16,7 @@
  *
  * ── Scrollbar Jitter Fix ─────────────────────────────────────────────
  *
- * VirtuosoMessageList's scroll compensation (the `jump` mechanism) only
+ * The virtualized message list's scroll compensation only
  * fires when scrolled to the bottom. During mid-list scrolling, when
  * items in the overscan zone get measured by ResizeObserver, scrollHeight
  * changes shift the scrollbar ratio (scrollTop / scrollRange) without
@@ -41,7 +41,7 @@
  *     reset via RAF. This initializes the library's position tracking.
  *
  * GHOST TEXT (blank items during fast scroll):
- *   - Increase `increaseViewportBy` on VirtuosoMessageList (currently 10000).
+ *   - Increase `increaseViewportBy` on the message list (currently 10000).
  *     This pre-renders more items outside the viewport.
  *   - Decrease `maxPxPerFrame` (default 50). Lower cap = slower scroll =
  *     more time for virtualized items to render.
@@ -59,12 +59,16 @@
  *   - Decrease `maxPxPerFrame` (default 50 → 35).
  * ───────────────────────────────────────────────────────────────────────
  */
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
+import { CHAT_LIST_SURFACE_SELECTOR } from '@/lib/chat/chat-selectors';
 import {
   markSwitchTimeline,
   recordSessionSwitchTrace,
 } from '@/services/conversations/session-switch-trace';
+
+const logger = createLogger('VelocityScroll');
 
 interface VelocityScrollOptions {
   /** Max pixels per frame. Caps speed for virtualization buffer. Default 50. */
@@ -84,9 +88,6 @@ interface VelocityScrollOptions {
   traceRequestId?: number | null;
   traceSessionId?: string | null;
 }
-
-/** Selector for Virtuoso's inner list container. */
-const LIST_SELECTOR = '[data-testid="virtuoso-list"]';
 
 /**
  * Compensate scrollTop to maintain the scrollbar ratio when scrollHeight
@@ -113,8 +114,31 @@ function compensateScrollHeight(scroller: HTMLElement, lastScrollHeight: number)
     return 0;
   }
 
+  // Measurement cascade guard: when scrollHeight changes by more than 2x the
+  // viewport in a single observation, this is a measurement cascade (many items
+  // measured for the first time), not a normal layout change. Compensating would
+  // amplify the oscillation. Let the virtualizer settle on its own.
+  const absDelta = Math.abs(delta);
+  if (absDelta > scroller.clientHeight * 2) {
+    logger.debug('[compensateScrollHeight] skipping — measurement cascade', {
+      delta,
+      clientHeight: scroller.clientHeight,
+      lastScrollHeight,
+      curScrollHeight,
+    });
+    return 0;
+  }
+
   const compensation = Math.round(scroller.scrollTop * (delta / scrollRange));
   if (compensation !== 0) {
+    logger.debug('[compensateScrollHeight]', {
+      delta,
+      compensation,
+      scrollTopBefore: Math.round(scroller.scrollTop),
+      scrollTopAfter: Math.round(scroller.scrollTop + compensation),
+      lastScrollHeight,
+      curScrollHeight,
+    });
     scroller.scrollTop += compensation;
   }
   return compensation;
@@ -197,8 +221,12 @@ export function useVelocityScroll(
       // Locate the inner list container and observe it. It may not exist
       // yet if the data is empty (the library conditionally renders it).
       const observeListContainer = (): void => {
-        const listEl = node.querySelector(LIST_SELECTOR);
-        if (listEl === null) return;
+        const listEl = node.querySelector(CHAT_LIST_SURFACE_SELECTOR);
+        if (listEl === null) {
+          logger.debug('[observeListContainer] list surface not found yet');
+          return;
+        }
+        logger.info('[observeListContainer] list surface found, attaching observers');
 
         // Primary: MutationObserver on style attribute — earliest signal.
         // Fires as a microtask after React updates height/margin/padding.
@@ -219,14 +247,14 @@ export function useVelocityScroll(
       let listChildObserver: MutationObserver | null = null;
 
       const initListObserver = (): void => {
-        if (node.querySelector(LIST_SELECTOR) !== null) {
+        if (node.querySelector(CHAT_LIST_SURFACE_SELECTOR) !== null) {
           observeListContainer();
           return;
         }
 
         // Wait for the list container to appear.
         listChildObserver = new MutationObserver(() => {
-          if (node.querySelector(LIST_SELECTOR) !== null) {
+          if (node.querySelector(CHAT_LIST_SURFACE_SELECTOR) !== null) {
             listChildObserver?.disconnect();
             listChildObserver = null;
             observeListContainer();
@@ -237,7 +265,7 @@ export function useVelocityScroll(
 
       initListObserver();
 
-      // Prime Virtuoso's internal scroll tracking before the first real wheel
+      // Prime the virtualizer's internal scroll tracking before the first real wheel
       // gesture. Without this 1px synthetic nudge, the first aggressive scroll
       // after attach can disagree with the virtualizer's cached position and
       // cause the scrollbar thumb to jitter until the second gesture.
@@ -302,6 +330,13 @@ export function useVelocityScroll(
         // compositor/main-thread position disagreement → scrollbar jitter.
         if (nativeCount < warmupEvents) {
           nativeCount++;
+          logger.debug('[wheel] warmup passthrough', {
+            nativeCount,
+            warmupEvents,
+            deltaY: Math.round(e.deltaY),
+            scrollTop: Math.round(node.scrollTop),
+            scrollHeight: node.scrollHeight,
+          });
           warmupCompensating = true;
           lastScrollHeight = node.scrollHeight;
           window.clearTimeout(warmupResetTimer);
@@ -319,6 +354,7 @@ export function useVelocityScroll(
         e.preventDefault();
         if (!hasFiredUserScroll) {
           hasFiredUserScroll = true;
+          logger.info('[wheel] first user scroll after warmup');
           onUserScrollStartRef.current?.();
         }
         velocity += e.deltaY * sensitivity;
@@ -326,6 +362,11 @@ export function useVelocityScroll(
         if (!animating) {
           animating = true;
           lastScrollHeight = node.scrollHeight;
+          logger.debug('[wheel] animation start', {
+            velocity: Math.round(velocity * 100) / 100,
+            scrollTop: Math.round(node.scrollTop),
+            scrollHeight: node.scrollHeight,
+          });
           raf = requestAnimationFrame(tick);
         }
       };

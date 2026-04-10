@@ -4,9 +4,9 @@
  * Architecture:
  * - Each instance is bound to ONE session for its lifetime (mounted by
  *   SessionInstance with `key={sessionId}`). No session-switch logic here.
- * - `@virtuoso.dev/message-list` owns virtualization AND scroll behavior
- * - The library's built-in `auto-scroll-to-bottom` and `items-change` scroll
- *   modifiers handle all auto-scroll (streaming, new messages, etc.)
+ * - A TanStack-backed compatibility layer owns virtualization and scroll behavior
+ * - The list-level scroll modifiers handle all auto-scroll (streaming, new
+ *   messages, etc.)
  * - Shimmer and queued message are rendered OUTSIDE the list as flex siblings
  *   so the library's Footer is empty and its `isAtBottom` detection (4px
  *   threshold) works correctly
@@ -16,7 +16,8 @@
  * WARNING: Do NOT add `contain: paint`, `content-visibility: auto`, or
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
-import { VirtuosoMessageList, VirtuosoMessageListLicense } from '@virtuoso.dev/message-list';
+import { createLogger } from '@orbit/common/lib';
+import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import { MessageItem } from './messages';
@@ -26,17 +27,17 @@ import { ToolWidgetLayoutFrozenContext, ToolWidgetSessionContext } from './tools
 import type { ChatMessage } from './messages';
 import type { SessionSwitchTraceGeometry } from '@/services/conversations/session-switch-trace';
 import type { ToolExecution } from '@/stores/agent/tool-store';
-import type { VirtuosoSizeCache } from '@/stores/chat/chat-store';
+import type { ChatMeasurementCache } from '@/stores/chat/chat-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
-import type {
-  DataWithScrollModifier,
-  ItemContent as VirtuosoItemContent,
-  VirtuosoMessageListMethods,
-} from '@virtuoso.dev/message-list';
-import type { FC } from 'react';
+import type { VirtualItem } from '@tanstack/react-virtual';
+import type { FC, Key, ReactNode } from 'react';
+
+const logger = createLogger('ChatMessages');
 
 import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
+import { estimateMessageHeight, isNearBottom, scrollToBottom } from '@/lib/chat/chat-scroll-utils';
+import { findChatListSurface } from '@/lib/chat/chat-selectors';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import {
   getShownSessionTraceRequest,
@@ -55,38 +56,36 @@ import {
   useSessionLayoutPendingCount,
   useSessionLayoutSettledVersion,
 } from '@/stores/chat/chat-store';
-import { getRenderCache, getRenderCacheAsync } from '@/stores/chat/render-cache-store';
+import {
+  buildMeasurementSizeMap,
+  getRenderCache,
+  getRenderCacheAsync,
+  isExactMeasurementCache,
+} from '@/stores/chat/render-cache-store';
 import { useSessionSwitchRequestId } from '@/stores/chat/session-switch-store';
 
 /** Constant empty array — prevents a new [] allocation per no-tool message
- *  on every Virtuoso item re-render (e.g., container resize). */
+ *  on every item re-render (e.g., container resize). */
 const EMPTY_TOOLS: ToolExecution[] = [];
+const ALWAYS_UNVIRTUALIZED_TAIL_ROWS = 8;
+const AUTO_SCROLL_BOTTOM_THRESHOLD_PX = 64;
+// TanStack Virtual overscan is ITEM COUNT, not pixels.
+// Entry: small buffer for hidden/visible verification passes.
+// Steady: generous buffer for smooth scrolling without blanks.
 const OVERSCAN_PARKED = 0;
-const OVERSCAN_ENTRY = 800;
-const OVERSCAN_STEADY = 8000;
-const PREMEASURE_STEP_PX = OVERSCAN_STEADY * 2;
-const PREMEASURE_STABLE_MS = 32;
-const PREMEASURE_TIMEOUT_MS = 120;
+const OVERSCAN_ENTRY = 5;
+const OVERSCAN_STEADY = 20;
 const HIDDEN_READY_STABLE_MS = 48;
 const VISIBLE_READY_QUIET_MS = 200;
 const READY_TIMEOUT_MS = 1500;
+const READY_TIMEOUT_LARGE_SESSION_MS = 3000;
+const LARGE_SESSION_THRESHOLD = 50;
 const BOTTOM_TOLERANCE_PX = 4;
 const POSITIONING_RECHECK_MS = 32;
-const VIEWPORT_WIDTH_TOLERANCE_PX = 16;
-const ESTIMATED_CHARS_PER_LINE = 72;
-const ESTIMATED_USER_BASE_HEIGHT = 48;
-const ESTIMATED_USER_LINE_HEIGHT = 24;
-const ESTIMATED_ASSISTANT_BASE_HEIGHT = 68;
-const ESTIMATED_ASSISTANT_LINE_HEIGHT = 22;
-const ESTIMATED_CODE_LINE_HEIGHT = 20;
-const ESTIMATED_CODE_BLOCK_PADDING = 40;
-const ESTIMATED_THINKING_HEIGHT = 96;
-const ESTIMATED_IMAGE_GRID_HEIGHT = 144;
-const ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT = 24;
-const MAX_ESTIMATED_MESSAGE_HEIGHT = 4000;
+const DEFAULT_ROW_HEIGHT = 96;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
-type RestorePhase = 'idle' | 'positioning' | 'premeasuring' | 'stabilizing' | 'done';
+type RestorePhase = 'idle' | 'positioning' | 'stabilizing' | 'done';
 
 interface ScrollerMetrics {
   readonly bottomTop: number;
@@ -119,7 +118,7 @@ function getSessionSwitchGeometrySnapshotFromMetrics(
     lastLayoutMutationAt: number | null;
     overscanPhase: string;
     sizeCacheRestored: boolean;
-    purgeItemSizesUsed: boolean;
+    restorePath: 'exact' | 'warm' | 'cold';
   }
 ): SessionSwitchTraceGeometry {
   return {
@@ -133,7 +132,7 @@ function getSessionSwitchGeometrySnapshotFromMetrics(
     lastLayoutMutationAt: state.lastLayoutMutationAt,
     overscanPhase: state.overscanPhase,
     sizeCacheRestored: state.sizeCacheRestored,
-    purgeItemSizesUsed: state.purgeItemSizesUsed,
+    restorePath: state.restorePath,
   };
 }
 
@@ -170,8 +169,8 @@ function isSameReadinessSurfaceSnapshot(
 /**
  * Relaxed snapshot comparison for visible-phase preseed matching.
  *
- * After hidden→visible promotion, the overscan changes from entry (800px) to
- * steady (8000px). Virtuoso recalculates its render range, changing
+ * After hidden→visible promotion, the overscan changes from entry (5 items) to
+ * steady (20 items). The virtualized list recalculates its render range, changing
  * renderedRowCount even though the CONTENT is identical. The strict comparator
  * (isSameReadinessSurfaceSnapshot) fails because it compares renderedRowCount.
  *
@@ -229,116 +228,25 @@ function buildReadinessProgressSignature(input: {
   ].join('|');
 }
 
-function estimateWrappedLines(text: string, charsPerLine: number): number {
-  const lines = text.split('\n');
-  let wrappedLines = 0;
-
-  for (const line of lines) {
-    wrappedLines += Math.max(1, Math.ceil(line.length / charsPerLine));
-  }
-
-  return Math.max(1, wrappedLines);
+function buildEstimatedMessageSizes(messages: readonly ChatMessage[]): number[] {
+  return messages.map((message) => estimateMessageHeight(message));
 }
 
-function estimateMessageHeight(message: ChatMessage): number {
-  const content = message.displayedContent.length > 0 ? message.displayedContent : message.content;
-  let height =
-    message.role === 'user' ? ESTIMATED_USER_BASE_HEIGHT : ESTIMATED_ASSISTANT_BASE_HEIGHT;
+function buildEstimatedSizesFromMeasurementCache(
+  rowCount: number,
+  cacheEntry: ChatMeasurementCache
+): number[] {
+  const sizeMap = buildMeasurementSizeMap(cacheEntry);
 
-  if (message.role === 'user') {
-    height += estimateWrappedLines(content, ESTIMATED_CHARS_PER_LINE) * ESTIMATED_USER_LINE_HEIGHT;
-  } else {
-    // Split by code fences: even indices are prose, odd indices are code blocks.
-    // This is O(n) on content length and handles nested/unmatched fences gracefully.
-    const parts = content.split('```');
-    let proseLines = 0;
-    let codeLines = 0;
-    let codeBlockCount = 0;
-
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i] ?? '';
-      if (i % 2 === 0) {
-        const trimmed = part.trim();
-        if (trimmed.length > 0) {
-          proseLines += estimateWrappedLines(trimmed, ESTIMATED_CHARS_PER_LINE);
-        }
-      } else {
-        // Code block: first line is the language tag (e.g. "typescript\n...")
-        const blockLineCount = part.split('\n').length;
-        codeLines += Math.max(1, blockLineCount - 1);
-        codeBlockCount += 1;
-      }
-    }
-
-    height += proseLines * ESTIMATED_ASSISTANT_LINE_HEIGHT;
-    height +=
-      codeLines * ESTIMATED_CODE_LINE_HEIGHT + codeBlockCount * ESTIMATED_CODE_BLOCK_PADDING;
-  }
-
-  if ((message.thinkingBlocks?.length ?? 0) > 0 || message.thinking) {
-    height += ESTIMATED_THINKING_HEIGHT;
-  }
-
-  if ((message.attachedImages?.length ?? 0) > 0) {
-    height += ESTIMATED_IMAGE_GRID_HEIGHT;
-    height +=
-      Math.max(0, (message.attachedImages?.length ?? 1) - 1) * ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT;
-  }
-
-  return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, height);
-}
-
-function buildEstimatedSizeRanges(messages: ChatMessage[]): { k: number; v: number }[] {
-  const ranges: { k: number; v: number }[] = [];
-  let previousHeight: number | null = null;
-
-  messages.forEach((message, index) => {
-    const nextHeight = estimateMessageHeight(message);
-    if (previousHeight === nextHeight) {
-      return;
-    }
-
-    ranges.push({ k: index, v: nextHeight });
-    previousHeight = nextHeight;
+  return Array.from({ length: rowCount }, (_value, index) => {
+    const measurement = cacheEntry.measurements[index];
+    const measurementKey = measurement?.key;
+    const sizeFromKey = measurementKey ? sizeMap.get(measurementKey) : undefined;
+    const resolvedSize = sizeFromKey ?? measurement?.size;
+    return resolvedSize !== undefined && Number.isFinite(resolvedSize) && resolvedSize > 0
+      ? resolvedSize
+      : DEFAULT_ROW_HEIGHT;
   });
-
-  return ranges;
-}
-
-function isViewportWidthCompatible(
-  cacheEntry: VirtuosoSizeCache,
-  viewportWidth: number | null
-): boolean {
-  if (
-    cacheEntry.viewportWidth === undefined ||
-    cacheEntry.viewportWidth === null ||
-    viewportWidth === null
-  ) {
-    return true;
-  }
-
-  return Math.abs(cacheEntry.viewportWidth - viewportWidth) <= VIEWPORT_WIDTH_TOLERANCE_PX;
-}
-
-function isUsableRenderCache(
-  session: {
-    layoutVersion: number;
-    messages: ChatMessage[];
-  },
-  cacheEntry: VirtuosoSizeCache,
-  viewportWidth: number | null
-): boolean {
-  if (cacheEntry.layoutVersion !== session.layoutVersion) {
-    return false;
-  }
-  if (cacheEntry.messageCount !== session.messages.length) {
-    return false;
-  }
-  if (cacheEntry.lastMessageId !== (session.messages.at(-1)?.id ?? null)) {
-    return false;
-  }
-
-  return isViewportWidthCompatible(cacheEntry, viewportWidth);
 }
 
 interface MessageRow {
@@ -404,46 +312,16 @@ const ITEM_WRAPPER_STYLE = {
   contain: 'layout style' as const,
 };
 
-/** Stable style for the VirtuosoMessageList scroller. */
+/** Stable style for the message-list scroller. */
 const LIST_STYLE = { scrollbarGutter: 'stable both-edges' as const };
 
 const TAIL_SENTINEL_ROW_ID = '__tail_sentinel__';
 
-/** Sentinel rendered as a Virtuoso Footer — inside the scroller DOM for
- *  querySelector detection, but NOT a data item so Virtuoso won't inflate
- *  its size during scroll operations. */
-/** Footer rendered inside the scroller DOM but NOT tracked by Virtuoso's
- *  size engine. Contains the thinking shimmer + tail sentinel. This prevents
- *  Virtuoso from inflating the last data item during scroll operations —
- *  the last data item is always a real message with substantial height. */
-const ChatFooter: FC<{ context: MessageListContext }> = ({ context }) => (
-  <>
-    {context.isAgentRunning ? (
-      <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-        <div className="flex items-center gap-2 px-[9px] py-2">
-          <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
-        </div>
-      </div>
-    ) : null}
-    <div
-      data-tail-sentinel-id={context.tailSentinelDomId}
-      data-tail-sentinel="true"
-      className="h-px w-full shrink-0"
-      aria-hidden="true"
-    />
-  </>
-);
-
-const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext> = ({
-  data,
-  index,
-  context,
-}) => {
-  const row = data as ChatRenderRow | undefined;
-  if (!row) {
-    return null;
-  }
-
+function renderMessageItem(
+  row: ChatRenderRow,
+  index: number,
+  context: MessageListContext
+): ReactNode {
   const message = row.message;
   const tools = context.toolsByMessageId.get(message.id) ?? EMPTY_TOOLS;
 
@@ -468,12 +346,45 @@ const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext>
       />
     </div>
   );
-};
+}
 
-// NOTE: No Header component. Adding a Header causes the library's
-// shortSizeAlign="top" padding to overshoot (it doesn't subtract
-// Header height), creating a scrollbar on short conversations.
-// Top padding is applied via pt-4 on the first MessageItemContent instead.
+// ── Traced wrapper for non-virtualized tail rows ─────────────────────
+// Measures the React render cost of the always-rendered bottom messages.
+interface TailRowsTracedProps {
+  readonly rows: readonly ChatRenderRow[];
+  readonly baseIndex: number;
+  readonly context: MessageListContext;
+  readonly sessionKey: string;
+  readonly verificationPhase: string | null;
+}
+
+function TailRowsTracedInner({
+  rows,
+  baseIndex,
+  context,
+  sessionKey,
+  verificationPhase,
+}: TailRowsTracedProps): ReactNode {
+  const tailStart = performance.now();
+  const result = (
+    <>
+      {rows.map((row, i) => (
+        <div key={row.id}>{renderMessageItem(row, baseIndex + i, context)}</div>
+      ))}
+    </>
+  );
+  const tailDuration = performance.now() - tailStart;
+  if (tailDuration > 2) {
+    const sid = sessionKey.slice(-6);
+    markSwitchTimeline(
+      'tail-rows-render',
+      `[${sid}] ${String(rows.length)} rows ${String(Math.round(tailDuration * 10) / 10)}ms phase=${String(verificationPhase)}`
+    );
+  }
+  return result;
+}
+
+const TailRowsTraced = TailRowsTracedInner;
 
 export const ChatMessages: FC<ChatMessagesProps> = ({
   messages,
@@ -497,14 +408,29 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 }) => {
   const verificationPhaseState = verificationPhase ?? (shouldPrime ? ('hidden' as const) : null);
   const shownTraceRequestId = sessionId ? getShownSessionTraceRequest(sessionId) : null;
-  const listRef = useRef<VirtuosoMessageListMethods<ChatRenderRow, MessageListContext>>(null);
+
+  // ── Render timing (frame budget tracing) ───────────────────────────
+  const renderStartMark = performance.now();
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const estimatedSizesRef = useRef<number[]>([]);
+  const initialMeasurementsCacheRef = useRef<VirtualItem[]>([]);
   const prevMessageCount = useRef(0);
-  const lastPlacedMessagesRef = useRef<ChatRenderRow[] | null>(null);
   const readinessStartedRef = useRef(false);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
   const [isReadyForSteady, setIsReadyForSteady] = useState(false);
-  const [isPremeasuring, setIsPremeasuring] = useState(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
+
+  // ── Scroll tracking (moved from shim) ──────────────────────────────
+  const shouldAutoScrollRef = useRef(true);
+  const lastScrollTopRef = useRef(0);
+  const pendingUserScrollUpIntentRef = useRef(false);
+  const isPointerScrollActiveRef = useRef(false);
+  const lastTouchClientYRef = useRef<number | null>(null);
+  const pendingStickToBottomFrameRef = useRef<number | null>(null);
+  const isAtBottomRef = useRef(true);
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
   // viewport buffer keeps items pre-rendered ahead of the scroll.
@@ -518,7 +444,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     traceSessionId: sessionId ?? null,
   });
   useEffect(() => {
-    const scroller = listRef.current?.scrollerElement();
+    const scroller = scrollContainerRef.current;
     if (!scroller) return;
 
     velocityScrollRef(scroller);
@@ -637,8 +563,337 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return rows;
   }, [messages]);
 
+  // ── Overscan strategy ──────────────────────────────────────────────────
+  // Defined early because useVirtualizer needs the overscan value.
+  // TanStack overscan = number of ITEMS (not pixels) rendered beyond viewport.
+  // parked: not verifying, not visible → no buffer
+  // entry (5 items): any verification pass (hidden or visible)
+  // steady (20 items): committed visible session
+  const targetOverscanPhase: OverscanPhase = !isVerifying
+    ? isVisible
+      ? 'steady'
+      : 'parked'
+    : 'entry';
+
+  // Cap overscan at entry for large sessions to prevent TanStack's internal
+  // render loop from hitting React's maximum update depth limit.
+  const overscanPhase: OverscanPhase =
+    targetOverscanPhase === 'steady' && messages.length > LARGE_SESSION_THRESHOLD
+      ? 'entry'
+      : targetOverscanPhase;
+  const overscan =
+    overscanPhase === 'parked'
+      ? OVERSCAN_PARKED
+      : overscanPhase === 'entry'
+        ? OVERSCAN_ENTRY
+        : OVERSCAN_STEADY;
+  const previousOverscanPhaseRef = useRef<OverscanPhase | null>(null);
+
+  // ── Virtualizer setup ──────────────────────────────────────────────────
+  // Last N rows are always rendered outside the virtualizer so streaming
+  // content never fights TanStack's recalculation loop. During streaming,
+  // expand to cover the entire active turn.
+  const virtualizedRowCount = useMemo(() => {
+    const baseTail = Math.max(0, renderRows.length - ALWAYS_UNVIRTUALIZED_TAIL_ROWS);
+    if (!isAgentRunning) return baseTail;
+    for (let i = renderRows.length - 1; i >= 0; i -= 1) {
+      if (renderRows[i]?.message.role === 'user') {
+        return Math.min(i, baseTail);
+      }
+    }
+    return baseTail;
+  }, [renderRows, isAgentRunning]);
+
+  const nonVirtualizedRows = useMemo(
+    () => renderRows.slice(virtualizedRowCount),
+    [renderRows, virtualizedRowCount]
+  );
+
+  const getItemKey = useCallback(
+    (index: number): Key => {
+      const row = renderRows[index];
+      return row ? `${sessionKey}:${row.id}` : index;
+    },
+    [renderRows, sessionKey]
+  );
+
+  const rowVirtualizer = useVirtualizer({
+    count: virtualizedRowCount,
+    getScrollElement: () => scrollContainerRef.current,
+    getItemKey,
+    initialMeasurementsCache: initialMeasurementsCacheRef.current,
+    estimateSize: (index: number): number => {
+      const estimated = estimatedSizesRef.current[index];
+      if (estimated !== undefined && Number.isFinite(estimated) && estimated > 0) {
+        return estimated;
+      }
+      const row = renderRows[index];
+      return row ? estimateMessageHeight(row.message) : DEFAULT_ROW_HEIGHT;
+    },
+    overscan,
+    measureElement,
+    useAnimationFrameWithResizeObserver: false,
+    useFlushSync: false,
+  });
+
+  useEffect(() => {
+    rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
+      if (instance.isScrolling) {
+        return false;
+      }
+      const viewportHeight = instance.scrollRect?.height ?? 0;
+      const scrollOffset = instance.scrollOffset ?? 0;
+      const itemIntersectsViewport =
+        item.end > scrollOffset && item.start < scrollOffset + viewportHeight;
+      if (itemIntersectsViewport) {
+        return false;
+      }
+      const remainingDistance = instance.getTotalSize() - (scrollOffset + viewportHeight);
+      return remainingDistance > AUTO_SCROLL_BOTTOM_THRESHOLD_PX;
+    };
+    return (): void => {
+      rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+    };
+  }, [rowVirtualizer]);
+
+  // ── Scroll tracking ────────────────────────────────────────────────────
+  const onScrollCallbackRef = useRef<((location: { isAtBottom: boolean }) => void) | null>(null);
+
+  const updateBottomTracking = useCallback((scroller: HTMLDivElement): void => {
+    const currentScrollTop = scroller.scrollTop;
+    const nearBottom = isNearBottom(scroller, AUTO_SCROLL_BOTTOM_THRESHOLD_PX);
+
+    const scrollDelta = Math.abs(currentScrollTop - lastScrollTopRef.current);
+    const isProgrammaticJump = scrollDelta > scroller.clientHeight;
+
+    if (isProgrammaticJump) {
+      lastScrollTopRef.current = currentScrollTop;
+      onScrollCallbackRef.current?.({ isAtBottom: nearBottom });
+      return;
+    }
+
+    isAtBottomRef.current = nearBottom;
+
+    if (!shouldAutoScrollRef.current && nearBottom) {
+      shouldAutoScrollRef.current = true;
+      pendingUserScrollUpIntentRef.current = false;
+    } else if (shouldAutoScrollRef.current && pendingUserScrollUpIntentRef.current) {
+      const scrolledUp = currentScrollTop < lastScrollTopRef.current - 1;
+      if (scrolledUp && !nearBottom) {
+        shouldAutoScrollRef.current = false;
+      }
+      pendingUserScrollUpIntentRef.current = false;
+    } else if (shouldAutoScrollRef.current && isPointerScrollActiveRef.current) {
+      const scrolledUp = currentScrollTop < lastScrollTopRef.current - 1;
+      if (scrolledUp && !nearBottom) {
+        shouldAutoScrollRef.current = false;
+      }
+    } else if (shouldAutoScrollRef.current && !nearBottom) {
+      const scrolledUp = currentScrollTop < lastScrollTopRef.current - 1;
+      if (scrolledUp) {
+        shouldAutoScrollRef.current = false;
+      }
+    }
+
+    lastScrollTopRef.current = currentScrollTop;
+    onScrollCallbackRef.current?.({ isAtBottom: nearBottom });
+  }, []);
+
+  const scheduleStickToBottom = useCallback((behavior: ScrollBehavior = 'auto'): void => {
+    isAtBottomRef.current = true;
+    if (pendingStickToBottomFrameRef.current !== null) {
+      cancelAnimationFrame(pendingStickToBottomFrameRef.current);
+    }
+    pendingStickToBottomFrameRef.current = requestAnimationFrame(() => {
+      pendingStickToBottomFrameRef.current = null;
+      const scroller = scrollContainerRef.current;
+      if (scroller === null) {
+        return;
+      }
+      scrollToBottom(scroller, behavior);
+    });
+  }, []);
+
+  useEffect(() => {
+    return (): void => {
+      if (pendingStickToBottomFrameRef.current !== null) {
+        cancelAnimationFrame(pendingStickToBottomFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-scroll when content grows while at bottom
+  useEffect(() => {
+    const content = contentRef.current;
+    if (content === null || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!shouldAutoScrollRef.current) {
+        return;
+      }
+      scheduleStickToBottom('auto');
+    });
+
+    observer.observe(content, { box: 'border-box' });
+    return (): void => {
+      observer.disconnect();
+    };
+  }, [renderRows.length, scheduleStickToBottom]);
+
+  // ── Helper functions ───────────────────────────────────────────────────
+
+  const getCurrentlyRenderedRows = useCallback((): ChatRenderRow[] => {
+    const virtualItems = rowVirtualizer.getVirtualItems();
+    const virtualRows = virtualItems
+      .map((item) => renderRows[item.index])
+      .filter((row): row is ChatRenderRow => row !== undefined);
+    return [...virtualRows, ...nonVirtualizedRows];
+  }, [rowVirtualizer, renderRows, nonVirtualizedRows]);
+
+  const scrollToLocation = useCallback(
+    (location: {
+      index: number | 'LAST';
+      align?: 'start' | 'center' | 'end';
+      behavior?: ScrollBehavior;
+    }): void => {
+      const scroller = scrollContainerRef.current;
+      if (!scroller || renderRows.length === 0) {
+        return;
+      }
+
+      const lastIndex = renderRows.length - 1;
+      const index = location.index === 'LAST' ? lastIndex : location.index;
+
+      if (index < 0) {
+        scroller.scrollTop = 0;
+        return;
+      }
+
+      if (index >= lastIndex && location.align === 'end') {
+        shouldAutoScrollRef.current = true;
+        pendingUserScrollUpIntentRef.current = false;
+        scheduleStickToBottom(location.behavior ?? 'auto');
+        return;
+      }
+
+      rowVirtualizer.scrollToIndex(index, {
+        align: location.align ?? 'auto',
+        behavior: location.behavior,
+      } as { align: 'start' | 'center' | 'end' | 'auto'; behavior?: 'auto' | 'smooth' });
+    },
+    [rowVirtualizer, renderRows, scheduleStickToBottom]
+  );
+
+  const buildCurrentMeasurementCache = useCallback(
+    (input: {
+      messageCount: number;
+      lastMessageId: string | null;
+      layoutVersion: number;
+      viewportWidth: number | null;
+    }): ChatMeasurementCache => {
+      const measured = rowVirtualizer.measurementsCache;
+      const measurements: ChatMeasurementCache['measurements'] = [];
+      let runningStart = 0;
+
+      for (let index = 0; index < renderRows.length; index += 1) {
+        const existing = index < measured.length ? measured[index] : undefined;
+        if (existing !== undefined && existing.size > 0) {
+          measurements.push({
+            key: String(existing.key),
+            index: existing.index,
+            start: runningStart,
+            size: existing.size,
+            end: runningStart + existing.size,
+            lane: existing.lane,
+            measured: true,
+          });
+          runningStart += existing.size;
+        } else {
+          const estimated = estimatedSizesRef.current[index];
+          const size =
+            estimated !== undefined && Number.isFinite(estimated) && estimated > 0
+              ? estimated
+              : DEFAULT_ROW_HEIGHT;
+          measurements.push({
+            key: String(getItemKey(index)),
+            index,
+            start: runningStart,
+            size,
+            end: runningStart + size,
+            lane: 0,
+            measured: false,
+          });
+          runningStart += size;
+        }
+      }
+
+      return {
+        measurements,
+        messageCount: input.messageCount,
+        lastMessageId: input.lastMessageId,
+        layoutVersion: input.layoutVersion,
+        viewportWidth: input.viewportWidth,
+      };
+    },
+    [getItemKey, renderRows.length, rowVirtualizer]
+  );
+
+  const applyMeasurementCacheToEstimates = useCallback(
+    (cache: ChatMeasurementCache): void => {
+      const sizes = new Array<number>(renderRows.length).fill(DEFAULT_ROW_HEIGHT);
+      for (const measurement of cache.measurements) {
+        if (measurement.index < sizes.length) {
+          sizes[measurement.index] = measurement.size;
+        }
+      }
+      estimatedSizesRef.current = sizes;
+      rowVirtualizer.measure();
+      if (shouldAutoScrollRef.current) {
+        scheduleStickToBottom('auto');
+      }
+    },
+    [renderRows.length, rowVirtualizer, scheduleStickToBottom]
+  );
+
+  const updateEstimatedSizes = useCallback(
+    (sizes: readonly number[]): void => {
+      estimatedSizesRef.current = [...sizes];
+      rowVirtualizer.measure();
+      if (shouldAutoScrollRef.current) {
+        scheduleStickToBottom('auto');
+      }
+    },
+    [rowVirtualizer, scheduleStickToBottom]
+  );
+
+  useEffect(() => {
+    const scroller = scrollContainerRef.current ?? null;
+    if (scroller === null || effectiveVerificationPhase !== 'visible') {
+      userScrollIntentDuringVisibleVerificationRef.current = false;
+      return;
+    }
+
+    const handleWheel = (): void => {
+      userScrollIntentDuringVisibleVerificationRef.current = true;
+    };
+    const handleTouchMove = (): void => {
+      userScrollIntentDuringVisibleVerificationRef.current = true;
+    };
+
+    scroller.addEventListener('wheel', handleWheel, { passive: true });
+    scroller.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    return (): void => {
+      scroller.removeEventListener('wheel', handleWheel);
+      scroller.removeEventListener('touchmove', handleTouchMove);
+      userScrollIntentDuringVisibleVerificationRef.current = false;
+    };
+  }, [effectiveVerificationPhase, sessionId]);
+
   const getCurrentViewportWidth = useCallback((): number | null => {
-    const scrollerWidth = listRef.current?.scrollerElement()?.clientWidth ?? 0;
+    const scrollerWidth = scrollContainerRef.current?.clientWidth ?? 0;
     if (scrollerWidth > 0) {
       return scrollerWidth;
     }
@@ -647,81 +902,141 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     return containerWidth > 0 ? containerWidth : null;
   }, []);
 
-  const snapshotSizeCache = useCallback((): void => {
+  const snapshotMeasurementCache = useCallback((): void => {
     if (!sessionId) return;
-
-    const handle = listRef.current;
-    if (!handle) return;
 
     const store = useChatStore.getState();
     const session = store.sessions[sessionId];
     if (!session) return;
 
-    store.setVirtuosoSizeCache(sessionId, {
-      ranges: handle.getSizeRanges(),
+    const sid = sessionId.slice(-6);
+    const cache = buildCurrentMeasurementCache({
       messageCount: session.messages.length,
       lastMessageId: session.messages.at(-1)?.id ?? null,
       layoutVersion: session.layoutVersion,
       viewportWidth: getCurrentViewportWidth(),
     });
-  }, [getCurrentViewportWidth, sessionId]);
+    logger.info(`[${sid}] snapshotMeasurementCache`, {
+      messageCount: cache.messageCount,
+      measurements: cache.measurements.length,
+      layoutVersion: cache.layoutVersion,
+      viewportWidth: cache.viewportWidth,
+      restorePhase: restorePhaseRef.current,
+    });
+    store.setMeasurementCache(sessionId, cache);
+  }, [buildCurrentMeasurementCache, getCurrentViewportWidth, sessionId]);
 
-  const snapshotStableSizeCache = useCallback((): void => {
+  const snapshotStableMeasurementCache = useCallback((): void => {
     if (restorePhaseRef.current !== 'done') {
       return;
     }
 
-    snapshotSizeCache();
-  }, [snapshotSizeCache]);
+    snapshotMeasurementCache();
+  }, [snapshotMeasurementCache]);
 
   useLayoutEffect(() => {
     restoredSizeCacheRef.current = false;
+    restorePathRef.current = 'cold';
+    initialMeasurementsCacheRef.current = [];
     if (!sessionId) return;
 
     const store = useChatStore.getState();
     const session = store.sessions[sessionId];
-    let cache = session?.virtuosoSizeCache ?? null;
+    let cache = session?.measurementCache ?? null;
     cache ??= getRenderCache(sessionId);
     const viewportWidth = getCurrentViewportWidth();
-    if (cache && session && isUsableRenderCache(session, cache, viewportWidth)) {
-      listRef.current?.setSizeRanges([...cache.ranges]);
+    const sid = sessionId.slice(-6);
+
+    logger.info(`[${sid}] cache restore START`, {
+      hasMemoryCache: session?.measurementCache !== null,
+      hasIdbCache: cache !== null,
+      cacheMeasurements: cache?.measurements.length ?? 0,
+      cacheMessageCount: cache?.messageCount ?? 0,
+      renderRowCount: renderRows.length,
+      viewportWidth,
+      sessionMessages: session?.messages.length ?? 0,
+    });
+
+    if (
+      cache &&
+      session &&
+      isExactMeasurementCache(session, cache, renderRows.length, viewportWidth)
+    ) {
+      logger.info(`[${sid}] cache restore → EXACT path`, {
+        measurements: cache.measurements.length,
+        layoutVersion: cache.layoutVersion,
+      });
+      // Seed TanStack's initialMeasurementsCache so that when measure()
+      // clears the internal cache, the next getMeasurements() call loads
+      // pre-computed positions instead of calling estimateSize() per item.
+      initialMeasurementsCacheRef.current = cache.measurements
+        .slice(0, renderRows.length)
+        .map((m) => ({
+          key: m.key,
+          index: m.index,
+          start: m.start,
+          size: m.size,
+          end: m.end,
+          lane: m.lane,
+        }));
+      applyMeasurementCacheToEstimates(cache);
       restoredSizeCacheRef.current = true;
+      restorePathRef.current = 'exact';
+      return;
+    }
+
+    if (cache) {
+      logger.info(`[${sid}] cache restore → WARM path`, {
+        measurements: cache.measurements.length,
+        renderRowCount: renderRows.length,
+        reason: 'exact validation failed',
+      });
+      updateEstimatedSizes(buildEstimatedSizesFromMeasurementCache(renderRows.length, cache));
+      restorePathRef.current = 'warm';
       return;
     }
 
     if (session && session.messages.length > 0) {
-      const estimatedRanges = buildEstimatedSizeRanges(session.messages);
-      if (estimatedRanges.length > 0) {
-        listRef.current?.setSizeRanges(estimatedRanges);
+      logger.info(`[${sid}] cache restore → COLD path (content-based estimates)`, {
+        messageCount: session.messages.length,
+      });
+      const estimatedSizes = buildEstimatedMessageSizes(session.messages);
+      if (estimatedSizes.length > 0) {
+        updateEstimatedSizes(estimatedSizes);
       }
+    } else {
+      logger.info(`[${sid}] cache restore → COLD path (no cache, no messages)`);
     }
-  }, [getCurrentViewportWidth, sessionId]);
+  }, [
+    applyMeasurementCacheToEstimates,
+    getCurrentViewportWidth,
+    renderRows.length,
+    sessionId,
+    updateEstimatedSizes,
+  ]);
 
   useEffect(() => {
-    if (!sessionId || restoredSizeCacheRef.current) {
+    if (!sessionId) {
       return;
     }
 
     let cancelled = false;
 
     void getRenderCacheAsync(sessionId).then((cache) => {
-      if (cancelled || restoredSizeCacheRef.current || !cache) {
+      if (cancelled || !cache) {
         return;
       }
 
-      const session = useChatStore.getState().sessions[sessionId];
-      if (!session || !isUsableRenderCache(session, cache, getCurrentViewportWidth())) {
-        return;
+      const store = useChatStore.getState();
+      if (store.sessions[sessionId]?.measurementCache === null) {
+        store.setMeasurementCache(sessionId, cache);
       }
-
-      listRef.current?.setSizeRanges([...cache.ranges]);
-      restoredSizeCacheRef.current = true;
     });
 
     return () => {
       cancelled = true;
     };
-  }, [getCurrentViewportWidth, sessionId]);
+  }, [sessionId]);
 
   const onRewindRef = useRef(onRewind);
   onRewindRef.current = onRewind;
@@ -748,94 +1063,41 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     onFeedbackRef.current();
   }, []);
 
-  // ── Scroll modifiers ─────────────────────────────────────────────────
-  // The library handles all auto-scroll internally via these modifiers.
-  // With no Footer content, isAtBottom (4px threshold) works correctly.
-  const messageListData = useMemo((): DataWithScrollModifier<ChatRenderRow> => {
-    // Empty data guard — the library's binary search crashes when scroll
-    // modifiers (item-location, items-change, auto-scroll-to-bottom) target
-    // items in an empty array: "Failed binary finding record, searched for 0".
-    // This happens during session transitions when messages briefly becomes [].
-    if (renderRows.length === 0) {
-      return { data: renderRows };
-    }
+  // ── Scroll intent handler ────────────────────────────────────────────
+  // Replaces the DataWithScrollModifier dispatch from the shim.
+  // Each intent is handled imperatively via direct scroll calls.
+  useLayoutEffect(() => {
+    if (scrollIntent === null || renderRows.length === 0) return;
+    const scroller = scrollContainerRef.current;
+    if (!scroller) return;
 
-    // Explicit intent from service layer (setMessages callers)
-    if (scrollIntent !== null) {
-      switch (scrollIntent) {
-        case 'history-load':
-          return {
-            data: renderRows,
-            scrollModifier: {
-              type: 'item-location',
-              location: { index: 0, align: 'start' },
-            },
-          };
-        case 'compact-reload':
-          return {
-            data: renderRows,
-            scrollModifier: { type: 'items-change', behavior: 'auto' },
-          };
-        case 'pending-verify':
-          return {
-            data: renderRows,
-          };
-        case 'session-restore':
-          // Multi-instance keep-alive: scroll-to-bottom is handled by an
-          // imperative scrollToItem() call in the effect below, NOT through
-          // the data prop's scrollModifier. The data-prop approach fails
-          // because clearing the intent triggers a second render that passes
-          // plain data, which can cancel the pending scroll.
-          return {
-            data: renderRows,
-          };
-        case 'session-refresh':
-          // Session refresh: backend re-sent the same data. Preserve scroll position.
-          return {
-            data: renderRows,
-          };
-        case 'rewind':
-          return {
-            data: renderRows,
-            scrollModifier: 'remove-from-end',
-          };
-      }
-    }
+    const sid = sessionKey.slice(-6);
+    logger.info(`[${sid}] scrollIntent: ${scrollIntent}`, {
+      messageCount: messages.length,
+      renderRowCount: renderRows.length,
+    });
 
-    if (isVerifying) {
-      return { data: renderRows };
+    switch (scrollIntent) {
+      case 'history-load':
+        scroller.scrollTo({ top: 0 });
+        break;
+      case 'compact-reload':
+        if (shouldAutoScrollRef.current) {
+          scheduleStickToBottom('auto');
+        }
+        break;
+      case 'pending-verify':
+      case 'session-restore':
+      case 'session-refresh':
+        // No scroll action — handled by verification state machine
+        break;
+      case 'rewind':
+        if (shouldAutoScrollRef.current) {
+          scheduleStickToBottom('auto');
+        }
+        break;
     }
-
-    // A just-applied session placement intent clears on the next effect-driven
-    // render. Keep that render on the plain data path so we don't immediately
-    // fall through to the heuristic items-change modifier.
-    if (lastPlacedMessagesRef.current === renderRows) {
-      return { data: renderRows };
-    }
-
-    if (messages.length === prevMessageCount.current) {
-      // Streaming: auto-scroll-to-bottom follows growing content at the bottom.
-      // items-change does NOT — it only adjusts for items above the viewport.
-      return {
-        data: renderRows,
-        scrollModifier: {
-          type: 'auto-scroll-to-bottom',
-          autoScroll: ({ atBottom }: { atBottom: boolean }): ScrollBehavior | false =>
-            atBottom ? 'auto' : false,
-        },
-      };
-    }
-
-    // Append: new message(s) arrived.
-    return {
-      data: renderRows,
-      scrollModifier: {
-        type: 'auto-scroll-to-bottom',
-        autoScroll: ({ atBottom }: { atBottom: boolean }): ScrollBehavior | false =>
-          atBottom ? 'smooth' : false,
-      },
-    };
-  }, [isVerifying, messages, renderRows, scrollIntent]);
+  }, [scrollIntent, renderRows.length, messages.length, sessionKey, scheduleStickToBottom]);
 
   const messageListContext = useMemo(
     (): MessageListContext => ({
@@ -868,34 +1130,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ]
   );
 
-  // Overscan strategy:
-  // - parked: not verifying, not visible → no buffer
-  // - entry (800px): hidden verification OR cold visible verification (no size cache)
-  // - steady (8000px): warm visible (size cache hit) or post-commit (not verifying)
-  //
-  // Cold visible sessions keep entry overscan during verification to avoid a
-  // main-thread-blocking Virtuoso re-render (200-500ms) from the 800→8000px
-  // expansion. Overscan expands to steady after commit when isVerifying becomes false.
-  //
-  // Note: isReadyForSteady is NOT used here because hidden-ready sets it to true
-  // (line 1102), and the hidden→visible promotion path preserves it. For cold sessions
-  // this would immediately expand to steady, defeating the deferral.
-  const overscanPhase: OverscanPhase =
-    !isVerifying && !isVisible
-      ? 'parked'
-      : effectiveVerificationPhase === 'hidden'
-        ? 'entry'
-        : restoredSizeCacheRef.current || hasUserScrolled
-          ? 'steady'
-          : 'entry';
-  const overscan =
-    overscanPhase === 'parked'
-      ? OVERSCAN_PARKED
-      : overscanPhase === 'entry'
-        ? OVERSCAN_ENTRY
-        : OVERSCAN_STEADY;
-  const previousOverscanPhaseRef = useRef<OverscanPhase | null>(null);
-
   useEffect(() => {
     if (previousOverscanPhaseRef.current === overscanPhase) {
       return;
@@ -903,27 +1137,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     const prev = previousOverscanPhaseRef.current;
     previousOverscanPhaseRef.current = overscanPhase;
+    logger.info(`[${sessionKey.slice(-6)}] overscan: ${String(prev)} → ${overscanPhase}`, {
+      overscanItems: overscan,
+      isVerifying,
+      isVisible,
+      messageCount: messages.length,
+    });
     markSwitchTimeline(
       'overscan-change',
-      `${prev ?? 'null'} -> ${overscanPhase} (${String(overscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} premeasure=${String(isPremeasuring)} scroll=${String(hasUserScrolled)}`
+      `${prev ?? 'null'} -> ${overscanPhase} (${String(overscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} scroll=${String(hasUserScrolled)}`
     );
   }, [
     effectiveVerificationPhase,
     hasUserScrolled,
-    isPremeasuring,
     isReadyForSteady,
     isVerifying,
     isVisible,
+    messages.length,
     overscan,
     overscanPhase,
+    sessionKey,
   ]);
-
-  // Stable key function — avoids creating a new closure on each render.
-  // Virtuoso compares the function reference; a new ref can force item re-renders.
-  const computeItemKey = useCallback(
-    ({ data }: { data: ChatRenderRow }): string => `${sessionKey}:${data.id}`,
-    [sessionKey]
-  );
 
   // ── Event-driven readiness ──────────────────────────────────────────
   const onVerificationResultRef = useRef(onVerificationResult);
@@ -931,7 +1165,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const hasResolvedVerificationRef = useRef(false);
   const needsRestoreRef = useRef(false);
   const hasEverHadMessagesRef = useRef(false);
-  const hasAttemptedPremeasureRef = useRef(false);
   const hasAttemptedTailProbeRef = useRef(false);
   const hiddenCandidateSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const hiddenReadySnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
@@ -939,11 +1172,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const tailProbePlaceholderSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const tailProbeRealSurfaceSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const tailProbeStartedAtRef = useRef<number | null>(null);
+  const userScrollIntentDuringVisibleVerificationRef = useRef(false);
   const visibleCandidateSnapshotRef = useRef<ReadinessSurfaceSnapshot | null>(null);
   const visiblePreseedPendingRef = useRef(false);
   const restorePhaseRef = useRef<RestorePhase>('idle');
   const lastMessageIdRef = useRef<string | null>(messages.at(-1)?.id ?? null);
-  const premeasureTimeoutRef = useRef<number | null>(null);
   const readinessTimeoutRef = useRef<number | null>(null);
   const readinessProgressSignatureRef = useRef<string | null>(null);
   const readinessStableTimerRef = useRef<number | null>(null);
@@ -956,16 +1189,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const tailProofVersionRef = useRef(0);
   const [surfaceReadyVersion, setSurfaceReadyVersion] = useState(0);
   const [restoreVersion, setRestoreVersion] = useState(0);
-  const [latestRenderedRowCount, setLatestRenderedRowCount] = useState(0);
-  const purgeItemSizesUsedRef = useRef(false);
+  const latestRenderedRowCountRef = useRef(0);
+  const restorePathRef = useRef<'exact' | 'warm' | 'cold'>('cold');
   const traceRootRef = useRef<HTMLDivElement>(null);
   lastMessageIdRef.current = messages.at(-1)?.id ?? null;
 
   const cancelReadinessWork = useCallback((): void => {
-    if (premeasureTimeoutRef.current !== null) {
-      window.clearTimeout(premeasureTimeoutRef.current);
-      premeasureTimeoutRef.current = null;
-    }
     if (readinessTimeoutRef.current !== null) {
       window.clearTimeout(readinessTimeoutRef.current);
       readinessTimeoutRef.current = null;
@@ -996,9 +1225,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, []);
 
   const ensureListSurfaceReady = useCallback((): boolean => {
-    const handle = listRef.current;
-    const scroller = handle?.scrollerElement();
-    const listElement = scroller?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
+    const scroller = scrollContainerRef.current;
+    const listElement = scroller ? findChatListSurface(scroller) : null;
     if (scroller && listElement) {
       surfaceWaitObserverRef.current?.disconnect();
       surfaceWaitObserverRef.current = null;
@@ -1035,7 +1263,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, []);
 
   const getScrollerMetrics = useCallback((): ScrollerMetrics | null => {
-    const scroller = listRef.current?.scrollerElement();
+    const scroller = scrollContainerRef.current;
     if (!scroller) return null;
 
     return {
@@ -1052,9 +1280,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       const metrics = getScrollerMetrics();
       if (!metrics) return null;
 
-      const listElement = metrics.scroller.querySelector<HTMLElement>(
-        '[data-testid="virtuoso-list"]'
-      );
+      const listElement = findChatListSurface(metrics.scroller);
       if (!listElement) {
         return null;
       }
@@ -1077,12 +1303,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
-    // Skip expensive alignment when Virtuoso has accurate cached heights
-    // and scroller is already at the bottom — saves 6+ DOM round trips.
-    // But don't skip when scrollHeight <= clientHeight (content fits viewport):
-    // that means setSizeRanges hasn't been processed yet and "at bottom" is
-    // a false positive. Calling scrollToItem(LAST) primes Virtuoso's render
-    // target so it renders from the end when heights load.
+    const sid = sessionKey.slice(-6);
     if (restoredSizeCacheRef.current) {
       const precheck = getScrollerMetrics();
       if (
@@ -1090,14 +1311,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         precheck.scrollHeight > precheck.clientHeight &&
         precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX
       ) {
+        logger.debug(`[${sid}] alignScrollerToBottom → already at bottom (cache shortcut)`);
         return precheck;
       }
     }
 
-    const handle = listRef.current;
-    if (!handle) return null;
-
-    handle.scrollToItem({
+    logger.debug(`[${sid}] alignScrollerToBottom → scrollToLocation(LAST, end)`, {
+      rowCount: renderRows.length,
+      sizeCacheRestored: restoredSizeCacheRef.current,
+    });
+    scrollToLocation({
       index: renderRows.length > 0 ? renderRows.length - 1 : 'LAST',
       align: 'end',
     });
@@ -1114,36 +1337,21 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
     }
     return afterMetrics;
-  }, [getScrollerMetrics, renderRows.length]);
+  }, [getScrollerMetrics, renderRows.length, scrollToLocation, sessionKey]);
 
   const forceTailProbeRender = useCallback((): boolean => {
-    const handle = listRef.current;
-    if (!handle || renderRows.length === 0) {
+    if (renderRows.length === 0) {
       return false;
     }
 
-    // Never purge item sizes. The probe's purpose is scroll positioning via
-    // initialLocation, not height correction. purgeItemSizes: true destroys all
-    // cached heights and forces Virtuoso to rebuild from scratch — 400ms+ for
-    // 8 msgs, 1200ms+ for 134 msgs. Even with a restored size cache,
-    // restoredSizeCacheRef.current is already true by the time the probe fires
-    // (the hidden pre-render instance saves the cache before verification starts),
-    // so conditioning on it never selects the soft path. The 48ms hidden
-    // stabilization window validates final geometry independently.
+    // With unvirtualized tail rows, the tail is always rendered.
+    // Just scroll to bottom instead of data.replace.
     hasAttemptedTailProbeRef.current = true;
     tailProbePlaceholderScrollHeightRef.current = null;
     tailProbePlaceholderSnapshotRef.current = null;
     tailProbeRealSurfaceSnapshotRef.current = null;
     hiddenCandidateSnapshotRef.current = null;
     tailProbeStartedAtRef.current = Date.now();
-    purgeItemSizesUsedRef.current = false;
-    handle.data.replace(renderRows, {
-      initialLocation: {
-        index: renderRows.length - 1,
-        align: 'end',
-      },
-      purgeItemSizes: false,
-    });
     alignScrollerToBottom();
     recordSessionSwitchTrace({
       event: 'tail_probe_start',
@@ -1158,7 +1366,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         lastLayoutMutationAt,
         overscanPhase,
         sizeCacheRestored: restoredSizeCacheRef.current,
-        purgeItemSizesUsed: true,
+        restorePath: restorePathRef.current,
       }),
     });
     return true;
@@ -1179,22 +1387,38 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     (
       phase: 'hidden' | 'visible',
       result: 'hidden-ready' | 'visible-ready' | 'timeout' | 'aborted',
-      tailProofVersion: number
+      tailProofVersion: number,
+      options?: {
+        readonly alignBottomOnReady?: boolean;
+      }
     ): void => {
       if (hasResolvedVerificationRef.current && result !== 'aborted') {
+        logger.debug(`[${sessionKey.slice(-6)}] emitVerification SKIPPED (already resolved)`, {
+          phase,
+          result,
+        });
         return;
       }
+
+      logger.info(`[${sessionKey.slice(-6)}] VERIFICATION RESULT: ${result}`, {
+        phase,
+        tailProofVersion,
+        alignBottomOnReady: options?.alignBottomOnReady ?? true,
+        restorePath: restorePathRef.current,
+        sizeCacheRestored: restoredSizeCacheRef.current,
+      });
 
       hasResolvedVerificationRef.current = true;
       readinessStartedRef.current = false;
       cancelReadinessWork();
-      setIsPremeasuring(false);
 
       if (result === 'hidden-ready' || result === 'visible-ready') {
         restorePhaseRef.current = 'done';
-        alignScrollerToBottom();
+        if (options?.alignBottomOnReady !== false) {
+          alignScrollerToBottom();
+        }
         setIsReadyForSteady(true);
-        snapshotStableSizeCache();
+        snapshotStableMeasurementCache();
       }
 
       onVerificationResultRef.current?.({
@@ -1206,7 +1430,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         onReady();
       }
     },
-    [alignScrollerToBottom, cancelReadinessWork, onReady, snapshotStableSizeCache]
+    [
+      alignScrollerToBottom,
+      cancelReadinessWork,
+      onReady,
+      sessionKey,
+      snapshotStableMeasurementCache,
+    ]
   );
 
   const signalReady = useCallback(
@@ -1248,11 +1478,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const startTemporaryResizeStabilityWindow = useCallback(
-    (
-      phase: Extract<RestorePhase, 'premeasuring' | 'stabilizing'>,
-      stableMs: number,
-      onStable: () => void
-    ): void => {
+    (phase: Extract<RestorePhase, 'stabilizing'>, stableMs: number, onStable: () => void): void => {
       if (readinessStableTimerRef.current !== null) {
         window.clearTimeout(readinessStableTimerRef.current);
         readinessStableTimerRef.current = null;
@@ -1260,9 +1486,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       readinessResizeObserverRef.current?.disconnect();
       readinessResizeObserverRef.current = null;
 
-      const listElement = listRef.current
-        ?.scrollerElement()
-        ?.querySelector<HTMLElement>('[data-testid="virtuoso-list"]');
+      const scroller = scrollContainerRef.current;
+      const listElement = scroller ? findChatListSurface(scroller) : null;
       if (!listElement) {
         return;
       }
@@ -1316,29 +1541,33 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if (readinessTimeoutRef.current !== null) {
         window.clearTimeout(readinessTimeoutRef.current);
       }
-      readinessTimeoutRef.current = window.setTimeout(() => {
-        markSwitchTimeline(
-          'timeout',
-          [
-            `phase=${restorePhaseRef.current}`,
-            `vPhase=${String(effectiveVerificationPhase)}`,
-            `tailProbe=${String(hasAttemptedTailProbeRef.current)}`,
-            `premeasure=${String(hasAttemptedPremeasureRef.current)}`,
-            `sizeCache=${String(restoredSizeCacheRef.current)}`,
-            `visPreseed=${String(visiblePreseedPendingRef.current)}`,
-            `started=${String(readinessStartedRef.current)}`,
-          ].join(' ')
-        );
-        if (effectiveVerificationPhase) {
-          emitVerificationResult(
-            effectiveVerificationPhase,
+      readinessTimeoutRef.current = window.setTimeout(
+        () => {
+          markSwitchTimeline(
             'timeout',
-            tailProofVersionRef.current
+            [
+              `phase=${restorePhaseRef.current}`,
+              `vPhase=${String(effectiveVerificationPhase)}`,
+              `tailProbe=${String(hasAttemptedTailProbeRef.current)}`,
+              `sizeCache=${String(restoredSizeCacheRef.current)}`,
+              `visPreseed=${String(visiblePreseedPendingRef.current)}`,
+              `started=${String(readinessStartedRef.current)}`,
+            ].join(' ')
           );
-        }
-      }, READY_TIMEOUT_MS);
+          if (effectiveVerificationPhase) {
+            emitVerificationResult(
+              effectiveVerificationPhase,
+              'timeout',
+              tailProofVersionRef.current
+            );
+          }
+        },
+        messages.length > LARGE_SESSION_THRESHOLD
+          ? READY_TIMEOUT_LARGE_SESSION_MS
+          : READY_TIMEOUT_MS
+      );
     },
-    [effectiveVerificationPhase, emitVerificationResult]
+    [effectiveVerificationPhase, emitVerificationResult, messages.length]
   );
   const queuePositioningRecheck = useCallback((): void => {
     if (positioningRecheckTimerRef.current !== null) {
@@ -1351,10 +1580,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      const rendered = listRef.current?.data.getCurrentlyRendered() ?? [];
+      const rendered = getCurrentlyRenderedRows();
       progressPositioningRef.current(rendered);
     }, POSITIONING_RECHECK_MS);
-  }, []);
+  }, [getCurrentlyRenderedRows]);
 
   const isHiddenPlaceholderShortSurface = useCallback(
     (metrics: RenderSurfaceMetrics): boolean =>
@@ -1363,121 +1592,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     [renderRows.length]
   );
 
-  const captureTailProbePlaceholder = useCallback(
-    (metrics: RenderSurfaceMetrics): void => {
-      if (tailProbePlaceholderSnapshotRef.current !== null) {
-        return;
-      }
-
-      tailProbePlaceholderScrollHeightRef.current = metrics.scrollHeight;
-      tailProbePlaceholderSnapshotRef.current = buildReadinessSurfaceSnapshot(
-        metrics,
-        layoutSettledVersion
-      );
-      recordSessionSwitchTrace({
-        event: 'tail_probe_placeholder_captured',
-        requestId: currentTraceRequestId,
-        sessionId: sessionId ?? null,
-        verificationPhase: effectiveVerificationPhase,
-        verificationKey: effectiveVerificationKey,
-        geometry: getSessionSwitchGeometrySnapshotFromMetrics(metrics, {
-          renderedRowCount: metrics.renderedRowCount,
-          tailSentinelRendered: metrics.tailSentinelRendered,
-          layoutPendingCount,
-          lastLayoutMutationAt,
-          overscanPhase,
-          sizeCacheRestored: restoredSizeCacheRef.current,
-          purgeItemSizesUsed: purgeItemSizesUsedRef.current,
-        }),
-      });
-    },
-    [
-      currentTraceRequestId,
-      effectiveVerificationKey,
-      effectiveVerificationPhase,
-      lastLayoutMutationAt,
-      layoutPendingCount,
-      layoutSettledVersion,
-      overscanPhase,
-      sessionId,
-    ]
-  );
-
-  const hasObservedPostProbeSurface = useCallback(
-    (metrics: RenderSurfaceMetrics): boolean => {
-      if (!hasAttemptedTailProbeRef.current) {
-        return true;
-      }
-
-      // Soft probe (no purge) doesn't need placeholder→real verification.
-      // Without purging, heights are preserved (estimates or cached), so the
-      // surface after replace() is immediately trustworthy. The 48ms hidden
-      // stabilization window still validates final geometry independently.
-      if (!purgeItemSizesUsedRef.current) {
-        return true;
-      }
-
-      const placeholderSnapshot = tailProbePlaceholderSnapshotRef.current;
-      if (placeholderSnapshot === null) {
-        captureTailProbePlaceholder(metrics);
-        return false;
-      }
-
-      const currentSnapshot = buildReadinessSurfaceSnapshot(metrics, layoutSettledVersion);
-      if (isSameReadinessSurfaceSnapshot(placeholderSnapshot, currentSnapshot)) {
-        return false;
-      }
-
-      if (
-        !isSameReadinessSurfaceSnapshot(tailProbeRealSurfaceSnapshotRef.current, currentSnapshot)
-      ) {
-        tailProbeRealSurfaceSnapshotRef.current = currentSnapshot;
-        recordSessionSwitchTrace({
-          event: 'tail_probe_first_real_height',
-          requestId: currentTraceRequestId,
-          sessionId: sessionId ?? null,
-          verificationPhase: effectiveVerificationPhase,
-          verificationKey: effectiveVerificationKey,
-          geometry: getSessionSwitchGeometrySnapshotFromMetrics(metrics, {
-            renderedRowCount: metrics.renderedRowCount,
-            tailSentinelRendered: metrics.tailSentinelRendered,
-            layoutPendingCount,
-            lastLayoutMutationAt,
-            overscanPhase,
-            sizeCacheRestored: restoredSizeCacheRef.current,
-            purgeItemSizesUsed: purgeItemSizesUsedRef.current,
-          }),
-          data: {
-            placeholderScrollHeight: tailProbePlaceholderScrollHeightRef.current,
-          },
-        });
-      }
-
-      return true;
-    },
-    [
-      captureTailProbePlaceholder,
-      currentTraceRequestId,
-      effectiveVerificationKey,
-      effectiveVerificationPhase,
-      lastLayoutMutationAt,
-      layoutPendingCount,
-      layoutSettledVersion,
-      overscanPhase,
-      sessionId,
-    ]
-  );
+  // With direct useVirtualizer (no purge), heights are always preserved.
+  // The 48ms hidden stabilization window validates final geometry independently.
+  const hasObservedPostProbeSurface = useCallback((): boolean => true, []);
 
   const scheduleHiddenVerificationCheck = useCallback((): void => {
     // Fast path for warm instances with restored size caches.
-    // Restored cache → Virtuoso has accurate heights (no estimates).
+    // Restored cache → the list has accurate heights (no estimates).
     // layoutPendingCount === 0 → no pending mutations.
     // Geometry checks → tail sentinel rendered, at bottom, not placeholder.
     // These conditions guarantee layout stability — skip the 48ms
     // ResizeObserver quiet window entirely and signal ready immediately.
     //
     // The rAF two-snapshot comparison was removed because alignScrollerToBottom()
-    // (called at verification start) triggers a Virtuoso internal re-render that
+    // (called at verification start) triggers an internal re-render that
     // settles across frames, causing the two snapshots to always differ for warm
     // instances even though the layout is genuinely stable.
     if (
@@ -1486,10 +1614,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       restorePhaseRef.current === 'stabilizing' &&
       effectiveVerificationPhase === 'hidden'
     ) {
-      const handle = listRef.current;
-      const immediateRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const immediateRendered = getCurrentlyRenderedRows();
       const immediateMetrics = getRenderSurfaceMetrics(immediateRendered);
-      // Accept either sentinel in DOM or sentinel in Virtuoso's render range.
+      // Accept either sentinel in DOM or sentinel in the rendered range.
       // Cold-cached sessions enter stabilizing with the sentinel in the render
       // range but not yet painted (~1 frame lag). Requiring DOM presence forces
       // them into the 48ms ResizeObserver window unnecessarily.
@@ -1501,7 +1628,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         immediateMetrics !== null &&
         immediateMetrics.isAtBottom &&
         !isHiddenPlaceholderShortSurface(immediateMetrics) &&
-        hasObservedPostProbeSurface(immediateMetrics)
+        hasObservedPostProbeSurface()
       ) {
         hiddenCandidateSnapshotRef.current = buildReadinessSurfaceSnapshot(
           immediateMetrics,
@@ -1517,8 +1644,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      const handle = listRef.current;
-      const latestRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const latestRendered = getCurrentlyRenderedRows();
       const latestMetrics = getRenderSurfaceMetrics(latestRendered);
       refreshReadinessTimeout(
         buildReadinessProgressSignature({
@@ -1532,7 +1658,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
 
       if (!latestMetrics?.tailSentinelRendered) {
-        // Check if the sentinel is in Virtuoso's render data but not yet in the DOM.
+        // Check if the sentinel is in the render data but not yet in the DOM.
         // The DOM query lags by 1-2 frames. Same guard exists in progressPositioning.
         // Without this, a stale DOM query triggers a destructive purged probe that
         // throws away all cached heights — costing 300ms+ for re-measurement.
@@ -1566,7 +1692,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      if (!hasObservedPostProbeSurface(latestMetrics)) {
+      if (!hasObservedPostProbeSurface()) {
         markSwitchTimeline('hidden-backtrack:no-post-probe-surface');
         hiddenCandidateSnapshotRef.current = null;
         restorePhaseRef.current = 'positioning';
@@ -1576,13 +1702,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
       if (!latestMetrics.isAtBottom) {
         markSwitchTimeline(
-          'hidden-backtrack:not-at-bottom',
+          'hidden-realign:not-at-bottom',
           `scrollTop=${String(latestMetrics.scrollTop)} scrollH=${String(latestMetrics.scrollHeight)} clientH=${String(latestMetrics.clientHeight)}`
         );
-        restorePhaseRef.current = 'positioning';
+        // Re-align in place instead of backtracking to positioning phase.
+        // Each ResizeObserver batch shifts scrollHeight; re-aligning and restarting
+        // the stability window converges in 2-3 cycles without restarting the pipeline.
         hiddenCandidateSnapshotRef.current = null;
         alignScrollerToBottom();
-        progressPositioningRef.current(latestRendered);
+        scheduleHiddenVerificationCheckRef.current();
         return;
       }
 
@@ -1610,6 +1738,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     alignScrollerToBottom,
     effectiveVerificationPhase,
     forceTailProbeRender,
+    getCurrentlyRenderedRows,
     getRenderSurfaceMetrics,
     hasObservedPostProbeSurface,
     isHiddenPlaceholderShortSurface,
@@ -1633,8 +1762,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       restorePhaseRef.current === 'stabilizing' &&
       effectiveVerificationPhase === 'visible'
     ) {
-      const handle = listRef.current;
-      const immediateRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const immediateRendered = getCurrentlyRenderedRows();
       const immediateMetrics = getRenderSurfaceMetrics(immediateRendered);
       if (immediateMetrics?.tailSentinelRendered === true && immediateMetrics.isAtBottom) {
         const immediateSnapshot = buildReadinessSurfaceSnapshot(
@@ -1656,7 +1784,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         !immediateMetrics.isAtBottom &&
         layoutPendingCount === 0
       ) {
-        // Sentinel rendered but not at bottom: Virtuoso applied cached heights
+        // Sentinel rendered but not at bottom: cached heights applied
         // after hidden-ready captured the snapshot, growing scrollHeight.
         // The hidden phase already proved content stability — scroll to bottom
         // and verify in one frame instead of the 200ms quiet window.
@@ -1669,8 +1797,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           if (restorePhaseRef.current !== 'stabilizing') {
             return;
           }
-          const retryHandle = listRef.current;
-          const retryRendered = retryHandle?.data.getCurrentlyRendered() ?? [];
+          const retryRendered = getCurrentlyRenderedRows();
           const retryMetrics = getRenderSurfaceMetrics(retryRendered);
           const freshPending = sessionId
             ? (useChatStore.getState().sessions[sessionId]?.layoutPendingCount ?? 0)
@@ -1707,8 +1834,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      const handle = listRef.current;
-      const latestRendered = handle?.data.getCurrentlyRendered() ?? [];
+      const latestRendered = getCurrentlyRenderedRows();
       const latestMetrics = getRenderSurfaceMetrics(latestRendered);
       refreshReadinessTimeout(
         buildReadinessProgressSignature({
@@ -1768,6 +1894,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     alignScrollerToBottom,
     clearVisibleVerificationCandidate,
     effectiveVerificationPhase,
+    getCurrentlyRenderedRows,
     getRenderSurfaceMetrics,
     layoutPendingCount,
     layoutSettledVersion,
@@ -1777,6 +1904,36 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     startTemporaryResizeStabilityWindow,
   ]);
   scheduleVisibleVerificationCheckRef.current = scheduleVisibleVerificationCheck;
+
+  const handleVisibleVerificationScroll = useCallback(
+    (location: { readonly isAtBottom: boolean }): void => {
+      logger.debug(`[${sessionKey.slice(-6)}] onScroll (verification)`, {
+        isAtBottom: location.isAtBottom,
+        verificationPhase: effectiveVerificationPhase,
+        hasResolved: hasResolvedVerificationRef.current,
+        userScrollIntent: userScrollIntentDuringVisibleVerificationRef.current,
+      });
+      if (
+        effectiveVerificationPhase !== 'visible' ||
+        hasResolvedVerificationRef.current ||
+        !userScrollIntentDuringVisibleVerificationRef.current ||
+        location.isAtBottom
+      ) {
+        return;
+      }
+
+      logger.info(
+        `[${sessionKey.slice(-6)}] USER SCROLLED during visible verification → early commit`
+      );
+      markSwitchTimeline('visible-user-scroll', 'commit-without-bottom-align');
+      userScrollIntentDuringVisibleVerificationRef.current = false;
+      tailProofVersionRef.current += 1;
+      emitVerificationResult('visible', 'visible-ready', tailProofVersionRef.current, {
+        alignBottomOnReady: false,
+      });
+    },
+    [effectiveVerificationPhase, emitVerificationResult, sessionKey]
+  );
 
   useEffect(() => {
     if (restorePhaseRef.current === 'stabilizing' && !hasResolvedVerificationRef.current) {
@@ -1800,10 +1957,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
 
       if (!metrics.tailSentinelRendered) {
-        // The DOM query for [data-tail-sentinel] can lag behind Virtuoso's
+        // The DOM query for [data-tail-sentinel] can lag behind the render data
         // internal render state by 1+ frames. For short sessions, this causes
         // the positioning phase to loop for 1500ms then timeout.
-        // Trust Virtuoso's render data: if the sentinel row is in the rendered
+        // Trust the render data: if the sentinel row is in the rendered
         // range, it WILL appear in the DOM within 1 frame. The stabilizing
         // phase's 48ms window catches any remaining layout drift.
         const sentinelInRenderRange = rendered.some((r) => r.id === lastMessageIdRef.current);
@@ -1817,7 +1974,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           }
           return false;
         }
-        // Sentinel is in Virtuoso's render range but not yet in the DOM.
+        // Sentinel is in the render range but not yet in the DOM.
         // Fall through to subsequent checks — trace this path so the
         // positioning gap is observable in session switch timelines.
         markSwitchTimeline(
@@ -1835,7 +1992,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           return false;
         }
 
-        if (!hasObservedPostProbeSurface(metrics)) {
+        if (!hasObservedPostProbeSurface()) {
           markSwitchTimeline('positioning:no-post-probe');
           return false;
         }
@@ -1896,121 +2053,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     ]
   );
 
-  const finishPremeasure = useCallback((): void => {
-    if (premeasureTimeoutRef.current !== null) {
-      window.clearTimeout(premeasureTimeoutRef.current);
-      premeasureTimeoutRef.current = null;
-    }
-
-    restorePhaseRef.current = 'positioning';
-    hasAttemptedPremeasureRef.current = true;
-    const handle = listRef.current;
-    if (!handle) {
-      needsRestoreRef.current = true;
-      restorePhaseRef.current = 'idle';
-      ensureListSurfaceReady();
-      return;
-    }
-
-    alignScrollerToBottom();
-    const rendered = handle.data.getCurrentlyRendered();
-    if (beginStabilizationIfTargetRendered(rendered)) {
-      return;
-    }
-
-    if (!hasAttemptedTailProbeRef.current) {
-      const sentinelAlreadyInRange = rendered.some((r) => r.id === lastMessageIdRef.current);
-      if (!sentinelAlreadyInRange && forceTailProbeRender()) {
-        return;
-      }
-    }
-
-    progressPositioningRef.current(rendered);
-  }, [
-    alignScrollerToBottom,
-    beginStabilizationIfTargetRendered,
-    ensureListSurfaceReady,
-    forceTailProbeRender,
-  ]);
-
-  const continuePremeasure = useCallback((): void => {
-    const metrics = getScrollerMetrics();
-    if (!metrics) {
-      finishPremeasure();
-      return;
-    }
-
-    const currentTop = metrics.scroller.scrollTop;
-    if (currentTop <= 0) {
-      finishPremeasure();
-      return;
-    }
-
-    const nextTop = Math.max(0, currentTop - PREMEASURE_STEP_PX);
-    if (nextTop === currentTop) {
-      finishPremeasure();
-      return;
-    }
-
-    metrics.scroller.scrollTop = nextTop;
-    startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
-    premeasureTimeoutRef.current = window.setTimeout(() => {
-      if (restorePhaseRef.current !== 'premeasuring') {
-        return;
-      }
-
-      continuePremeasure();
-    }, PREMEASURE_TIMEOUT_MS);
-  }, [finishPremeasure, getScrollerMetrics, startTemporaryResizeStabilityWindow]);
-
-  const startPremeasureIfNeeded = useCallback((): boolean => {
-    if (hasAttemptedPremeasureRef.current) {
-      return false;
-    }
-
-    if (hasAttemptedTailProbeRef.current) {
-      return false;
-    }
-
-    if (isVisible || restoredSizeCacheRef.current) {
-      return false;
-    }
-
-    const metrics = getScrollerMetrics();
-    if (!metrics) {
-      return false;
-    }
-
-    if (metrics.bottomTop <= metrics.clientHeight) {
-      return false;
-    }
-
-    const warmupTop = Math.max(0, metrics.bottomTop - PREMEASURE_STEP_PX);
-    if (warmupTop >= metrics.bottomTop) {
-      return false;
-    }
-
-    if (warmupTop === 0) {
-      hasAttemptedPremeasureRef.current = true;
-      return false;
-    }
-
-    restorePhaseRef.current = 'premeasuring';
-    setIsPremeasuring(true);
-    metrics.scroller.scrollTop = warmupTop;
-
-    startTemporaryResizeStabilityWindow('premeasuring', PREMEASURE_STABLE_MS, continuePremeasure);
-    premeasureTimeoutRef.current = window.setTimeout(() => {
-      if (restorePhaseRef.current !== 'premeasuring') {
-        return;
-      }
-
-      continuePremeasure();
-    }, PREMEASURE_TIMEOUT_MS);
-
-    return true;
-  }, [continuePremeasure, getScrollerMetrics, isVisible, startTemporaryResizeStabilityWindow]);
-
   const progressPositioning = useCallback(
     (rendered: ChatRenderRow[]): void => {
       markSwitchTimeline(
@@ -2044,12 +2086,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
-      if (startPremeasureIfNeeded()) {
-        return;
-      }
-
       if (effectiveVerificationPhase === 'hidden' && !hasAttemptedTailProbeRef.current) {
-        // Only probe if the sentinel is genuinely missing from Virtuoso's render
+        // Only probe if the sentinel is genuinely missing from the render
         // range. If it's already rendered (just not in the DOM yet), probing is
         // counterproductive: it sets hasAttemptedTailProbeRef which gates
         // hasObservedPostProbeSurface, and for short lists the surface snapshot
@@ -2074,25 +2112,23 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       layoutPendingCount,
       layoutSettledVersion,
       refreshReadinessTimeout,
-      startPremeasureIfNeeded,
     ]
   );
   progressPositioningRef.current = progressPositioning;
 
-  const handleRenderedDataChange = useCallback(
-    (rendered: ChatRenderRow[]): void => {
-      setLatestRenderedRowCount(rendered.length);
-      if (import.meta.env.DEV && overscanPhase === 'entry') {
-        performance.mark('rendered-item-count');
-      }
-      if (restorePhaseRef.current !== 'positioning') {
-        return;
-      }
+  // Track rendered data changes for verification positioning.
+  // Fires when the virtualizer's render range changes.
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const virtualItemCount = virtualItems.length;
 
-      progressPositioning(rendered);
-    },
-    [overscanPhase, progressPositioning]
-  );
+  useLayoutEffect(() => {
+    const count = virtualItemCount + nonVirtualizedRows.length;
+    latestRenderedRowCountRef.current = count;
+    if (restorePhaseRef.current !== 'positioning') {
+      return;
+    }
+    progressPositioningRef.current(getCurrentlyRenderedRows());
+  }, [virtualItemCount, nonVirtualizedRows.length, getCurrentlyRenderedRows]);
 
   useLayoutEffect(() => {
     const traceRoot = traceRootRef.current;
@@ -2101,14 +2137,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     traceRoot.dataset['switchTraceRoot'] = 'true';
-    traceRoot.dataset['renderedRowCount'] = String(latestRenderedRowCount);
+    traceRoot.dataset['renderedRowCount'] = String(latestRenderedRowCountRef.current);
     traceRoot.dataset['tailSentinelRendered'] = String(
       traceRoot.querySelector<HTMLElement>('[data-tail-sentinel="true"]') !== null
     );
     traceRoot.dataset['overscanPhase'] = overscanPhase;
     traceRoot.dataset['sizeCacheRestored'] = String(restoredSizeCacheRef.current);
-    traceRoot.dataset['purgeItemSizesUsed'] = String(purgeItemSizesUsedRef.current);
-  }, [latestRenderedRowCount, overscanPhase]);
+    traceRoot.dataset['restorePath'] = restorePathRef.current;
+  }, [overscanPhase]);
 
   // Capture the restore intent into a ref before the clear effect runs.
   // Also trigger for re-mounted hydrated instances (no session-restore intent,
@@ -2146,14 +2182,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       readinessStartedRef.current = false;
       tailProofVersionRef.current = 0;
       hasAttemptedTailProbeRef.current = false;
-      purgeItemSizesUsedRef.current = false;
       hiddenCandidateSnapshotRef.current = null;
       tailProbePlaceholderScrollHeightRef.current = null;
       tailProbePlaceholderSnapshotRef.current = null;
       tailProbeRealSurfaceSnapshotRef.current = null;
       tailProbeStartedAtRef.current = null;
       clearVisibleVerificationCandidate();
-      setIsPremeasuring(false);
       cancelReadinessWork();
       restorePhaseRef.current = 'idle';
     }
@@ -2197,10 +2231,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     // Lightweight hidden→visible promotion: the hidden phase already proved
-    // layout stability, so preserve Virtuoso's render state and let the
+    // layout stability, so preserve the render state and let the
     // preseed match fire immediately instead of restarting from positioning.
-    // Skipping setRestoreVersion / setIsReadyForSteady / setIsPremeasuring
-    // avoids the React re-render cycle that collapses Virtuoso to 2 rows.
+    // Skipping setRestoreVersion / setIsReadyForSteady avoids the React
+    // re-render cycle that collapses the list to 2 rows.
     if (
       previousVerificationPhaseRef.current === 'hidden' &&
       effectiveVerificationPhase === 'visible'
@@ -2230,10 +2264,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     previousVerificationPhaseRef.current = effectiveVerificationPhase;
     hasResolvedVerificationRef.current = false;
     needsRestoreRef.current = true;
+    userScrollIntentDuringVisibleVerificationRef.current = false;
     hasEverHadMessagesRef.current = messages.length > 0;
-    hasAttemptedPremeasureRef.current = false;
     hasAttemptedTailProbeRef.current = false;
-    purgeItemSizesUsedRef.current = false;
+    restorePathRef.current = 'cold';
     const preseededVisibleSnapshot =
       effectiveVerificationPhase === 'visible' ? hiddenReadySnapshotRef.current : null;
     hiddenCandidateSnapshotRef.current = null;
@@ -2256,16 +2290,21 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     // For keep-alive instances, the cache restore useLayoutEffect (line 621)
     // won't re-run because sessionId hasn't changed. Re-check the memory
     // cache synchronously so the instant hidden verification fast path can
-    // fire. Only re-set the flag — don't call setSizeRanges (Virtuoso
+    // fire. Only re-set the flag — don't reapply measurements (the list
     // retains its internal sizes across display mode transitions).
     if (sessionId) {
       const reCacheSession = useChatStore.getState().sessions[sessionId];
       if (reCacheSession) {
-        let reCache = reCacheSession.virtuosoSizeCache ?? null;
+        let reCache = reCacheSession.measurementCache ?? null;
         reCache ??= getRenderCache(sessionId);
         if (
           reCache !== null &&
-          isUsableRenderCache(reCacheSession, reCache, getCurrentViewportWidth())
+          isExactMeasurementCache(
+            reCacheSession,
+            reCache,
+            renderRows.length,
+            getCurrentViewportWidth()
+          )
         ) {
           restoredSizeCacheRef.current = true;
         }
@@ -2273,7 +2312,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     cancelReadinessWork();
-    setIsPremeasuring(false);
     setIsReadyForSteady(false);
     setRestoreVersion((v) => v + 1);
   }, [
@@ -2282,6 +2320,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     getCurrentViewportWidth,
     isVerifying,
     messages.length,
+    renderRows.length,
     clearVisibleVerificationCandidate,
     effectiveVerificationKey,
     effectiveVerificationPhase,
@@ -2291,22 +2330,23 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   useLayoutEffect(() => {
     if (!isVerifying || !needsRestoreRef.current || hasResolvedVerificationRef.current) return;
     if (!ensureListSurfaceReady()) {
+      logger.debug(`[${sessionKey.slice(-6)}] verification start BLOCKED — list surface not ready`);
       return;
     }
 
     needsRestoreRef.current = false;
 
-    const handle = listRef.current;
-    if (!handle) {
-      needsRestoreRef.current = true;
-      restorePhaseRef.current = 'idle';
-      return;
-    }
+    logger.info(`[${sessionKey.slice(-6)}] VERIFICATION START`, {
+      phase: effectiveVerificationPhase,
+      messageCount: messages.length,
+      restorePath: restorePathRef.current,
+      sizeCacheRestored: restoredSizeCacheRef.current,
+      isVisible,
+    });
 
     restorePhaseRef.current = 'positioning';
     alignScrollerToBottom();
     readinessStartedRef.current = false;
-    setIsPremeasuring(false);
     if (import.meta.env.DEV) {
       const startMarkName = sessionKey !== '' ? `readiness-start:${sessionKey}` : 'readiness-start';
       readinessStartMarkRef.current = startMarkName;
@@ -2319,10 +2359,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     );
 
     cancelReadinessWork();
-    progressPositioning(handle.data.getCurrentlyRendered());
+    progressPositioning(getCurrentlyRenderedRows());
   }, [
     alignScrollerToBottom,
     cancelReadinessWork,
+    getCurrentlyRenderedRows,
     isVisible,
     messages.length,
     sessionKey,
@@ -2341,8 +2382,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
-    listRef.current?.scrollToItem({ index: 'LAST', align: 'end' });
-  }, [messages.length, scrollIntent]);
+    scrollToLocation({ index: 'LAST', align: 'end' });
+  }, [messages.length, scrollIntent, scrollToLocation]);
 
   // Clear consumed scroll intent (safe — poll is ref-driven, not affected)
   useEffect(() => {
@@ -2354,10 +2395,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const previousIsVerifyingRef = useRef(isVerifying);
   useEffect(() => {
     if (previousIsVerifyingRef.current && !isVerifying) {
-      snapshotStableSizeCache();
+      snapshotStableMeasurementCache();
     }
     previousIsVerifyingRef.current = isVerifying;
-  }, [isVerifying, snapshotStableSizeCache]);
+  }, [isVerifying, snapshotStableMeasurementCache]);
 
   useEffect(() => {
     return (): void => {
@@ -2374,24 +2415,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
       clearVisibleVerificationCandidate();
       cancelReadinessWork();
-      snapshotStableSizeCache();
+      snapshotStableMeasurementCache();
     };
-  }, [cancelReadinessWork, clearVisibleVerificationCandidate, snapshotStableSizeCache]);
-
-  useLayoutEffect(() => {
-    if (
-      scrollIntent === 'pending-verify' ||
-      scrollIntent === 'session-restore' ||
-      scrollIntent === 'session-refresh'
-    ) {
-      lastPlacedMessagesRef.current = renderRows;
-      return;
-    }
-
-    if (lastPlacedMessagesRef.current !== renderRows) {
-      lastPlacedMessagesRef.current = null;
-    }
-  }, [messages.length, renderRows, scrollIntent]);
+  }, [cancelReadinessWork, clearVisibleVerificationCandidate, snapshotStableMeasurementCache]);
 
   // New user message: animate and force scroll to bottom.
   // The library's scroll modifiers handle streaming and subsequent messages.
@@ -2402,36 +2428,166 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (messages.length === prevCount + 1) {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'user') {
+        logger.info(
+          `[${sessionKey.slice(-6)}] new user message → animate + smooth scroll to bottom`,
+          {
+            messageId: lastMessage.id.slice(-6),
+            prevCount,
+            newCount: messages.length,
+          }
+        );
         setAnimatingMessageIds((prev) => new Set(prev).add(lastMessage.id));
-        listRef.current?.scrollToItem({ index: 'LAST', align: 'end', behavior: 'smooth' });
+        scrollToLocation({ index: 'LAST', align: 'end', behavior: 'smooth' });
+      } else if (lastMessage) {
+        logger.debug(`[${sessionKey.slice(-6)}] new ${lastMessage.role} message appended`, {
+          messageId: lastMessage.id.slice(-6),
+          prevCount,
+          newCount: messages.length,
+        });
       }
+    } else if (messages.length !== prevCount) {
+      logger.debug(
+        `[${sessionKey.slice(-6)}] message count changed: ${String(prevCount)} → ${String(messages.length)}`
+      );
     }
-  }, [messages]);
+  }, [messages, scrollToLocation, sessionKey]);
+
+  // Wire the verification scroll callback
+  onScrollCallbackRef.current = handleVisibleVerificationScroll;
+
+  // ── Render timing: measure React render cost ───────────────────────
+  // This runs synchronously at the end of render, before commit.
+  // The useLayoutEffect below fires after commit, giving us total cost.
+  const renderJsxStart = performance.now();
+  const renderDuration = renderJsxStart - renderStartMark;
+  // Log renders that exceed half a frame budget (>4ms)
+  if (renderDuration > 4 && sessionId) {
+    const sid = sessionId.slice(-6);
+    markSwitchTimeline(
+      'react-render',
+      `[${sid}] #${String(renderCountRef.current)} ${String(Math.round(renderDuration * 10) / 10)}ms phase=${String(effectiveVerificationPhase)} rows=${String(renderRows.length)} virt=${String(virtualizedRowCount)} overscan=${String(overscan)}`
+    );
+  }
 
   return (
     <ToolWidgetSessionContext.Provider value={sessionKey}>
       <ToolWidgetLayoutFrozenContext.Provider value={isVerifying}>
         <div ref={traceRootRef} className="flex-1 flex flex-col min-h-0">
-          <VirtuosoMessageListLicense licenseKey="a014c4870c11acfee45b6a7935dd7d97TzoyMjI7RToxODA2NjE2MDMxOTAz">
-            <VirtuosoMessageList<ChatRenderRow, MessageListContext>
-              ref={listRef}
-              initialData={renderRows}
-              data={messageListData}
-              context={messageListContext}
-              itemIdentity={(row) => row.id}
-              computeItemKey={computeItemKey}
-              ItemContent={MessageItemContent}
-              Footer={ChatFooter}
-              onRenderedDataChange={handleRenderedDataChange}
-              increaseViewportBy={overscan}
-              shortSizeAlign="top"
-              className="flex-1 overflow-x-hidden overscroll-y-contain"
-              style={LIST_STYLE}
-            />
-          </VirtuosoMessageListLicense>
+          <div
+            ref={scrollContainerRef}
+            data-testid="chat-scroller"
+            className="flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain"
+            style={LIST_STYLE}
+            onScroll={() => {
+              const scroller = scrollContainerRef.current;
+              if (scroller) {
+                updateBottomTracking(scroller);
+              }
+            }}
+            onWheel={(event) => {
+              if (event.deltaY < 0) {
+                pendingUserScrollUpIntentRef.current = true;
+              }
+            }}
+            onPointerDown={() => {
+              isPointerScrollActiveRef.current = true;
+            }}
+            onPointerUp={() => {
+              isPointerScrollActiveRef.current = false;
+            }}
+            onPointerCancel={() => {
+              isPointerScrollActiveRef.current = false;
+            }}
+            onTouchStart={(event) => {
+              const touch = event.touches[0];
+              if (touch) {
+                lastTouchClientYRef.current = touch.clientY;
+              }
+            }}
+            onTouchMove={(event) => {
+              const touch = event.touches[0];
+              if (!touch) return;
+              const prev = lastTouchClientYRef.current;
+              if (prev !== null && touch.clientY > prev + 1) {
+                pendingUserScrollUpIntentRef.current = true;
+              }
+              lastTouchClientYRef.current = touch.clientY;
+            }}
+            onTouchEnd={() => {
+              lastTouchClientYRef.current = null;
+            }}
+          >
+            {/* Virtualized region — the chat-list-inner element MUST always
+                exist in the DOM. findChatListSurface(), velocity scroll,
+                verification, and session-switch all query for it. When
+                virtualizedRowCount === 0 (≤8 messages), it renders as an
+                empty marker div so those systems still find a surface. */}
+            <div
+              ref={contentRef}
+              data-testid="chat-list-inner"
+              style={
+                virtualizedRowCount > 0
+                  ? {
+                      position: 'relative',
+                      height: rowVirtualizer.getTotalSize(),
+                      width: '100%',
+                    }
+                  : undefined
+              }
+            >
+              {virtualizedRowCount > 0 &&
+                virtualItems.map((item) => {
+                  const row = renderRows[item.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={String(item.key)}
+                      data-index={item.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${String(item.start)}px)`,
+                      }}
+                    >
+                      {renderMessageItem(row, item.index, messageListContext)}
+                    </div>
+                  );
+                })}
+            </div>
 
-          {/* Queued message stays OUTSIDE the list so the library's
-              isAtBottom detection (4px threshold) isn't broken by Footer content. */}
+            {/* Non-virtualized tail rows (always rendered) */}
+            <TailRowsTraced
+              rows={nonVirtualizedRows}
+              baseIndex={virtualizedRowCount}
+              context={messageListContext}
+              sessionKey={sessionKey}
+              verificationPhase={effectiveVerificationPhase}
+            />
+
+            {/* Thinking shimmer */}
+            {isAgentRunning ? (
+              <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+                <div className="flex items-center gap-2 px-[9px] py-2">
+                  <ShimmerText className="font-sans text-base text-foreground">
+                    Thinking
+                  </ShimmerText>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Tail sentinel */}
+            <div
+              data-tail-sentinel-id={tailSentinelDomId}
+              data-tail-sentinel="true"
+              className="h-px w-full shrink-0"
+              aria-hidden="true"
+            />
+          </div>
+
+          {/* Queued message outside scroller */}
           {queuedMessage !== null ? (
             <div className="shrink-0 mx-auto px-4 pb-2 w-full" style={CHAT_MAX_WIDTH_STYLE}>
               <QueuedMessageBubble message={queuedMessage} onCancel={onCancelQueue} />

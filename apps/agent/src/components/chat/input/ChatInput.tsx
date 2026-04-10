@@ -47,7 +47,7 @@ export const ChatInput: FC<ChatInputProps> = memo(function ChatInput({
   const model = useModel();
   // Subscribe directly to ToolStore instead of receiving as props from root.
   // This prevents BackendChatSurface (root) from re-rendering on switchSession,
-  // which would cascade through all 10 keep-alive VirtuosoMessageList instances.
+  // which would cascade through all 10 keep-alive message-list instances.
   const usage = useSessionUsage();
   const maxTokens = useMaxTokens();
 

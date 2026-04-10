@@ -257,7 +257,7 @@ describe('SessionInstanceManager', () => {
           layoutSettledVersion: 0,
           lastLayoutMutationAt: null,
           layoutLeakDeadlineAt: null,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -302,7 +302,7 @@ describe('SessionInstanceManager', () => {
           layoutSettledVersion: 0,
           lastLayoutMutationAt: null,
           layoutLeakDeadlineAt: null,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
         'session-hover-b': {
           messages: [],
@@ -315,7 +315,7 @@ describe('SessionInstanceManager', () => {
           layoutSettledVersion: 0,
           lastLayoutMutationAt: null,
           layoutLeakDeadlineAt: null,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });

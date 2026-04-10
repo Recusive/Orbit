@@ -59,17 +59,23 @@ export interface PendingMessage {
 
 export type SessionHydrationState = 'unloaded' | 'hydrated';
 
-/** Opaque Virtuoso item measurement ranges — shape from getSizeRanges(). */
-export type VirtuosoSizeRange = { k: number; v: number }[];
+export interface PersistedMeasurement {
+  key: string;
+  index: number;
+  start: number;
+  size: number;
+  end: number;
+  lane: number;
+  /** true = real ResizeObserver measurement, false/undefined = estimate */
+  measured?: boolean;
+}
 
-export interface VirtuosoSizeCache {
-  ranges: VirtuosoSizeRange;
+export interface ChatMeasurementCache {
+  measurements: PersistedMeasurement[];
   messageCount: number;
   lastMessageId: string | null;
-  /** Monotonic counter bumped on every height-affecting mutation. */
   layoutVersion: number;
-  /** Width of the chat scroller when the cache was captured. */
-  viewportWidth?: number | null;
+  viewportWidth: number | null;
 }
 
 export type ScrollIntent =
@@ -91,7 +97,7 @@ export interface ChatSessionData {
   layoutSettledVersion?: number;
   lastLayoutMutationAt?: number | null;
   layoutLeakDeadlineAt?: number | null;
-  virtuosoSizeCache: VirtuosoSizeCache | null;
+  measurementCache: ChatMeasurementCache | null;
 }
 
 export interface ActiveCompaction {
@@ -133,8 +139,8 @@ export interface ChatStoreState {
   markSessionHydrated: (id: string) => void;
   setScrollIntent: (id: string, intent: ScrollIntent | null) => void;
   clearScrollIntent: (id: string) => void;
-  setVirtuosoSizeCache: (id: string, cache: VirtuosoSizeCache | null) => void;
-  clearVirtuosoSizeCache: (id: string) => void;
+  setMeasurementCache: (id: string, cache: ChatMeasurementCache | null) => void;
+  clearMeasurementCache: (id: string) => void;
   bumpLayoutVersion: (id: string) => void;
   layoutMutationStart: (sessionId: string, source: string, timeoutMs?: number) => string;
   layoutMutationEnd: (sessionId: string, mutationToken: string) => void;
@@ -184,7 +190,7 @@ function createEmptySession(): ChatSessionData {
     layoutSettledVersion: 0,
     lastLayoutMutationAt: null,
     layoutLeakDeadlineAt: null,
-    virtuosoSizeCache: null,
+    measurementCache: null,
   };
 }
 
@@ -316,12 +322,12 @@ function evictIfNeeded(
 
     // Evict: clear messages but keep key for state tracking
     if (session) {
-      if (session.virtuosoSizeCache) {
-        saveRenderCache(candidate, session.virtuosoSizeCache);
+      if (session.measurementCache) {
+        saveRenderCache(candidate, session.measurementCache);
       }
       session.messages = [];
       session.hydrationState = 'unloaded';
-      session.virtuosoSizeCache = null;
+      session.measurementCache = null;
     }
     // Clear loadedSessions so switching back triggers a fresh conversation:load
     Reflect.deleteProperty(loadedSessions, candidate);
@@ -436,15 +442,15 @@ export const useChatStore = create<ChatStoreState>()(
         });
       },
 
-      setVirtuosoSizeCache: (id: string, cache: VirtuosoSizeCache | null): void => {
+      setMeasurementCache: (id: string, cache: ChatMeasurementCache | null): void => {
         set((draft) => {
           const session = draft.sessions[id];
           if (session) {
-            session.virtuosoSizeCache = cache;
+            session.measurementCache = cache;
           }
         });
 
-        if (cache) {
+        if (cache !== null) {
           saveRenderCache(id, cache);
           return;
         }
@@ -452,11 +458,11 @@ export const useChatStore = create<ChatStoreState>()(
         removeRenderCache(id);
       },
 
-      clearVirtuosoSizeCache: (id: string): void => {
+      clearMeasurementCache: (id: string): void => {
         set((draft) => {
           const session = draft.sessions[id];
           if (session) {
-            session.virtuosoSizeCache = null;
+            session.measurementCache = null;
           }
         });
 
@@ -906,7 +912,7 @@ export function useIsStopPending(): boolean {
 // Per-Session Selectors (Multi-Instance Keep-Alive)
 //
 // These read a SPECIFIC session by ID (not the active session). Used by
-// SessionInstance components so each keep-alive VirtuosoMessageList subscribes
+// SessionInstance components so each keep-alive message list subscribes
 // to its own session's data independently.
 // ────────────────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@/components/chat/messages/types';
+import type { ChatMeasurementCache } from '@/stores/chat/chat-store';
 
 import { useChatStore } from '@/stores/chat/chat-store';
 import { getRenderCache, removeRenderCache } from '@/stores/chat/render-cache-store';
@@ -33,7 +34,24 @@ function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   };
 }
 
-describe('ChatStore virtuoso size cache', () => {
+function buildMeasurementCache(messageCount: number): ChatMeasurementCache {
+  return {
+    measurements: Array.from({ length: messageCount }, (_value, index) => ({
+      key: `width:720:session-1:message-${String(index + 1)}`,
+      index,
+      start: index * 120,
+      size: 120,
+      end: (index + 1) * 120,
+      lane: 0,
+    })),
+    messageCount,
+    lastMessageId: messageCount > 0 ? `message-${String(messageCount)}` : null,
+    layoutVersion: messageCount,
+    viewportWidth: null,
+  };
+}
+
+describe('ChatStore measurement cache lifecycle', () => {
   beforeEach(() => {
     resetChatStore();
   });
@@ -84,35 +102,25 @@ describe('ChatStore virtuoso size cache', () => {
     expect(useChatStore.getState().sessions['session-1']?.layoutVersion).toBe(7);
   });
 
-  it('remaps the size cache along with the session', () => {
+  it('remaps the measurement cache along with the session', () => {
     const store = useChatStore.getState();
     store.getOrCreateSession('session-old');
-    store.setVirtuosoSizeCache('session-old', {
-      ranges: [{ k: 0, v: 120 }],
-      messageCount: 1,
-      lastMessageId: 'message-1',
-      layoutVersion: 0,
-    });
+    store.setMeasurementCache('session-old', buildMeasurementCache(1));
 
     store.remapSession('session-old', 'session-new');
 
-    expect(useChatStore.getState().sessions['session-new']?.virtuosoSizeCache).toEqual({
-      ranges: [{ k: 0, v: 120 }],
-      messageCount: 1,
-      lastMessageId: 'message-1',
-      layoutVersion: 0,
-    });
+    expect(useChatStore.getState().sessions['session-new']?.measurementCache).toEqual(
+      buildMeasurementCache(1)
+    );
     expect(useChatStore.getState().sessions['session-old']).toBeUndefined();
   });
 
-  it('clears the size cache when the session is evicted from memory', () => {
+  it('clears the measurement cache when the session is evicted from memory', () => {
     const store = useChatStore.getState();
     store.getOrCreateSession('session-1');
     store.setMessages('session-1', [buildMessage({ id: 'message-1' })]);
-    store.setVirtuosoSizeCache('session-1', {
-      ranges: [{ k: 0, v: 120 }],
-      messageCount: 1,
-      lastMessageId: 'message-1',
+    store.setMeasurementCache('session-1', {
+      ...buildMeasurementCache(1),
       layoutVersion: useChatStore.getState().sessions['session-1']?.layoutVersion ?? 0,
     });
 
@@ -121,9 +129,18 @@ describe('ChatStore virtuoso size cache', () => {
     }
 
     expect(useChatStore.getState().sessions['session-1']?.messages).toEqual([]);
-    expect(useChatStore.getState().sessions['session-1']?.virtuosoSizeCache).toBeNull();
+    expect(useChatStore.getState().sessions['session-1']?.measurementCache).toBeNull();
     expect(getRenderCache('session-1')).toEqual({
-      ranges: [{ k: 0, v: 120 }],
+      measurements: [
+        {
+          key: 'width:720:session-1:message-1',
+          index: 0,
+          start: 0,
+          size: 120,
+          end: 120,
+          lane: 0,
+        },
+      ],
       messageCount: 1,
       lastMessageId: 'message-1',
       layoutVersion: 1,
@@ -134,12 +151,7 @@ describe('ChatStore virtuoso size cache', () => {
   it('removes the persistent render cache when the session is destroyed', () => {
     const store = useChatStore.getState();
     store.getOrCreateSession('session-1');
-    store.setVirtuosoSizeCache('session-1', {
-      ranges: [{ k: 0, v: 120 }],
-      messageCount: 1,
-      lastMessageId: 'message-1',
-      layoutVersion: 0,
-    });
+    store.setMeasurementCache('session-1', buildMeasurementCache(1));
 
     store.destroySession('session-1');
 

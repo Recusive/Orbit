@@ -80,7 +80,7 @@ describe('ChatContent render invariants', () => {
           scrollIntent: null,
           hydrationState: 'unloaded',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -127,7 +127,7 @@ describe('ChatContent render invariants', () => {
           scrollIntent: null,
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });
@@ -175,7 +175,7 @@ describe('ChatContent render invariants', () => {
           scrollIntent: null,
           hydrationState: 'hydrated',
           layoutVersion: 0,
-          virtuosoSizeCache: null,
+          measurementCache: null,
         },
       },
     });

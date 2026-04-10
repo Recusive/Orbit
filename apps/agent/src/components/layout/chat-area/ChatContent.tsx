@@ -1,3 +1,4 @@
+import { createLogger } from '@orbit/common/lib';
 import { useCallback, useRef } from 'react';
 
 import { SessionInstanceManager } from './SessionInstanceManager';
@@ -6,6 +7,8 @@ import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
 import type { ChatContentProps } from './types';
 import type { SessionVerificationResult } from '@/services/conversations/session-switch-coordinator';
 import type { FC } from 'react';
+
+const logger = createLogger('ChatContent');
 
 import { AuthErrorBanner, ChatInput, TodoBar } from '@/components/chat';
 import { StatusAnnouncer } from '@/components/shared';
@@ -28,8 +31,8 @@ import { useUIStore, useVaultOpen } from '@/stores/ui/ui-store';
  * Chat content section handling both empty and messages states
  *
  * - Empty state: Input positioned above center with paddingBottom
- * - Messages state: SessionInstanceManager renders keep-alive VirtuosoMessageList
- *   instances per recently-visited session (Discord/Slack pattern)
+ * - Messages state: SessionInstanceManager renders keep-alive virtualized
+ *   message-list instances per recently-visited session (Discord/Slack pattern)
  *
  * Drop target for file-explorer drag-and-drop: marked with
  * data-orbit-drop-zone="chat" so the source-side handleDragEnd
@@ -100,15 +103,23 @@ export const ChatContent: FC<ChatContentProps> = ({
 
   const handlePendingVerificationResult = useCallback(
     (result: SessionVerificationResult): void => {
+      const sid = result.sessionId.slice(-6);
       if (
         pendingSessionId === undefined ||
         result.sessionId !== pendingSessionId ||
         result.requestId !== sessionSwitchRequestId
       ) {
+        logger.debug(`[${sid}] verification result IGNORED (stale/mismatch)`, {
+          result: result.result,
+          phase: result.phase,
+          expectedPending: pendingSessionId?.slice(-6),
+          expectedRequestId: sessionSwitchRequestId,
+        });
         return;
       }
 
       if (result.result === 'hidden-ready') {
+        logger.info(`[${sid}] HIDDEN READY → promoting to visible verification`);
         const activeElement =
           document.activeElement instanceof HTMLElement ? document.activeElement : null;
         focusRestoreRef.current = activeElement;
@@ -121,15 +132,20 @@ export const ChatContent: FC<ChatContentProps> = ({
       }
 
       if (result.result === 'visible-ready') {
+        logger.info(`[${sid}] VISIBLE READY → committing session reveal`);
         commitSessionReveal(result.requestId, result.sessionId, pendingConversationTitle);
         focusRestoreRef.current = null;
         return;
       }
 
       if (result.result === 'aborted') {
+        logger.debug(`[${sid}] verification aborted`);
         return;
       }
 
+      logger.warn(`[${sid}] VERIFICATION TIMEOUT → aborting switch`, {
+        phase: result.phase,
+      });
       abortSessionSwitch(
         result.requestId,
         result.phase === 'hidden' ? 'hidden_timeout' : 'visible_timeout'

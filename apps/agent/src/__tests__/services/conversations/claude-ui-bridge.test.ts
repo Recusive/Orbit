@@ -104,7 +104,7 @@ function mountReadySessionInstance(sessionId: string): void {
   instance.setAttribute('data-tail-proof-version', '1');
 
   const scroller = document.createElement('div');
-  scroller.setAttribute('data-testid', 'virtuoso-scroller');
+  scroller.setAttribute('data-testid', 'chat-scroller');
   Object.defineProperty(scroller, 'scrollHeight', {
     configurable: true,
     value: 1200,

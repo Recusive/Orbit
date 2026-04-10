@@ -24,7 +24,7 @@ const Harness: FC<HarnessProps> = ({ enabled, onUserScrollStart }) => {
 
   return (
     <div data-testid="scroller" ref={ref}>
-      <div data-testid="virtuoso-list" />
+      <div data-testid="chat-list-inner" />
     </div>
   );
 };
@@ -55,7 +55,7 @@ const PrimingHarness: FC = () => {
 
   return (
     <div data-testid="priming-scroller" ref={scrollerRef}>
-      <div data-testid="virtuoso-list" />
+      <div data-testid="chat-list-inner" />
     </div>
   );
 };

@@ -5,7 +5,7 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
-import { code } from '@streamdown/code';
+import { code as shikiCode } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
 import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import remarkGfm from 'remark-gfm';
@@ -75,6 +75,18 @@ const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
+// Wrapper: unlabeled code blocks (```  with no language) default to markdown highlighting
+// instead of Shiki's internal "text" fallback which produces no syntax colors.
+const code: typeof shikiCode = {
+  ...shikiCode,
+  highlight: (...args: Parameters<typeof shikiCode.highlight>) => {
+    const [options, callback] = args;
+    const language = shikiCode.supportsLanguage(options.language)
+      ? options.language
+      : ('markdown' as typeof options.language);
+    return shikiCode.highlight({ ...options, language }, callback);
+  },
+};
 const STREAMDOWN_PLUGINS = { mermaid, code };
 const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 
