@@ -415,6 +415,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   renderCountRef.current += 1;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const scrollContentWrapperRef = useRef<HTMLDivElement>(null);
   const estimatedSizesRef = useRef<number[]>([]);
   const initialMeasurementsCacheRef = useRef<VirtualItem[]>([]);
   const prevMessageCount = useRef(0);
@@ -722,10 +723,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Auto-scroll when content grows while at bottom
+  // Auto-scroll when content grows while at bottom.
+  // Observes scrollContentWrapperRef (which wraps BOTH the virtualizer inner
+  // AND the non-virtualized tail rows) so that growth from streaming tail
+  // content triggers stick-to-bottom. Previously observed contentRef
+  // (chat-list-inner) which missed tail-row growth during streaming.
   useEffect(() => {
-    const content = contentRef.current;
-    if (content === null || typeof ResizeObserver === 'undefined') {
+    const wrapper = scrollContentWrapperRef.current;
+    if (wrapper === null || typeof ResizeObserver === 'undefined') {
       return;
     }
 
@@ -736,7 +741,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       scheduleStickToBottom('auto');
     });
 
-    observer.observe(content, { box: 'border-box' });
+    observer.observe(wrapper, { box: 'border-box' });
     return (): void => {
       observer.disconnect();
     };
@@ -2517,74 +2522,81 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               lastTouchClientYRef.current = null;
             }}
           >
-            {/* Virtualized region — the chat-list-inner element MUST always
+            {/* Wrapper observed by ResizeObserver for auto-scroll.
+                Must contain both the virtualized region AND the
+                non-virtualized tail rows so the observer fires when
+                streaming content grows outside the virtualizer. */}
+            <div ref={scrollContentWrapperRef}>
+              {/* Virtualized region — the chat-list-inner element MUST always
                 exist in the DOM. findChatListSurface(), velocity scroll,
                 verification, and session-switch all query for it. When
                 virtualizedRowCount === 0 (≤8 messages), it renders as an
                 empty marker div so those systems still find a surface. */}
-            <div
-              ref={contentRef}
-              data-testid="chat-list-inner"
-              style={
-                virtualizedRowCount > 0
-                  ? {
-                      position: 'relative',
-                      height: rowVirtualizer.getTotalSize(),
-                      width: '100%',
-                    }
-                  : undefined
-              }
-            >
-              {virtualizedRowCount > 0 &&
-                virtualItems.map((item) => {
-                  const row = renderRows[item.index];
-                  if (!row) return null;
-                  return (
-                    <div
-                      key={String(item.key)}
-                      data-index={item.index}
-                      ref={rowVirtualizer.measureElement}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
+              <div
+                ref={contentRef}
+                data-testid="chat-list-inner"
+                style={
+                  virtualizedRowCount > 0
+                    ? {
+                        position: 'relative',
+                        height: rowVirtualizer.getTotalSize(),
                         width: '100%',
-                        transform: `translateY(${String(item.start)}px)`,
-                      }}
-                    >
-                      {renderMessageItem(row, item.index, messageListContext)}
-                    </div>
-                  );
-                })}
-            </div>
-
-            {/* Non-virtualized tail rows (always rendered) */}
-            <TailRowsTraced
-              rows={nonVirtualizedRows}
-              baseIndex={virtualizedRowCount}
-              context={messageListContext}
-              sessionKey={sessionKey}
-              verificationPhase={effectiveVerificationPhase}
-            />
-
-            {/* Thinking shimmer */}
-            {isAgentRunning ? (
-              <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-                <div className="flex items-center gap-2 px-[9px] py-2">
-                  <ShimmerText className="font-sans text-base text-foreground">
-                    Thinking
-                  </ShimmerText>
-                </div>
+                      }
+                    : undefined
+                }
+              >
+                {virtualizedRowCount > 0 &&
+                  virtualItems.map((item) => {
+                    const row = renderRows[item.index];
+                    if (!row) return null;
+                    return (
+                      <div
+                        key={String(item.key)}
+                        data-index={item.index}
+                        ref={rowVirtualizer.measureElement}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${String(item.start)}px)`,
+                        }}
+                      >
+                        {renderMessageItem(row, item.index, messageListContext)}
+                      </div>
+                    );
+                  })}
               </div>
-            ) : null}
 
-            {/* Tail sentinel */}
-            <div
-              data-tail-sentinel-id={tailSentinelDomId}
-              data-tail-sentinel="true"
-              className="h-px w-full shrink-0"
-              aria-hidden="true"
-            />
+              {/* Non-virtualized tail rows (always rendered) */}
+              <TailRowsTraced
+                rows={nonVirtualizedRows}
+                baseIndex={virtualizedRowCount}
+                context={messageListContext}
+                sessionKey={sessionKey}
+                verificationPhase={effectiveVerificationPhase}
+              />
+
+              {/* Thinking shimmer */}
+              {isAgentRunning ? (
+                <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+                  <div className="flex items-center gap-2 px-[9px] py-2">
+                    <ShimmerText className="font-sans text-base text-foreground">
+                      Thinking
+                    </ShimmerText>
+                  </div>
+                </div>
+              ) : null}
+
+              {/* Tail sentinel */}
+              <div
+                data-tail-sentinel-id={tailSentinelDomId}
+                data-tail-sentinel="true"
+                className="h-px w-full shrink-0"
+                aria-hidden="true"
+              />
+            </div>
+            {/* end scrollContentWrapperRef */}
           </div>
 
           {/* Queued message outside scroller */}
