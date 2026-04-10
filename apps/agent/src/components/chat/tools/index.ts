@@ -10,7 +10,6 @@ export { PlanToolWidget } from './plan-tool-widget';
 export { ReadToolWidget } from './read-tool-widget';
 export { SkillToolWidget } from './skill-tool-widget';
 export { TaskToolWidget } from './task-tool-widget';
-export { TodoToolWidget } from './todo-tool-widget';
 export { WebFetchToolWidget } from './web-fetch-tool-widget';
 export { WebSearchToolWidget } from './web-search-tool-widget';
 export { WriteToolWidget } from './write-tool-widget';

@@ -279,10 +279,3 @@ export const ContextOutputUsage: FC<{ readonly className?: string }> = ({ classN
   const tokens = usage?.completionTokens ?? 0;
   return <UsageLine label="Output" tokens={tokens} className={className} />;
 };
-
-// Total usage
-export const ContextTotalUsage: FC<{ readonly className?: string }> = ({ className }) => {
-  const { usage } = useContextData();
-  const tokens = usage?.totalTokens ?? 0;
-  return <UsageLine label="Total" tokens={tokens} className={className} />;
-};

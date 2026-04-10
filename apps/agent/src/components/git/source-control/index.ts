@@ -8,7 +8,6 @@ export type { SourceControlTabProps } from './types';
 
 // Sub-components (for advanced usage)
 export { BranchSelector } from './components/BranchSelector';
-export { ChangeItem } from './components/ChangeItem';
 export { ChangesList } from './components/ChangesList';
 export { CommitForm } from './components/CommitForm';
 export { DiffFileCard } from './components/DiffFileCard';

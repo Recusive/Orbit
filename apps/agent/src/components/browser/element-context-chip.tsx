@@ -178,28 +178,3 @@ export const ElementContextChip: FC<ElementContextChipProps> = ({
     </div>
   );
 };
-
-// Compact list of element chips for chat input
-export interface ElementContextListProps {
-  readonly elements: ReactElementContext[];
-  readonly onRemove: (index: number) => void;
-}
-
-export const ElementContextList: FC<ElementContextListProps> = ({ elements, onRemove }) => {
-  if (elements.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap gap-1.5 px-3 py-2 border-b border-border bg-lg-control">
-      {elements.map((element, index) => (
-        <ElementContextChip
-          key={`${element.displayName}-${String(index)}`}
-          element={element}
-          onRemove={(): void => {
-            onRemove(index);
-          }}
-          compact
-        />
-      ))}
-    </div>
-  );
-};

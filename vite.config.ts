@@ -148,10 +148,7 @@ export default defineConfig({
             return 'vendor-streamdown';
           }
           // Pierre diffs — bundles Shiki internally for syntax highlighting (~200KB)
-          if (
-            id.includes('node_modules/@pierre/diffs') ||
-            id.includes('node_modules/@pierre/precision-diffs')
-          ) {
+          if (id.includes('node_modules/@pierre/diffs')) {
             return 'vendor-pierre-diffs';
           }
           // All other node_modules will be bundled together into the main vendor chunk
@@ -198,9 +195,6 @@ export default defineConfig({
       '@lexical/react/LexicalErrorBoundary',
       '@lexical/react/LexicalHistoryPlugin',
       '@lexical/react/LexicalPlainTextPlugin',
-      '@lexical/plain-text',
-      '@lexical/history',
-      '@lexical/selection',
       // xterm packages must be pre-bundled to prevent runtime discovery that triggers
       // 504 "Outdated Optimize Dep" errors — especially in Tauri's WKWebView which
       // doesn't handle Vite's full-reload recovery as well as a regular browser.
@@ -211,7 +205,6 @@ export default defineConfig({
       // Pierre diffs — pre-bundle to prevent stale cache in dev
       '@pierre/diffs',
       '@pierre/diffs/react',
-      '@pierre/precision-diffs',
       // Milkdown Crepe — lazy-loaded by VaultCrepeEditor, must be pre-bundled to prevent
       // runtime discovery triggering 504 "Outdated Optimize Dep" in Tauri's WKWebView.
       '@milkdown/crepe',

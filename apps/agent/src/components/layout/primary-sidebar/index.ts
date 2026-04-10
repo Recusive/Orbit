@@ -13,7 +13,6 @@ export {
   ConversationList,
   SidebarItem,
   SidebarToggleIcon,
-  TabButton,
   WorkspaceItem,
 } from './components';
 
@@ -28,6 +27,5 @@ export type {
   SidebarItemProps,
   SidebarTab,
   SidebarToggleIconProps,
-  TabButtonProps,
   WorkspaceItemProps,
 } from './types';
