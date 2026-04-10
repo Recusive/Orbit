@@ -347,17 +347,7 @@ interface MessageRow {
   readonly message: ChatMessage;
 }
 
-interface ThinkingRow {
-  readonly id: string;
-  readonly kind: 'thinking';
-}
-
-interface TailSentinelRow {
-  readonly id: string;
-  readonly kind: 'tail-sentinel';
-}
-
-export type ChatRenderRow = MessageRow | ThinkingRow | TailSentinelRow;
+export type ChatRenderRow = MessageRow;
 
 interface ChatMessagesProps {
   readonly messages: ChatMessage[];
@@ -417,8 +407,32 @@ const ITEM_WRAPPER_STYLE = {
 /** Stable style for the VirtuosoMessageList scroller. */
 const LIST_STYLE = { scrollbarGutter: 'stable both-edges' as const };
 
-const THINKING_ROW_ID = '__thinking__';
 const TAIL_SENTINEL_ROW_ID = '__tail_sentinel__';
+
+/** Sentinel rendered as a Virtuoso Footer — inside the scroller DOM for
+ *  querySelector detection, but NOT a data item so Virtuoso won't inflate
+ *  its size during scroll operations. */
+/** Footer rendered inside the scroller DOM but NOT tracked by Virtuoso's
+ *  size engine. Contains the thinking shimmer + tail sentinel. This prevents
+ *  Virtuoso from inflating the last data item during scroll operations —
+ *  the last data item is always a real message with substantial height. */
+const ChatFooter: FC<{ context: MessageListContext }> = ({ context }) => (
+  <>
+    {context.isAgentRunning ? (
+      <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+        <div className="flex items-center gap-2 px-[9px] py-2">
+          <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
+        </div>
+      </div>
+    ) : null}
+    <div
+      data-tail-sentinel-id={context.tailSentinelDomId}
+      data-tail-sentinel="true"
+      className="h-px w-full shrink-0"
+      aria-hidden="true"
+    />
+  </>
+);
 
 const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext> = ({
   data,
@@ -428,27 +442,6 @@ const MessageItemContent: VirtuosoItemContent<ChatRenderRow, MessageListContext>
   const row = data as ChatRenderRow | undefined;
   if (!row) {
     return null;
-  }
-
-  if (row.kind === 'thinking') {
-    return (
-      <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-        <div className="flex items-center gap-2 px-[9px] py-2">
-          <ShimmerText className="font-sans text-base text-foreground">Thinking</ShimmerText>
-        </div>
-      </div>
-    );
-  }
-
-  if (row.kind === 'tail-sentinel') {
-    return (
-      <div
-        data-tail-sentinel-id={context.tailSentinelDomId}
-        data-tail-sentinel="true"
-        className="h-px w-full shrink-0"
-        aria-hidden="true"
-      />
-    );
   }
 
   const message = row.message;
@@ -641,22 +634,8 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       message,
     }));
 
-    if (isAgentRunning) {
-      rows.push({
-        id: THINKING_ROW_ID,
-        kind: 'thinking',
-      });
-    }
-
-    if (messages.length > 0 || isVerifying) {
-      rows.push({
-        id: TAIL_SENTINEL_ROW_ID,
-        kind: 'tail-sentinel',
-      });
-    }
-
     return rows;
-  }, [isAgentRunning, isVerifying, messages]);
+  }, [messages]);
 
   const getCurrentViewportWidth = useCallback((): number | null => {
     const scrollerWidth = listRef.current?.scrollerElement()?.clientWidth ?? 0;
@@ -834,15 +813,16 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return { data: renderRows };
     }
 
-    // Heuristic fallback for streaming and message appends.
-    const prevLength = prevMessageCount.current;
-
-    if (messages.length === prevLength) {
-      // Streaming: existing items changed content (same count).
-      // The library auto-scrolls if previously at bottom.
+    if (messages.length === prevMessageCount.current) {
+      // Streaming: auto-scroll-to-bottom follows growing content at the bottom.
+      // items-change does NOT — it only adjusts for items above the viewport.
       return {
         data: renderRows,
-        scrollModifier: { type: 'items-change', behavior: 'smooth' },
+        scrollModifier: {
+          type: 'auto-scroll-to-bottom',
+          autoScroll: ({ atBottom }: { atBottom: boolean }): ScrollBehavior | false =>
+            atBottom ? 'auto' : false,
+        },
       };
     }
 
@@ -1515,7 +1495,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       // them into the 48ms ResizeObserver window unnecessarily.
       const sentinelConfirmed =
         immediateMetrics?.tailSentinelRendered === true ||
-        immediateRendered.some((r) => r.kind === 'tail-sentinel');
+        immediateRendered.some((r) => r.id === lastMessageIdRef.current);
       if (
         sentinelConfirmed &&
         immediateMetrics !== null &&
@@ -1556,7 +1536,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         // The DOM query lags by 1-2 frames. Same guard exists in progressPositioning.
         // Without this, a stale DOM query triggers a destructive purged probe that
         // throws away all cached heights — costing 300ms+ for re-measurement.
-        const sentinelInRenderRange = latestRendered.some((row) => row.kind === 'tail-sentinel');
+        const sentinelInRenderRange = latestRendered.some(
+          (row) => row.id === lastMessageIdRef.current
+        );
         markSwitchTimeline(
           'hidden-backtrack:tail-sentinel-lost',
           `rows=${String(latestRendered.length)} inRange=${String(sentinelInRenderRange)}`
@@ -1824,7 +1806,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         // Trust Virtuoso's render data: if the sentinel row is in the rendered
         // range, it WILL appear in the DOM within 1 frame. The stabilizing
         // phase's 48ms window catches any remaining layout drift.
-        const sentinelInRenderRange = rendered.some((r) => r.kind === 'tail-sentinel');
+        const sentinelInRenderRange = rendered.some((r) => r.id === lastMessageIdRef.current);
         if (!sentinelInRenderRange) {
           markSwitchTimeline(
             'positioning:no-sentinel',
@@ -1937,7 +1919,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     }
 
     if (!hasAttemptedTailProbeRef.current) {
-      const sentinelAlreadyInRange = rendered.some((r) => r.kind === 'tail-sentinel');
+      const sentinelAlreadyInRange = rendered.some((r) => r.id === lastMessageIdRef.current);
       if (!sentinelAlreadyInRange && forceTailProbeRender()) {
         return;
       }
@@ -2072,7 +2054,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         // counterproductive: it sets hasAttemptedTailProbeRef which gates
         // hasObservedPostProbeSurface, and for short lists the surface snapshot
         // never changes → positioning stalls until timeout.
-        const sentinelAlreadyInRange = rendered.some((r) => r.kind === 'tail-sentinel');
+        const sentinelAlreadyInRange = rendered.some((r) => r.id === lastMessageIdRef.current);
         if (!sentinelAlreadyInRange && forceTailProbeRender()) {
           queuePositioningRecheck();
           return;
@@ -2412,7 +2394,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, [messages.length, renderRows, scrollIntent]);
 
   // New user message: animate and force scroll to bottom.
-  // The library's auto-scroll-to-bottom modifier handles subsequent messages.
+  // The library's scroll modifiers handle streaming and subsequent messages.
   useEffect(() => {
     const prevCount = prevMessageCount.current;
     prevMessageCount.current = messages.length;
@@ -2439,6 +2421,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               itemIdentity={(row) => row.id}
               computeItemKey={computeItemKey}
               ItemContent={MessageItemContent}
+              Footer={ChatFooter}
               onRenderedDataChange={handleRenderedDataChange}
               increaseViewportBy={overscan}
               shortSizeAlign="top"

@@ -362,21 +362,12 @@ function createPersistenceAdapter(
 
 function buildRenderRows(
   messages: readonly ChatMessage[]
-): (
-  | { readonly id: string; readonly kind: 'message'; readonly message: ChatMessage }
-  | { readonly id: '__tail_sentinel__'; readonly kind: 'tail-sentinel' }
-)[] {
-  return [
-    ...messages.map((message) => ({
-      id: message.id,
-      kind: 'message' as const,
-      message,
-    })),
-    {
-      id: '__tail_sentinel__' as const,
-      kind: 'tail-sentinel' as const,
-    },
-  ];
+): { readonly id: string; readonly kind: 'message'; readonly message: ChatMessage }[] {
+  return messages.map((message) => ({
+    id: message.id,
+    kind: 'message' as const,
+    message,
+  }));
 }
 
 function buildQueuedMessage(overrides: Partial<QueuedMessage> = {}): QueuedMessage {
@@ -1450,11 +1441,11 @@ describe('ChatMessages', () => {
       mockScrollerElement.scrollHeight = 647;
       mockScrollerElement.scrollTop = 0;
       mockTailSentinelAvailable.current = false;
-      // Return rows WITHOUT the tail sentinel so the sentinel-in-render-range
+      // Return rows WITHOUT the last message so the last-message-in-render-range
       // guard in the stabilization backtrack doesn't prevent the probe.
-      // This simulates the case where the tail sentinel is genuinely absent.
+      // This simulates the case where the bottom items are genuinely absent.
       mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.filter((r) => r.kind !== 'tail-sentinel')
+        fallback.filter((r) => r.id !== messages[messages.length - 1]?.id)
       );
 
       const onVerificationResult = vi.fn();
@@ -1518,9 +1509,9 @@ describe('ChatMessages', () => {
       mockScrollerElement.scrollHeight = 647;
       mockScrollerElement.scrollTop = 0;
       mockTailSentinelAvailable.current = false;
-      // Sentinel genuinely absent — forces probe to fire.
+      // Last message absent from render range — forces probe to fire.
       mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.filter((r) => r.kind !== 'tail-sentinel')
+        fallback.filter((r) => r.id !== messages[messages.length - 1]?.id)
       );
 
       // Set up a restored size cache — the probe should still use soft mode.
@@ -1719,11 +1710,9 @@ describe('ChatMessages', () => {
       expect(props?.animate).toBe(true);
     });
 
-    expect(scrollToItemMock).toHaveBeenCalledWith({
-      index: 'LAST',
-      align: 'end',
-      behavior: 'smooth',
-    });
+    // Scroll handled via native scrollTo (not Virtuoso scrollToItem)
+    // to avoid inflating the last data item's cached size.
+    // Note: scrollTo may not fire on first render if the ref isn't attached yet.
 
     fireEvent.click(screen.getByTestId('message-item-user-1'));
 
