@@ -1,6 +1,7 @@
 import * as Sentry from '@sentry/react';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
+import type { ChatScrollHandle } from '@/components/chat/chat-messages';
 import type {
   EffortLevel,
   Model,
@@ -8,6 +9,7 @@ import type {
   ThinkingMode,
   WebviewMessage,
 } from '@/types/protocol';
+import type { RefObject } from 'react';
 
 import { useVaultStore } from '@/features/vault/stores';
 import { conversationAddMessage } from '@/lib/api';
@@ -41,6 +43,7 @@ import { useUIStore } from '@/stores/ui/ui-store';
  */
 interface ChatActionsDeps {
   postMessage: (message: WebviewMessage) => void;
+  scrollHandleRef?: RefObject<ChatScrollHandle | null>;
 }
 
 interface ChatOpenHandlers {
@@ -89,7 +92,7 @@ function persistConversationMessage(
 }
 
 export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
-  const { postMessage } = deps;
+  const { postMessage, scrollHandleRef } = deps;
   const { handleOpenFile, handleOpenUrl } = createChatOpenHandlers(deps);
 
   /**
@@ -241,6 +244,12 @@ export function createChatActions(deps: ChatActionsDeps): ChatActionsReturn {
         useChatStore.getState().addMessage(sessionId, userMessage);
         cacheAttachedImagesForMessage(sessionId, userMessage.id, images);
         useChatStore.getState().setAgentRunning(sessionId, true);
+
+        // Force the optimistic user bubble into view. This handles the race
+        // where the composer has just grown (e.g. multi-line draft) and the
+        // React-state stick-to-bottom trigger would otherwise scroll one frame
+        // later against a stale viewport height.
+        scrollHandleRef?.current?.forceStickToBottom();
 
         // Persist user message to backend
         persistConversationMessage(

@@ -130,11 +130,24 @@ export interface ChatStoreState {
   activeCompactions: Record<string, ActiveCompaction>;
   /** LRU access order for eviction (most recently accessed at end) */
   lruOrder: LruTracker;
+  /**
+   * Transient force-stick request keyed by session ID. Set by the pending-create
+   * flow in use-chat-messages.ts when a new conversation's first message is sent;
+   * consumed by the target ChatMessages instance on mount via useLayoutEffect.
+   * Works around the timing gap where scrollHandleRef is null at request time
+   * because the target instance hasn't mounted yet (SessionInstanceManager only
+   * forwards the handle to shown instances, and session transitions through
+   * hidden-priming and visible-verifying before reaching shown). Single-fire:
+   * consumeForceStick clears the flag once consumed.
+   */
+  pendingForceStickSessionId: string | null;
 
   // ── Actions ───────────────────────────────────────────────────────────
   getOrCreateSession: (id: string) => ChatSessionData;
   setActiveSession: (id: string) => void;
   clearActiveSession: () => void;
+  requestForceStick: (sessionId: string) => void;
+  consumeForceStick: (sessionId: string) => boolean;
   setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null) => void;
   markSessionHydrated: (id: string) => void;
   setScrollIntent: (id: string, intent: ScrollIntent | null) => void;
@@ -357,6 +370,7 @@ export const useChatStore = create<ChatStoreState>()(
       conversationLoadEpoch: 0,
       loadedSessions: {},
       lruOrder: [],
+      pendingForceStickSessionId: null,
 
       // ── Actions ─────────────────────────────────────────────────────
 
@@ -399,6 +413,23 @@ export const useChatStore = create<ChatStoreState>()(
         set((draft) => {
           draft.activeSessionId = null;
         });
+      },
+
+      requestForceStick: (sessionId: string): void => {
+        set((draft) => {
+          draft.pendingForceStickSessionId = sessionId;
+        });
+      },
+
+      consumeForceStick: (sessionId: string): boolean => {
+        const state = get();
+        if (state.pendingForceStickSessionId !== sessionId) {
+          return false;
+        }
+        set((draft) => {
+          draft.pendingForceStickSessionId = null;
+        });
+        return true;
       },
 
       setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null): void => {

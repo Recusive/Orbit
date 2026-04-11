@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef } from 'react';
 
+import type { ChatScrollHandle } from '@/components/chat/chat-messages';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { FC } from 'react';
 
@@ -24,6 +25,7 @@ const ClaudeAgentSurface: FC = () => {
   const thinkingMode = useThinkingMode();
   const effortLevel = useEffortLevel();
   const allPendingPermissions = usePendingPermissions();
+  const chatScrollHandleRef = useRef<ChatScrollHandle | null>(null);
   const {
     messages,
     isAgentRunning,
@@ -42,7 +44,7 @@ const ClaudeAgentSurface: FC = () => {
     handleThinkingModeChange,
     handleEffortLevelChange,
     handleModelChange,
-  } = useChatMessages();
+  } = useChatMessages({ scrollHandleRef: chatScrollHandleRef });
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -100,6 +102,7 @@ const ClaudeAgentSurface: FC = () => {
         onModelChange={handleModelChange}
         onPermissionApprove={handlePermissionApprove}
         onPermissionDeny={handlePermissionDeny}
+        scrollHandleRef={chatScrollHandleRef}
       />
     </div>
   );
@@ -111,6 +114,7 @@ const ClaudeEditorSurface: FC = () => {
   const thinkingMode = useThinkingMode();
   const effortLevel = useEffortLevel();
   const pendingPermissions = usePendingPermissions();
+  const chatScrollHandleRef = useRef<ChatScrollHandle | null>(null);
   const {
     messages,
     isAgentRunning,
@@ -129,7 +133,7 @@ const ClaudeEditorSurface: FC = () => {
     handleThinkingModeChange,
     handleModelChange,
     handleEffortLevelChange,
-  } = useChatMessages();
+  } = useChatMessages({ scrollHandleRef: chatScrollHandleRef });
 
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +183,7 @@ const ClaudeEditorSurface: FC = () => {
         onModelChange={handleModelChange}
         onPermissionApprove={handlePermissionApprove}
         onPermissionDeny={handlePermissionDeny}
+        scrollHandleRef={chatScrollHandleRef}
       />
     </div>
   );

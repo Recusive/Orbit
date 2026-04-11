@@ -3,10 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { SessionInstance } from './SessionInstance';
 
+import type { ChatScrollHandle } from '@/components/chat/chat-messages';
 import type { SessionVerificationResult } from '@/services/conversations/session-switch-coordinator';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { SessionSwitchStatus } from '@/stores/chat/session-switch-store';
-import type { FC } from 'react';
+import type { FC, RefObject } from 'react';
 
 import { clearReadyInstances } from '@/services/conversations/session-switch-coordinator';
 import { useChatStore } from '@/stores/chat/chat-store';
@@ -29,6 +30,7 @@ export interface SessionInstanceManagerProps {
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
   readonly onPendingVerificationResult?: (result: SessionVerificationResult) => void;
+  readonly scrollHandleRef?: RefObject<ChatScrollHandle | null>;
 }
 
 function touchMountedSession(list: string[], sessionId: string | undefined): string[] {
@@ -170,6 +172,7 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
   onCancelQueue,
   onFeedback,
   onPendingVerificationResult,
+  scrollHandleRef,
 }) => {
   const effectiveShownId = isShownHidden ? undefined : shownSessionId;
   const preMountSessionId = usePreMountSessionId() ?? undefined;
@@ -204,6 +207,8 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
         const queuedMessageForSession =
           displayMode === 'shown' || displayMode === 'holdover' ? queuedMessage : null;
 
+        const sessionScrollHandleRef =
+          displayMode === 'shown' && scrollHandleRef ? scrollHandleRef : undefined;
         return (
           <SessionInstance
             key={sid}
@@ -218,6 +223,7 @@ export const SessionInstanceManager: FC<SessionInstanceManagerProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
             onVerificationResult={handleVerificationResult}
+            {...(sessionScrollHandleRef ? { scrollHandleRef: sessionScrollHandleRef } : {})}
           />
         );
       })}

@@ -17,7 +17,16 @@
  * `user-select: none` to .message-item — breaks WKWebView text selection.
  */
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDownIcon } from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { MessageItem } from './messages';
 import { QueuedMessageBubble } from './queued-message';
@@ -29,7 +38,7 @@ import type { ToolExecution } from '@/stores/agent/tool-store';
 import type { ChatMeasurementCache } from '@/stores/chat/chat-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { VirtualItem } from '@tanstack/react-virtual';
-import type { FC, Key, ReactNode } from 'react';
+import type { FC, Key, ReactNode, RefObject } from 'react';
 
 import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
@@ -273,6 +282,12 @@ interface ChatMessagesProps {
   readonly onFeedback: () => void;
   readonly onReady?: () => void;
   readonly onVerificationResult?: (result: ChatMessagesVerificationResult) => void;
+  readonly scrollHandleRef?: RefObject<ChatScrollHandle | null>;
+}
+
+export interface ChatScrollHandle {
+  forceStickToBottom: () => void;
+  stickToBottomIfEnabled: () => void;
 }
 
 export interface ChatMessagesVerificationResult {
@@ -402,6 +417,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   onFeedback,
   onReady,
   onVerificationResult,
+  scrollHandleRef,
 }) => {
   const verificationPhaseState = verificationPhase ?? (shouldPrime ? ('hidden' as const) : null);
   const shownTraceRequestId = sessionId ? getShownSessionTraceRequest(sessionId) : null;
@@ -412,7 +428,6 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   renderCountRef.current += 1;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const scrollContentWrapperRef = useRef<HTMLDivElement>(null);
   const estimatedSizesRef = useRef<number[]>([]);
   const initialMeasurementsCacheRef = useRef<VirtualItem[]>([]);
   const prevMessageCount = useRef(0);
@@ -420,15 +435,22 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
   const [isReadyForSteady, setIsReadyForSteady] = useState(false);
   const [hasUserScrolled, setHasUserScrolled] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
   // ── Scroll tracking (moved from shim) ──────────────────────────────
   const shouldAutoScrollRef = useRef(true);
+  const hasRunStreamTriggerRef = useRef(false);
   const lastScrollTopRef = useRef(0);
   const pendingUserScrollUpIntentRef = useRef(false);
   const isPointerScrollActiveRef = useRef(false);
   const lastTouchClientYRef = useRef<number | null>(null);
   const pendingStickToBottomFrameRef = useRef<number | null>(null);
   const isAtBottomRef = useRef(true);
+  const pendingInteractionAnchorRef = useRef<{
+    element: HTMLElement;
+    top: number;
+  } | null>(null);
+  const pendingInteractionAnchorFrameRef = useRef<number | null>(null);
 
   // Velocity-based wheel damping for WKWebView — caps scroll speed so the
   // viewport buffer keeps items pre-rendered ahead of the scroll.
@@ -693,24 +715,67 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
     }
 
+    setShowScrollToBottom(!shouldAutoScrollRef.current);
     lastScrollTopRef.current = currentScrollTop;
     onScrollCallbackRef.current?.({ isAtBottom: nearBottom });
   }, []);
 
-  const scheduleStickToBottom = useCallback((behavior: ScrollBehavior = 'auto'): void => {
+  const scrollMessagesToBottom = useCallback((behavior: ScrollBehavior = 'auto'): void => {
+    const scroller = scrollContainerRef.current;
+    if (scroller === null) {
+      return;
+    }
+    scrollToBottom(scroller, behavior);
+    lastScrollTopRef.current = scroller.scrollTop;
+    shouldAutoScrollRef.current = true;
     isAtBottomRef.current = true;
+  }, []);
+
+  const scheduleStickToBottom = useCallback(
+    (behavior: ScrollBehavior = 'auto'): void => {
+      if (pendingStickToBottomFrameRef.current !== null) {
+        cancelAnimationFrame(pendingStickToBottomFrameRef.current);
+      }
+      pendingStickToBottomFrameRef.current = requestAnimationFrame(() => {
+        pendingStickToBottomFrameRef.current = null;
+        scrollMessagesToBottom(behavior);
+      });
+    },
+    [scrollMessagesToBottom]
+  );
+
+  const forceStickToBottom = useCallback((): void => {
     if (pendingStickToBottomFrameRef.current !== null) {
       cancelAnimationFrame(pendingStickToBottomFrameRef.current);
-    }
-    pendingStickToBottomFrameRef.current = requestAnimationFrame(() => {
       pendingStickToBottomFrameRef.current = null;
-      const scroller = scrollContainerRef.current;
-      if (scroller === null) {
-        return;
-      }
-      scrollToBottom(scroller, behavior);
-    });
-  }, []);
+    }
+    shouldAutoScrollRef.current = true;
+    pendingUserScrollUpIntentRef.current = false;
+    // Double-fire is intentional. The sync call handles the current frame —
+    // immediately pins to bottom and syncs tracking refs. The scheduled rAF
+    // call handles layout settle in the next frame (composer height changes,
+    // image loads, tool widget renders). Do NOT collapse to a single call:
+    // without the rAF follow-up, a send-time force-stick can land "not quite
+    // bottom" one frame later when layout finishes.
+    scrollMessagesToBottom('auto');
+    scheduleStickToBottom('auto');
+  }, [scrollMessagesToBottom, scheduleStickToBottom]);
+
+  const stickToBottomIfEnabled = useCallback((): void => {
+    if (!shouldAutoScrollRef.current) return;
+    scheduleStickToBottom('auto');
+  }, [scheduleStickToBottom]);
+
+  // Fallback target for useImperativeHandle when no external scrollHandleRef
+  // is passed. useImperativeHandle requires a non-null ref target, so this
+  // serves as a sink for instances in keep-alive / hidden state that don't
+  // need externally-reachable scroll control.
+  const fallbackScrollHandleRef = useRef<ChatScrollHandle | null>(null);
+  useImperativeHandle(
+    scrollHandleRef ?? fallbackScrollHandleRef,
+    () => ({ forceStickToBottom, stickToBottomIfEnabled }),
+    [forceStickToBottom, stickToBottomIfEnabled]
+  );
 
   useEffect(() => {
     return (): void => {
@@ -720,29 +785,94 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     };
   }, []);
 
-  // Auto-scroll when content grows while at bottom.
-  // Observes scrollContentWrapperRef (which wraps BOTH the virtualizer inner
-  // AND the non-virtualized tail rows) so that growth from streaming tail
-  // content triggers stick-to-bottom. Previously observed contentRef
-  // (chat-list-inner) which missed tail-row growth during streaming.
+  const onScrollerClickCapture = useCallback((event: React.MouseEvent<HTMLDivElement>): void => {
+    // Skip keyboard-activated clicks (Enter/Space on a focused button). They
+    // have event.detail === 0 and no pointer-anchor expectation — the user
+    // navigated via Tab and has no cursor to pin to, so scroll adjustments
+    // would cause unexpected jumps during keyboard navigation.
+    if (event.detail === 0) return;
+
+    const scroller = scrollContainerRef.current;
+    if (scroller === null || !(event.target instanceof Element)) return;
+    const trigger = event.target.closest<HTMLElement>(
+      "button, summary, [role='button'], [data-scroll-anchor-target]"
+    );
+    if (trigger === null || !scroller.contains(trigger)) return;
+    if (trigger.closest('[data-scroll-anchor-ignore]') !== null) return;
+
+    pendingInteractionAnchorRef.current = {
+      element: trigger,
+      top: trigger.getBoundingClientRect().top,
+    };
+
+    if (pendingInteractionAnchorFrameRef.current !== null) {
+      cancelAnimationFrame(pendingInteractionAnchorFrameRef.current);
+    }
+    pendingInteractionAnchorFrameRef.current = requestAnimationFrame(() => {
+      pendingInteractionAnchorFrameRef.current = null;
+      const anchor = pendingInteractionAnchorRef.current;
+      pendingInteractionAnchorRef.current = null;
+      const activeScroller = scrollContainerRef.current;
+      if (anchor === null || activeScroller === null) return;
+      if (!anchor.element.isConnected || !activeScroller.contains(anchor.element)) return;
+      const nextTop = anchor.element.getBoundingClientRect().top;
+      const delta = nextTop - anchor.top;
+      if (Math.abs(delta) < 0.5) return;
+      activeScroller.scrollTop += delta;
+      lastScrollTopRef.current = activeScroller.scrollTop;
+    });
+  }, []);
+
   useEffect(() => {
-    const wrapper = scrollContentWrapperRef.current;
-    if (wrapper === null || typeof ResizeObserver === 'undefined') {
+    return (): void => {
+      if (pendingInteractionAnchorFrameRef.current !== null) {
+        cancelAnimationFrame(pendingInteractionAnchorFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Stick-to-bottom trigger: fires on messages AND tool-state AND layout-settle
+  // reference changes. Orbit splits state across three drivers:
+  //
+  //   1. Chat store (messages): text content, reveal progress, new messages.
+  //      Every streaming chunk produces a new reference via Immer.
+  //   2. Tool store (toolsByMessageId): tool lifecycle rendered inside messages.
+  //      handleToolStart in chat-message-service.ts:1584 writes only to
+  //      useToolStore unless thinking is active, so this captures tool widgets
+  //      appearing mid-stream that don't touch the messages array.
+  //   3. Layout-settle (layoutSettledVersion): async height changes from image
+  //      decode (SafeImage:95,151 via layoutMutationStart/End) and tool-widget
+  //      settle (use-session-layout-mutation hook). These happen AFTER messages
+  //      and tools references stabilize — without this dep, an image loading in
+  //      a tail-row assistant message pushes content below the fold with no
+  //      recovery.
+  //
+  // The first run is skipped so the verification FSM / restore phases own
+  // initial positioning. Session-restore relies on measurement-cache scroll
+  // restoration, not the estimate-based scroll this effect would perform on
+  // mount. Every subsequent effect run (streaming, tools, layout settle, new
+  // messages) runs normally.
+  useEffect(() => {
+    if (!hasRunStreamTriggerRef.current) {
+      hasRunStreamTriggerRef.current = true;
       return;
     }
+    if (!shouldAutoScrollRef.current) return;
+    scheduleStickToBottom('auto');
+  }, [messages, toolsByMessageId, layoutSettledVersion, scheduleStickToBottom]);
 
-    const observer = new ResizeObserver(() => {
-      if (!shouldAutoScrollRef.current) {
-        return;
-      }
-      scheduleStickToBottom('auto');
-    });
-
-    observer.observe(wrapper, { box: 'border-box' });
-    return (): void => {
-      observer.disconnect();
-    };
-  }, [renderRows.length, scheduleStickToBottom]);
+  // Consume pending force-stick request from the store. Set by the
+  // pending-create flow in use-chat-messages.ts when a new conversation
+  // starts — the ref isn't available at that point because this instance
+  // hasn't mounted yet. By the time this useLayoutEffect runs, the
+  // instance IS mounted and forceStickToBottom is callable.
+  useLayoutEffect(() => {
+    if (sessionId === undefined) return;
+    const wasRequested = useChatStore.getState().consumeForceStick(sessionId);
+    if (wasRequested) {
+      forceStickToBottom();
+    }
+  }, [sessionId, forceStickToBottom]);
 
   // ── Helper functions ───────────────────────────────────────────────────
 
@@ -1281,6 +1411,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const prevTop = metrics.scroller.scrollTop;
     metrics.scroller.scrollTop = metrics.bottomTop;
     const afterMetrics = getScrollerMetrics();
+    if (afterMetrics !== null) {
+      // Sync echo-detection baseline with the post-write scrollTop. Without
+      // this, the next native scroll event fires updateBottomTracking with a
+      // stale lastScrollTopRef, the phantom delta looks like user scroll-up,
+      // and shouldAutoScrollRef flips off mid-restore. Same fix pattern as
+      // scrollMessagesToBottom (Task 2) for a different scroll path.
+      lastScrollTopRef.current = afterMetrics.scrollTop;
+    }
     if (afterMetrics && prevTop !== afterMetrics.scrollTop) {
       markSwitchTimeline(
         'align-bottom',
@@ -2369,7 +2507,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   return (
     <ToolWidgetSessionContext.Provider value={sessionKey}>
       <ToolWidgetLayoutFrozenContext.Provider value={isVerifying}>
-        <div ref={traceRootRef} className="flex-1 flex flex-col min-h-0">
+        <div ref={traceRootRef} className="relative flex-1 flex flex-col min-h-0">
           <div
             ref={scrollContainerRef}
             data-testid="chat-scroller"
@@ -2381,6 +2519,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                 updateBottomTracking(scroller);
               }
             }}
+            onClickCapture={onScrollerClickCapture}
             onWheel={(event) => {
               if (event.deltaY < 0) {
                 pendingUserScrollUpIntentRef.current = true;
@@ -2414,82 +2553,93 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               lastTouchClientYRef.current = null;
             }}
           >
-            {/* Wrapper observed by ResizeObserver for auto-scroll.
-                Must contain both the virtualized region AND the
-                non-virtualized tail rows so the observer fires when
-                streaming content grows outside the virtualizer. */}
-            <div ref={scrollContentWrapperRef}>
-              {/* Virtualized region — the chat-list-inner element MUST always
+            {/* Virtualized region — the chat-list-inner element MUST always
                 exist in the DOM. findChatListSurface(), velocity scroll,
                 verification, and session-switch all query for it. When
                 virtualizedRowCount === 0 (≤8 messages), it renders as an
                 empty marker div so those systems still find a surface. */}
-              <div
-                ref={contentRef}
-                data-testid="chat-list-inner"
-                style={
-                  virtualizedRowCount > 0
-                    ? {
-                        position: 'relative',
-                        height: rowVirtualizer.getTotalSize(),
+            <div
+              ref={contentRef}
+              data-testid="chat-list-inner"
+              style={
+                virtualizedRowCount > 0
+                  ? {
+                      position: 'relative',
+                      height: rowVirtualizer.getTotalSize(),
+                      width: '100%',
+                    }
+                  : undefined
+              }
+            >
+              {virtualizedRowCount > 0 &&
+                virtualItems.map((item) => {
+                  const row = renderRows[item.index];
+                  if (!row) return null;
+                  return (
+                    <div
+                      key={String(item.key)}
+                      data-index={item.index}
+                      ref={rowVirtualizer.measureElement}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
                         width: '100%',
-                      }
-                    : undefined
-                }
-              >
-                {virtualizedRowCount > 0 &&
-                  virtualItems.map((item) => {
-                    const row = renderRows[item.index];
-                    if (!row) return null;
-                    return (
-                      <div
-                        key={String(item.key)}
-                        data-index={item.index}
-                        ref={rowVirtualizer.measureElement}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${String(item.start)}px)`,
-                        }}
-                      >
-                        {renderMessageItem(row, item.index, messageListContext)}
-                      </div>
-                    );
-                  })}
-              </div>
-
-              {/* Non-virtualized tail rows (always rendered) */}
-              <TailRowsTraced
-                rows={nonVirtualizedRows}
-                baseIndex={virtualizedRowCount}
-                context={messageListContext}
-                sessionKey={sessionKey}
-                verificationPhase={effectiveVerificationPhase}
-              />
-
-              {/* Thinking shimmer */}
-              {isAgentRunning ? (
-                <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
-                  <div className="flex items-center gap-2 px-[9px] py-2">
-                    <ShimmerText className="font-sans text-base text-foreground">
-                      Thinking
-                    </ShimmerText>
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Tail sentinel */}
-              <div
-                data-tail-sentinel-id={tailSentinelDomId}
-                data-tail-sentinel="true"
-                className="h-px w-full shrink-0"
-                aria-hidden="true"
-              />
+                        transform: `translateY(${String(item.start)}px)`,
+                      }}
+                    >
+                      {renderMessageItem(row, item.index, messageListContext)}
+                    </div>
+                  );
+                })}
             </div>
-            {/* end scrollContentWrapperRef */}
+
+            {/* Non-virtualized tail rows (always rendered) */}
+            <TailRowsTraced
+              rows={nonVirtualizedRows}
+              baseIndex={virtualizedRowCount}
+              context={messageListContext}
+              sessionKey={sessionKey}
+              verificationPhase={effectiveVerificationPhase}
+            />
+
+            {/* Thinking shimmer */}
+            {isAgentRunning ? (
+              <div className="mx-auto px-4 pb-4 w-full" style={CHAT_MAX_WIDTH_STYLE}>
+                <div className="flex items-center gap-2 px-[9px] py-2">
+                  <ShimmerText className="font-sans text-base text-foreground">
+                    Thinking
+                  </ShimmerText>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Tail sentinel */}
+            <div
+              data-tail-sentinel-id={tailSentinelDomId}
+              data-tail-sentinel="true"
+              className="h-px w-full shrink-0"
+              aria-hidden="true"
+            />
           </div>
+
+          {showScrollToBottom ? (
+            <button
+              type="button"
+              data-scroll-anchor-ignore
+              onClick={() => {
+                const prefersReducedMotion =
+                  typeof window !== 'undefined' &&
+                  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                scheduleStickToBottom(prefersReducedMotion ? 'auto' : 'smooth');
+              }}
+              aria-label="Scroll to bottom"
+              className="group absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1 text-xs text-muted-foreground shadow-md transition-[translate,scale,box-shadow,border-color,color] duration-200 ease-[cubic-bezier(0.165,0.85,0.45,1)] hover:-translate-y-px hover:border-border hover:text-foreground hover:shadow-lg active:scale-[0.97] active:duration-75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
+            >
+              <ChevronDownIcon className="h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.165,0.85,0.45,1)] group-hover:translate-y-[1px]" />
+              Scroll to bottom
+            </button>
+          ) : null}
 
           {/* Queued message outside scroller */}
           {queuedMessage !== null ? (

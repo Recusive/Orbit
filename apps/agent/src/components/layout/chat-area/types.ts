@@ -1,3 +1,4 @@
+import type { ChatScrollHandle } from '@/components/chat/chat-messages';
 import type { ImageAttachment } from '@/components/chat/input/types';
 import type { ChatMessage } from '@/components/chat/messages';
 import type { PermissionRequest } from '@/stores/agent/tool-store';
@@ -9,6 +10,7 @@ import type {
   ReactElementContext,
   ThinkingMode,
 } from '@/types/protocol';
+import type { RefObject } from 'react';
 
 /** Props for ChatContent component */
 export interface ChatContentProps {
@@ -58,6 +60,8 @@ export interface ChatContentProps {
   readonly onPermissionDeny: (requestId: string) => void;
   /** Optional controls rendered above ChatInput */
   readonly extraControls?: React.ReactNode;
+  /** Imperative scroll handle exposed by ChatMessages (only attached on the shown instance). */
+  readonly scrollHandleRef?: RefObject<ChatScrollHandle | null>;
 }
 
 /** Props for layout stabilization hook */

@@ -1,10 +1,13 @@
 import { createLogger } from '@orbit/common/lib';
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-import type { ChatMessagesVerificationResult } from '@/components/chat/chat-messages';
+import type {
+  ChatMessagesVerificationResult,
+  ChatScrollHandle,
+} from '@/components/chat/chat-messages';
 import type { SessionVerificationResult } from '@/services/conversations/session-switch-coordinator';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
-import type { CSSProperties, FC } from 'react';
+import type { CSSProperties, FC, RefObject } from 'react';
 
 import { ChatMessages } from '@/components/chat';
 import { findChatScroller } from '@/lib/chat/chat-selectors';
@@ -45,6 +48,7 @@ export interface SessionInstanceProps {
   readonly onCancelQueue: () => void;
   readonly onFeedback: () => void;
   readonly onVerificationResult?: (result: SessionVerificationResult) => void;
+  readonly scrollHandleRef?: RefObject<ChatScrollHandle | null>;
 }
 
 // All instances use absolute positioning so switching is a pure z-index change
@@ -129,6 +133,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
   onCancelQueue,
   onFeedback,
   onVerificationResult,
+  scrollHandleRef,
 }) => {
   const messages = useSessionMessages(sessionId);
   const isAgentRunning = useSessionAgentRunning(sessionId);
@@ -286,17 +291,34 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       const savedTop = savedScrollTopRef.current;
       if (savedWasAtBottomRef.current) {
         requestAnimationFrame(() => {
-          scroller.scrollTop = scroller.scrollHeight;
+          // Prefer routing through the imperative handle so ChatMessages can
+          // sync its echo-detection baseline (lastScrollTopRef) atomically with
+          // the scrollTop write. Otherwise the next native scroll event would
+          // compute a phantom delta against a stale baseline and could flip
+          // shouldAutoScrollRef off, silently breaking auto-follow.
+          const handle = scrollHandleRef?.current;
+          if (handle) {
+            handle.forceStickToBottom();
+          } else {
+            // Fallback for early mount / hidden keep-alive states where the
+            // handle isn't attached yet. The isProgrammaticJump heuristic in
+            // updateBottomTracking handles the missing baseline sync here.
+            scroller.scrollTop = scroller.scrollHeight;
+          }
         });
       } else if (savedTop !== null && savedTop > 0) {
         requestAnimationFrame(() => {
+          // Non-bottom restore intentionally skips lastScrollTopRef sync —
+          // that ref lives inside ChatMessages and isn't reachable from here.
+          // The isProgrammaticJump heuristic in updateBottomTracking absorbs
+          // the resulting phantom delta on the next native scroll event.
           scroller.scrollTop = savedTop;
         });
       }
     }
 
     prevVisibleRef.current = isActuallyVisible;
-  }, [isActuallyVisible]);
+  }, [isActuallyVisible, scrollHandleRef]);
 
   useLayoutEffect(() => {
     if (displayMode !== 'holdover') {
@@ -414,6 +436,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
         onCancelQueue={onCancelQueue}
         onFeedback={onFeedback}
         onVerificationResult={handleVerificationResult}
+        {...(scrollHandleRef ? { scrollHandleRef } : {})}
       />
     </div>
   );

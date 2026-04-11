@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useLayoutEffect, useRef } from 'react';
 
 import { SessionInstanceManager } from './SessionInstanceManager';
 import { EMPTY_STATE_PADDING_BOTTOM } from './constants';
@@ -63,6 +63,7 @@ export const ChatContent: FC<ChatContentProps> = ({
   onPermissionApprove,
   onPermissionDeny,
   extraControls,
+  scrollHandleRef,
 }) => {
   const vaultOpen = useVaultOpen();
   const shownSessionId = sessionId !== '' ? sessionId : undefined;
@@ -87,6 +88,34 @@ export const ChatContent: FC<ChatContentProps> = ({
     !isConversationTransitioning;
   const shouldShowPendingShell = shownSessionId === undefined && pendingSessionId !== undefined;
   const focusRestoreRef = useRef<HTMLElement | null>(null);
+  const composerWrapperRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const composerElement = composerWrapperRef.current;
+    if (composerElement === null || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const handleRef = scrollHandleRef;
+    if (handleRef === undefined) {
+      return;
+    }
+
+    let previousHeight = composerElement.getBoundingClientRect().height;
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry === undefined) return;
+      const nextHeight = entry.contentRect.height;
+      if (Math.abs(nextHeight - previousHeight) < 0.5) return;
+      previousHeight = nextHeight;
+      handleRef.current?.stickToBottomIfEnabled();
+    });
+
+    observer.observe(composerElement);
+    return (): void => {
+      observer.disconnect();
+    };
+  }, [scrollHandleRef]);
 
   const restoreFocus = useCallback((): void => {
     const target = focusRestoreRef.current;
@@ -203,6 +232,7 @@ export const ChatContent: FC<ChatContentProps> = ({
             onCancelQueue={onCancelQueue}
             onFeedback={onFeedback}
             onPendingVerificationResult={handlePendingVerificationResult}
+            {...(scrollHandleRef ? { scrollHandleRef } : {})}
           />
         </>
       )}
@@ -212,6 +242,7 @@ export const ChatContent: FC<ChatContentProps> = ({
           input above the midpoint; otherwise it sits as a fixed footer. */}
       {!vaultOpen ? (
         <div
+          ref={composerWrapperRef}
           className={
             isEmptyState ? 'flex-1 flex flex-col justify-center px-0' : 'shrink-0 pb-2 px-0'
           }

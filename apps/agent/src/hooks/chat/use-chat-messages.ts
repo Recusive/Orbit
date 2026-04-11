@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { createChatActions } from './handlers/chat-actions';
 
 import type { ChatMessage, ImageAttachment } from '@/components/chat';
+import type { ChatScrollHandle } from '@/components/chat/chat-messages';
 import type { DemoConfig, DemoRunnerControls, DemoScript } from '@/demo/types';
 import type { GitScalingStressTestConfig } from '@/stress-tests/git-scaling-stress-test';
 import type { ReviewFixesStressTestConfig } from '@/stress-tests/review-fixes-stress-test';
@@ -40,6 +41,7 @@ import type {
   ThinkingMode,
   WebviewMessage,
 } from '@/types/protocol';
+import type { RefObject } from 'react';
 
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
@@ -150,7 +152,12 @@ function persistConversationMessage(
 // Hook
 // ────────────────────────────────────────────────────────────────────────────
 
-export function useChatMessages(): UseChatMessagesReturn {
+interface UseChatMessagesOptions {
+  scrollHandleRef?: RefObject<ChatScrollHandle | null>;
+}
+
+export function useChatMessages(options?: UseChatMessagesOptions): UseChatMessagesReturn {
+  const scrollHandleRef = options?.scrollHandleRef;
   // ── Reactive state from ChatStore ──────────────────────────────────────
   const messages = useActiveMessages();
   const isAgentRunning = useIsAgentRunning();
@@ -436,6 +443,15 @@ export function useChatMessages(): UseChatMessagesReturn {
     cacheAttachedImagesForMessage(targetSessionId, userMessage.id, images);
     chatStore.setAgentRunning(targetSessionId, true);
 
+    // Request a force-stick on the target session. The actual force-stick
+    // fires when the new ChatMessages instance mounts and consumes the flag
+    // via a useLayoutEffect. This works around the timing gap where
+    // scrollHandleRef is null at this point because the new instance hasn't
+    // mounted yet (SessionInstanceManager only forwards the ref to shown
+    // instances, and session transitions through hidden-priming and
+    // visible-verifying before reaching shown).
+    useChatStore.getState().requestForceStick(targetSessionId);
+
     // Broadcast for cross-instance sync (Agent ↔ Editor)
     window.dispatchEvent(
       new CustomEvent('orbit:user-message', {
@@ -659,7 +675,14 @@ export function useChatMessages(): UseChatMessagesReturn {
   // Actions
   // ══════════════════════════════════════════════════════════════════════
 
-  const chatActions = useMemo(() => createChatActions({ postMessage }), [postMessage]);
+  const chatActions = useMemo(
+    () =>
+      createChatActions({
+        postMessage,
+        ...(scrollHandleRef ? { scrollHandleRef } : {}),
+      }),
+    [postMessage, scrollHandleRef]
+  );
 
   return {
     messages,
