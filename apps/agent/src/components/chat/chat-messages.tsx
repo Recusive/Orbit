@@ -19,6 +19,8 @@
 import { measureElement, useVirtualizer } from '@tanstack/react-virtual';
 import { ChevronDownIcon } from 'lucide-react';
 import {
+  Profiler,
+  startTransition,
   useCallback,
   useEffect,
   useImperativeHandle,
@@ -44,6 +46,7 @@ import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
 import { estimateMessageHeight, isNearBottom, scrollToBottom } from '@/lib/chat/chat-scroll-utils';
 import { findChatListSurface } from '@/lib/chat/chat-selectors';
+import { markOperation, onProfilerRender } from '@/lib/perf/frame-monitor';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import {
   getShownSessionTraceRequest,
@@ -377,11 +380,23 @@ function TailRowsTracedInner({
   sessionKey,
   verificationPhase,
 }: TailRowsTracedProps): ReactNode {
+  // Progressive rendering: during verification phases, render fewer tail rows
+  // to spread the cost across frames. Full set renders after commit.
+  const maxRows =
+    verificationPhase === 'hidden' || verificationPhase === 'hidden-visible'
+      ? 2 // Wave 1: just enough for the verification probe
+      : verificationPhase === 'visible' || verificationPhase === 'visible-done'
+        ? 5 // Wave 2: most rows visible
+        : rows.length; // Wave 3 (committed): all rows
+
+  const visibleRows = rows.length <= maxRows ? rows : rows.slice(rows.length - maxRows);
+  const visibleBaseIndex = baseIndex + (rows.length - visibleRows.length);
+
   const tailStart = performance.now();
   const result = (
     <>
-      {rows.map((row, i) => (
-        <div key={row.id}>{renderMessageItem(row, baseIndex + i, context)}</div>
+      {visibleRows.map((row, i) => (
+        <div key={row.id}>{renderMessageItem(row, visibleBaseIndex + i, context)}</div>
       ))}
     </>
   );
@@ -390,7 +405,7 @@ function TailRowsTracedInner({
     const sid = sessionKey.slice(-6);
     markSwitchTimeline(
       'tail-rows-render',
-      `[${sid}] ${String(rows.length)} rows ${String(Math.round(tailDuration * 10) / 10)}ms phase=${String(verificationPhase)}`
+      `[${sid}] ${String(visibleRows.length)}/${String(rows.length)} rows ${String(Math.round(tailDuration * 10) / 10)}ms phase=${String(verificationPhase)}`
     );
   }
   return result;
@@ -602,12 +617,34 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   // now forced to 'visible' via CSS, measurements are stable and the cap
   // is no longer needed.
   const overscanPhase: OverscanPhase = targetOverscanPhase;
-  const overscan =
-    overscanPhase === 'parked'
-      ? OVERSCAN_PARKED
-      : overscanPhase === 'entry'
-        ? OVERSCAN_ENTRY
-        : OVERSCAN_STEADY;
+
+  // Defer overscan expansion so React can yield between mounting new items.
+  // When overscan goes from entry (5) to steady (20), 15 new virtual items
+  // would mount in one blocking commit. startTransition lets React split
+  // this work across multiple frames.
+  const [deferredOverscan, setDeferredOverscan] = useState(OVERSCAN_PARKED);
+
+  useEffect(() => {
+    const target =
+      overscanPhase === 'parked'
+        ? OVERSCAN_PARKED
+        : overscanPhase === 'entry'
+          ? OVERSCAN_ENTRY
+          : OVERSCAN_STEADY;
+
+    if (target === deferredOverscan) return;
+
+    if (target > deferredOverscan) {
+      // Expanding: defer to let React yield
+      startTransition(() => {
+        setDeferredOverscan(target);
+      });
+    } else {
+      // Shrinking: apply immediately (don't leave extra items mounted)
+      setDeferredOverscan(target);
+    }
+  }, [overscanPhase, deferredOverscan]);
+
   const previousOverscanPhaseRef = useRef<OverscanPhase | null>(null);
 
   // ── Virtualizer setup ──────────────────────────────────────────────────
@@ -657,9 +694,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       }
       return DEFAULT_ROW_HEIGHT;
     },
-    overscan,
-    measureElement,
-    useAnimationFrameWithResizeObserver: false,
+    overscan: deferredOverscan,
+    measureElement: (element, entry, instance) => {
+      const end = markOperation('measure-element');
+      const size = measureElement(element, entry, instance);
+      end();
+      return size;
+    },
+    useAnimationFrameWithResizeObserver: true,
     useFlushSync: false,
   });
 
@@ -732,10 +774,12 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     if (scroller === null) {
       return;
     }
+    const endScroll = markOperation('scroll-to-bottom');
     scrollToBottom(scroller, behavior);
     lastScrollTopRef.current = scroller.scrollTop;
     shouldAutoScrollRef.current = true;
     isAtBottomRef.current = true;
+    endScroll();
   }, []);
 
   const scheduleStickToBottom = useCallback(
@@ -865,7 +909,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
     if (!shouldAutoScrollRef.current) return;
+    const endAutoScroll = markOperation('auto-scroll-stick');
     scheduleStickToBottom('auto');
+    endAutoScroll();
   }, [messages, toolsByMessageId, layoutSettledVersion, scheduleStickToBottom]);
 
   // Consume pending force-stick request from the store. Set by the
@@ -1237,19 +1283,21 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
+    const endOverscan = markOperation('overscan-transition');
     const prev = previousOverscanPhaseRef.current;
     previousOverscanPhaseRef.current = overscanPhase;
     markSwitchTimeline(
       'overscan-change',
-      `${prev ?? 'null'} -> ${overscanPhase} (${String(overscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} scroll=${String(hasUserScrolled)}`
+      `${prev ?? 'null'} -> ${overscanPhase} (${String(deferredOverscan)}px) vPhase=${String(effectiveVerificationPhase)} ready=${String(isReadyForSteady)} scroll=${String(hasUserScrolled)}`
     );
+    endOverscan();
   }, [
+    deferredOverscan,
     effectiveVerificationPhase,
     hasUserScrolled,
     isReadyForSteady,
     isVerifying,
     isVisible,
-    overscan,
     overscanPhase,
   ]);
 
@@ -1319,6 +1367,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   }, []);
 
   const ensureListSurfaceReady = useCallback((): boolean => {
+    const endSurfaceCheck = markOperation('verify-surface-ready');
     const scroller = scrollContainerRef.current;
     const listElement = scroller ? findChatListSurface(scroller) : null;
     if (scroller && listElement) {
@@ -1329,6 +1378,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         surfaceWaitRafRef.current = null;
       }
       lastSurfaceResizeAtRef.current = Date.now();
+      endSurfaceCheck();
       return true;
     }
 
@@ -1353,6 +1403,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       setSurfaceReadyVersion((value) => value + 1);
     });
 
+    endSurfaceCheck();
     return false;
   }, []);
 
@@ -1397,6 +1448,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   );
 
   const alignScrollerToBottom = useCallback((): ScrollerMetrics | null => {
+    const endAlign = markOperation('scroll-align-bottom');
     if (restoredSizeCacheRef.current) {
       const precheck = getScrollerMetrics();
       if (
@@ -1404,6 +1456,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         precheck.scrollHeight > precheck.clientHeight &&
         precheck.scrollTop >= precheck.bottomTop - BOTTOM_TOLERANCE_PX
       ) {
+        endAlign();
         return precheck;
       }
     }
@@ -1413,7 +1466,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       align: 'end',
     });
     const metrics = getScrollerMetrics();
-    if (!metrics) return null;
+    if (!metrics) {
+      endAlign();
+      return null;
+    }
 
     const prevTop = metrics.scroller.scrollTop;
     metrics.scroller.scrollTop = metrics.bottomTop;
@@ -1432,6 +1488,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         `${String(Math.round(prevTop))} → ${String(Math.round(afterMetrics.scrollTop))} scrollH=${String(afterMetrics.scrollHeight)}`
       );
     }
+    endAlign();
     return afterMetrics;
   }, [getScrollerMetrics, renderRows.length, scrollToLocation]);
 
@@ -1492,6 +1549,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
+      const endEmit = markOperation('verify-emit');
       hasResolvedVerificationRef.current = true;
       readinessStartedRef.current = false;
       cancelReadinessWork();
@@ -1513,6 +1571,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       if ((result === 'hidden-ready' || result === 'visible-ready') && onReady) {
         onReady();
       }
+      endEmit();
     },
     [alignScrollerToBottom, cancelReadinessWork, onReady, snapshotStableMeasurementCache]
   );
@@ -1524,6 +1583,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return;
       }
 
+      const endSignal = markOperation('verify-signal-ready');
       if (effectiveVerificationPhase === 'hidden') {
         hiddenReadySnapshotRef.current = hiddenCandidateSnapshotRef.current;
       }
@@ -1551,6 +1611,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         effectiveVerificationPhase === 'hidden' ? 'hidden-ready' : 'visible-ready',
         tailProofVersionRef.current
       );
+      endSignal();
     },
     [emitVerificationResult, messages.length, sessionKey, effectiveVerificationPhase]
   );
@@ -2006,22 +2067,26 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   useEffect(() => {
     if (restorePhaseRef.current === 'stabilizing' && !hasResolvedVerificationRef.current) {
+      const endLayoutSettle = markOperation('layout-settle-recheck');
       if (effectiveVerificationPhase === 'hidden') {
         scheduleHiddenVerificationCheckRef.current();
       } else if (effectiveVerificationPhase === 'visible') {
         scheduleVisibleVerificationCheckRef.current();
       }
+      endLayoutSettle();
     }
   }, [effectiveVerificationPhase, layoutPendingCount, layoutSettledVersion, lastLayoutMutationAt]);
 
   const beginStabilizationIfTargetRendered = useCallback(
     (rendered: ChatRenderRow[]): boolean => {
+      const endStabGate = markOperation('verify-stab-gate');
       const metrics = getRenderSurfaceMetrics(rendered);
       if (!metrics) {
         markSwitchTimeline('no-metrics:stabilization-gate', `rows=${String(rendered.length)}`);
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
         }
+        endStabGate();
         return false;
       }
 
@@ -2041,6 +2106,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           if (restorePhaseRef.current === 'positioning') {
             alignScrollerToBottom();
           }
+          endStabGate();
           return false;
         }
         // Sentinel is in the render range but not yet in the DOM.
@@ -2058,11 +2124,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             'positioning:placeholder-short',
             `rows=${String(rendered.length)} scrollH=${String(metrics.scrollHeight)} clientH=${String(metrics.clientHeight)}`
           );
+          endStabGate();
           return false;
         }
 
         if (!hasObservedPostProbeSurface()) {
           markSwitchTimeline('positioning:no-post-probe');
+          endStabGate();
           return false;
         }
       }
@@ -2075,6 +2143,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         if (restorePhaseRef.current === 'positioning') {
           alignScrollerToBottom();
         }
+        endStabGate();
         return false;
       }
 
@@ -2083,6 +2152,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
           'positioning:layout-pending',
           `count=${String(layoutPendingCount)} sources=[${sessionId ? getActiveLayoutMutationSources(sessionId).join(',') : ''}]`
         );
+        endStabGate();
         return false;
       }
 
@@ -2106,6 +2176,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       } else {
         scheduleHiddenVerificationCheck();
       }
+      endStabGate();
       return true;
     },
     [
@@ -2124,11 +2195,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
   const progressPositioning = useCallback(
     (rendered: ChatRenderRow[]): void => {
+      const endPositioning = markOperation('verify-positioning');
       markSwitchTimeline(
         'positioning:poll',
         `phase=${restorePhaseRef.current} rows=${String(rendered.length)}`
       );
       if (restorePhaseRef.current !== 'positioning') {
+        endPositioning();
         return;
       }
 
@@ -2137,6 +2210,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         markSwitchTimeline('positioning:no-metrics', `rows=${String(rendered.length)}`);
         alignScrollerToBottom();
         queuePositioningRecheck();
+        endPositioning();
         return;
       }
 
@@ -2152,6 +2226,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       );
 
       if (beginStabilizationIfTargetRendered(rendered)) {
+        endPositioning();
         return;
       }
 
@@ -2164,12 +2239,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         const sentinelAlreadyInRange = rendered.some((r) => r.id === lastMessageIdRef.current);
         if (!sentinelAlreadyInRange && forceTailProbeRender()) {
           queuePositioningRecheck();
+          endPositioning();
           return;
         }
       }
 
       alignScrollerToBottom();
       queuePositioningRecheck();
+      endPositioning();
     },
     [
       alignScrollerToBottom,
@@ -2402,6 +2479,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       return;
     }
 
+    const endVerifyStart = markOperation('verify-start');
     needsRestoreRef.current = false;
 
     restorePhaseRef.current = 'positioning';
@@ -2420,6 +2498,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
 
     cancelReadinessWork();
     progressPositioning(getCurrentlyRenderedRows());
+    endVerifyStart();
   }, [
     alignScrollerToBottom,
     cancelReadinessWork,
@@ -2507,7 +2586,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     const sid = sessionId.slice(-6);
     markSwitchTimeline(
       'react-render',
-      `[${sid}] #${String(renderCountRef.current)} ${String(Math.round(renderDuration * 10) / 10)}ms phase=${String(effectiveVerificationPhase)} rows=${String(renderRows.length)} virt=${String(virtualizedRowCount)} overscan=${String(overscan)}`
+      `[${sid}] #${String(renderCountRef.current)} ${String(Math.round(renderDuration * 10) / 10)}ms phase=${String(effectiveVerificationPhase)} rows=${String(renderRows.length)} virt=${String(virtualizedRowCount)} overscan=${String(deferredOverscan)}`
     );
   }
 
@@ -2602,13 +2681,15 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             </div>
 
             {/* Non-virtualized tail rows (always rendered) */}
-            <TailRowsTraced
-              rows={nonVirtualizedRows}
-              baseIndex={virtualizedRowCount}
-              context={messageListContext}
-              sessionKey={sessionKey}
-              verificationPhase={effectiveVerificationPhase}
-            />
+            <Profiler id="tail-rows" onRender={onProfilerRender}>
+              <TailRowsTraced
+                rows={nonVirtualizedRows}
+                baseIndex={virtualizedRowCount}
+                context={messageListContext}
+                sessionKey={sessionKey}
+                verificationPhase={effectiveVerificationPhase}
+              />
+            </Profiler>
 
             {/* Thinking shimmer */}
             {isAgentRunning ? (

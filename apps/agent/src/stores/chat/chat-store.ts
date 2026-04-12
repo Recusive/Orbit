@@ -149,6 +149,23 @@ export interface ChatStoreState {
   requestForceStick: (sessionId: string) => void;
   consumeForceStick: (sessionId: string) => boolean;
   setMessages: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null) => void;
+  /**
+   * Fast path for bulk message writes that bypasses Immer's `produce()`.
+   *
+   * When data is freshly allocated (e.g. from a TanStack Query fetch or a
+   * `buildActiveChainMessages()` call), the structural clone Immer performs
+   * inside `produce()` is redundant — the caller already owns the array.
+   *
+   * This method constructs the new `sessions` slice as a plain object and
+   * passes it to Zustand's `set()` as a non-function value. Because the
+   * Immer middleware only wraps *function* updaters with `produce()`, an
+   * object literal falls through to Zustand's native shallow-merge — zero
+   * proxy allocation, zero structural cloning.
+   *
+   * **Safety contract:** callers MUST NOT retain or mutate `msgs` after
+   * calling this method. The store takes ownership of the array.
+   */
+  setMessagesDirect: (id: string, msgs: ChatMessage[], scrollIntent?: ScrollIntent | null) => void;
   markSessionHydrated: (id: string) => void;
   setScrollIntent: (id: string, intent: ScrollIntent | null) => void;
   clearScrollIntent: (id: string) => void;
@@ -444,6 +461,64 @@ export const useChatStore = create<ChatStoreState>()(
           session.layoutVersion += 1;
           noteSynchronousLayoutMutation(session);
         });
+      },
+
+      setMessagesDirect: (
+        id: string,
+        msgs: ChatMessage[],
+        scrollIntent?: ScrollIntent | null
+      ): void => {
+        // Read current state *outside* of produce() — plain JS, no proxies.
+        const current = get();
+        const existing = current.sessions[id];
+        const now = Date.now();
+
+        // Build the updated session as a plain object.
+        const baseSession = existing ?? createEmptySession();
+        const nextLayoutPendingCount = baseSession.layoutPendingCount ?? 0;
+        const nextLayoutSettledVersion =
+          nextLayoutPendingCount === 0
+            ? (baseSession.layoutSettledVersion ?? 0) + 1
+            : (baseSession.layoutSettledVersion ?? 0);
+
+        const updatedSession: ChatSessionData = {
+          messages: msgs,
+          isAgentRunning: baseSession.isAgentRunning,
+          isStopPending: baseSession.isStopPending,
+          scrollIntent: scrollIntent ?? null,
+          hydrationState: baseSession.hydrationState,
+          layoutVersion: baseSession.layoutVersion + 1,
+          layoutPendingCount: nextLayoutPendingCount,
+          layoutSettledVersion: nextLayoutSettledVersion,
+          lastLayoutMutationAt: now,
+          layoutLeakDeadlineAt:
+            nextLayoutPendingCount === 0 ? null : (baseSession.layoutLeakDeadlineAt ?? null),
+          measurementCache: baseSession.measurementCache,
+        };
+
+        // If creating a new session, update the LRU list.
+        const needsLruUpdate = !existing;
+        const nextLruOrder = needsLruUpdate ? [...current.lruOrder, id] : current.lruOrder;
+
+        // Pass a partial-state *object* (not a function) to set().
+        // The Immer middleware only wraps function updaters with produce();
+        // an object literal falls through to Zustand's native shallow-merge.
+        set({
+          sessions: { ...current.sessions, [id]: updatedSession },
+          ...(needsLruUpdate ? { lruOrder: nextLruOrder } : {}),
+        } as Partial<ChatStoreState>);
+
+        // Run eviction outside the set() call — it uses its own set() internally.
+        if (needsLruUpdate) {
+          set((draft) => {
+            evictIfNeeded(
+              draft.sessions,
+              draft.lruOrder,
+              draft.loadedSessions,
+              draft.activeSessionId
+            );
+          });
+        }
       },
 
       markSessionHydrated: (id: string): void => {

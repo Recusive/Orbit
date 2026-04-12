@@ -1,5 +1,5 @@
 import { createLogger } from '@orbit/common/lib';
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Profiler, memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import type {
   ChatMessagesVerificationResult,
@@ -11,6 +11,7 @@ import type { CSSProperties, FC, RefObject } from 'react';
 
 import { ChatMessages } from '@/components/chat';
 import { findChatScroller } from '@/lib/chat/chat-selectors';
+import { markOperation, onProfilerRender } from '@/lib/perf/frame-monitor';
 import {
   clearReadyInstance,
   recordReadyInstance,
@@ -52,10 +53,21 @@ export interface SessionInstanceProps {
 }
 
 // All instances use absolute positioning so switching is a pure z-index change
-// with no layout recalculation. `contain: layout paint` limits paint/layout
-// recalc to this subtree without `contain: size` which prevents the
-// virtualized message list from measuring row heights during the hidden
-// positioning pass.
+// with no layout recalculation. Each display mode gets a tailored `contain`
+// value to let the browser skip as much work as possible:
+//
+// - candidate/hidden: `contain: strict` (= size layout style paint) — the
+//   element is fully off-screen, so the browser can skip its entire subtree.
+//   `will-change: transform` on candidates promotes the layer to the
+//   compositor so the transition to shown is compositor-only.
+//
+// - shown: `contain: layout style` — internal layout changes don't affect
+//   siblings. `paint` is intentionally omitted because `contain: paint` on
+//   ancestor containers breaks WKWebView text selection on .message-item
+//   descendants.
+//
+// - holdover: `contain: strict` — the previous session is non-interactive
+//   and about to be hidden, so full containment is safe.
 const BASE_STYLE: CSSProperties = {
   position: 'absolute',
   inset: 0,
@@ -63,12 +75,12 @@ const BASE_STYLE: CSSProperties = {
   flexDirection: 'column',
   minHeight: 0,
   overflow: 'hidden',
-  contain: 'layout paint',
 };
 
 const ACTIVE_STYLE: CSSProperties = {
   ...BASE_STYLE,
   zIndex: 1,
+  contain: 'layout style',
 };
 
 const HIDDEN_STYLE: CSSProperties = {
@@ -76,12 +88,15 @@ const HIDDEN_STYLE: CSSProperties = {
   transform: 'translateX(-200vw)',
   pointerEvents: 'none',
   zIndex: 0,
+  contain: 'strict',
+  willChange: 'transform',
 };
 
 const HOLDOVER_STYLE: CSSProperties = {
   ...BASE_STYLE,
   pointerEvents: 'none',
   zIndex: 2,
+  contain: 'strict',
 };
 
 const VELOCITY_SCROLL_ENABLE_QUIET_MS = 500;
@@ -281,15 +296,18 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
 
     if (!isActuallyVisible && prevVisibleRef.current) {
       if (scroller) {
+        const endSave = markOperation('scroll-position-save');
         savedScrollTopRef.current = scroller.scrollTop;
         savedWasAtBottomRef.current =
           scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 4;
+        endSave();
       }
     }
 
     if (isActuallyVisible && !prevVisibleRef.current && scroller) {
       const savedTop = savedScrollTopRef.current;
       if (savedWasAtBottomRef.current) {
+        const endRestore = markOperation('scroll-position-restore');
         requestAnimationFrame(() => {
           // Prefer routing through the imperative handle so ChatMessages can
           // sync its echo-detection baseline (lastScrollTopRef) atomically with
@@ -306,7 +324,9 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
             scroller.scrollTop = scroller.scrollHeight;
           }
         });
+        endRestore();
       } else if (savedTop !== null && savedTop > 0) {
+        const endRestore = markOperation('scroll-position-restore');
         requestAnimationFrame(() => {
           // Non-bottom restore intentionally skips lastScrollTopRef sync —
           // that ref lives inside ChatMessages and isn't reachable from here.
@@ -314,15 +334,42 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
           // the resulting phantom delta on the next native scroll event.
           scroller.scrollTop = savedTop;
         });
+        endRestore();
       }
     }
 
     prevVisibleRef.current = isActuallyVisible;
   }, [isActuallyVisible, scrollHandleRef]);
 
+  // Pre-layout: force browser to compute layout while session is off-screen.
+  // When verificationPhase transitions to 'visible', the session is about to be
+  // promoted but still has `contain: strict` (full isolation — browser skips the
+  // entire subtree). Without this, the hidden→visible transition triggers a
+  // 121ms first-layout stall because the browser has zero cached layout data.
+  //
+  // Strategy: temporarily relax containment to `layout style`, read scrollHeight
+  // to force synchronous layout, then restore `strict`. useLayoutEffect fires
+  // before paint, so the browser has cached metrics by the time it paints the
+  // visible session.
   useLayoutEffect(() => {
+    if (verificationPhase !== 'visible' || !containerRef.current) return;
+    const el = containerRef.current;
+    const prev = el.style.contain;
+    const end = markOperation('pre-layout');
+    // Relax containment to allow layout computation
+    el.style.contain = 'layout style';
+    // Force synchronous layout by reading a layout-dependent property
+    void el.scrollHeight;
+    // Restore strict containment before the frame paints
+    el.style.contain = prev;
+    end();
+  }, [verificationPhase]);
+
+  useLayoutEffect(() => {
+    const end = markOperation('display-mode-transition');
     if (displayMode !== 'holdover') {
       setHoldoverBackgroundColor(null);
+      end();
       return;
     }
 
@@ -334,11 +381,13 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
         `[${sid}] holdover background lookup: ${String(Math.round(bgDuration * 10) / 10)}ms`
       );
     }
+    end();
   }, [displayMode, sid]);
 
   useEffect(() => {
     if (displayMode !== 'shown') {
       if (velocityScrollEnabled) {
+        const endGate = markOperation('velocity-scroll-gate');
         recordSessionSwitchTrace({
           event: 'velocity_scroll_gate_closed',
           requestId: getShownSessionTraceRequest(sessionId),
@@ -347,9 +396,13 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
             reason: 'not_shown',
           },
         });
+        setVelocityScrollEnabled(false);
+        hasEnabledVelocityScrollRef.current = false;
+        endGate();
+      } else {
+        setVelocityScrollEnabled(false);
+        hasEnabledVelocityScrollRef.current = false;
       }
-      setVelocityScrollEnabled(false);
-      hasEnabledVelocityScrollRef.current = false;
       return;
     }
 
@@ -376,6 +429,7 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
         ? VELOCITY_SCROLL_ENABLE_QUIET_MS
         : Date.now() - lastLayoutMutationAt;
     if (quietForMs >= VELOCITY_SCROLL_ENABLE_QUIET_MS) {
+      const endGate = markOperation('velocity-scroll-gate');
       setVelocityScrollEnabled(true);
       hasEnabledVelocityScrollRef.current = true;
       recordSessionSwitchTrace({
@@ -386,13 +440,16 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
           quietForMs,
         },
       });
+      endGate();
       return;
     }
 
     setVelocityScrollEnabled(false);
     const timerId = window.setTimeout(() => {
+      const endGate = markOperation('velocity-scroll-gate');
       setVelocityScrollEnabled(true);
       hasEnabledVelocityScrollRef.current = true;
+      endGate();
     }, VELOCITY_SCROLL_ENABLE_QUIET_MS - quietForMs);
 
     return () => {
@@ -420,24 +477,26 @@ const SessionInstanceComponent: FC<SessionInstanceProps> = ({
       data-tail-proof-version={tailProofVersion}
       aria-hidden={displayMode === 'holdover' ? true : undefined}
     >
-      <ChatMessages
-        messages={messages}
-        isAgentRunning={isAgentRunning}
-        sessionId={sessionId}
-        isVisible={isActuallyVisible}
-        enableVelocityScroll={displayMode === 'shown' && velocityScrollEnabled}
-        skipInitialVelocityPrime={true}
-        verificationPhase={verificationPhase}
-        verificationKey={verificationKey}
-        queuedMessage={queuedMessage}
-        onRewind={onRewind}
-        onOpenFile={onOpenFile}
-        onOpenUrl={onOpenUrl}
-        onCancelQueue={onCancelQueue}
-        onFeedback={onFeedback}
-        onVerificationResult={handleVerificationResult}
-        {...(scrollHandleRef ? { scrollHandleRef } : {})}
-      />
+      <Profiler id="session-instance" onRender={onProfilerRender}>
+        <ChatMessages
+          messages={messages}
+          isAgentRunning={isAgentRunning}
+          sessionId={sessionId}
+          isVisible={isActuallyVisible}
+          enableVelocityScroll={displayMode === 'shown' && velocityScrollEnabled}
+          skipInitialVelocityPrime={true}
+          verificationPhase={verificationPhase}
+          verificationKey={verificationKey}
+          queuedMessage={queuedMessage}
+          onRewind={onRewind}
+          onOpenFile={onOpenFile}
+          onOpenUrl={onOpenUrl}
+          onCancelQueue={onCancelQueue}
+          onFeedback={onFeedback}
+          onVerificationResult={handleVerificationResult}
+          {...(scrollHandleRef ? { scrollHandleRef } : {})}
+        />
+      </Profiler>
     </div>
   );
 };

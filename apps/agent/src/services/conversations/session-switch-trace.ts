@@ -482,16 +482,6 @@ export function endSwitchTimeline(
   activeTimeline = null;
 
   const totalMs = performance.now() - timeline.startedAt;
-  const sid = timeline.sessionId.slice(-6);
-
-  const suffix =
-    result === 'instant'
-      ? `instant, ${String(Math.round(totalMs))}ms`
-      : result === 'aborted'
-        ? `aborted @ ${String(Math.round(totalMs))}ms`
-        : result === 'timeout'
-          ? `timeout @ ${String(Math.round(totalMs))}ms`
-          : `${String(Math.round(totalMs))}ms`;
 
   // Add final mark
   timeline.marks.push({
@@ -500,88 +490,10 @@ export function endSwitchTimeline(
     detail: detail ?? '',
   });
 
-  // Format marks as aligned table
-  const maxPhaseLen = Math.max(...timeline.marks.map((m) => m.phase.length));
-  const lines = timeline.marks.map((mark) => {
-    const ms = `${String(Math.round(mark.elapsed))}ms`.padStart(7);
-    const phase = mark.phase.padEnd(maxPhaseLen);
-    return mark.detail !== '' ? `  ${ms}  ${phase}  ${mark.detail}` : `  ${ms}  ${phase}`;
-  });
-
-  // eslint-disable-next-line no-console
-  console.groupCollapsed(
-    `%cSessionSwitch %c#${String(timeline.requestId)} → ${sid}%c (${suffix})`,
-    'color: #7c93c3; font-weight: bold',
-    'color: #e0a866; font-weight: bold',
-    'color: #8a8a8a; font-weight: normal'
-  );
-  // eslint-disable-next-line no-console
-  console.log(
-    `from ${timeline.from?.slice(-6) ?? '—'} · ${String(timeline.msgCount)} msgs · ${timeline.title ?? 'untitled'}`
-  );
-  for (const line of lines) {
-    // eslint-disable-next-line no-console
-    console.log(line);
-  }
-
-  // Frame budget report (during switch)
-  const switchFrames = [...frameBudgetSamples];
-  const switchDropped = switchFrames.filter((f) => f.elapsedMs <= totalMs);
-  if (switchDropped.length > 0) {
-    const worst = Math.max(...switchDropped.map((f) => f.durationMs));
-    // eslint-disable-next-line no-console
-    console.log(
-      `  %c[warn] ${String(switchDropped.length)} dropped frames during switch (>${String(Math.round(FRAME_BUDGET_120FPS_MS))}ms) - worst: ${String(worst)}ms`,
-      'color: #e06c75'
-    );
-    for (const frame of switchDropped) {
-      // eslint-disable-next-line no-console
-      console.log(
-        `    frame #${String(frame.frameIndex)} @ ${String(frame.elapsedMs)}ms → ${String(frame.durationMs)}ms`
-      );
-    }
-  } else {
-    // eslint-disable-next-line no-console
-    console.log('  %c✓ no dropped frames during switch (all <8.3ms)', 'color: #98c379');
-  }
-
-  // eslint-disable-next-line no-console
-  console.groupEnd();
-
-  // Keep frame monitor running 500ms after commit to capture post-commit drops
-  // (overscan entry→steady, VelocityScroll attach, prefetch sidebar work)
-  const postCommitSid = sid;
-  const postCommitTotalMs = totalMs;
+  // Flush frame budget samples — data is still available via
+  // window.__dumpLatestSwitchTrace() for programmatic inspection.
   setTimeout(() => {
-    const allFrames = flushFrameBudgetReport();
-    const postFrames = allFrames.filter((f) => f.elapsedMs > postCommitTotalMs);
-    if (postFrames.length > 0) {
-      const worst = Math.max(...postFrames.map((f) => f.durationMs));
-      // eslint-disable-next-line no-console
-      console.groupCollapsed(
-        `%cPostCommit %c${postCommitSid}%c ${String(postFrames.length)} dropped frames - worst: ${String(worst)}ms`,
-        'color: #7c93c3; font-weight: bold',
-        'color: #e0a866; font-weight: bold',
-        'color: #e06c75; font-weight: normal'
-      );
-      for (const frame of postFrames) {
-        const offsetMs = Math.round((frame.elapsedMs - postCommitTotalMs) * 10) / 10;
-        // eslint-disable-next-line no-console
-        console.log(
-          `    +${String(offsetMs)}ms  frame #${String(frame.frameIndex)} → ${String(frame.durationMs)}ms`
-        );
-      }
-      // eslint-disable-next-line no-console
-      console.groupEnd();
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(
-        `%cPostCommit %c${postCommitSid}%c ✓ no dropped frames 500ms after commit`,
-        'color: #7c93c3; font-weight: bold',
-        'color: #e0a866; font-weight: bold',
-        'color: #98c379; font-weight: normal'
-      );
-    }
+    flushFrameBudgetReport();
   }, 500);
 }
 

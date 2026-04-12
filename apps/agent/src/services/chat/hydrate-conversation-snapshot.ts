@@ -10,6 +10,7 @@ import type { ScrollIntent } from '@/stores/chat/chat-store';
 import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
 import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
+import { markOperation } from '@/lib/perf/frame-monitor';
 import { queryClient, queryKeys } from '@/lib/query';
 import {
   isActiveTimelineSession,
@@ -47,6 +48,14 @@ export interface HydrateConversationSnapshotInput {
   readonly source: 'event-load' | 'query-fast-path';
   readonly title: string;
   readonly activateToolSession?: boolean;
+  /**
+   * When true, the bulk message write uses `setMessagesDirect()` which
+   * bypasses Immer's `produce()` — avoiding the structural clone overhead.
+   *
+   * Set this when the caller owns the data (e.g. freshly allocated from
+   * a TanStack Query fetch) and it does not need defensive copying.
+   */
+  readonly skipImmerClone?: boolean;
 }
 
 export function mapPersistedMessage(message: PersistedChatMessage): ChatMessage {
@@ -239,6 +248,7 @@ function seedConversationDetailCache(input: HydrateConversationSnapshotInput): v
 export function hydrateConversationSnapshot(
   input: HydrateConversationSnapshotInput
 ): ChatMessage[] {
+  const endHydrateMark = markOperation('hydrate-snapshot-inner');
   const hydrateStart = performance.now();
 
   const messages = [
@@ -283,7 +293,11 @@ export function hydrateConversationSnapshot(
         `session=${input.sessionId.slice(-6)} msgs=${String(messages.length)} source=${input.source} layoutV=${String(existingSession?.layoutVersion ?? 0)}`
       );
     }
-    chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
+    if (input.skipImmerClone === true) {
+      chatStore.setMessagesDirect(input.sessionId, messages, input.scrollIntent);
+    } else {
+      chatStore.setMessages(input.sessionId, messages, input.scrollIntent);
+    }
   }
 
   // Lifecycle calls — always run regardless of layout equivalence
@@ -311,5 +325,6 @@ export function hydrateConversationSnapshot(
     );
   }
 
+  endHydrateMark();
   return messages;
 }

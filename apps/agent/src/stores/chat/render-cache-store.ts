@@ -2,6 +2,8 @@ import { createLogger } from '@orbit/common/lib';
 
 import type { ChatMeasurementCache, PersistedMeasurement } from './chat-store';
 
+import { markOperation } from '@/lib/perf/frame-monitor';
+
 const logger = createLogger('RenderCacheStore');
 
 const MAX_CACHED_SESSIONS = 50;
@@ -61,13 +63,16 @@ function clonePersistedMeasurement(measurement: PersistedMeasurement): Persisted
 }
 
 function cloneMeasurementCache(cacheEntry: ChatMeasurementCache): ChatMeasurementCache {
-  return {
+  const end = markOperation('cache-clone');
+  const clone: ChatMeasurementCache = {
     measurements: cacheEntry.measurements.map(clonePersistedMeasurement),
     messageCount: cacheEntry.messageCount,
     lastMessageId: cacheEntry.lastMessageId,
     layoutVersion: cacheEntry.layoutVersion,
     viewportWidth: cacheEntry.viewportWidth,
   };
+  end();
+  return clone;
 }
 
 function touchLru(sessionId: string): void {
@@ -235,7 +240,12 @@ export function isExactMeasurementCache(
 }
 
 export function buildMeasurementSizeMap(cacheEntry: ChatMeasurementCache): Map<string, number> {
-  return new Map(cacheEntry.measurements.map((measurement) => [measurement.key, measurement.size]));
+  const end = markOperation('cache-build-size-map');
+  const map = new Map(
+    cacheEntry.measurements.map((measurement) => [measurement.key, measurement.size])
+  );
+  end();
+  return map;
 }
 
 function isExpired(entry: PersistedEntry): boolean {
@@ -443,8 +453,10 @@ async function prunePersistedSessions(sessionIds: string[]): Promise<void> {
 }
 
 export function saveRenderCache(sessionId: string, measurementCache: ChatMeasurementCache): void {
+  const end = markOperation('cache-save');
   setMemoryCache(sessionId, measurementCache);
   persistToIdb(sessionId, measurementCache);
+  end();
   logger.debug('Saved render cache', {
     sessionId: sessionId.slice(-6),
     measurementCount: measurementCache.measurements.length,
@@ -454,13 +466,17 @@ export function saveRenderCache(sessionId: string, measurementCache: ChatMeasure
 }
 
 export function getRenderCache(sessionId: string): ChatMeasurementCache | null {
+  const end = markOperation('cache-restore');
   const entry = cache.get(sessionId);
   if (!entry) {
+    end();
     return null;
   }
 
   touchLru(sessionId);
-  return cloneMeasurementCache(entry);
+  const clone = cloneMeasurementCache(entry);
+  end();
+  return clone;
 }
 
 export async function preloadRenderCacheFromIdb(
@@ -477,15 +493,19 @@ export async function preloadRenderCacheFromIdb(
     return null;
   }
 
+  const end = markOperation('cache-preload-parse');
   const entry = parsePersistedEntry(raw);
   if (!entry || isExpired(entry)) {
     removeFromIdb(sessionId);
+    end();
     return null;
   }
 
   setMemoryCache(sessionId, entry.cache);
   persistToIdb(sessionId, entry.cache);
-  return cloneMeasurementCache(entry.cache);
+  const clone = cloneMeasurementCache(entry.cache);
+  end();
+  return clone;
 }
 
 async function warmMemoryCacheFromIdbInternal(): Promise<void> {

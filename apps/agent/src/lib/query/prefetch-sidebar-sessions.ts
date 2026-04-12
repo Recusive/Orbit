@@ -19,6 +19,7 @@ import { createLogger } from '@orbit/common/lib';
 
 import { loadConversationDetailFresh } from './conversation-detail';
 
+import { markEvent, markOperation } from '@/lib/perf/frame-monitor';
 import { preloadRenderCacheFromIdb } from '@/stores/chat/render-cache-store';
 
 const logger = createLogger('PrefetchSidebar');
@@ -47,6 +48,7 @@ export function prefetchSidebarSessions(
   snapshotKey: string
 ): void {
   if (prefetchedSnapshots.has(snapshotKey)) {
+    markEvent('prefetch-skip-dedup');
     return;
   }
   prefetchedSnapshots.add(snapshotKey);
@@ -58,6 +60,7 @@ export function prefetchSidebarSessions(
     .slice(0, MAX_PREFETCH_SESSIONS);
 
   if (candidates.length === 0) {
+    markEvent('prefetch-no-candidates');
     return;
   }
 
@@ -66,7 +69,9 @@ export function prefetchSidebarSessions(
     sessionIds: candidates.map((s) => s.sessionId.slice(-6)),
   });
 
-  void prefetchBatched(candidates.map((s) => s.sessionId));
+  // Mark start — the end fires when all batches complete
+  const endPrefetchAll = markOperation(`prefetch-start (${String(candidates.length)})`);
+  void prefetchBatched(candidates.map((s) => s.sessionId)).then(endPrefetchAll);
 }
 
 async function prefetchBatched(sessionIds: string[]): Promise<void> {

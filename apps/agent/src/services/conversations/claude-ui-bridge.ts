@@ -12,6 +12,7 @@ import type {
 } from './types';
 import type { ConversationDetailResult } from '@/lib/query/conversation-detail';
 
+import { markEvent, markOperation } from '@/lib/perf/frame-monitor';
 import {
   getFreshConversationDetail,
   loadConversationDetailFresh,
@@ -99,7 +100,9 @@ export const claudeUiBridge: ConversationUiBridge = {
     const prevActive = uiState.activeConversationId;
     const msgCount = chatStore.sessions[sessionId]?.messages.length ?? 0;
 
+    const endBeginSwitch = markOperation('begin-switch');
     const requestId = beginSessionSwitch(sessionId, title);
+    endBeginSwitch();
     startSwitchTimeline({
       requestId,
       sessionId,
@@ -110,7 +113,9 @@ export const claudeUiBridge: ConversationUiBridge = {
 
     if (hasCurrentReadyInstance(sessionId, requestId)) {
       markSwitchTimeline('select', 'ready-instance-reuse');
+      const endCommitReveal1 = markOperation('commit-reveal');
       void commitSessionReveal(requestId, sessionId, title);
+      endCommitReveal1();
       recordSessionSwitchTrace({
         event: 'hydrate_source_chosen',
         requestId,
@@ -122,8 +127,12 @@ export const claudeUiBridge: ConversationUiBridge = {
       return;
     }
 
+    const endCacheCheck = markOperation('cache-check');
     const freshResultValue = getFreshConversationDetail(sessionId) as unknown;
     const freshResult = isRevealableConversationDetail(freshResultValue) ? freshResultValue : null;
+    endCacheCheck();
+    // Signal cache hit vs miss for frame attribution — shows in perf overlay
+    markEvent(freshResult !== null ? 'cache-HIT' : 'cache-MISS');
     const queryStateAtSelect = queryClient.getQueryState(queryKeys.conversations.detail(sessionId));
     markSwitchTimeline(
       'select:gate-1',
@@ -143,6 +152,7 @@ export const claudeUiBridge: ConversationUiBridge = {
 
       if (freshResult.kind === 'data') {
         markSwitchTimeline('select', 'query-fast-path');
+        const endHydrateSnapshot = markOperation('hydrate-snapshot');
         hydrateConversationSnapshot({
           sessionId,
           persistedMessages: freshResult.conversation.messages,
@@ -151,10 +161,14 @@ export const claudeUiBridge: ConversationUiBridge = {
           source: 'query-fast-path',
           title: title ?? freshResult.conversation.title,
           activateToolSession: false,
+          skipImmerClone: true,
         });
+        endHydrateSnapshot();
         markSwitchTimeline('hydrate', `${String(freshResult.conversation.messages.length)} msgs`);
         if (hasCurrentReadyInstance(sessionId, requestId)) {
+          const endCommitReveal2 = markOperation('commit-reveal');
           void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
+          endCommitReveal2();
         }
       } else {
         // "Empty" in TanStack = no persisted JSONL. But the ChatStore may have
@@ -170,7 +184,9 @@ export const claudeUiBridge: ConversationUiBridge = {
           chatStore.markSessionLoaded(sessionId);
         }
         chatStore.bumpConversationLoadEpoch();
+        const endCommitReveal3 = markOperation('commit-reveal');
         void commitSessionReveal(requestId, sessionId, title ?? freshResult.conversation.title);
+        endCommitReveal3();
       }
 
       return;
@@ -185,7 +201,9 @@ export const claudeUiBridge: ConversationUiBridge = {
 
     const epochBefore = getWorkspaceEpoch();
     const generationBefore = getConversationGeneration(sessionId);
+    const endLoadConversation = markOperation('load-conversation');
     const result = await loadConversationDetailFresh(sessionId);
+    endLoadConversation();
     const epochAfter = getWorkspaceEpoch();
     const generationAfter = getConversationGeneration(sessionId);
     const currentRequestId = useSessionSwitchStore.getState().requestId;
@@ -212,6 +230,7 @@ export const claudeUiBridge: ConversationUiBridge = {
     if (result.kind === 'data') {
       markSwitchTimeline('select', 'query-load');
       setPendingConversationTitle(title ?? result.conversation.title, requestId);
+      const endHydrateSnapshot2 = markOperation('hydrate-snapshot');
       hydrateConversationSnapshot({
         sessionId,
         persistedMessages: result.conversation.messages,
@@ -220,10 +239,14 @@ export const claudeUiBridge: ConversationUiBridge = {
         source: 'query-fast-path',
         title: title ?? result.conversation.title,
         activateToolSession: false,
+        skipImmerClone: true,
       });
+      endHydrateSnapshot2();
       markSwitchTimeline('hydrate', `${String(result.conversation.messages.length)} msgs`);
       if (hasCurrentReadyInstance(sessionId, requestId)) {
+        const endCommitReveal4 = markOperation('commit-reveal');
         void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+        endCommitReveal4();
       }
       return;
     }
@@ -240,7 +263,9 @@ export const claudeUiBridge: ConversationUiBridge = {
         chatStore.markSessionLoaded(sessionId);
       }
       chatStore.bumpConversationLoadEpoch();
+      const endCommitReveal5 = markOperation('commit-reveal');
       void commitSessionReveal(requestId, sessionId, title ?? result.conversation.title);
+      endCommitReveal5();
       return;
     }
 
@@ -254,10 +279,6 @@ export const claudeUiBridge: ConversationUiBridge = {
 
   async restoreSelection(): Promise<RestoreSelectionResult> {
     const sessionId = claudeConversationRepo.restoreActiveSession();
-    // eslint-disable-next-line no-console
-    console.debug(
-      `[RestoreSelection] sessionId=${sessionId?.slice(-6) ?? 'null'} t=${String(Math.round(performance.now()))}ms`
-    );
     if (!sessionId) {
       recordSessionSwitchTrace({
         event: 'restore_selection',

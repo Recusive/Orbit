@@ -7,7 +7,16 @@
  */
 import { code as shikiCode } from '@streamdown/code';
 import { mermaid } from '@streamdown/mermaid';
-import { memo, useCallback, useContext, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Profiler,
+  memo,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
@@ -28,6 +37,7 @@ import type { MessageItemProps } from './types';
 import type { FC } from 'react';
 
 import { ErrorBoundary } from '@/components/shared';
+import { onProfilerRender } from '@/lib/perf/frame-monitor';
 import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
 import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING } from '@/lib/utils';
@@ -64,14 +74,12 @@ const REMARK_PLUGINS = [remarkGfm];
 //    Must run BEFORE rehypeFlowTokens so the DOM is finalized before tokenization.
 // 2. rehypeFlowTokens: wraps text in <span class="flow-token"> for per-word
 //    blur-in animation during streaming. Inert when data-streaming="false".
-//
-// IMPORTANT: We use ONE pipeline for both streaming and completed messages.
-// Previously, we switched from streaming→static (empty) plugins when isStreaming
-// changed. This caused a massive DOM restructuring (removing hundreds of spans
-// in one frame), creating a visible flash/glitch at the end of streaming.
-// Keeping the spans avoids the restructuring. The extra DOM weight is negligible
-// relative to the cost of tearing down and rebuilding the markdown tree.
-const REHYPE_PLUGINS = [rehypeInsightBlocks, rehypeFlowTokens];
+
+// Streaming messages: flow tokens enable per-word blur-in animation.
+const REHYPE_PLUGINS_STREAMING = [rehypeInsightBlocks, rehypeFlowTokens];
+// Completed messages: skip flow tokens — animation never plays, saves ~1ms
+// per segment in AST processing and 500+ DOM nodes per message.
+const REHYPE_PLUGINS_STATIC = [rehypeInsightBlocks];
 
 // Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
 // The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
@@ -93,22 +101,25 @@ const STREAMDOWN_LAYOUT_STABLE_MS = 250;
 const FlowTokenSegment: FC<{
   readonly text: string;
   readonly onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
-}> = memo(function FlowTokenSegment({ text, onClick }) {
+  readonly isStreaming: boolean;
+}> = memo(function FlowTokenSegment({ text, onClick, isStreaming }) {
   return (
     <div
       className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
       onClick={onClick}
     >
-      <Streamdown
-        remarkPlugins={REMARK_PLUGINS}
-        rehypePlugins={REHYPE_PLUGINS}
-        plugins={STREAMDOWN_PLUGINS}
-        components={STREAMDOWN_COMPONENTS}
-        linkSafety={LINK_SAFETY_DISABLED}
-        mode="static"
-      >
-        {text}
-      </Streamdown>
+      <Profiler id="streamdown" onRender={onProfilerRender}>
+        <Streamdown
+          remarkPlugins={REMARK_PLUGINS}
+          rehypePlugins={isStreaming ? REHYPE_PLUGINS_STREAMING : REHYPE_PLUGINS_STATIC}
+          plugins={STREAMDOWN_PLUGINS}
+          components={STREAMDOWN_COMPONENTS}
+          linkSafety={LINK_SAFETY_DISABLED}
+          mode="static"
+        >
+          {text}
+        </Streamdown>
+      </Profiler>
     </div>
   );
 });
@@ -450,6 +461,7 @@ export const MessageItem: FC<MessageItemProps> = memo(function MessageItem({
                     key={segment.key}
                     text={segment.text}
                     onClick={handleContentClick}
+                    isStreaming={message.isStreaming === true}
                   />
                 );
               }

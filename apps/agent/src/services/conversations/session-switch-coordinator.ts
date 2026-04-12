@@ -20,6 +20,7 @@ import type {
 } from '@/stores/chat';
 
 import { findChatScroller } from '@/lib/chat/chat-selectors';
+import { markOperation } from '@/lib/perf/frame-monitor';
 import {
   getConversationGeneration,
   getWorkspaceEpoch,
@@ -60,6 +61,7 @@ export interface SessionVerificationResult {
 }
 
 export function beginSessionSwitch(targetSessionId: string, title: string | null): number {
+  const endCoordinatorBegin = markOperation('coordinator-begin');
   const switchState = useSessionSwitchStore.getState();
   if (switchState.pending !== null) {
     abortSessionSwitch(switchState.requestId, 'superseded_by_new_request');
@@ -92,6 +94,7 @@ export function beginSessionSwitch(targetSessionId: string, title: string | null
     },
   });
 
+  endCoordinatorBegin();
   return requestId;
 }
 
@@ -100,8 +103,10 @@ export function promotePendingToVisibleVerification(
   sessionId: string,
   title: string | null
 ): boolean {
+  const endPromote = markOperation('coordinator-promote');
   const switchState = useSessionSwitchStore.getState();
   if (switchState.pending?.sessionId !== sessionId || switchState.requestId !== requestId) {
+    endPromote();
     return false;
   }
 
@@ -132,6 +137,7 @@ export function promotePendingToVisibleVerification(
       }
     }, VISIBLE_VERIFICATION_SAFETY_TIMEOUT_MS);
   }
+  endPromote();
   return promoted;
 }
 
@@ -182,6 +188,7 @@ export function abortSessionSwitch(
     return;
   }
 
+  const endAbort = markOperation('coordinator-abort');
   clearVisibleVerificationSafetyTimer();
 
   const pendingSessionId = switchState.pending.sessionId;
@@ -204,6 +211,7 @@ export function abortSessionSwitch(
     sessionId: pendingSessionId,
     abortReason: reason,
   });
+  endAbort();
 }
 
 export function commitSessionReveal(
@@ -235,7 +243,7 @@ export function commitSessionReveal(
     sessionId: targetSessionId,
     geometry: getSessionSwitchGeometrySnapshot(targetSessionId),
   });
-  const commitStart = performance.now();
+  const endCommitMark = markOperation('store-commit');
   useChatStore.getState().setActiveSession(targetSessionId);
   useFileStore.getState().switchSession(targetSessionId);
   useToolStore.getState().switchSession(targetSessionId);
@@ -244,8 +252,8 @@ export function commitSessionReveal(
   useUIStore.getState().setConversationTransitioning(false);
   useMessageBufferStore.getState().clearLoadPending(targetSessionId);
   useSessionSwitchStore.getState().clearPendingSwitch(requestId);
-  const commitDuration = performance.now() - commitStart;
-  markSwitchTimeline('commit:stores', `${String(Math.round(commitDuration * 10) / 10)}ms sync`);
+  endCommitMark();
+  markSwitchTimeline('commit:stores', 'sync');
 
   setShownSessionTraceRequest(targetSessionId, requestId);
   recordSessionSwitchTrace({

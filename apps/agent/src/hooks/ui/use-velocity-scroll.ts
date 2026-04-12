@@ -62,6 +62,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
 import { CHAT_LIST_SURFACE_SELECTOR } from '@/lib/chat/chat-selectors';
+import { markOperation } from '@/lib/perf/frame-monitor';
 import {
   markSwitchTimeline,
   recordSessionSwitchTrace,
@@ -172,8 +173,12 @@ export function useVelocityScroll(
       // Locate the inner list container and observe it. It may not exist
       // yet if the data is empty (the library conditionally renders it).
       const observeListContainer = (): void => {
+        const end = markOperation('velocity-attach');
         const listEl = node.querySelector(CHAT_LIST_SURFACE_SELECTOR);
-        if (listEl === null) return;
+        if (listEl === null) {
+          end();
+          return;
+        }
 
         // Primary: MutationObserver on style attribute — earliest signal.
         // Fires as a microtask after React updates height/margin/padding.
@@ -187,6 +192,7 @@ export function useVelocityScroll(
         // catches non-style size changes.
         listResizeObserver = new ResizeObserver(onScrollHeightChange);
         listResizeObserver.observe(listEl, { box: 'border-box' });
+        end();
       };
 
       // If the list container isn't in the DOM yet, use a MutationObserver
@@ -225,6 +231,7 @@ export function useVelocityScroll(
           sessionId: traceSessionId,
         });
       } else if (maxScrollTop > 0) {
+        const endPrime = markOperation('velocity-prime');
         const nudgedScrollTop =
           originalScrollTop < maxScrollTop ? originalScrollTop + 1 : originalScrollTop - 1;
 
@@ -234,6 +241,7 @@ export function useVelocityScroll(
             node.scrollTop = originalScrollTop;
           });
         }
+        endPrime();
       }
 
       const tick = (): void => {
@@ -246,11 +254,13 @@ export function useVelocityScroll(
           return;
         }
 
+        const endTick = markOperation('velocity-tick');
         lastScrollHeight = node.scrollHeight;
 
         const max = node.scrollHeight - node.clientHeight;
         node.scrollTop = Math.round(Math.max(0, Math.min(node.scrollTop + velocity, max)));
         velocity *= friction;
+        endTick();
         raf = requestAnimationFrame(tick);
       };
 

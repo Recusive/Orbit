@@ -46,6 +46,7 @@ import type { RefObject } from 'react';
 import { useTauri } from '@/hooks/agent/use-tauri';
 import { conversationAddMessage, conversationLoad } from '@/lib/api';
 import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
+import { markEvent } from '@/lib/perf/frame-monitor';
 import { appendMessageToConversationCache, markConversationDirty } from '@/lib/query';
 import {
   buildOptimisticAttachedImages,
@@ -353,7 +354,17 @@ export function useChatMessages(options?: UseChatMessagesOptions): UseChatMessag
     }
     const conversations = useUIStore.getState().conversations;
     if (conversations.length === 0) {
+      // Conversations not loaded yet — prefetch silently bails.
+      // This is the suspected race condition: if the backend hasn't sent
+      // the conversation list by the time initialRestoreCompleted fires,
+      // we exit here and never retry.
+      if (import.meta.env.DEV) {
+        markEvent('prefetch-bail-empty');
+      }
       return;
+    }
+    if (import.meta.env.DEV) {
+      markEvent(`prefetch-trigger (${String(conversations.length)} convos)`);
     }
     const snapshotKey = `${workspacePath}:${activeWorktreePath ?? ''}:${String(conversations.length)}`;
     void import('@/lib/query/prefetch-sidebar-sessions').then(({ prefetchSidebarSessions }) => {

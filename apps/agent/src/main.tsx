@@ -10,13 +10,14 @@ import { loadConversationDetailFresh } from '@/lib/query/conversation-detail';
 import { claudeConversationRepo } from '@/services/conversations/claude-conversation-repo';
 import { warmMemoryCacheFromIdb } from '@/stores/chat/render-cache-store';
 
-// Enable React Scan in development to visualize component re-renders.
-// Must run before createRoot so it can instrument React internals.
-if (typeof __DEV__ !== 'undefined' && __DEV__) {
-  void import('react-scan').then(({ scan }) => {
-    scan({ enabled: true, log: false });
-  });
-}
+// React Scan disabled — adds 10-25ms overhead per frame by patching React's
+// reconciler. Re-enable for visual re-render debugging, but expect 40-60 FPS
+// instead of 120 FPS while it's active.
+// if (typeof __DEV__ !== 'undefined' && __DEV__) {
+//   void import('react-scan').then(({ scan }) => {
+//     scan({ enabled: true, log: false });
+//   });
+// }
 
 // Initialize Sentry before rendering using shared config for consistency
 // This ensures release naming, privacy settings, and sampling rates match
@@ -81,18 +82,36 @@ void warmMemoryCacheFromIdb();
 // restoreSelection() → select() finds cached data (query-fast-path) or joins
 // this in-flight fetch (join-path) instead of falling through to slow-path.
 const lastActiveSessionId = claudeConversationRepo.restoreActiveSession();
-// eslint-disable-next-line no-console
-console.debug(
-  `[StartupPrefetch] lastActive=${lastActiveSessionId?.slice(-6) ?? 'null'} t=${String(Math.round(performance.now()))}ms`
-);
 if (lastActiveSessionId) {
-  void loadConversationDetailFresh(lastActiveSessionId).then((result) => {
-    // eslint-disable-next-line no-console
-    console.debug(
-      `[StartupPrefetch] resolved kind=${result.kind} t=${String(Math.round(performance.now()))}ms`
-    );
+  void loadConversationDetailFresh(lastActiveSessionId);
+}
+
+// Performance frame attribution monitor (dev-only, tree-shaken in production).
+// Shows FPS badge + frame-drop attribution log. Toggle: Ctrl+Shift+M.
+if (import.meta.env.DEV) {
+  void import('./lib/perf').then(({ initPerfMonitor }) => {
+    void initPerfMonitor();
   });
 }
+
+// Pre-warm Shiki syntax highlighting engine — forces WASM grammar load
+// for ALL supported languages while the user views the sidebar. Sequential
+// warming with yields to avoid blocking the main thread. Eliminates cold
+// grammar stalls when switching to sessions with any language.
+void import('@streamdown/code').then(({ code }) => {
+  const languages = code.getSupportedLanguages();
+  let i = 0;
+  const warmNext = (): void => {
+    const lang = languages[i];
+    if (lang === undefined) return;
+    i += 1;
+    code.highlight(
+      { code: 'x', language: lang, themes: ['github-light', 'github-dark'] },
+      warmNext
+    );
+  };
+  warmNext();
+});
 
 const rootElement = document.getElementById('root');
 
