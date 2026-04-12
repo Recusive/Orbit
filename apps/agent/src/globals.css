@@ -724,6 +724,15 @@ html.window-mode-liquid-glass:not(.dark) .glass-popover::after {
    Easing: ease-out-quart — matches TOOL_EXPAND_TRANSITION.
    ───────────────────────────────────────────────────────── */
 
+/* Headings — break unbreakable runs (e.g. "===="/"----" ASCII dividers that
+   markdown keeps inside a setext heading during streaming) so they can't push
+   the flex message row past its allotted width. `anywhere` (not `break-word`)
+   is required so the heading's min-content shrinks and the flex parent with
+   `min-width: 0` can actually contain it. */
+[data-streamdown^='heading-'] {
+  overflow-wrap: anywhere;
+}
+
 /* Inline code — subtle border + tinted background, matching Claude.ai style */
 [data-streamdown='inline-code'] {
   background: transparent !important;
@@ -759,10 +768,15 @@ html.dark [data-streamdown='code-block-container'] {
   display: contents !important;
 }
 
-/* Language label — visible only when populated */
+/* Language label — visible only when populated.
+   Left padding matches code-block-body (0.5rem) so the label's x-origin
+   lines up with the first character of the code content below. Streamdown
+   emits `ml-1` on this span by default; zero it out so our padding alone
+   controls the offset. */
 [data-streamdown='code-block-header'] > span:first-child {
   display: block !important;
-  padding: 0.5rem 0.75rem 0 !important;
+  margin-left: 0 !important;
+  padding: 0.5rem 0.5rem 0 !important;
   font-size: 0.6875rem !important; /* 11px */
   line-height: 1 !important;
   color: var(--orbit-900) !important;
@@ -859,6 +873,21 @@ html.dark [data-streamdown='code-block-container'] {
    for the final newline. Removing min-height lets it collapse to zero. */
 [data-streamdown='code-block-body'] code > span:last-child {
   min-height: 0 !important;
+}
+
+/* Disable content-visibility: auto on Streamdown code blocks.
+   Streamdown's CodeBlockContainer applies inline contentVisibility: "auto"
+   with containIntrinsicSize: "auto 200px" — a browser-level skip-rendering
+   optimization for non-virtualized lists. Inside TanStack Virtual this
+   conflicts: overscan-zone rows are mounted but off-screen, so the browser
+   reports ~200px placeholder height. When the row scrolls into view, the
+   real height (1000-10000px) is revealed, creating a delta that
+   destabilizes the virtualizer's totalSize and scroll position math.
+   The virtualizer already handles visibility — we don't need a second layer.
+   CSS !important overrides the inline style per the cascade specification. */
+[data-streamdown="code-block"] {
+  content-visibility: visible !important;
+  contain-intrinsic-size: none !important;
 }
 
 /* ============================================

@@ -6,11 +6,19 @@ const ESTIMATED_USER_LINE_HEIGHT = 24;
 const ESTIMATED_ASSISTANT_BASE_HEIGHT = 68;
 const ESTIMATED_ASSISTANT_LINE_HEIGHT = 22;
 const ESTIMATED_CODE_LINE_HEIGHT = 20;
-const ESTIMATED_CODE_BLOCK_PADDING = 40;
+const ESTIMATED_CODE_BLOCK_HEADER = 46;
+const ESTIMATED_CODE_BLOCK_CONTAINER_PADDING = 32;
+const ESTIMATED_MIN_CODE_BLOCK_HEIGHT = 96;
+const ESTIMATED_TOOL_WIDGET_HEIGHT = 80;
 const ESTIMATED_THINKING_HEIGHT = 96;
 const ESTIMATED_IMAGE_GRID_HEIGHT = 144;
 const ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT = 24;
-const MAX_ESTIMATED_MESSAGE_HEIGHT = 4000;
+// No artificial cap — messages in this app can be 70,000+ pixels tall
+// (long conversations with extensive code blocks). Capping at 4000 caused
+// the virtualizer's totalSize to be 10-20x too small for long conversations,
+// creating a scroll ceiling at ~60% and constant jitter from measurement
+// corrections. The virtualizer needs accurate estimates to compute scroll range.
+const MAX_ESTIMATED_MESSAGE_HEIGHT = 200_000;
 
 function estimateWrappedLines(text: string, charsPerLine: number): number {
   const lines = text.split('\n');
@@ -41,7 +49,16 @@ export function scrollToBottom(
   });
 }
 
-export function estimateMessageHeight(message: ChatMessage): number {
+export interface EstimateMessageHeightOptions {
+  toolCount?: number;
+  hasThinking?: boolean;
+  imageCount?: number;
+}
+
+export function estimateMessageHeight(
+  message: ChatMessage,
+  options?: EstimateMessageHeightOptions
+): number {
   const content = message.displayedContent.length > 0 ? message.displayedContent : message.content;
   let height =
     message.role === 'user' ? ESTIMATED_USER_BASE_HEIGHT : ESTIMATED_ASSISTANT_BASE_HEIGHT;
@@ -51,8 +68,7 @@ export function estimateMessageHeight(message: ChatMessage): number {
   } else {
     const parts = content.split('```');
     let proseLines = 0;
-    let codeLines = 0;
-    let codeBlockCount = 0;
+    let codeBlockHeight = 0;
 
     for (let i = 0; i < parts.length; i += 1) {
       const part = parts[i] ?? '';
@@ -62,26 +78,38 @@ export function estimateMessageHeight(message: ChatMessage): number {
           proseLines += estimateWrappedLines(trimmed, ESTIMATED_CHARS_PER_LINE);
         }
       } else {
-        const blockLineCount = part.split('\n').length;
-        codeLines += Math.max(1, blockLineCount - 1);
-        codeBlockCount += 1;
+        const blockLineCount = Math.max(1, part.split('\n').length - 1);
+        const rawBlockHeight =
+          ESTIMATED_CODE_BLOCK_HEADER +
+          blockLineCount * ESTIMATED_CODE_LINE_HEIGHT +
+          ESTIMATED_CODE_BLOCK_CONTAINER_PADDING;
+        codeBlockHeight += Math.max(ESTIMATED_MIN_CODE_BLOCK_HEIGHT, rawBlockHeight);
       }
     }
 
     height += proseLines * ESTIMATED_ASSISTANT_LINE_HEIGHT;
-    height +=
-      codeLines * ESTIMATED_CODE_LINE_HEIGHT + codeBlockCount * ESTIMATED_CODE_BLOCK_PADDING;
+    height += codeBlockHeight;
   }
 
-  if ((message.thinkingBlocks?.length ?? 0) > 0 || message.thinking) {
+  // Thinking — options override, else introspect message
+  const hasThinking =
+    options?.hasThinking ??
+    ((message.thinkingBlocks?.length ?? 0) > 0 ||
+      (message.thinking !== undefined && message.thinking.length > 0));
+  if (hasThinking) {
     height += ESTIMATED_THINKING_HEIGHT;
   }
 
-  if ((message.attachedImages?.length ?? 0) > 0) {
+  // Images — options override, else introspect message
+  const imageCount = options?.imageCount ?? message.attachedImages?.length ?? 0;
+  if (imageCount > 0) {
     height += ESTIMATED_IMAGE_GRID_HEIGHT;
-    height +=
-      Math.max(0, (message.attachedImages?.length ?? 1) - 1) * ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT;
+    height += Math.max(0, imageCount - 1) * ESTIMATED_EXTRA_IMAGE_ROW_HEIGHT;
   }
+
+  // Tool widgets
+  const toolCount = options?.toolCount ?? 0;
+  height += toolCount * ESTIMATED_TOOL_WIDGET_HEIGHT;
 
   return Math.min(MAX_ESTIMATED_MESSAGE_HEIGHT, height);
 }

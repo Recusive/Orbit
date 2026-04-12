@@ -595,12 +595,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       : 'parked'
     : 'entry';
 
-  // Cap overscan at entry for large sessions to prevent TanStack's internal
-  // render loop from hitting React's maximum update depth limit.
-  const overscanPhase: OverscanPhase =
-    targetOverscanPhase === 'steady' && messages.length > LARGE_SESSION_THRESHOLD
-      ? 'entry'
-      : targetOverscanPhase;
+  // Previously capped at entry (5 items) for large sessions to prevent
+  // TanStack's internal update loop hitting React's maximum update depth.
+  // That loop was caused by content-visibility: auto on code blocks creating
+  // massive measurement deltas on each overscan cycle. With content-visibility
+  // now forced to 'visible' via CSS, measurements are stable and the cap
+  // is no longer needed.
+  const overscanPhase: OverscanPhase = targetOverscanPhase;
   const overscan =
     overscanPhase === 'parked'
       ? OVERSCAN_PARKED
@@ -648,7 +649,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         return estimated;
       }
       const row = renderRows[index];
-      return row ? estimateMessageHeight(row.message) : DEFAULT_ROW_HEIGHT;
+      if (row) {
+        const tools = toolsByMessageId.get(row.id);
+        return estimateMessageHeight(row.message, {
+          toolCount: tools?.length ?? 0,
+        });
+      }
+      return DEFAULT_ROW_HEIGHT;
     },
     overscan,
     measureElement,

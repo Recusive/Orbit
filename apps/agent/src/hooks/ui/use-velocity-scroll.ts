@@ -59,7 +59,6 @@
  *   - Decrease `maxPxPerFrame` (default 50 → 35).
  * ───────────────────────────────────────────────────────────────────────
  */
-import { createLogger } from '@orbit/common/lib';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { CHAT_LIST_SURFACE_SELECTOR } from '@/lib/chat/chat-selectors';
@@ -67,8 +66,6 @@ import {
   markSwitchTimeline,
   recordSessionSwitchTrace,
 } from '@/services/conversations/session-switch-trace';
-
-const logger = createLogger('VelocityScroll');
 
 interface VelocityScrollOptions {
   /** Max pixels per frame. Caps speed for virtualization buffer. Default 50. */
@@ -89,52 +86,13 @@ interface VelocityScrollOptions {
   traceSessionId?: string | null;
 }
 
-/**
- * Compensate scrollTop to maintain the scrollbar ratio when scrollHeight
- * changes during active scrolling. Returns the compensation applied.
- *
- * Formula: newScrollTop / (newScrollHeight - clientHeight)
- *        = oldScrollTop / (oldScrollHeight - clientHeight)
- *
- * Solving: compensation = scrollTop × (delta / oldScrollRange)
- */
-function compensateScrollHeight(scroller: HTMLElement, lastScrollHeight: number): number {
-  const curScrollHeight = scroller.scrollHeight;
-  if (lastScrollHeight <= 0 || curScrollHeight === lastScrollHeight) {
-    return 0;
-  }
-
-  const delta = curScrollHeight - lastScrollHeight;
-  const scrollRange = lastScrollHeight - scroller.clientHeight;
-
-  // Skip when at bottom — the library handles that case internally.
-  const atBottom = scroller.scrollTop + scroller.clientHeight >= curScrollHeight - 4;
-
-  if (scrollRange <= 0 || atBottom) {
-    return 0;
-  }
-
-  // Measurement cascade guard: when scrollHeight changes by more than 2x the
-  // viewport in a single observation, this is a measurement cascade (many items
-  // measured for the first time), not a normal layout change. Compensating would
-  // amplify the oscillation. Let the virtualizer settle on its own.
-  const absDelta = Math.abs(delta);
-  if (absDelta > scroller.clientHeight * 2) {
-    logger.debug('[compensateScrollHeight] skipping — measurement cascade', {
-      delta,
-      clientHeight: scroller.clientHeight,
-      lastScrollHeight,
-      curScrollHeight,
-    });
-    return 0;
-  }
-
-  const compensation = Math.round(scroller.scrollTop * (delta / scrollRange));
-  if (compensation !== 0) {
-    scroller.scrollTop += compensation;
-  }
-  return compensation;
-}
+// compensateScrollHeight REMOVED — it fought with TanStack Virtual's position
+// math during fast scroll. When row measurements change, the virtualizer
+// updates totalSize → chat-list-inner height changes → the observer fires →
+// compensates scrollTop → virtualizer sees new scrollTop → recalculates range
+// → more measurements change → observer fires again → OSCILLATION LOOP.
+// The virtualizer handles scroll position stability internally via
+// shouldAdjustScrollPositionOnItemSizeChange. See git history for the original.
 
 export function useVelocityScroll(
   options?: VelocityScrollOptions
@@ -206,7 +164,8 @@ export function useVelocityScroll(
 
       const onScrollHeightChange = (): void => {
         if ((!animating && !warmupCompensating) || lastScrollHeight <= 0) return;
-        compensateScrollHeight(node, lastScrollHeight);
+        // Track scrollHeight for the tick fallback. No compensation — the
+        // virtualizer's shouldAdjustScrollPositionOnItemSizeChange handles it.
         lastScrollHeight = node.scrollHeight;
       };
 
@@ -287,27 +246,10 @@ export function useVelocityScroll(
           return;
         }
 
-        // Fallback: if the ResizeObserver missed a scrollHeight change
-        // (or hasn't been set up yet), catch it here. This fires 1 frame
-        // late but is better than no compensation.
-        const curScrollHeight = node.scrollHeight;
-        let compensation = 0;
+        lastScrollHeight = node.scrollHeight;
 
-        if (lastScrollHeight > 0 && curScrollHeight !== lastScrollHeight) {
-          const delta = curScrollHeight - lastScrollHeight;
-          const scrollRange = lastScrollHeight - node.clientHeight;
-          const atBottom = node.scrollTop + node.clientHeight >= curScrollHeight - 4;
-
-          if (scrollRange > 0 && !atBottom) {
-            compensation = node.scrollTop * (delta / scrollRange);
-          }
-        }
-        lastScrollHeight = curScrollHeight;
-
-        const max = curScrollHeight - node.clientHeight;
-        node.scrollTop = Math.round(
-          Math.max(0, Math.min(node.scrollTop + velocity + compensation, max))
-        );
+        const max = node.scrollHeight - node.clientHeight;
+        node.scrollTop = Math.round(Math.max(0, Math.min(node.scrollTop + velocity, max)));
         velocity *= friction;
         raf = requestAnimationFrame(tick);
       };
