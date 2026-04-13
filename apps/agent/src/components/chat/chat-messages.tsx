@@ -46,6 +46,8 @@ import { ShimmerText } from '@/components/ui/shimmer-text';
 import { useVelocityScroll } from '@/hooks/ui/use-velocity-scroll';
 import { estimateMessageHeight, isNearBottom, scrollToBottom } from '@/lib/chat/chat-scroll-utils';
 import { findChatListSurface } from '@/lib/chat/chat-selectors';
+import { getStreamdownCache, hashContent } from '@/lib/chat/streamdown-cache';
+import { getChatContentWidth } from '@/lib/chat/streamdown-render-utils';
 import { markOperation, onProfilerRender } from '@/lib/perf/frame-monitor';
 import { CHAT_WIDTH, CHAT_WIDTH_VAR } from '@/lib/utils';
 import {
@@ -445,6 +447,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const estimatedSizesRef = useRef<number[]>([]);
   const initialMeasurementsCacheRef = useRef<VirtualItem[]>([]);
+  /** Exact row sizes from previous visits — keyed by item key (sessionKey:msgId).
+   *  When measureElement fires, returning the cached size produces delta=0,
+   *  preventing shouldAdjustScrollPositionOnItemSizeChange from shifting scrollTop. */
+  const cachedSizeMapRef = useRef<Map<string, number>>(new Map());
   const prevMessageCount = useRef(0);
   const readinessStartedRef = useRef(false);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
@@ -681,12 +687,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     getItemKey,
     initialMeasurementsCache: initialMeasurementsCacheRef.current,
     estimateSize: (index: number): number => {
+      // Priority 1: Previously measured size from the render cache store.
       const estimated = estimatedSizesRef.current[index];
       if (estimated !== undefined && Number.isFinite(estimated) && estimated > 0) {
         return estimated;
       }
       const row = renderRows[index];
       if (row) {
+        // Priority 2: Pre-rendered height from the streamdown cache.
+        // This is the FlowTokenSegment content height — close to the
+        // real row height (just missing padding/actions). Still vastly
+        // more accurate than estimateMessageHeight() for code-heavy
+        // messages where estimates can be 30-40% off.
+        if (row.message.role === 'assistant' && row.message.isStreaming !== true) {
+          const contentHash = hashContent(row.message.content);
+          const cached = getStreamdownCache(contentHash, getChatContentWidth());
+          if (cached !== null) {
+            // Add approximate wrapper overhead (padding + gap + actions).
+            return cached.height + 24;
+          }
+        }
+        // Priority 3: Heuristic estimate.
         const tools = toolsByMessageId.get(row.id);
         return estimateMessageHeight(row.message, {
           toolCount: tools?.length ?? 0,
@@ -697,6 +718,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     overscan: deferredOverscan,
     measureElement: (element, entry, instance) => {
       const end = markOperation('measure-element');
+
+      // If we have a cached size from a previous visit, return it directly.
+      // This produces delta=0 against the estimate, preventing
+      // shouldAdjustScrollPositionOnItemSizeChange from shifting scrollTop.
+      // Only use cached sizes for non-streaming, completed items.
+      const itemKey = element.getAttribute('data-item-key');
+      if (itemKey !== null && cachedSizeMapRef.current.size > 0) {
+        const cachedSize = cachedSizeMapRef.current.get(itemKey);
+        if (cachedSize !== undefined && cachedSize > 0) {
+          end();
+          return cachedSize;
+        }
+      }
+
       const size = measureElement(element, entry, instance);
       end();
       return size;
@@ -1101,6 +1136,9 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       viewportWidth: getCurrentViewportWidth(),
     });
     store.setMeasurementCache(sessionId, cache);
+    // Refresh the cached size map so measureElement returns exact sizes
+    // for items remounted during scroll within the same session visit.
+    cachedSizeMapRef.current = buildMeasurementSizeMap(cache);
   }, [buildCurrentMeasurementCache, getCurrentViewportWidth, sessionId]);
 
   const snapshotStableMeasurementCache = useCallback((): void => {
@@ -1115,6 +1153,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     restoredSizeCacheRef.current = false;
     restorePathRef.current = 'cold';
     initialMeasurementsCacheRef.current = [];
+    cachedSizeMapRef.current = new Map();
     if (!sessionId) return;
 
     const store = useChatStore.getState();
@@ -1122,6 +1161,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     let cache = session?.measurementCache ?? null;
     cache ??= getRenderCache(sessionId);
     const viewportWidth = getCurrentViewportWidth();
+
+    // Build the cached size map from ANY available cache — this is what
+    // measureElement checks to return exact sizes and prevent scroll jitter.
+    if (cache) {
+      const sizeMap = buildMeasurementSizeMap(cache);
+      cachedSizeMapRef.current = sizeMap;
+    }
 
     if (
       cache &&
@@ -2665,6 +2711,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
                     <div
                       key={String(item.key)}
                       data-index={item.index}
+                      data-item-key={String(item.key)}
                       ref={rowVirtualizer.measureElement}
                       style={{
                         position: 'absolute',

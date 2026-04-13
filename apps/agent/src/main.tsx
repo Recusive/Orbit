@@ -6,6 +6,7 @@ import '@fontsource-variable/geist-mono';
 import './globals.css';
 import App from './App';
 
+import { startViewportWidthTracking } from '@/lib/chat/streamdown-render-utils';
 import { loadConversationDetailFresh } from '@/lib/query/conversation-detail';
 import { claudeConversationRepo } from '@/services/conversations/claude-conversation-repo';
 import { warmMemoryCacheFromIdb } from '@/stores/chat/render-cache-store';
@@ -77,6 +78,7 @@ if (localStorage.getItem('orbit-backend-mode') !== null) {
 }
 
 void warmMemoryCacheFromIdb();
+startViewportWidthTracking();
 
 // Pre-fetch the last-active conversation into TanStack Query cache so that
 // restoreSelection() → select() finds cached data (query-fast-path) or joins

@@ -9,9 +9,11 @@ import type { ScrollIntent } from '@/stores/chat/chat-store';
 
 import { getActiveChain } from '@/components/chat/messages/message-utils';
 import { toCachedImagePreviewUrl } from '@/lib/api/image-cache';
+import { warmStreamdownCache } from '@/lib/chat/streamdown-cache';
 import { collectUsageMessageIds, toContextUsage } from '@/lib/context-usage';
 import { markOperation } from '@/lib/perf/frame-monitor';
 import { queryClient, queryKeys } from '@/lib/query';
+import { queueSessionMessages } from '@/services/chat/streamdown-render-service';
 import {
   isActiveTimelineSession,
   markSwitchTimeline,
@@ -324,6 +326,12 @@ export function hydrateConversationSnapshot(
       `${String(Math.round(hydrateDuration * 10) / 10)}ms msgs=${String(messages.length)} layoutEq=${String(isLayoutEquivalent)}`
     );
   }
+
+  // Warm the streamdown cache from IndexedDB (populated by prior visits), then
+  // queue any remaining uncached messages for background rendering.
+  void warmStreamdownCache().then(() => {
+    queueSessionMessages(messages);
+  });
 
   endHydrateMark();
   return messages;

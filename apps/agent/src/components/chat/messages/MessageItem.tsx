@@ -5,8 +5,6 @@
  * To change message widths or assistant padding, update CHAT_WIDTH,
  * CHAT_WIDTH_VAR, and CHAT_SPACING in constants.ts - DO NOT hardcode here.
  */
-import { code as shikiCode } from '@streamdown/code';
-import { mermaid } from '@streamdown/mermaid';
 import {
   Profiler,
   memo,
@@ -17,7 +15,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import remarkGfm from 'remark-gfm';
 import { Streamdown } from 'streamdown';
 
 import { CompactIndicator, InterruptIndicator, ThinkingBox } from '../status';
@@ -37,74 +34,132 @@ import type { MessageItemProps } from './types';
 import type { FC } from 'react';
 
 import { ErrorBoundary } from '@/components/shared';
+import { getStreamdownCache, hashContent, setStreamdownCache } from '@/lib/chat/streamdown-cache';
+import {
+  LINK_SAFETY_DISABLED,
+  REHYPE_PLUGINS_STATIC,
+  REHYPE_PLUGINS_STREAMING,
+  REMARK_PLUGINS,
+  STREAMDOWN_COMPONENTS,
+  STREAMDOWN_LAYOUT_STABLE_MS,
+  STREAMDOWN_PLUGINS,
+} from '@/lib/chat/streamdown-config';
+import { getChatContentWidth } from '@/lib/chat/streamdown-render-utils';
 import { onProfilerRender } from '@/lib/perf/frame-monitor';
-import { rehypeFlowTokens } from '@/lib/rehype-flow-tokens';
-import { rehypeInsightBlocks } from '@/lib/rehype-insight-blocks';
 import { cn, CHAT_SPACING } from '@/lib/utils';
 import { useUIStore } from '@/stores/ui/ui-store';
 
 /** Max collapsed height for user message bubbles (px). Content taller than this gets a "Show more" toggle. */
 const USER_MESSAGE_MAX_HEIGHT = 200;
 
-// Disable Streamdown's built-in link safety modal. Links render as plain <a> tags instead
-// of <button> elements, letting our handleContentClick route them through onOpenUrl → Tauri.
-const LINK_SAFETY_DISABLED = { enabled: false } as const;
-
-// Custom table component — replaces Streamdown's built-in MarkdownTable which hardcodes
-// `w-full border-collapse border border-border` on the <table> element and adds
-// copy/download control buttons. Our component renders a clean <table> inside a
-// .table-wrapper div, letting globals.css handle styling (rounded corners, fit-content).
-const MarkdownTable: FC<{ readonly children?: React.ReactNode }> = ({ children }) => (
-  <div className="table-wrapper">
-    <table>{children}</table>
-  </div>
-);
-
-// Stable components object — defined outside component to prevent recreation on each render.
-// Streamdown compares components by reference; recreating this object would force full re-renders.
-const STREAMDOWN_COMPONENTS = { table: MarkdownTable };
-
-// Stable plugin arrays - defined outside component to prevent recreation on each render.
-// This is critical for Streamdown performance as it compares plugin arrays by reference.
-const REMARK_PLUGINS = [remarkGfm];
-
-// Rehype configuration:
-// 1. rehypeInsightBlocks: detects `★ Insight ───` / `───` border patterns and
-//    restructures them into styled <aside class="insight-block"> elements.
-//    Must run BEFORE rehypeFlowTokens so the DOM is finalized before tokenization.
-// 2. rehypeFlowTokens: wraps text in <span class="flow-token"> for per-word
-//    blur-in animation during streaming. Inert when data-streaming="false".
-
-// Streaming messages: flow tokens enable per-word blur-in animation.
-const REHYPE_PLUGINS_STREAMING = [rehypeInsightBlocks, rehypeFlowTokens];
-// Completed messages: skip flow tokens — animation never plays, saves ~1ms
-// per segment in AST processing and 500+ DOM nodes per message.
-const REHYPE_PLUGINS_STATIC = [rehypeInsightBlocks];
-
-// Streamdown plugins for diagram and code rendering - defined outside component for reference stability.
-// The `code` plugin provides Shiki syntax highlighting with github-light/dark themes.
-// Wrapper: unlabeled code blocks (```  with no language) default to markdown highlighting
-// instead of Shiki's internal "text" fallback which produces no syntax colors.
-const code: typeof shikiCode = {
-  ...shikiCode,
-  highlight: (...args: Parameters<typeof shikiCode.highlight>) => {
-    const [options, callback] = args;
-    const language = shikiCode.supportsLanguage(options.language)
-      ? options.language
-      : ('markdown' as typeof options.language);
-    return shikiCode.highlight({ ...options, language }, callback);
-  },
-};
-const STREAMDOWN_PLUGINS = { mermaid, code };
-const STREAMDOWN_LAYOUT_STABLE_MS = 250;
+/** Settle time (ms) after last DOM mutation before capturing cached HTML. */
+const SHIKI_SETTLE_MS = 80;
 
 const FlowTokenSegment: FC<{
   readonly text: string;
   readonly onClick: (e: React.MouseEvent<HTMLDivElement>) => void;
   readonly isStreaming: boolean;
 }> = memo(function FlowTokenSegment({ text, onClick, isStreaming }) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Cache lookup — keyed by content hash, not messageId. This handles
+  // multi-segment messages correctly (each segment has its own hash).
+  const contentHash = useMemo(() => (isStreaming ? 0 : hashContent(text)), [text, isStreaming]);
+  const viewportWidth = getChatContentWidth();
+  const cached =
+    !isStreaming && contentHash !== 0 ? getStreamdownCache(contentHash, viewportWidth) : null;
+
+  // ── Write-through cache ──────────────────────────────────────────────
+  // After a live Streamdown render, wait for Shiki async highlighting to
+  // settle (MutationObserver debounce), then capture innerHTML + height
+  // and write to cache. The NEXT time TanStack remounts this item, the
+  // cache hit path fires and injects HTML instantly.
+  useLayoutEffect(() => {
+    if (isStreaming || cached !== null) return;
+
+    const el = wrapperRef.current;
+    if (el === null) return;
+
+    let settleTimer: ReturnType<typeof setTimeout>;
+    let disposed = false;
+
+    const capture = (): void => {
+      if (disposed) return;
+      observer.disconnect();
+
+      const html = el.innerHTML;
+      const height = el.getBoundingClientRect().height;
+
+      if (html.length > 0 && height > 0) {
+        const currentWidth = getChatContentWidth();
+        setStreamdownCache(contentHash, {
+          html,
+          height,
+          viewportWidth: currentWidth,
+          cachedAt: Date.now(),
+        });
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.debug(
+            '[SD-CACHE] WRITE',
+            `h=${String(Math.round(height))}`,
+            `htmlLen=${String(html.length)}`
+          );
+        }
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(capture, SHIKI_SETTLE_MS);
+    });
+
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      characterData: true,
+    });
+
+    // Initial settle timer — fires if no mutations (no code blocks).
+    settleTimer = setTimeout(capture, SHIKI_SETTLE_MS);
+
+    return (): void => {
+      disposed = true;
+      observer.disconnect();
+      clearTimeout(settleTimer);
+    };
+  }, [contentHash, isStreaming, cached]);
+
+  // ── Cache HIT path — inject pre-rendered HTML ────────────────────────
+  if (cached !== null) {
+    if (import.meta.env.DEV) {
+      // eslint-disable-next-line no-console
+      console.debug(
+        '[SD-CACHE] HIT',
+        `h=${String(Math.round(cached.height))}`,
+        `htmlLen=${String(cached.html.length)}`
+      );
+    }
+    return (
+      <div
+        ref={wrapperRef}
+        className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
+        onClick={onClick}
+        dangerouslySetInnerHTML={{ __html: cached.html }}
+      />
+    );
+  }
+
+  // ── Cache MISS path — live Streamdown render ─────────────────────────
+  if (import.meta.env.DEV && !isStreaming) {
+    // eslint-disable-next-line no-console
+    console.debug('[SD-CACHE] MISS', `textLen=${String(text.length)}`);
+  }
+
   return (
     <div
+      ref={wrapperRef}
       className="chat-markdown prose prose-sm dark:prose-invert max-w-none select-text"
       onClick={onClick}
     >

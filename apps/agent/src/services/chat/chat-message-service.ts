@@ -43,6 +43,7 @@ import {
   hydrateConversationSnapshot,
   mapPersistedMessage,
 } from '@/services/chat/hydrate-conversation-snapshot';
+import { queueMessageRender } from '@/services/chat/streamdown-render-service';
 import { StreamingRevealController } from '@/services/chat/streaming-reveal-controller';
 import {
   abortPendingCreate,
@@ -865,6 +866,10 @@ class ChatMessageService {
           : {}),
         ...(finalBlocks !== undefined ? { thinkingBlocks: finalBlocks } : {}),
       };
+
+      // Queue the completed message for background Streamdown rendering.
+      // The render service caches HTML + height so the next mount is instant.
+      queueMessageRender(completedMsg.id, completedMsg.content);
 
       // Persist assistant message to backend
       const persistedTurnUsage = message.turn_usage;
