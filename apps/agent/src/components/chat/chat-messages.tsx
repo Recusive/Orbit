@@ -1149,6 +1149,28 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     snapshotMeasurementCache();
   }, [snapshotMeasurementCache]);
 
+  // ── Measure on stream end ──────────────────────────────────────────
+  // When the agent finishes a turn (isAgentRunning transitions false),
+  // wait for Shiki highlighting to settle (~250ms) then snapshot ALL
+  // current measurements. This ensures the completed message's exact
+  // height is persisted to IndexedDB and available in cachedSizeMapRef
+  // for future visits — the "measure once, use forever" guarantee.
+  const prevAgentRunningRef = useRef(isAgentRunning);
+  useEffect(() => {
+    const wasRunning = prevAgentRunningRef.current;
+    prevAgentRunningRef.current = isAgentRunning;
+
+    if (wasRunning && !isAgentRunning) {
+      const timer = setTimeout(() => {
+        snapshotMeasurementCache();
+      }, 300);
+      return (): void => {
+        clearTimeout(timer);
+      };
+    }
+    return undefined;
+  }, [isAgentRunning, snapshotMeasurementCache]);
+
   useLayoutEffect(() => {
     restoredSizeCacheRef.current = false;
     restorePathRef.current = 'cold';
@@ -2771,7 +2793,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
               aria-label="Scroll to bottom"
               className="group absolute bottom-3 left-1/2 z-30 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 py-1 text-xs text-muted-foreground shadow-md transition-[translate,scale,box-shadow,border-color,color] duration-200 ease-[cubic-bezier(0.165,0.85,0.45,1)] hover:-translate-y-px hover:border-border hover:text-foreground hover:shadow-lg active:scale-[0.97] active:duration-75 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
             >
-              <ChevronDownIcon className="h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.165,0.85,0.45,1)] group-hover:translate-y-[1px]" />
+              <ChevronDownIcon className="h-3.5 w-3.5 transition-transform duration-200 ease-[cubic-bezier(0.165,0.85,0.45,1)] group-hover:translate-y-px" />
               Scroll to bottom
             </button>
           ) : null}
