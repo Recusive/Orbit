@@ -34,7 +34,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `ACTIVITY-PANEL-CSS-MAXWIDTH-CLAMP.md` — CSS max-width with calc(100%) over JS clamping for activity panel overflow (4 failed JS attempts, WKWebView reflow/transition quirks)
 - `VIRTUOSO-SCROLLBAR-JITTER-COMPENSATION.md` — Three-tier scrollTop compensation for VirtuosoMessageList mid-list scrollbar jitter (MutationObserver + ResizeObserver + rAF, library gap analysis)
 
-## architecture/ (11 files)
+## architecture/ (12 files)
 
 - `AUTO-UPDATE.md` — Auto-update pipeline (Tauri updater, signing, CI, Orbit-Release public repo)
 - `TECH-STACK.md` — Complete technology overview
@@ -47,6 +47,7 @@ Use this to find the right file. Read the file directly — no links needed.
 - `REACT-19-ACTIVITY-OPTIMIZATION.md` — React 19 Activity API optimization
 - `INSTANT-THEME-SWITCH.md` — Flash-free instant theme switching
 - `LIQUID-GLASS.md` — Liquid glass visual effect system
+- `VIRTUALIZATION.md` — Measure-once chat virtualization: write-through cache, cached measureElement, stream-end snapshots
 - `tauri-plugins.md` — Tauri 2 plugins reference
 
 ## design/ (7 files)
