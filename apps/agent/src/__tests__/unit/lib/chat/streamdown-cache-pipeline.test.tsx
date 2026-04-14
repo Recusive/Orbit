@@ -648,3 +648,182 @@ describe('Full pipeline: measure once, use forever', () => {
     expect(getStreamdownCache(hashContent(newText), 650)?.height).toBe(100);
   });
 });
+
+// ════════════════════════════════════════════════════════════════════════
+// Layer 5 — Settle-Gated Snapshot (per-row quiet-window detection)
+// ════════════════════════════════════════════════════════════════════════
+
+/**
+ * Mirrors the settle state machine in chat-messages.tsx. Rows are considered
+ * "settled" only after ROW_SETTLE_MS has passed without a new ResizeObserver
+ * fire — guaranteeing persisted heights are post-Shiki, post-font-load.
+ */
+const ROW_SETTLE_MS = 500;
+
+interface SettleMachine {
+  lastMeasureAt: Map<string, number>;
+  settledKeys: Set<string>;
+  snapshotCalls: number;
+  recordMeasure: (key: string) => void;
+  runSettleCheck: () => void;
+}
+
+function createSettleMachine(): SettleMachine {
+  const lastMeasureAt = new Map<string, number>();
+  const settledKeys = new Set<string>();
+  let snapshotCalls = 0;
+
+  return {
+    lastMeasureAt,
+    settledKeys,
+    get snapshotCalls(): number {
+      return snapshotCalls;
+    },
+    recordMeasure(key: string): void {
+      const prev = lastMeasureAt.get(key);
+      lastMeasureAt.set(key, Date.now());
+      if (prev !== undefined) {
+        // Re-fire before settle → un-settle
+        settledKeys.delete(key);
+      }
+    },
+    runSettleCheck(): void {
+      const now = Date.now();
+      let anyNewlySettled = false;
+      for (const [key, lastAt] of lastMeasureAt) {
+        if (settledKeys.has(key)) continue;
+        if (now - lastAt < ROW_SETTLE_MS) continue;
+        settledKeys.add(key);
+        anyNewlySettled = true;
+      }
+      if (anyNewlySettled) snapshotCalls++;
+    },
+  };
+}
+
+describe('Layer 5: settle-gated snapshot', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('row is NOT settled until ROW_SETTLE_MS quiet window passes', () => {
+    const m = createSettleMachine();
+    m.recordMeasure('row-1');
+
+    vi.advanceTimersByTime(ROW_SETTLE_MS - 1);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(false);
+
+    vi.advanceTimersByTime(2);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+  });
+
+  it('re-fire during quiet window resets the timer (un-settles)', () => {
+    const m = createSettleMachine();
+    m.recordMeasure('row-1');
+
+    // Fire 1 → wait 400ms → fire 2 (simulating Shiki re-render)
+    vi.advanceTimersByTime(400);
+    m.recordMeasure('row-1');
+
+    // Only 400ms since fire 2 — not settled
+    vi.advanceTimersByTime(400);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(false);
+
+    // Now 500ms since fire 2 — settled
+    vi.advanceTimersByTime(100);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+  });
+
+  it('multiple rows settle independently based on their own timelines', () => {
+    const m = createSettleMachine();
+    m.recordMeasure('row-1');
+    vi.advanceTimersByTime(200);
+    m.recordMeasure('row-2');
+    vi.advanceTimersByTime(300); // row-1 at 500, row-2 at 300
+
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+    expect(m.settledKeys.has('row-2')).toBe(false);
+
+    vi.advanceTimersByTime(200); // row-2 now at 500
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-2')).toBe(true);
+  });
+
+  it('snapshot fires only when NEW rows become settled', () => {
+    const m = createSettleMachine();
+    m.recordMeasure('row-1');
+    vi.advanceTimersByTime(ROW_SETTLE_MS);
+
+    m.runSettleCheck();
+    expect(m.snapshotCalls).toBe(1); // row-1 newly settled
+
+    m.runSettleCheck();
+    expect(m.snapshotCalls).toBe(1); // no new settles, no additional snapshot
+
+    m.recordMeasure('row-2');
+    vi.advanceTimersByTime(ROW_SETTLE_MS);
+
+    m.runSettleCheck();
+    expect(m.snapshotCalls).toBe(2); // row-2 newly settled
+  });
+
+  it('simulates full Shiki lifecycle: placeholder → final height', () => {
+    const m = createSettleMachine();
+
+    // Stage 1: Wrapper mounts (ResizeObserver fires with placeholder height)
+    m.recordMeasure('row-1');
+    vi.advanceTimersByTime(50);
+    expect(m.settledKeys.has('row-1')).toBe(false);
+
+    // Stage 2: Streamdown parses markdown (another fire at higher height)
+    m.recordMeasure('row-1');
+    vi.advanceTimersByTime(100);
+    expect(m.settledKeys.has('row-1')).toBe(false);
+
+    // Stage 3: Shiki async callback (final highlighted render)
+    m.recordMeasure('row-1');
+
+    // Settle check before quiet window completes — NOT settled
+    vi.advanceTimersByTime(400);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(false);
+    expect(m.snapshotCalls).toBe(0);
+
+    // Quiet window completes → NOW settled → snapshot fires
+    vi.advanceTimersByTime(100);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+    expect(m.snapshotCalls).toBe(1);
+  });
+
+  it('settled row stays settled unless size changes (new fire)', () => {
+    const m = createSettleMachine();
+    m.recordMeasure('row-1');
+    vi.advanceTimersByTime(ROW_SETTLE_MS);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+
+    // No new fires — stays settled
+    vi.advanceTimersByTime(10000);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+
+    // New fire (e.g., viewport width changed) → un-settled
+    m.recordMeasure('row-1');
+    expect(m.settledKeys.has('row-1')).toBe(false);
+
+    // Quiet window → settled again
+    vi.advanceTimersByTime(ROW_SETTLE_MS);
+    m.runSettleCheck();
+    expect(m.settledKeys.has('row-1')).toBe(true);
+  });
+});

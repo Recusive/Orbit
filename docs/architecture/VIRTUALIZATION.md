@@ -96,13 +96,18 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
    └─ Write-through: MutationObserver waits 80ms for Shiki
    └─ Captures innerHTML + height → streamdown-cache (memory + IndexedDB)
 
-3. isAgentRunning transitions false (300ms delay)
-   └─ snapshotMeasurementCache() fires
-   └─ Captures ALL current row heights from TanStack
-   └─ Saves to render-cache-store (memory + IndexedDB)
-   └─ Updates cachedSizeMapRef
+3. ResizeObserver fires per row (initial mount, Shiki callback, etc.)
+   └─ measureElement records timestamp in lastMeasureAtRef
+   └─ If re-fire within quiet window: row un-settled
+   └─ scheduleSettleCheck debounces a check
 
-4. User scrolls away and back
+4. ROW_SETTLE_MS (500ms) elapses with no new fires for a row
+   └─ Row marked in settledKeysRef (truly post-Shiki final height)
+   └─ snapshotMeasurementCache fires
+   └─ Only rows in settledKeysRef persisted as `measured: true`
+   └─ Pre-settle values (placeholder heights) marked `measured: false`
+
+5. User scrolls away and back
    └─ TanStack unmounts the item (leaves viewport)
    └─ TanStack remounts the item (re-enters viewport)
    └─ estimateSize → cachedSizeMapRef → exact height
@@ -119,7 +124,10 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
    └─ warmStreamdownCache() loads HTML caches from IndexedDB
 
 2. User selects session
-   └─ useLayoutEffect loads render cache → cachedSizeMapRef
+   └─ useLayoutEffect filters cache entries: ONLY `measured: true` rows
+     (truly post-Shiki settled) are loaded into cachedSizeMapRef
+   └─ Pre-settle/estimated entries are discarded — never cause positioning
+     errors (blank rows, overlaps)
    └─ TanStack renders visible items
    └─ estimateSize → cached row heights (exact)
    └─ measureElement → cached row heights (delta = 0)
@@ -173,6 +181,16 @@ A background render service exists (`streamdown-render-service.ts`) for potentia
 
 Shiki syntax highlighting is async — `code.highlight()` returns null on first call and fires a callback when ready. Streamdown re-renders the code block after the callback. The MutationObserver debounce (80ms quiet window) ensures we capture the final highlighted HTML, not the intermediate unhighlighted version.
 
+### Settle-Gated Snapshot (500ms Per-Row)
+
+Persisted row heights must be post-Shiki, post-font-load, post-all-async-rendering. A session-wide timer (e.g., 300ms after `isAgentRunning` transitions false) is unreliable — some messages might still be in Shiki callback hell when the timer fires.
+
+Instead, each row has its own quiet-window timer. When TanStack's ResizeObserver fires for a row, we record the timestamp. `ROW_SETTLE_MS` (500ms) later, if no new fires happened for that row, it's marked in `settledKeysRef`. Only these keys are persisted as `measured: true` to IndexedDB.
+
+If Shiki fires again mid-window (re-render after grammar loads), the row is un-settled and the timer resets. This guarantees captured heights are always the final rendered heights — never pre-Shiki placeholders.
+
+On revisit, only entries with `measured: true` load into `cachedSizeMapRef`. Pre-settle/estimated entries are discarded — preventing the blank/overlap positioning errors that stale heights would cause.
+
 ### Viewport Width Validation (16px Tolerance)
 
 Cached heights depend on text wrapping, which depends on container width. Each cache entry stores the viewport width at render time. On lookup, widths are compared with 16px tolerance — enough to absorb OS-level DPI rounding and scrollbar appearance, but catches actual window resizes that affect line breaks.
@@ -191,10 +209,11 @@ Cached heights depend on text wrapping, which depends on container width. Each c
 
 ## Testing
 
-23 integration tests in `__tests__/unit/lib/chat/streamdown-cache-pipeline.test.tsx` cover:
+29 integration tests in `__tests__/unit/lib/chat/streamdown-cache-pipeline.test.tsx` cover:
 
 - **Layer 1 — Cache module:** Hash stability, miss→write→hit, width tolerance, invalidation, multi-segment
 - **Layer 2 — Write-through capture:** MutationObserver settle → cache write, streaming skip, dangerouslySetInnerHTML on remount
 - **Layer 3 — measureElement override:** Cached size return, fallthrough on miss, multi-message sessions
 - **Layer 4 — Stream-end trigger:** `isAgentRunning` transition detection, cleanup on unmount, rapid toggle (multi-turn)
+- **Layer 5 — Settle-gated snapshot:** Quiet-window detection, re-fire un-settles, independent row timelines, Shiki lifecycle simulation, snapshot fires only on new settles
 - **Full pipeline:** Stream→measure→cache→revisit lifecycle, incremental new message extension

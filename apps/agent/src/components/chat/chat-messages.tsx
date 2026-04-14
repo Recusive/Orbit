@@ -94,6 +94,10 @@ const LARGE_SESSION_THRESHOLD = 50;
 const BOTTOM_TOLERANCE_PX = 4;
 const POSITIONING_RECHECK_MS = 32;
 const DEFAULT_ROW_HEIGHT = 96;
+/** Quiet window before a row is considered settled (post-Shiki, post-font-load).
+ *  Rows settled this long are persisted as `measured: true` — guaranteeing
+ *  IndexedDB only stores heights captured after async rendering completed. */
+const ROW_SETTLE_MS = 500;
 
 type OverscanPhase = 'parked' | 'entry' | 'steady';
 type RestorePhase = 'idle' | 'positioning' | 'stabilizing' | 'done';
@@ -451,6 +455,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
    *  When measureElement fires, returning the cached size produces delta=0,
    *  preventing shouldAdjustScrollPositionOnItemSizeChange from shifting scrollTop. */
   const cachedSizeMapRef = useRef<Map<string, number>>(new Map());
+  /** Keys of rows whose size has been confirmed stable (no ResizeObserver fires
+   *  in the last SETTLE_MS). Only these rows are persisted as `measured: true`
+   *  to IndexedDB — guaranteeing that persisted heights are post-Shiki final. */
+  const settledKeysRef = useRef<Set<string>>(new Set());
+  /** Timestamp of the last ResizeObserver fire per key — drives settle detection. */
+  const lastMeasureAtRef = useRef<Map<string, number>>(new Map());
+  /** Debounce timer for the settle check. Fires once per quiet window. */
+  const settleCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevMessageCount = useRef(0);
   const readinessStartedRef = useRef(false);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
@@ -718,13 +730,14 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     overscan: deferredOverscan,
     measureElement: (element, entry, instance) => {
       const end = markOperation('measure-element');
-
-      // If we have a cached size from a previous visit, return it directly.
-      // This produces delta=0 against the estimate, preventing
-      // shouldAdjustScrollPositionOnItemSizeChange from shifting scrollTop.
-      // Only use cached sizes for non-streaming, completed items.
       const itemKey = element.getAttribute('data-item-key');
-      if (itemKey !== null && cachedSizeMapRef.current.size > 0) {
+
+      // Stable path: if we have a cached size for this row, return it.
+      // This produces delta=0 against the estimate → no
+      // shouldAdjustScrollPositionOnItemSizeChange → no scroll jitter.
+      // Only rows in settledKeysRef contribute to this cache — rows
+      // whose size came from truly post-Shiki measurements.
+      if (itemKey !== null) {
         const cachedSize = cachedSizeMapRef.current.get(itemKey);
         if (cachedSize !== undefined && cachedSize > 0) {
           end();
@@ -732,9 +745,27 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
         }
       }
 
-      const size = measureElement(element, entry, instance);
+      // Unseen row: measure the DOM.
+      const domSize = measureElement(element, entry, instance);
+      if (itemKey !== null && domSize > 0) {
+        cachedSizeMapRef.current.set(itemKey, domSize);
+
+        // Track real ResizeObserver fires for settle detection. If size
+        // changes in a subsequent fire, we un-settle the row until the
+        // new stable window passes — guaranteeing persisted heights are
+        // always the final post-render values.
+        if (entry !== undefined) {
+          const prev = lastMeasureAtRef.current.get(itemKey);
+          lastMeasureAtRef.current.set(itemKey, Date.now());
+          if (prev !== undefined) {
+            settledKeysRef.current.delete(itemKey);
+          }
+          scheduleSettleCheckRef.current();
+        }
+      }
+
       end();
-      return size;
+      return domSize;
     },
     useAnimationFrameWithResizeObserver: true,
     useFlushSync: false,
@@ -1020,14 +1051,20 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       for (let index = 0; index < renderRows.length; index += 1) {
         const existing = index < measured.length ? measured[index] : undefined;
         if (existing !== undefined && existing.size > 0) {
+          const key = String(existing.key);
+          // `measured: true` ONLY if this row has been confirmed settled
+          // (ROW_SETTLE_MS quiet window passed without further ResizeObserver
+          // fires). Otherwise it's a pre-settle value (could be pre-Shiki
+          // placeholder height) and must not be trusted on revisit.
+          const isSettled = settledKeysRef.current.has(key);
           measurements.push({
-            key: String(existing.key),
+            key,
             index: existing.index,
             start: runningStart,
             size: existing.size,
             end: runningStart + existing.size,
             lane: existing.lane,
-            measured: true,
+            measured: isSettled,
           });
           runningStart += existing.size;
         } else {
@@ -1136,9 +1173,11 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       viewportWidth: getCurrentViewportWidth(),
     });
     store.setMeasurementCache(sessionId, cache);
-    // Refresh the cached size map so measureElement returns exact sizes
-    // for items remounted during scroll within the same session visit.
-    cachedSizeMapRef.current = buildMeasurementSizeMap(cache);
+    // Do NOT overwrite cachedSizeMapRef wholesale here. measureElement already
+    // populates it with DOM sizes as rows are measured, and the settle
+    // tracking ensures only truly-settled rows have trustworthy entries.
+    // Overwriting from the built cache would pollute with estimated sizes
+    // for unmeasured overscan rows → positioning errors.
   }, [buildCurrentMeasurementCache, getCurrentViewportWidth, sessionId]);
 
   const snapshotStableMeasurementCache = useCallback((): void => {
@@ -1149,33 +1188,61 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     snapshotMeasurementCache();
   }, [snapshotMeasurementCache]);
 
-  // ── Measure on stream end ──────────────────────────────────────────
-  // When the agent finishes a turn (isAgentRunning transitions false),
-  // wait for Shiki highlighting to settle (~250ms) then snapshot ALL
-  // current measurements. This ensures the completed message's exact
-  // height is persisted to IndexedDB and available in cachedSizeMapRef
-  // for future visits — the "measure once, use forever" guarantee.
-  const prevAgentRunningRef = useRef(isAgentRunning);
-  useEffect(() => {
-    const wasRunning = prevAgentRunningRef.current;
-    prevAgentRunningRef.current = isAgentRunning;
+  // ── Settle-gated snapshot ──────────────────────────────────────────
+  // Each row is "settled" when ROW_SETTLE_MS has passed without a new
+  // ResizeObserver fire. Once settled, the DOM is guaranteed post-Shiki,
+  // post-font-load, post-all-async-rendering — the height is final.
+  // Only settled rows are persisted as `measured: true` to IndexedDB.
+  // This replaces the previous session-wide timer that could fire before
+  // Shiki completed, saving placeholder heights as if they were final.
+  const snapshotRef = useRef<(() => void) | null>(null);
+  snapshotRef.current = snapshotMeasurementCache;
 
-    if (wasRunning && !isAgentRunning) {
-      const timer = setTimeout(() => {
-        snapshotMeasurementCache();
-      }, 300);
-      return (): void => {
-        clearTimeout(timer);
-      };
+  const scheduleSettleCheck = useCallback((): void => {
+    if (settleCheckTimerRef.current !== null) {
+      clearTimeout(settleCheckTimerRef.current);
     }
-    return undefined;
-  }, [isAgentRunning, snapshotMeasurementCache]);
+    settleCheckTimerRef.current = setTimeout(() => {
+      settleCheckTimerRef.current = null;
+      const now = Date.now();
+      let anyNewlySettled = false;
+
+      for (const [key, lastMeasureAt] of lastMeasureAtRef.current) {
+        if (settledKeysRef.current.has(key)) continue;
+        if (now - lastMeasureAt < ROW_SETTLE_MS) continue;
+        settledKeysRef.current.add(key);
+        anyNewlySettled = true;
+      }
+
+      if (anyNewlySettled) {
+        snapshotRef.current?.();
+      }
+    }, ROW_SETTLE_MS);
+  }, []);
+
+  // Stable ref so measureElement can call scheduleSettleCheck without
+  // being a dependency of useVirtualizer (which would re-create the
+  // virtualizer every render).
+  const scheduleSettleCheckRef = useRef(scheduleSettleCheck);
+  scheduleSettleCheckRef.current = scheduleSettleCheck;
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return (): void => {
+      if (settleCheckTimerRef.current !== null) {
+        clearTimeout(settleCheckTimerRef.current);
+        settleCheckTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useLayoutEffect(() => {
     restoredSizeCacheRef.current = false;
     restorePathRef.current = 'cold';
     initialMeasurementsCacheRef.current = [];
     cachedSizeMapRef.current = new Map();
+    settledKeysRef.current = new Set();
+    lastMeasureAtRef.current = new Map();
     if (!sessionId) return;
 
     const store = useChatStore.getState();
@@ -1184,11 +1251,18 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
     cache ??= getRenderCache(sessionId);
     const viewportWidth = getCurrentViewportWidth();
 
-    // Build the cached size map from ANY available cache — this is what
-    // measureElement checks to return exact sizes and prevent scroll jitter.
+    // Only trust measurements that were confirmed settled in a prior session.
+    // Entries with `measured: false` are estimates — must not be fed to
+    // measureElement or they'd cause positioning errors (blank/overlap).
     if (cache) {
-      const sizeMap = buildMeasurementSizeMap(cache);
-      cachedSizeMapRef.current = sizeMap;
+      const trustedSizeMap = new Map<string, number>();
+      for (const m of cache.measurements) {
+        if (m.measured === true && m.size > 0) {
+          trustedSizeMap.set(m.key, m.size);
+          settledKeysRef.current.add(m.key);
+        }
+      }
+      cachedSizeMapRef.current = trustedSizeMap;
     }
 
     if (
