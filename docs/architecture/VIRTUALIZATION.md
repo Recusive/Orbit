@@ -2,6 +2,10 @@
 
 > Measure once. Use forever. Never re-render what hasn't changed.
 
+![Virtualization flow diagram](./virtualization-flow.svg)
+
+_Source: [virtualization-flow.mmd](./virtualization-flow.mmd) — rendered with tokyo-night theme via pretty-mermaid._
+
 ## Overview
 
 The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to virtualize potentially hundreds of messages, each containing rich markdown rendered by Streamdown + Shiki syntax highlighting. The virtualization system is designed around one principle: **messages are measured exactly once, and that measurement is reused for the lifetime of the message.**

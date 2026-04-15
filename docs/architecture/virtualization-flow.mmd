@@ -1,0 +1,65 @@
+flowchart TB
+    Start([A new message streams in])
+
+    Render["Row renders in the DOM<br/>markdown parses,<br/>Shiki colors the code"]
+
+    Wait["Wait 500ms without<br/>any size changes<br/>(row is 'settled')"]
+
+    Capture["Capture the final height<br/>+ the rendered HTML"]
+
+    Save[("Save to IndexedDB<br/>• row height → render cache<br/>• HTML → streamdown cache")]
+
+    Gap{{"Time passes...<br/>user scrolls, closes app,<br/>reopens, etc."}}
+
+    Load["Load heights from IndexedDB<br/>on session open"]
+
+    Ask["TanStack asks:<br/>'how tall is each row?'"]
+
+    Return["Return the cached height<br/>instead of measuring again"]
+
+    Position["Row gets positioned<br/>at its exact final height<br/>from the very first frame"]
+
+    Inject["Row's HTML is injected<br/>instantly from cache<br/>(no markdown parse, no Shiki)"]
+
+    Result(["No re-measuring<br/>No scroll jitter<br/>No blank gaps<br/>No overlaps"])
+
+    Start --> Render
+    Render --> Wait
+    Wait --> Capture
+    Capture --> Save
+    Save --> Gap
+    Gap --> Load
+    Load --> Ask
+    Ask --> Return
+    Return --> Position
+    Position --> Inject
+    Inject --> Result
+
+    subgraph Write["Measure Once — when message is new"]
+        Render
+        Wait
+        Capture
+        Save
+    end
+
+    subgraph Read["Use Forever — every time after"]
+        Load
+        Ask
+        Return
+        Position
+        Inject
+    end
+
+    classDef start fill:#7aa2f7,stroke:#1a1b26,color:#1a1b26,font-weight:bold
+    classDef write fill:#e0af68,stroke:#1a1b26,color:#1a1b26
+    classDef read fill:#9ece6a,stroke:#1a1b26,color:#1a1b26
+    classDef db fill:#bb9af7,stroke:#1a1b26,color:#1a1b26,font-weight:bold
+    classDef gap fill:#565f89,stroke:#1a1b26,color:#fff,font-style:italic
+    classDef result fill:#73daca,stroke:#1a1b26,color:#1a1b26,font-weight:bold
+
+    class Start start
+    class Render,Wait,Capture write
+    class Save db
+    class Gap gap
+    class Load,Ask,Return,Position,Inject read
+    class Result result
