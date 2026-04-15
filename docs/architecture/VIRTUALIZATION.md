@@ -9,13 +9,16 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
 ## Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│                    TanStack Virtual                             │
-│                                                                │
-│  estimateSize(index) ──► cachedSizeMapRef ──► exact height     │
-│  measureElement(el)  ──► cachedSizeMapRef ──► cached height    │
-│                          (delta = 0, no scroll adjustment)     │
-└──────────────┬─────────────────────────────┬───────────────────┘
+┌────────────────────────────────────────────────────────────────────┐
+│                        TanStack Virtual                             │
+│                                                                    │
+│  estimateSize(index)           ──► cachedSizeMapRef (initial hint) │
+│  measureElement(el, entry)     ──► ref-attach: return cached       │
+│                                    RO fire:    read DOM, update    │
+│                                                                    │
+│  shouldAdjustScrollPositionOn  ──► suppressed for 250ms after any  │
+│  ItemSizeChange                    scroll event (velocity-aware)   │
+└──────────────┬─────────────────────────────┬───────────────────────┘
                │                             │
                ▼                             ▼
 ┌──────────────────────────┐  ┌──────────────────────────────────┐
@@ -26,9 +29,9 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
 │  MISS: live Streamdown   │  │          size>                   │
 │        → write-through   │  │  IndexedDB: orbit-render-cache   │
 │        cache after Shiki │  │                                  │
-│        settles (80ms)    │  │  Saves per-item row heights      │
-└──────────────┬───────────┘  │  on layout stabilization +       │
-               │              │  agent turn completion            │
+│        settles (80ms)    │  │  Only `measured: true` entries   │
+└──────────────┬───────────┘  │  (truly post-Shiki settled)      │
+               │              │  load into cachedSizeMapRef       │
                ▼              └──────────────────────────────────┘
 ┌──────────────────────────┐
 │   Streamdown Cache       │
@@ -56,14 +59,18 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
 
 **Used by:**
 
-- `estimateSize()` — returns exact height as the initial estimate
-- `measureElement()` — returns cached height instead of DOM measurement → delta = 0
+- `estimateSize()` — returns the cached height as the initial estimate
+- `measureElement()` — uses cached sizes differently depending on the call reason:
+  - **Ref-attach (entry === undefined):** returns cached size so TanStack positions the row at its final height immediately, even before the DOM has rendered content
+  - **ResizeObserver fire (entry !== undefined):** always reads the real DOM, updates the cache with the latest value, and un-settles the row. This ensures the cache tracks actual rendered sizes through Streamdown → Shiki → final, and never gets stuck on a pre-render placeholder
 
 **Lifecycle:**
 
-1. First visit: TanStack measures rows via ResizeObserver → heights saved
-2. `snapshotMeasurementCache()` persists to IndexedDB
-3. Second visit: loaded from IndexedDB → fed to `cachedSizeMapRef` → `measureElement` returns cached sizes
+1. First visit: TanStack measures rows via ResizeObserver → each fire updates `cachedSizeMapRef`
+2. Row "settles" (500ms quiet window with no new fires) → added to `settledKeysRef`
+3. `snapshotMeasurementCache()` persists to IndexedDB with `measured: true` only for settled rows
+4. Second visit: loaded from IndexedDB, filtered to `measured: true` entries → `cachedSizeMapRef`
+5. Ref-attach returns cached → DOM renders at correct final size → no delta, no jitter
 
 ### 2. Streamdown Cache (`streamdown-cache.ts`)
 
@@ -146,16 +153,26 @@ The chat message list uses [TanStack Virtual](https://tanstack.com/virtual) to v
 5. All previous measurements remain untouched
 ```
 
-## Why This Solves Scroll Jitter
+## Why This Solves Scroll Jitter and Pushback
 
-The scroll jitter was caused by `shouldAdjustScrollPositionOnItemSizeChange`. When TanStack remounts an item during scroll:
+Two separate problems had to be fixed:
+
+### 1. Jitter from Measurement Deltas
+
+When TanStack remounts an item during scroll:
 
 1. `estimateSize()` returns a height (e.g., 470px)
-2. ResizeObserver fires → `measureElement()` reads DOM (e.g., 468px)
+2. ResizeObserver fires → default `measureElement()` reads DOM (e.g., 468px)
 3. Delta = -2px → `shouldAdjustScrollPositionOnItemSizeChange` fires
-4. ScrollTop shifts by 2px → scroll event → range recalculation → more mounts → more deltas → cascade
+4. ScrollTop shifts → scroll event → range recalculation → more mounts → more deltas → cascade
 
-**The fix:** `measureElement()` returns the cached height from `cachedSizeMapRef` instead of reading the DOM. Since `estimateSize()` also returns the cached height, delta = 0. No scroll adjustment fires. No cascade. No jitter.
+**The fix:** On ref-attach, `measureElement` returns the cached height (same value as `estimateSize`) so TanStack positions the row at the correct final size from frame 1. Once the DOM renders at that same height (via streamdown-cache HTML injection), the subsequent ResizeObserver fire returns the same value → delta = 0 → no adjustment.
+
+### 2. Pushback During Velocity Scroll
+
+The `useVelocityScroll` hook writes `scrollTop` directly in a RAF loop, which bypasses TanStack's internal `isScrolling` tracking. This meant `shouldAdjustScrollPositionOnItemSizeChange` could fire during fast scrolling, producing the "4-up, 2-back" pushback as above-viewport rows measured differently than estimated.
+
+**The fix:** `lastScrollAtRef` records the timestamp of every scroll event. The `shouldAdjust` guard suppresses compensation for 250ms after any scroll event — bridging the gap where TanStack's own `isScrolling` misses velocity animations. User gestures no longer fight TanStack's scroll compensation.
 
 ## Key Design Decisions
 
@@ -195,17 +212,28 @@ On revisit, only entries with `measured: true` load into `cachedSizeMapRef`. Pre
 
 Cached heights depend on text wrapping, which depends on container width. Each cache entry stores the viewport width at render time. On lookup, widths are compared with 16px tolerance — enough to absorb OS-level DPI rounding and scrollbar appearance, but catches actual window resizes that affect line breaks.
 
+### Scroll-Activity Guard (250ms Window)
+
+`shouldAdjustScrollPositionOnItemSizeChange` is TanStack's mechanism for keeping visible content anchored when above-viewport rows grow — useful during streaming, harmful during active scrolling (it fights the user's scroll). TanStack's built-in `isScrolling` detects native scroll events but misses velocity-driven `scrollTop` writes.
+
+A plain scroll-event listener records `lastScrollAtRef` on every scroll (native or velocity-driven). The `shouldAdjust` guard returns `false` if any scroll event happened within the last 250ms. This covers the velocity animation window cleanly without needing to couple directly to the velocity hook.
+
+### One-Time Cache Reset (localStorage Sentinel)
+
+When the measurement-storage schema changes in incompatible ways (e.g., the `measured` flag going from "set on everything" to "set only on truly settled"), existing IndexedDB entries are invalid. Rather than relying on IndexedDB's `onupgradeneeded` migration, `main.tsx` uses a localStorage sentinel (`orbit-cache-reset-v3`) to purge both caches exactly once per user. The sentinel is set after successful purge, so subsequent boots skip the cleanup. To force another reset after a future schema change, bump the sentinel name.
+
 ## Files
 
-| File                                         | Purpose                                                                               |
-| -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `lib/chat/streamdown-cache.ts`               | Dual-layer HTML cache (memory LRU 2000 + IndexedDB) keyed by content hash             |
-| `lib/chat/streamdown-config.tsx`             | Shared Streamdown + Shiki plugin config (used by both MessageItem and render service) |
-| `lib/chat/streamdown-render-utils.ts`        | `getChatContentWidth()` + viewport width change tracking                              |
-| `services/chat/streamdown-render-service.ts` | Background pre-render service (bonus, not primary)                                    |
-| `stores/chat/render-cache-store.ts`          | Per-session row height cache (memory + IndexedDB)                                     |
-| `components/chat/chat-messages.tsx`          | TanStack Virtual setup: `estimateSize`, `measureElement`, `cachedSizeMapRef`          |
-| `components/chat/messages/MessageItem.tsx`   | `FlowTokenSegment` write-through cache                                                |
+| File                                         | Purpose                                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `lib/chat/streamdown-cache.ts`               | Dual-layer HTML cache (memory LRU 2000 + IndexedDB) keyed by content hash                                    |
+| `lib/chat/streamdown-config.tsx`             | Shared Streamdown + Shiki plugin config (used by both MessageItem and render service)                        |
+| `lib/chat/streamdown-render-utils.ts`        | `getChatContentWidth()` + viewport width change tracking                                                     |
+| `services/chat/streamdown-render-service.ts` | Background pre-render service (bonus, not primary)                                                           |
+| `stores/chat/render-cache-store.ts`          | Per-session row height cache (memory + IndexedDB)                                                            |
+| `components/chat/chat-messages.tsx`          | TanStack Virtual setup: `estimateSize`, `measureElement`, `cachedSizeMapRef`, `settledKeysRef`, scroll guard |
+| `components/chat/messages/MessageItem.tsx`   | `FlowTokenSegment` write-through cache                                                                       |
+| `main.tsx`                                   | One-time IndexedDB cache reset (`orbit-cache-reset-v3` sentinel)                                             |
 
 ## Testing
 

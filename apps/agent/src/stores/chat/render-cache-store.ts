@@ -9,7 +9,12 @@ const logger = createLogger('RenderCacheStore');
 const MAX_CACHED_SESSIONS = 50;
 const MAX_CACHE_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 const DB_NAME = 'orbit-render-cache';
-const DB_VERSION = 2;
+// v3: reset after switching to settle-gated snapshots. Old v2 entries were
+// saved with a blanket `measured: true` flag that included pre-Shiki estimates,
+// causing positioning errors (blank rows, overlaps) on revisit. The new code
+// only marks truly-settled rows as `measured: true`, but existing entries
+// must be purged to avoid contaminating the trusted cache.
+const DB_VERSION = 3;
 const STORE_NAME = 'size-caches';
 const TANSTACK_RENDER_CACHE_KIND = 'tanstack-v2';
 const VIEWPORT_WIDTH_TOLERANCE_PX = 16;
@@ -299,9 +304,12 @@ function createIndexedDbAdapter(): RenderCachePersistenceAdapter {
             return;
           }
 
-          // DB_VERSION=2 keeps the existing store intact. Old v1 entries are
-          // allowed to age out naturally and parse as misses.
-          if (event.oldVersion < 2) {
+          // v3: drop and recreate to purge entries saved with the old
+          // blanket `measured: true` flag that conflated real measurements
+          // with estimates. Sessions will re-measure on next visit.
+          if (event.oldVersion < 3) {
+            db.deleteObjectStore(STORE_NAME);
+            db.createObjectStore(STORE_NAME, { keyPath: 'sessionId' });
             return;
           }
         };

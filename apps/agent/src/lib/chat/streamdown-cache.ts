@@ -28,7 +28,9 @@ const logger = createLogger('StreamdownCache');
 // ── Constants ──────────────────────────────────────────────────────────
 
 const DB_NAME = 'orbit-streamdown-cache';
-const DB_VERSION = 2;
+// v3: reset after switching to settle-gated snapshots. Old v2 entries could
+// include pre-Shiki placeholder heights, causing positioning errors on revisit.
+const DB_VERSION = 3;
 const STORE_NAME = 'html-cache';
 const MAX_MEMORY_ENTRIES = 2000;
 const MAX_CACHE_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days

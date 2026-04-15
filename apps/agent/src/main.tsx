@@ -77,7 +77,47 @@ if (localStorage.getItem('orbit-backend-mode') !== null) {
   localStorage.removeItem('orbit-backend-mode');
 }
 
-void warmMemoryCacheFromIdb();
+// One-time cache reset (v3): purge both IndexedDB caches that were populated
+// with the pre-settle-gated code. Old entries have `measured: true` on
+// pre-Shiki placeholder heights, causing blank/overlap on revisit. Fresh
+// caches rebuild from live renders with correct settle-gated measurements.
+// Gated by a localStorage flag so it runs exactly once per user.
+const CACHE_RESET_FLAG = 'orbit-cache-reset-v3';
+const cacheResetPromise =
+  localStorage.getItem(CACHE_RESET_FLAG) === '1'
+    ? Promise.resolve()
+    : Promise.all([
+        new Promise<void>((resolve) => {
+          const req = indexedDB.deleteDatabase('orbit-render-cache');
+          req.onsuccess = (): void => {
+            resolve();
+          };
+          req.onerror = (): void => {
+            resolve();
+          };
+          req.onblocked = (): void => {
+            resolve();
+          };
+        }),
+        new Promise<void>((resolve) => {
+          const req = indexedDB.deleteDatabase('orbit-streamdown-cache');
+          req.onsuccess = (): void => {
+            resolve();
+          };
+          req.onerror = (): void => {
+            resolve();
+          };
+          req.onblocked = (): void => {
+            resolve();
+          };
+        }),
+      ]).then(() => {
+        localStorage.setItem(CACHE_RESET_FLAG, '1');
+      });
+
+void cacheResetPromise.then(() => {
+  void warmMemoryCacheFromIdb();
+});
 startViewportWidthTracking();
 
 // Pre-fetch the last-active conversation into TanStack Query cache so that

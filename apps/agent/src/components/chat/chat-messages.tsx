@@ -463,6 +463,10 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   const lastMeasureAtRef = useRef<Map<string, number>>(new Map());
   /** Debounce timer for the settle check. Fires once per quiet window. */
   const settleCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Timestamp of the last scroll event. Used by shouldAdjustScrollPositionOn-
+   *  ItemSizeChange to suppress compensation during velocity scroll (TanStack's
+   *  isScrolling doesn't cover scrollTop writes from the velocity hook). */
+  const lastScrollAtRef = useRef<number>(0);
   const prevMessageCount = useRef(0);
   const readinessStartedRef = useRef(false);
   const [animatingMessageIds, setAnimatingMessageIds] = useState<Set<string>>(() => new Set());
@@ -732,36 +736,41 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
       const end = markOperation('measure-element');
       const itemKey = element.getAttribute('data-item-key');
 
-      // Stable path: if we have a cached size for this row, return it.
-      // This produces delta=0 against the estimate → no
-      // shouldAdjustScrollPositionOnItemSizeChange → no scroll jitter.
-      // Only rows in settledKeysRef contribute to this cache — rows
-      // whose size came from truly post-Shiki measurements.
-      if (itemKey !== null) {
-        const cachedSize = cachedSizeMapRef.current.get(itemKey);
-        if (cachedSize !== undefined && cachedSize > 0) {
-          end();
-          return cachedSize;
+      // Ref-attach (entry === undefined): DOM hasn't rendered content yet.
+      // Return the cached size from a prior settled measurement so TanStack
+      // can position the row at its known final size immediately. If no
+      // cache entry, fall through to DOM (likely a placeholder height —
+      // that's fine, ResizeObserver will update it below).
+      if (entry === undefined) {
+        if (itemKey !== null) {
+          const cached = cachedSizeMapRef.current.get(itemKey);
+          if (cached !== undefined && cached > 0) {
+            end();
+            return cached;
+          }
         }
+        const initialDomSize = measureElement(element, entry, instance);
+        if (itemKey !== null && initialDomSize > 0) {
+          cachedSizeMapRef.current.set(itemKey, initialDomSize);
+        }
+        end();
+        return initialDomSize;
       }
 
-      // Unseen row: measure the DOM.
+      // ResizeObserver fire: always read the DOM. This tracks the row as
+      // it renders (wrapper → Streamdown → Shiki), ending at the final
+      // post-render size. Updating the cache on every fire ensures we
+      // eventually converge on the correct size — no stale placeholders.
       const domSize = measureElement(element, entry, instance);
       if (itemKey !== null && domSize > 0) {
         cachedSizeMapRef.current.set(itemKey, domSize);
 
-        // Track real ResizeObserver fires for settle detection. If size
-        // changes in a subsequent fire, we un-settle the row until the
-        // new stable window passes — guaranteeing persisted heights are
-        // always the final post-render values.
-        if (entry !== undefined) {
-          const prev = lastMeasureAtRef.current.get(itemKey);
-          lastMeasureAtRef.current.set(itemKey, Date.now());
-          if (prev !== undefined) {
-            settledKeysRef.current.delete(itemKey);
-          }
-          scheduleSettleCheckRef.current();
-        }
+        // Any ResizeObserver fire restarts the settle timer. Only after
+        // the quiet window passes without new fires is the row considered
+        // settled and eligible for `measured: true` persistence.
+        lastMeasureAtRef.current.set(itemKey, Date.now());
+        settledKeysRef.current.delete(itemKey);
+        scheduleSettleCheckRef.current();
       }
 
       end();
@@ -774,6 +783,13 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
   useEffect(() => {
     rowVirtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
       if (instance.isScrolling) {
+        return false;
+      }
+      // Velocity scroll bypasses TanStack's isScrolling by writing scrollTop
+      // directly. Treat any scroll event within the last 250ms as "scrolling"
+      // to suppress compensation during velocity-driven animations — prevents
+      // the "4-up-2-back" pushback from size deltas on above-viewport rows.
+      if (Date.now() - lastScrollAtRef.current < 250) {
         return false;
       }
       const viewportHeight = instance.scrollRect?.height ?? 0;
@@ -2744,6 +2760,7 @@ export const ChatMessages: FC<ChatMessagesProps> = ({
             onScroll={() => {
               const scroller = scrollContainerRef.current;
               if (scroller) {
+                lastScrollAtRef.current = Date.now();
                 updateBottomTracking(scroller);
               }
             }}
