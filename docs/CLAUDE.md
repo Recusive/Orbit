@@ -73,13 +73,11 @@ Use this to find the right file. Read the file directly — no links needed.
 
 **After finishing a plan implementation:** Ask the user "Is this plan good to mark as done?" If confirmed (or if the user says it's done/shipped/complete), move the plan file to `plans/tracked/done/` and update this index. If no response, default to marking done after successful implementation.
 
-## plans/tracked/todo/ (21 entries)
+## plans/tracked/todo/ (17 entries)
 
 - `BULLETPROOF-REWIND-FORK-ERROR-HANDLING.md` — Bulletproof rewind fork error handling
 - `FIX-OAUTH-TOKEN-EXPIRY-RECOVERY.md` — OAuth token expiry recovery fix
 - `GHOSTTY-WEB-TERMINAL-MIGRATION.md` — Ghostty web terminal migration
-- `IMAGE-ATTACHMENT-TILES.md` — Image attachment tiles
-- `OOM-34K-UNTRACKED-FILES.md` — OOM fix for 34k untracked files
 - `OPTIMIZE-AGENT-FIRST-RESPONSE-LATENCY.md` — Agent first response latency optimization
 - `PIERRE-BG-COLOR-AND-LARGE-DIFF-PERF-FIX.md` — Pierre background color and large diff perf fix
 - `PRODUCTION-PR-REVIEW-WORKFLOW.md` — Production PR review workflow (4-pass read-only review, host-side synthesis, apply via fork)
@@ -97,10 +95,8 @@ Use this to find the right file. Read the file directly — no links needed.
 - `worktree-default-orbit-location.md` — Worktree default Orbit location
 - `TUI-CLI/ORBIT-TUI-RATATUI.md` — Orbit TUI (Ratatui): extract agent-bridge crate, port Codex TUI widgets, build CLI chat interface
 - `AGENT-BRIDGE-HTTP-SSE-MIGRATION.md` — Replace stdin/stdout Rust proxy with HTTP+SSE direct frontend↔sidecar communication (5→2 serialization boundaries)
-- `fix-virtuoso-cold-mount-performance.md` — VirtuosoMessageList cold-mount performance: three-phase adaptive overscan, observer gating, event-driven readiness, size caching
-- `COLD-SWITCH-REMAINING-BOTTLENECKS.md` — Large cold-session render gap (132 msgs, silent positioning gap) and visible-phase tail-sentinel collapse after overscan expansion (19 msgs)
 
-## plans/tracked/done/ (53 entries)
+## plans/tracked/done/ (61 entries)
 
 - `virtualize-chat-react-virtuoso.md` — Virtualize chat with react-virtuoso (original plan, superseded by VirtuosoMessageList migration)
 - `virtuoso-message-list-migration.md` — Migrate to VirtuosoMessageList: purpose-built chat virtualization with built-in auto-scroll, velocity wheel damping, WKWebView scroll fixes
@@ -160,6 +156,14 @@ Use this to find the right file. Read the file directly — no links needed.
 - `react-grab-fix.md` — Fix React-grab element selection (sync handler returns true, deferred enrichment via separate URL scheme, textContent capture, epoch-based staleness)
 - `element-chip-detail-dialog.md` — Element context chip click-to-inspect dialog (syntax-highlighted HTML, copy buttons, click-to-open file, keyboard accessible)
 - `COLD-SWITCH-VISIBLE-STABILIZATION.md` — Cold switch visible-phase overscan fix, hidden→visible promotion fast path, startup prefetch, session switch trace instrumentation
+- `120FPS-SESSION-SWITCHING.md` — Session-keyed ToolStore/FileStore migration for O(1) pointer-swap session switching (eliminates 5-15ms clone cost)
+- `COLD-SWITCH-REMAINING-BOTTLENECKS.md` — Fix hidden-phase layout-pending stalls and visible-phase sentinel backtrack guards for cold cached sessions
+- `IMAGE-ATTACHMENT-TILES.md` — Image attachment tiles with SafeImage blob URL sanitization, lightbox, asset:// URL support end-to-end
+- `INSTANT-SESSION-SWITCHING-TANSTACK-QUERY.md` — TanStack Query data cache layer with lazy hydration, prefetch scheduling, session-scoped data lifecycle
+- `OOM-34K-UNTRACKED-FILES.md` — IDE-grade git scaling: Rust status fingerprinting, conditional polling, concurrency-limited diff fetching for 34k+ untracked files
+- `virtuoso-to-tanstack-migration.md` — Replace Virtuoso with TanStack Virtual for chat message rendering with production scroll fixes
+- `fix-session-switching-jitter-virtuoso.md` — Session switching hydration-aware Virtuoso restore (superseded by TanStack Virtual migration)
+- `fix-virtuoso-cold-mount-performance.md` — VirtuosoMessageList cold-mount performance plan (superseded by TanStack Virtual migration)
 - `HIDDEN-PHASE-LAYOUT-PENDING-STALLS.md` — Disable assistant-markdown 250ms settle window during verification, remove layoutPendingCount gate from visible preseed
 
 ## plans/others/ (58 files in 14 topic subfolders)
