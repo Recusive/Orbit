@@ -156,7 +156,13 @@ export interface SlashCommandDefinition {
   readonly?: boolean;
 }
 
-export type SkillSource = 'project' | 'user';
+export type SkillSource =
+  | 'project'
+  | 'user'
+  | 'claude_user'
+  | 'claude_plugin'
+  | 'claude_project'
+  | 'codex';
 
 export interface SkillDefinition {
   name: string;
