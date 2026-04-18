@@ -29,6 +29,26 @@ interface SkillRowProps {
 const SOURCE_CONFIG: Record<string, { label: string; dot: string; facehash: string }> = {
   project: { label: 'Project', dot: 'bg-green-500', facehash: 'bg-avatar-project' },
   user: { label: 'Personal', dot: 'bg-orange-400', facehash: 'bg-avatar-user' },
+  claude_project: {
+    label: 'Workspace (Claude Code)',
+    dot: 'bg-sky-400',
+    facehash: 'bg-avatar-project',
+  },
+  claude_user: {
+    label: 'Claude Code',
+    dot: 'bg-blue-400',
+    facehash: 'bg-avatar-user',
+  },
+  claude_plugin: {
+    label: 'Claude Code Plugins',
+    dot: 'bg-indigo-400',
+    facehash: 'bg-avatar-system',
+  },
+  codex: {
+    label: 'Codex',
+    dot: 'bg-violet-400',
+    facehash: 'bg-avatar-system',
+  },
 };
 
 const SkillRow: FC<SkillRowProps> = ({ skill, colorClass, onClick }) => (
