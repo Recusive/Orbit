@@ -414,7 +414,14 @@ export type DeleteCommandRequest = z.infer<typeof DeleteCommandRequestSchema>;
 // Skill Schemas
 // ============================================================================
 
-export const SkillSourceSchema = z.enum(['project', 'user']);
+export const SkillSourceSchema = z.enum([
+  'project',
+  'user',
+  'claude_user',
+  'claude_plugin',
+  'claude_project',
+  'codex',
+]);
 export type SkillSource = z.infer<typeof SkillSourceSchema>;
 
 export const SkillDefinitionSchema = z
