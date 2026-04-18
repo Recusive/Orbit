@@ -773,11 +773,21 @@ export const BrowserToolResponseSchema = z
 // ═══════════════════════════════════════════════════════════════
 
 // Skill definition
+export const SkillSourceSchema = z.enum([
+  'project',
+  'user',
+  'claude_user',
+  'claude_plugin',
+  'claude_project',
+  'codex',
+]);
+export type SkillSource = z.infer<typeof SkillSourceSchema>;
+
 export const SkillDefinitionSchema = z
   .object({
     name: z.string().min(1),
     description: z.string(),
-    source: z.enum(['project', 'user']),
+    source: SkillSourceSchema,
     triggers: z.array(z.string()).optional(),
     filePath: z.string().optional(),
   })
