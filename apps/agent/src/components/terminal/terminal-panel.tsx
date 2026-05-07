@@ -618,6 +618,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
                       e.stopPropagation();
                       handleCloseSession(session.id);
                     }}
+                    aria-label={`Close ${session.name} terminal`}
                     title="Close terminal"
                   >
                     <X className="h-3 w-3" />
@@ -631,6 +632,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
           <button
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             onClick={handleOpenSearch}
+            aria-label="Find in terminal"
             title="Find (Cmd+F)"
           >
             <Search className="h-4 w-4" />
@@ -638,6 +640,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
           <button
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             onClick={handleNewSession}
+            aria-label="New terminal"
             title="New Terminal"
           >
             <Plus className="h-4 w-4" />
@@ -669,6 +672,7 @@ export const TerminalPanel: FC<TerminalPanelProps> = ({ collapsed = false, mode 
           <button
             className="h-6 w-6 flex items-center justify-center rounded hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
             onClick={toggleTerminalCollapsed}
+            aria-label={collapsed ? 'Expand terminal' : 'Collapse terminal'}
             title={collapsed ? 'Expand terminal' : 'Collapse terminal'}
           >
             <ToggleIcon className="h-4 w-4" />

@@ -17,6 +17,7 @@ interface ScopeOptionButtonProps {
   readonly disabled?: boolean;
   readonly icon: ComponentType<{ className?: string }>;
   readonly label: string;
+  readonly ariaLabel: string;
   readonly description: string;
   readonly onClick: () => void;
 }
@@ -25,11 +26,13 @@ const ScopeOptionButton: FC<ScopeOptionButtonProps> = ({
   disabled = false,
   icon: Icon,
   label,
+  ariaLabel,
   description,
   onClick,
 }) => (
   <button
     type="button"
+    aria-label={ariaLabel}
     disabled={disabled}
     onClick={onClick}
     className={cn(
@@ -81,6 +84,7 @@ export const ScopePopover: FC<ScopePopoverProps> = ({
             <ScopeOptionButton
               icon={Folder}
               label="Project"
+              ariaLabel="Install for this project"
               description="Install in this workspace"
               onClick={() => {
                 onSelectScope('project');
@@ -94,6 +98,7 @@ export const ScopePopover: FC<ScopePopoverProps> = ({
                   <ScopeOptionButton
                     icon={Folder}
                     label="Project"
+                    ariaLabel="Install for this project"
                     description="Install in this workspace"
                     disabled
                     onClick={() => {
@@ -110,6 +115,7 @@ export const ScopePopover: FC<ScopePopoverProps> = ({
           <ScopeOptionButton
             icon={User}
             label="Personal"
+            ariaLabel="Install for all projects"
             description="Install in ~/.claude/skills"
             onClick={() => {
               onSelectScope('personal');
