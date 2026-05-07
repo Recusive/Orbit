@@ -12,6 +12,7 @@ import type { FC, ReactNode } from 'react';
 import { SFSymbol } from '@/components/shared';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn, SIDEBAR } from '@/lib/utils';
+import { useGitTotalChanges } from '@/stores/git/git-store';
 import { useActiveTab, useActivityTab, useUIStore } from '@/stores/ui/ui-store';
 
 interface ActionButtonProps {
@@ -23,6 +24,11 @@ interface ActionButtonProps {
 }
 
 const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onClick, badge }) => {
+  const ariaLabel =
+    badge !== undefined && badge > 0
+      ? `${label}, ${String(badge)} ${badge === 1 ? 'change' : 'changes'}`
+      : label;
+
   return (
     <button
       onClick={onClick}
@@ -30,7 +36,7 @@ const ActionButton: FC<ActionButtonProps> = ({ icon: Icon, label, isActive, onCl
         'relative flex items-center justify-center w-full h-12 transition-colors',
         isActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
       )}
-      aria-label={label}
+      aria-label={ariaLabel}
       aria-selected={isActive}
       role="tab"
     >
@@ -113,6 +119,7 @@ const ModeButton: FC<ModeButtonProps> = ({
  */
 export const ActionsBar: FC = () => {
   const activeTab = useActivityTab();
+  const totalChanges = useGitTotalChanges();
   const setActiveTab = useUIStore((state) => state.setActivityTab);
   const handleTabClick = (tab: ActivityTab): void => {
     setActiveTab(tab);
@@ -139,6 +146,7 @@ export const ActionsBar: FC = () => {
           icon={GitBranch}
           label="Source Control"
           isActive={activeTab === 'source'}
+          badge={totalChanges}
           onClick={() => {
             handleTabClick('source');
           }}
