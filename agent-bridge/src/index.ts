@@ -32,8 +32,6 @@ process.env.PATH = Array.from(pathSet).join(':');
 
 import * as readline from 'readline';
 
-import { formatZodError } from '@orbit/shared-schemas';
-
 import {
   createAgent,
   deleteAgent,
@@ -61,6 +59,10 @@ import {
 import { ClaudeCredentials } from './common/auth/credentials.js';
 import { createLogger } from './common/logging/logger.js';
 import { canEnableIOS } from './ios/ios-service.js';
+import {
+  formatBridgeIpcValidationError,
+  summarizeBridgeIpcLine,
+} from './protocol/ipc-diagnostics.js';
 import { BridgeRequestSchema } from './protocol/schemas.js';
 import { captureAgentError, captureFatalError, initSentry } from './sentry/index.js';
 
@@ -264,6 +266,11 @@ async function main(): Promise<void> {
     terminal: false,
   });
 
+  /**
+   * [warning] TESTED: Invalid IPC diagnostics are covered by integration tests.
+   *     If you modify this, run: cd agent-bridge && bun test src/__tests__/ipc-diagnostics-redaction.test.ts
+   *     Test file: src/__tests__/ipc-diagnostics-redaction.test.ts
+   */
   rl.on('line', (line) => {
     if (!line.trim()) {
       return;
@@ -274,12 +281,13 @@ async function main(): Promise<void> {
       const parsed: unknown = JSON.parse(line);
       const result = BridgeRequestSchema.safeParse(parsed);
       if (!result.success) {
-        const errorMessage = formatZodError(result.error);
-        logger.error({ error: errorMessage, line }, 'Invalid request schema');
+        const errorMessage = formatBridgeIpcValidationError(result.error);
+        const ipc = summarizeBridgeIpcLine(line, parsed);
+        logger.error({ error: errorMessage, ipc }, 'Invalid request schema');
         // Capture schema validation errors to Sentry
         captureAgentError(new Error(`Invalid request schema: ${errorMessage}`), {
           source: 'ipc_validation',
-          extra: { line: line.substring(0, 500) }, // Truncate to avoid huge payloads
+          extra: { ipc },
         });
         sendResponse({
           type: 'error',
@@ -290,12 +298,13 @@ async function main(): Promise<void> {
       }
       request = result.data;
     } catch (error) {
-      logger.error({ error, line }, 'Failed to parse request JSON');
+      const ipc = summarizeBridgeIpcLine(line);
+      logger.error({ error, ipc }, 'Failed to parse request JSON');
       // Capture JSON parse errors to Sentry
       const parseError = error instanceof Error ? error : new Error(String(error));
       captureAgentError(parseError, {
         source: 'ipc_json_parse',
-        extra: { line: line.substring(0, 500) }, // Truncate to avoid huge payloads
+        extra: { ipc },
       });
       sendResponse({
         type: 'error',
