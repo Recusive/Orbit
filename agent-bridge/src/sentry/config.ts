@@ -7,6 +7,7 @@
 
 import * as Sentry from '@sentry/bun';
 
+import { redactSensitiveData, redactSensitiveLogValue } from '../common/logging/logger.js';
 import { BRIDGE_VERSION } from '../version.js';
 
 // Re-export for external use
@@ -20,29 +21,6 @@ const SENTRY_DSN =
   'https://c9518e0817d46db099af2bfd59eb0fc0@o4510750911037440.ingest.us.sentry.io/4510750915624960';
 
 /**
- * Regex patterns for sensitive data that should be scrubbed from error reports.
- */
-const SENSITIVE_PATTERNS = {
-  /** Anthropic API key pattern */
-  anthropicApiKey: /sk-ant-[a-zA-Z0-9-]+/g,
-  /** Generic API key patterns */
-  genericApiKey: /api[_-]?key[=:]\s*['"]?[a-zA-Z0-9-_]+['"]?/gi,
-  /** Bearer tokens */
-  bearerToken: /bearer\s+[a-zA-Z0-9-_.]+/gi,
-} as const;
-
-/**
- * Scrub sensitive data from a string.
- */
-function scrubSensitiveData(value: string): string {
-  let scrubbed = value;
-  scrubbed = scrubbed.replace(SENSITIVE_PATTERNS.anthropicApiKey, '[REDACTED_ANTHROPIC_KEY]');
-  scrubbed = scrubbed.replace(SENSITIVE_PATTERNS.genericApiKey, '[REDACTED_API_KEY]');
-  scrubbed = scrubbed.replace(SENSITIVE_PATTERNS.bearerToken, '[REDACTED_BEARER_TOKEN]');
-  return scrubbed;
-}
-
-/**
  * Recursively scrub sensitive data from an object.
  * Used for cleaning event.extra which may contain IPC payloads.
  */
@@ -51,12 +29,12 @@ function scrubObject(obj: Record<string, unknown>): Record<string, unknown> {
 
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      result[key] = scrubSensitiveData(value);
+      result[key] = redactSensitiveLogValue(key, value);
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
       result[key] = scrubObject(value as Record<string, unknown>);
     } else if (Array.isArray(value)) {
       result[key] = value.map((item: unknown): unknown => {
-        if (typeof item === 'string') return scrubSensitiveData(item);
+        if (typeof item === 'string') return redactSensitiveData(item);
         if (typeof item === 'object' && item !== null) {
           return scrubObject(item as Record<string, unknown>);
         }
@@ -83,14 +61,14 @@ function scrubObject(obj: Record<string, unknown>): Record<string, unknown> {
 function beforeSend(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
   // Scrub error messages
   if (event.message) {
-    event.message = scrubSensitiveData(event.message);
+    event.message = redactSensitiveData(event.message);
   }
 
   // Scrub exception values
   if (event.exception?.values) {
     for (const exception of event.exception.values) {
       if (exception.value) {
-        exception.value = scrubSensitiveData(exception.value);
+        exception.value = redactSensitiveData(exception.value);
       }
     }
   }
@@ -99,7 +77,7 @@ function beforeSend(event: Sentry.ErrorEvent): Sentry.ErrorEvent | null {
   if (event.breadcrumbs) {
     for (const breadcrumb of event.breadcrumbs) {
       if (breadcrumb.message) {
-        breadcrumb.message = scrubSensitiveData(breadcrumb.message);
+        breadcrumb.message = redactSensitiveData(breadcrumb.message);
       }
     }
   }
