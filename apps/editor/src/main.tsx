@@ -12,6 +12,12 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import './globals.css';
 
+declare global {
+  interface Window {
+    Sentry?: typeof Sentry;
+  }
+}
+
 // ============================================
 // Initialize Sentry
 // ============================================
@@ -39,7 +45,7 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
   });
 
   // Expose Sentry globally for console testing in development
-  (window as unknown as { Sentry: typeof Sentry }).Sentry = Sentry;
+  window.Sentry = Sentry;
 }
 
 // Declare globals that Vite defines

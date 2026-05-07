@@ -11,6 +11,12 @@ import { loadConversationDetailFresh } from '@/lib/query/conversation-detail';
 import { claudeConversationRepo } from '@/services/conversations/claude-conversation-repo';
 import { warmMemoryCacheFromIdb } from '@/stores/chat/render-cache-store';
 
+declare global {
+  interface Window {
+    Sentry?: typeof Sentry;
+  }
+}
+
 // React Scan disabled — adds 10-25ms overhead per frame by patching React's
 // reconciler. Re-enable for visual re-render debugging, but expect 40-60 FPS
 // instead of 120 FPS while it's active.
@@ -62,7 +68,7 @@ if (typeof __DEV__ !== 'undefined' && __DEV__) {
 
   // Expose Sentry globally for console testing in development
   // Usage: Sentry.captureMessage('test') or Sentry.captureException(new Error('test'))
-  (window as unknown as { Sentry: typeof Sentry }).Sentry = Sentry;
+  window.Sentry = Sentry;
 }
 
 // Suppress native WebKit context menu (Reload, Inspect, Autofill).

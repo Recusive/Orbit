@@ -5,8 +5,9 @@ import pierreDarkTheme from '@pierre/theme/themes/pierre-dark.json';
 import pierreLightTheme from '@pierre/theme/themes/pierre-light.json';
 import { createContext, useEffect, useMemo, useState } from 'react';
 
-import type { SupportedLanguages, ThemeRegistrationResolved } from '@pierre/diffs';
+import type { SupportedLanguages } from '@pierre/diffs';
 import type { FC, ReactNode } from 'react';
+import type { ThemeRegistration } from 'shiki';
 
 import { PIERRE_THEME } from '@/lib/utils/pierre-adapter';
 import { clearParsedDiffCache } from '@/lib/utils/pierre-diff-cache';
@@ -21,8 +22,8 @@ import { useGitStore } from '@/stores/git/git-store';
 // Pierre's registerCustomTheme is "first write wins" — use unique names.
 // Static imports avoid WKWebView's broken dynamic import() for JSON.
 // ---------------------------------------------------------------------------
-const darkBase = pierreDarkTheme as unknown as ThemeRegistrationResolved;
-const lightBase = pierreLightTheme as unknown as ThemeRegistrationResolved;
+const darkBase = { ...pierreDarkTheme, type: 'dark' } satisfies ThemeRegistration;
+const lightBase = { ...pierreLightTheme, type: 'light' } satisfies ThemeRegistration;
 
 // Orbit themes — sidebar background for all Pierre surfaces.
 // Pierre's worker pool only supports one theme set, so both inline cards
@@ -38,7 +39,7 @@ if ((globalThis as Record<string, unknown>)[THEMES_KEY] !== true) {
       ...darkBase,
       name: 'orbit-dark',
       colors: { ...darkBase.colors, 'editor.background': '#232323' },
-    } as ThemeRegistrationResolved)
+    } satisfies ThemeRegistration)
   );
 
   registerCustomTheme('orbit-light', () =>
@@ -46,7 +47,7 @@ if ((globalThis as Record<string, unknown>)[THEMES_KEY] !== true) {
       ...lightBase,
       name: 'orbit-light',
       colors: { ...lightBase.colors, 'editor.background': '#f8f8f8' },
-    } as ThemeRegistrationResolved)
+    } satisfies ThemeRegistration)
   );
 }
 

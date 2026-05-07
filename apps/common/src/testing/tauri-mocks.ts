@@ -43,6 +43,16 @@ export interface MockInvokeFn {
   mockReset: () => void;
 }
 
+function isMockInvokeFn(value: unknown): value is MockInvokeFn {
+  return (
+    typeof value === 'function' &&
+    'mockImplementation' in value &&
+    'getMockImplementation' in value &&
+    'mockClear' in value &&
+    'mockReset' in value
+  );
+}
+
 // =============================================================================
 // Mock Creators
 // =============================================================================
@@ -98,9 +108,10 @@ export function createMockInvoke(responses: MockResponseMap): MockInvokeFn {
  * ```
  */
 export async function mockTauriCommand(command: string, response: unknown): Promise<void> {
-  // Dynamic import to get the mocked invoke - cast through unknown since
-  // in tests the module is mocked and invoke has mock methods attached
-  const { invoke } = (await import('@tauri-apps/api/core')) as unknown as { invoke: MockInvokeFn };
+  const { invoke } = await import('@tauri-apps/api/core');
+  if (!isMockInvokeFn(invoke)) {
+    throw new Error('Tauri invoke is not mocked. Call vi.mock before mockTauriCommand().');
+  }
 
   const originalImpl = invoke.getMockImplementation();
 

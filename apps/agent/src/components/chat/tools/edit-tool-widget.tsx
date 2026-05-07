@@ -132,10 +132,16 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
     reloadVersion,
   ]);
 
-  const handleFileClick = (e: React.MouseEvent): void => {
+  const handleFileClick = (e: React.MouseEvent | React.KeyboardEvent): void => {
     e.preventDefault();
     e.stopPropagation();
     onOpenFile?.(filePath);
+  };
+
+  const handleFileKeyDown = (e: React.KeyboardEvent): void => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      handleFileClick(e);
+    }
   };
 
   const handleRetry = useCallback((e: React.MouseEvent): void => {
@@ -172,10 +178,7 @@ export const EditToolWidget: FC<EditToolWidgetProps> = ({
               isFailed ? 'text-lg-text-secondary' : 'text-git-untracked'
             )}
             onClick={handleFileClick}
-            onKeyDown={(e): void => {
-              if (e.key === 'Enter' || e.key === ' ')
-                handleFileClick(e as unknown as React.MouseEvent);
-            }}
+            onKeyDown={handleFileKeyDown}
             title={filePath}
           >
             {fileName}
