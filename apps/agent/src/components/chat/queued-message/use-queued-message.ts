@@ -34,7 +34,8 @@ export function useQueuedMessageHandler(options: UseQueuedMessageOptions): UseQu
   const { isAgentRunning, sessionId, postMessage, addMessage, setIsAgentRunning } = options;
 
   const queuedMessage = useQueuedMessage();
-  const { queueMessage: storeQueueMessage, clearQueue } = useQueuedMessageStore();
+  const storeQueueMessage = useQueuedMessageStore((state) => state.queueMessage);
+  const clearQueue = useQueuedMessageStore((state) => state.clearQueue);
 
   // Process queued message when agent stops running
   useEffect(() => {

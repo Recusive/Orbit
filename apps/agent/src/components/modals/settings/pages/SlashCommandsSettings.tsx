@@ -578,7 +578,10 @@ export const SlashCommandsSettings: FC = () => {
   const commands = useCommands();
   const isLoading = useCommandsLoading();
   const hasFetched = useCommandsHasFetched();
-  const { fetchCommands, addCommand, updateCommand, removeCommand } = useCommandsStore();
+  const fetchCommands = useCommandsStore((state) => state.fetchCommands);
+  const addCommand = useCommandsStore((state) => state.addCommand);
+  const updateCommand = useCommandsStore((state) => state.updateCommand);
+  const removeCommand = useCommandsStore((state) => state.removeCommand);
 
   // Initial load state: loading and haven't fetched yet
   const isInitialLoad = isLoading && !hasFetched;
