@@ -1,11 +1,18 @@
 import { render } from '@testing-library/react';
+import { createContext } from 'react';
 
 import type { HTMLAttributes, ReactNode } from 'react';
 
-const { mockGetShiki, mockUseReducedMotion, mockUseToolWidgetExpanded } = vi.hoisted(() => ({
+const {
+  mockGetShiki,
+  mockUseReducedMotion,
+  mockUseToolWidgetExpanded,
+  mockUseToolWidgetMotionDisabled,
+} = vi.hoisted(() => ({
   mockGetShiki: vi.fn(() => new Promise(() => undefined)),
   mockUseReducedMotion: vi.fn(() => true),
   mockUseToolWidgetExpanded: vi.fn(() => [true, vi.fn()] as const),
+  mockUseToolWidgetMotionDisabled: vi.fn(() => false),
 }));
 
 vi.mock('motion/react', () => ({
@@ -27,9 +34,12 @@ vi.mock('@/components/chat/tools/shared', () => ({
   TOOL_EXPAND_ENTER: {},
   TOOL_EXPAND_EXIT: {},
   TOOL_EXPAND_TRANSITION_NONE: {},
+  ToolWidgetSessionContext: createContext(''),
   getShiki: mockGetShiki,
+  useBeginSessionLayoutMutation: () => () => ({ complete: vi.fn() }),
   useIsDarkMode: () => false,
   useToolWidgetExpanded: mockUseToolWidgetExpanded,
+  useToolWidgetMotionDisabled: mockUseToolWidgetMotionDisabled,
 }));
 
 import { BashToolWidget } from '@/components/chat/tools/bash-tool-widget';
@@ -39,6 +49,7 @@ describe('bash tool widget stability', () => {
     mockGetShiki.mockClear();
     mockUseReducedMotion.mockClear();
     mockUseToolWidgetExpanded.mockClear();
+    mockUseToolWidgetMotionDisabled.mockClear();
   });
 
   it('reserves command and output shell height while Shiki highlighting is pending', () => {

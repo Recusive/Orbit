@@ -488,7 +488,7 @@ describe('MarketplacePane', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'Add' }));
-    await user.click(screen.getByRole('button', { name: /Personal/i }));
+    await user.click(screen.getByRole('button', { name: 'Install for all projects' }));
 
     await waitFor(() => {
       expect(mockInstallMarketplaceSkill).toHaveBeenCalledWith(

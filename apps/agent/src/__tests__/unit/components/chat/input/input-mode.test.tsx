@@ -102,8 +102,8 @@ describe('InputControls mode picker', () => {
   });
 });
 
-describe('InputControls image attachment button', () => {
-  it('keeps the image button enabled for Claude', async () => {
+describe('InputControls image attachment menu item', () => {
+  it('keeps image attachment available for Claude', async () => {
     const handleImageClick = vi.fn();
     const user = userEvent.setup();
 
@@ -111,7 +111,9 @@ describe('InputControls image attachment button', () => {
       wrapper: TestWrapper,
     });
 
-    const button = screen.getByRole('button', { name: 'Attach image' });
+    await user.click(screen.getByRole('button', { name: 'Add agents, context, tools' }));
+
+    const button = screen.getByRole('menuitem', { name: 'Image' });
     expect(button).toBeEnabled();
 
     await user.click(button);
