@@ -461,8 +461,7 @@ fn read_manifest_entries(manifest_path: &Path) -> Result<Vec<ManifestEntry>, Str
 fn unique_temp_manifest_path(manifest_path: &Path) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
+        .map_or(0, |duration| duration.as_nanos());
 
     let file_name = format!("{MARKETPLACE_MANIFEST_FILE}.{nanos}.tmp");
     manifest_path.with_file_name(file_name)

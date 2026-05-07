@@ -204,9 +204,7 @@ fn extract_panic_message(panic_info: &PanicHookInfo<'_>) -> String {
 
 /// Check if the crash log needs rotation.
 fn should_rotate(log_path: &Path) -> bool {
-    fs::metadata(log_path)
-        .map(|m| m.len() >= MAX_LOG_SIZE)
-        .unwrap_or(false)
+    fs::metadata(log_path).is_ok_and(|m| m.len() >= MAX_LOG_SIZE)
 }
 
 /// Rotate crash logs (crash.log -> crash.log.1 -> crash.log.2 -> ...).
@@ -278,7 +276,7 @@ impl CrashManager {
     #[must_use]
     pub fn has_pending_crashes(&self) -> bool {
         let path = self.crash_log_path();
-        path.exists() && fs::metadata(&path).map(|m| m.len() > 0).unwrap_or(false)
+        path.exists() && fs::metadata(&path).is_ok_and(|m| m.len() > 0)
     }
 
     /// Read and consume the crash log, returning its contents.

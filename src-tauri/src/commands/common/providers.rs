@@ -238,8 +238,7 @@ pub fn keychain_status_sync() -> KeychainStatus {
                         // Fail-closed: if system time is unavailable, treat token as expired
                         let now = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
-                            .map(|d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX))
-                            .unwrap_or(i64::MAX);
+                            .map_or(i64::MAX, |d| i64::try_from(d.as_secs()).unwrap_or(i64::MAX));
 
                         // expiresAt is in milliseconds
                         let exp_secs = exp / 1000;

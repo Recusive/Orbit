@@ -1996,7 +1996,7 @@ mod eval_result_tests {
         );
         assert_eq!(
             normalize_wait_timeout(Some(42_000)),
-            Duration::from_millis(42_000)
+            Duration::from_secs(42)
         );
     }
 

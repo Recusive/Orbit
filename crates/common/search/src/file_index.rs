@@ -3,6 +3,7 @@
 //! This module provides fast fuzzy file search for the @ mention picker.
 //! Files are indexed on workspace open and incrementally updated on file changes.
 
+use std::cmp::Reverse;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -392,7 +393,7 @@ impl FileIndex {
         }
 
         // Sort by score descending
-        scored.sort_by(|a, b| b.0.cmp(&a.0));
+        scored.sort_by_key(|s| Reverse(s.0));
 
         // Take top results and convert to FuzzySearchResult
         let results: Vec<FuzzySearchResult> = scored

@@ -25,8 +25,7 @@ fn unique_test_app(base_name: &str) -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
     let ts = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
+        .map_or(0, |d| d.as_nanos());
     format!("orbit_test_{base_name}_{}", ts % 1_000_000_u128)
 }
 
