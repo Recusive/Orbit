@@ -9,7 +9,9 @@
 )]
 
 use std::collections::HashSet;
-use std::path::{Component, Path, PathBuf};
+use std::fs;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
@@ -32,7 +34,7 @@ use crate::core::sentry_utils::SentryCapture as _;
 // SECURITY NOTE: Read-only file operations (read_file, file_exists, is_directory,
 // get_file_info) are NOT restricted to the workspace directory. This matches VS Code
 // behavior where the editor can read any file on the system. Write operations remain
-// sandboxed to the workspace via ensure_workspace_paths(). The frontend must not
+// sandboxed to the workspace via resolve_workspace_path(). The frontend must not
 // expose file paths to untrusted input (e.g., from web content or user-provided URLs).
 
 /// Read file contents as a string.
@@ -57,8 +59,9 @@ pub async fn read_file_bytes(path: String) -> Result<Vec<u8>> {
 /// Write content to a file
 #[tauri::command]
 pub async fn write_file(path: String, content: String) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::write_file(&path, &content)
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::write_file(&resolved_path, &content)
         .await
         .capture("write_file")
 }
@@ -66,8 +69,9 @@ pub async fn write_file(path: String, content: String) -> Result<()> {
 /// Write bytes to a file
 #[tauri::command]
 pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::write_file_bytes(&path, &content)
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::write_file_bytes(&resolved_path, &content)
         .await
         .capture("write_file_bytes")
 }
@@ -80,8 +84,9 @@ pub async fn write_file_bytes(path: String, content: Vec<u8>) -> Result<()> {
 /// * `show_hidden` - Whether to include hidden files (default: false)
 #[tauri::command]
 pub async fn list_directory(path: String, show_hidden: Option<bool>) -> Result<Vec<FileEntry>> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::list_directory(&path, show_hidden.unwrap_or(false))
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::list_directory(&resolved_path, show_hidden.unwrap_or(false))
         .await
         .capture("list_directory")
 }
@@ -89,15 +94,19 @@ pub async fn list_directory(path: String, show_hidden: Option<bool>) -> Result<V
 /// Create an empty file
 #[tauri::command]
 pub async fn create_file(path: String) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::create_file(&path).await.capture("create_file")
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::create_file(&resolved_path)
+        .await
+        .capture("create_file")
 }
 
 /// Create a directory (and parents if needed)
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::create_directory(&path)
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::create_directory(&resolved_path)
         .await
         .capture("create_directory")
 }
@@ -105,15 +114,21 @@ pub async fn create_directory(path: String) -> Result<()> {
 /// Delete a file or directory
 #[tauri::command]
 pub async fn delete_file(path: String) -> Result<()> {
-    ensure_workspace_paths(&[&path])?;
-    orbit_fs::delete_file(&path).await.capture("delete_file")
+    let resolved_path = resolve_workspace_path(&path)?;
+    let resolved_path = path_to_string(&resolved_path);
+    orbit_fs::delete_file(&resolved_path)
+        .await
+        .capture("delete_file")
 }
 
 /// Rename or move a file
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<()> {
-    ensure_workspace_paths(&[&old_path, &new_path])?;
-    orbit_fs::rename_file(&old_path, &new_path)
+    let resolved_old_path = resolve_workspace_path(&old_path)?;
+    let resolved_new_path = resolve_workspace_path(&new_path)?;
+    let resolved_old_path = path_to_string(&resolved_old_path);
+    let resolved_new_path = path_to_string(&resolved_new_path);
+    orbit_fs::rename_file(&resolved_old_path, &resolved_new_path)
         .await
         .capture("rename_file")
 }
@@ -121,8 +136,13 @@ pub async fn rename_file(old_path: String, new_path: String) -> Result<()> {
 /// Copy a file
 #[tauri::command]
 pub async fn copy_file(from: String, to: String) -> Result<()> {
-    ensure_workspace_paths(&[&from, &to])?;
-    orbit_fs::copy_file(&from, &to).await.capture("copy_file")
+    let resolved_from = resolve_workspace_path(&from)?;
+    let resolved_to = resolve_workspace_path(&to)?;
+    let resolved_from = path_to_string(&resolved_from);
+    let resolved_to = path_to_string(&resolved_to);
+    orbit_fs::copy_file(&resolved_from, &resolved_to)
+        .await
+        .capture("copy_file")
 }
 
 /// Reveal a file or directory in the system file manager (Finder on macOS).
@@ -273,85 +293,90 @@ fn get_watcher_state() -> &'static FileWatcherState {
     })
 }
 
-/// Normalize a path for consistent comparison.
-/// Canonicalizes if the path exists, otherwise normalizes trailing slashes.
-fn normalize_path(path: &str) -> String {
-    let path_obj = Path::new(path);
-
-    // Try to canonicalize (resolves symlinks, relative paths, etc.)
-    if let Ok(canonical) = path_obj.canonicalize() {
-        return canonical.to_string_lossy().into_owned();
-    }
-
-    // Fallback: just normalize trailing slashes
-    let trimmed = path.trim_end_matches('/');
-    if trimmed.is_empty() {
-        "/".to_owned()
-    } else {
-        trimmed.to_owned()
-    }
+fn path_to_string(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
 }
 
-fn normalize_path_for_compare(path: &Path) -> PathBuf {
-    let mut normalized = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::CurDir => {},
-            Component::ParentDir => {
-                let _ = normalized.pop();
-            },
-            Component::Prefix(prefix) => {
-                normalized.push(prefix.as_os_str());
-            },
-            Component::RootDir | Component::Normal(_) => {
-                normalized.push(component.as_os_str());
-            },
-        }
-    }
-    normalized
-}
-
-fn ensure_within_workspace(path: &str) -> Result<()> {
+fn canonical_workspace_root() -> Result<PathBuf> {
     let Some(workspace_path) = workspace::get_workspace_path() else {
         return Err(Error::Config("Workspace path not set".to_owned()));
     };
 
-    let workspace_root = normalize_path_for_compare(Path::new(&workspace_path));
-    let requested = Path::new(path);
-    let resolved = if requested.is_absolute() {
-        normalize_path_for_compare(requested)
-    } else {
-        normalize_path_for_compare(&workspace_root.join(requested))
-    };
+    Path::new(&workspace_path).canonicalize().map_err(Error::Io)
+}
 
+fn workspace_candidate_path(workspace_root: &Path, path: &str) -> PathBuf {
+    let requested = Path::new(path);
+    if requested.is_absolute() {
+        requested.to_path_buf()
+    } else {
+        workspace_root.join(requested)
+    }
+}
+
+fn reject_existing_symlink_components(candidate: &Path, original_path: &str) -> Result<()> {
+    let mut current = PathBuf::new();
+    for component in candidate.components() {
+        current.push(component.as_os_str());
+        match fs::symlink_metadata(&current) {
+            Ok(metadata) if metadata.file_type().is_symlink() => {
+                return Err(Error::PermissionDenied(original_path.to_owned()));
+            },
+            Ok(_) => {},
+            Err(error) if error.kind() == ErrorKind::NotFound => break,
+            Err(error) => return Err(Error::Io(error)),
+        }
+    }
+
+    Ok(())
+}
+
+fn canonicalize_existing_ancestor(candidate: &Path, original_path: &str) -> Result<PathBuf> {
+    let mut pending = Vec::new();
+    let mut cursor = candidate.to_path_buf();
+
+    loop {
+        match cursor.canonicalize() {
+            Ok(mut resolved) => {
+                while let Some(segment) = pending.pop() {
+                    resolved.push(segment);
+                }
+                return Ok(resolved);
+            },
+            Err(error) if error.kind() == ErrorKind::NotFound => {
+                let Some(name) = cursor.file_name() else {
+                    return Err(Error::PermissionDenied(original_path.to_owned()));
+                };
+                pending.push(name.to_os_string());
+
+                let Some(parent) = cursor.parent() else {
+                    return Err(Error::PermissionDenied(original_path.to_owned()));
+                };
+                cursor = parent.to_path_buf();
+            },
+            Err(error) => return Err(Error::Io(error)),
+        }
+    }
+}
+
+/// Resolve a path under the current workspace for workspace-scoped commands.
+///
+/// Existing symlink components are rejected for mutation, launch, and watch paths.
+/// That keeps workspace confinement simple and avoids following links that may point
+/// outside the selected workspace.
+///
+/// [warning] TESTED: This resolver is covered by symlink containment tests.
+///     If you modify this, run: cargo test -p orbit-app workspace_path
+///     Test location: src-tauri/src/commands/common/files.rs tests module.
+fn resolve_workspace_path(path: &str) -> Result<PathBuf> {
+    let workspace_root = canonical_workspace_root()?;
+    let candidate = workspace_candidate_path(&workspace_root, path);
+    reject_existing_symlink_components(&candidate, path)?;
+
+    let resolved = canonicalize_existing_ancestor(&candidate, path)?;
     if !resolved.starts_with(&workspace_root) {
         return Err(Error::PermissionDenied(path.to_owned()));
     }
-
-    Ok(())
-}
-
-fn ensure_workspace_paths(paths: &[&str]) -> Result<()> {
-    for path in paths {
-        ensure_within_workspace(path)?;
-    }
-    Ok(())
-}
-
-fn resolve_workspace_path(path: &str) -> Result<PathBuf> {
-    ensure_within_workspace(path)?;
-
-    let Some(workspace_path) = workspace::get_workspace_path() else {
-        return Err(Error::Config("Workspace path not set".to_owned()));
-    };
-
-    let workspace_root = normalize_path_for_compare(Path::new(&workspace_path));
-    let requested = Path::new(path);
-    let resolved = if requested.is_absolute() {
-        normalize_path_for_compare(requested)
-    } else {
-        normalize_path_for_compare(&workspace_root.join(requested))
-    };
 
     Ok(resolved)
 }
@@ -461,10 +486,9 @@ fn start_event_forwarder(app: AppHandle) {
 pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
     // Wrap the implementation in a closure for Sentry capture
     (|| {
-        ensure_workspace_paths(&[&path])?;
-        // Normalize the path for consistent comparison
-        let normalized_path = normalize_path(&path);
-        let path_obj = Path::new(&normalized_path);
+        let resolved_path = resolve_workspace_path(&path)?;
+        let normalized_path = path_to_string(&resolved_path);
+        let path_obj = resolved_path.as_path();
 
         // Validate path exists
         if !path_obj.exists() {
@@ -525,9 +549,8 @@ pub fn watch_path(path: String, app: AppHandle) -> Result<()> {
 pub fn unwatch_path(path: String) -> Result<()> {
     // Wrap the implementation in a closure for Sentry capture
     (|| {
-        ensure_workspace_paths(&[&path])?;
-        // Normalize the path for consistent comparison
-        let normalized_path = normalize_path(&path);
+        let resolved_path = resolve_workspace_path(&path)?;
+        let normalized_path = path_to_string(&resolved_path);
 
         let state = get_watcher_state();
 
@@ -557,4 +580,77 @@ pub fn unwatch_path(path: String) -> Result<()> {
         Ok(())
     })()
     .capture("unwatch_path")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs::create_dir_all;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink as create_dir_symlink;
+    #[cfg(windows)]
+    use std::os::windows::fs::symlink_dir as create_dir_symlink;
+    use std::path::Path;
+    use std::sync::OnceLock;
+
+    use tokio::sync::Mutex as TokioMutex;
+
+    use super::*;
+
+    #[cfg(unix)]
+    fn symlink_dir(target: &Path, link: &Path) -> Result<()> {
+        create_dir_symlink(target, link).map_err(Error::Io)
+    }
+
+    #[cfg(windows)]
+    fn symlink_dir(target: &Path, link: &Path) -> Result<()> {
+        create_dir_symlink(target, link).map_err(Error::Io)
+    }
+
+    fn workspace_test_lock() -> &'static TokioMutex<()> {
+        static LOCK: OnceLock<TokioMutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| TokioMutex::new(()))
+    }
+
+    #[cfg(any(unix, windows))]
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    async fn write_file_rejects_symlinked_parent_outside_workspace() -> Result<()> {
+        let _guard = workspace_test_lock().lock().await;
+        let previous_workspace = workspace::get_workspace_path();
+
+        let temp_dir = tempfile::tempdir().map_err(Error::Io)?;
+        let workspace_dir = temp_dir.path().join("workspace");
+        let outside_dir = temp_dir.path().join("outside");
+        create_dir_all(&workspace_dir).map_err(Error::Io)?;
+        create_dir_all(&outside_dir).map_err(Error::Io)?;
+
+        let link_path = workspace_dir.join("linked-outside");
+        symlink_dir(&outside_dir, &link_path)?;
+
+        workspace::set_workspace_path(workspace_dir.to_string_lossy().into_owned());
+
+        let requested_path = link_path.join("escape.txt");
+        let result = write_file(
+            requested_path.to_string_lossy().into_owned(),
+            "escaped".to_owned(),
+        )
+        .await;
+        let escaped_path = outside_dir.join("escape.txt");
+        let escaped_file_was_created = escaped_path.exists();
+
+        if let Some(previous_workspace) = previous_workspace {
+            workspace::set_workspace_path(previous_workspace);
+        }
+
+        assert!(
+            matches!(result, Err(Error::PermissionDenied(_))),
+            "writing through a workspace symlink outside the workspace must be denied"
+        );
+        assert!(
+            !escaped_file_was_created,
+            "denied writes must not create files outside the workspace"
+        );
+
+        Ok(())
+    }
 }
