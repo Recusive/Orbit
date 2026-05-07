@@ -25,10 +25,13 @@ const { mockInvalidateAllConversationCaches } = vi.hoisted(() => ({
   mockInvalidateAllConversationCaches: vi.fn<[], Promise<void>>(),
 }));
 
-const { mockAbortPendingCreate, mockAbortSessionSwitch } = vi.hoisted(() => ({
-  mockAbortPendingCreate: vi.fn<[], undefined>(),
-  mockAbortSessionSwitch: vi.fn<[number], undefined>(),
-}));
+const { mockAbortPendingCreate, mockAbortSessionSwitch, mockClearAllReadyInstances } = vi.hoisted(
+  () => ({
+    mockAbortPendingCreate: vi.fn<[], undefined>(),
+    mockAbortSessionSwitch: vi.fn<[number], undefined>(),
+    mockClearAllReadyInstances: vi.fn<[], undefined>(),
+  })
+);
 
 const { mockCloseTab, mockConvertFileSrc, mockSetImageFile, viewerStoreState } = vi.hoisted(() => ({
   mockCloseTab: vi.fn<[string], undefined>(),
@@ -61,6 +64,7 @@ vi.mock('@/lib/query', () => ({
 vi.mock('@/services/conversations/session-switch-coordinator', () => ({
   abortPendingCreate: mockAbortPendingCreate,
   abortSessionSwitch: mockAbortSessionSwitch,
+  clearAllReadyInstances: mockClearAllReadyInstances,
 }));
 
 vi.mock('@tauri-apps/api/core', () => ({

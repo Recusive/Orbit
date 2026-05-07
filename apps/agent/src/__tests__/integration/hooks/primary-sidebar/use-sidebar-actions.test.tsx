@@ -483,19 +483,16 @@ describe('useSidebarActions', () => {
 
       expect(mockHandleConversationLoad).not.toHaveBeenCalled();
       expect(useUIStore.getState().activeConversationId).toBe('current-session');
-      expect(useUIStore.getState().isLoadingConversation).toBe(true);
-      expect(useUIStore.getState().isConversationTransitioning).toBe(true);
     });
 
-    it('should set loading states before sending message', () => {
+    it('should not flip the shown conversation synchronously', () => {
       const { result } = renderHook(() => useSidebarActions(createDefaultHookProps()));
 
       act(() => {
         result.current.handleLoadConversation('target-session-id');
       });
 
-      expect(useUIStore.getState().isLoadingConversation).toBe(true);
-      expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+      expect(useUIStore.getState().activeConversationId).not.toBe('target-session-id');
     });
 
     it('should close secondary surfaces when loading conversation', () => {

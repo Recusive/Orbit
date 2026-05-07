@@ -123,6 +123,22 @@ function mountReadySessionInstance(sessionId: string): void {
   document.body.appendChild(instance);
 }
 
+function createDeferred<T>(): {
+  readonly promise: Promise<T>;
+  readonly resolve: (value: T) => void;
+} {
+  let resolveValue: ((value: T) => void) | undefined;
+  const promise = new Promise<T>((resolve) => {
+    resolveValue = resolve;
+  });
+
+  if (resolveValue === undefined) {
+    throw new Error('Expected deferred resolver to be initialized');
+  }
+
+  return { promise, resolve: resolveValue };
+}
+
 describe('claudeUiBridge.select', () => {
   beforeEach(() => {
     resetStores();
@@ -297,7 +313,18 @@ describe('claudeUiBridge.select', () => {
 
     // When no sync cache exists, select() goes through the single
     // query-backed load path instead of falling to slow-path.
-    mockLoadConversationDetailFresh.mockResolvedValueOnce({
+    const load = createDeferred<unknown>();
+    mockLoadConversationDetailFresh.mockReturnValueOnce(load.promise);
+
+    const selectPromise = claudeUiBridge.select(sessionId);
+
+    expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
+    expect(useUIStore.getState().isLoadingConversation).toBe(true);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
+    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('query');
+
+    load.resolve({
       kind: 'empty',
       conversation: {
         sessionId,
@@ -308,13 +335,13 @@ describe('claudeUiBridge.select', () => {
       },
     });
 
-    await claudeUiBridge.select(sessionId);
+    await selectPromise;
 
     expect(mockLoadConversationDetailFresh).toHaveBeenCalledWith(sessionId);
-    expect(useUIStore.getState().isLoadingConversation).toBe(true);
-    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
-    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
-    expect(useSessionSwitchStore.getState().pending?.loadStrategy).toBe('query');
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useUIStore.getState().activeConversationId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
   });
 
   it('falls back to slow loadStrategy when query-load returns an error', async () => {
@@ -490,9 +517,10 @@ describe('claudeUiBridge.select', () => {
     expect(mockLoad).not.toHaveBeenCalled();
     expect(useChatStore.getState().sessions[sessionId]?.messages).toEqual([]);
     expect(useChatStore.getState().sessions[sessionId]?.hydrationState).toBe('hydrated');
-    expect(useUIStore.getState().isLoadingConversation).toBe(true);
-    expect(useUIStore.getState().isConversationTransitioning).toBe(true);
-    expect(useSessionSwitchStore.getState().pending?.sessionId).toBe(sessionId);
+    expect(useUIStore.getState().isLoadingConversation).toBe(false);
+    expect(useUIStore.getState().isConversationTransitioning).toBe(false);
+    expect(useUIStore.getState().activeConversationId).toBe(sessionId);
+    expect(useSessionSwitchStore.getState().pending).toBeNull();
   });
 
   it('joins an in-flight prefetch instead of triggering the slow path load', async () => {

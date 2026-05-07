@@ -1425,6 +1425,13 @@ class ChatMessageService {
         }
 
         const preferredTitle = getPreferredTitle(message.session_id);
+        const resolvedTitle = preferredTitle ?? message.title;
+        if (
+          !isStaleNavigation &&
+          useUIStore.getState().activeConversationId === message.session_id
+        ) {
+          useUIStore.getState().setActiveConversation(message.session_id, resolvedTitle);
+        }
         const scrollIntent = currentPendingSession
           ? 'pending-verify'
           : wasHydrated
@@ -1438,7 +1445,7 @@ class ChatMessageService {
           cachedMessages: cachedMessages ?? undefined,
           resolvedMessages: newMessages,
           source: 'event-load',
-          title: preferredTitle ?? message.title,
+          title: resolvedTitle,
           activateToolSession: !currentPendingSession,
         });
 

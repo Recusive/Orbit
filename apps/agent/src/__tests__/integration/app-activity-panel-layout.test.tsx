@@ -1,4 +1,4 @@
-import { act, render, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 
@@ -278,6 +278,15 @@ function getCardsRowObserver(): ControlledResizeObserver {
   return observer;
 }
 
+function getActivityWrapper(): HTMLElement {
+  const wrapper =
+    screen.getByTestId('activity-card').parentElement?.parentElement?.parentElement ?? null;
+  if (!(wrapper instanceof HTMLElement)) {
+    throw new Error('Expected activity wrapper');
+  }
+  return wrapper;
+}
+
 describe('App activity panel layout', () => {
   beforeEach(() => {
     resetStore();
@@ -290,7 +299,7 @@ describe('App activity panel layout', () => {
     });
   });
 
-  it('clamps the activity panel when the cards row shrinks', async () => {
+  it('keeps the preferred activity width and lets CSS clamp normal row shrink', async () => {
     renderWorkspaceApp({
       leftSidebarWidth: SIDEBAR.collapsed,
       rightSidebarOpen: false,
@@ -303,7 +312,11 @@ describe('App activity panel layout', () => {
     });
 
     await waitFor(() => {
-      expect(useUIStore.getState().reviewPanelWidth).toBe(416);
+      expect(useUIStore.getState().reviewPanelWidth).toBe(560);
+    });
+    expect(getActivityWrapper()).toHaveStyle({
+      width: '560px',
+      maxWidth: 'calc(100% - 404px)',
     });
   });
 

@@ -1,82 +1,41 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
-import type { ChatRenderRow } from '@/components/chat/chat-messages';
 import type { ChatMessage } from '@/components/chat/messages/types';
 import type { ToolExecution } from '@/stores/agent/tool-store';
+import type { ChatMeasurementCache } from '@/stores/chat/chat-store';
 import type { QueuedMessage } from '@/stores/chat/queued-message-store';
 import type { RenderCachePersistenceAdapter } from '@/stores/chat/render-cache-store';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, Key, ReactNode } from 'react';
 
-const {
-  mockGetCurrentlyRendered,
-  applyMeasurementCacheMock,
-  getMeasurementCacheMock,
-  messageItemPropsById,
-  mockListSurfaceAvailable,
-  mockTailSentinelAvailable,
-  mockResizeObserverDisconnect,
-  mockResizeObserverObserve,
-  mockScrollerElement,
-  mockVirtuosoListElement,
-  mockUseVelocityScroll,
-  mockVirtuosoMessageListProps,
-  queuedMessageBubbleProps,
-  replaceDataMock,
-  setEstimatedItemSizesMock,
-  scrollerScrollToMock,
-  scrollToItemMock,
-  velocityScrollAttachMock,
-} = vi.hoisted(() => {
-  const scrollerScrollToMock = vi.fn();
+interface MockVirtualItem {
+  readonly key: Key;
+  readonly index: number;
+  readonly start: number;
+  readonly size: number;
+  readonly end: number;
+  readonly lane: number;
+}
 
-  return {
-    applyMeasurementCacheMock: vi.fn(),
-    mockGetCurrentlyRendered: vi.fn(),
-    getMeasurementCacheMock: vi.fn(() => ({
-      measurements: [],
-      messageCount: 0,
-      lastMessageId: null,
-      layoutVersion: 0,
-      viewportWidth: null,
-    })),
-    messageItemPropsById: new Map<string, unknown>(),
-    mockListSurfaceAvailable: { current: true },
-    mockTailSentinelAvailable: { current: true },
-    mockResizeObserverDisconnect: vi.fn(),
-    mockResizeObserverObserve: vi.fn(),
-    mockScrollerElement: {
-      scrollHeight: 1200,
-      scrollTop: 0,
-      clientHeight: 800,
-      scrollTo: scrollerScrollToMock,
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      querySelector: vi.fn(),
-    },
-    mockVirtuosoListElement: {},
-    mockUseVelocityScroll: vi.fn(),
-    mockVirtuosoMessageListProps: vi.fn(),
-    queuedMessageBubbleProps: [] as unknown[],
-    replaceDataMock: vi.fn(),
-    setEstimatedItemSizesMock: vi.fn(),
-    scrollerScrollToMock,
-    scrollToItemMock: vi.fn(),
-    velocityScrollAttachMock: vi.fn(),
-  };
-});
+interface MockVirtualizerOptions {
+  readonly count: number;
+  readonly estimateSize: (index: number) => number;
+  readonly getItemKey: (index: number) => Key;
+  readonly getScrollElement: () => Element | null;
+  readonly initialMeasurementsCache?: readonly MockVirtualItem[] | undefined;
+  readonly overscan: number;
+}
 
-interface MockMessageListContext {
-  readonly toolsByMessageId: Map<string, ToolExecution[]>;
-  readonly lastAssistantMessageId: string | null;
-  readonly lastInAssistantGroupIds: Set<string>;
-  readonly messageCount: number;
-  readonly isAgentRunning: boolean;
-  readonly animatingMessageIds: Set<string>;
-  readonly onRewind: (messageId: string) => void;
-  readonly onOpenFile: (path: string) => void;
-  readonly onOpenUrl: (url: string) => void;
-  readonly onFeedback: () => void;
-  readonly onAnimationComplete: (messageId: string) => void;
+interface MockVirtualizer {
+  measurementsCache: readonly MockVirtualItem[];
+  shouldAdjustScrollPositionOnItemSizeChange?: unknown;
+  getTotalSize: () => number;
+  getVirtualItems: () => MockVirtualItem[];
+  measure: () => void;
+  measureElement: (element: Element | null) => void;
+  scrollToIndex: (
+    index: number,
+    options?: { readonly align?: string; readonly behavior?: ScrollBehavior }
+  ) => void;
 }
 
 interface MockMessageItemProps {
@@ -99,156 +58,92 @@ interface MockQueuedMessageBubbleProps {
   readonly onCancel: () => void;
 }
 
-interface MockVirtuosoMessageListMethods<TData> {
-  readonly data: {
-    readonly replace: (
-      data: TData[],
-      options?: {
-        readonly initialLocation?: { readonly index: number | 'LAST'; readonly align?: string };
-        readonly purgeItemSizes?: boolean;
-      }
-    ) => void;
-    readonly getCurrentlyRendered: () => TData[];
-  };
-  readonly scrollToItem: (location: {
-    readonly index: number | 'LAST';
-    readonly align?: string;
-    readonly behavior?: string;
-  }) => void;
-  readonly scrollerElement: () => {
-    readonly scrollHeight: number;
-    readonly scrollTo: (options: ScrollToOptions) => void;
-  };
-  readonly getScrollLocation: () => {
-    readonly bottomOffset: number;
-    readonly visibleListHeight: number;
-  };
-  readonly getMeasurementCache: () => unknown;
-  readonly applyMeasurementCache: (cache: unknown) => void;
-  readonly setEstimatedItemSizes: (sizes: number[]) => void;
-}
+const {
+  latestVirtualizerOptionsRef,
+  messageItemPropsById,
+  mockMeasureElement,
+  mockTotalSize,
+  mockUseVelocityScroll,
+  mockUseVirtualizer,
+  mockUseVirtualizerOptions,
+  mockVirtualItemIndexes,
+  mockVirtualizerMeasure,
+  mockVirtualizerMeasureElement,
+  mockVirtualizerMeasurements,
+  queuedMessageBubbleProps,
+  scrollToIndexMock,
+  velocityScrollAttachMock,
+} = vi.hoisted(() => {
+  const latestVirtualizerOptionsRef = { current: null as MockVirtualizerOptions | null };
+  const mockTotalSize = { current: 1200 };
+  const mockVirtualItemIndexes = { current: null as readonly number[] | null };
+  const mockVirtualizerMeasurements = { current: [] as readonly MockVirtualItem[] };
+  const mockUseVirtualizerOptions = vi.fn();
+  const mockVirtualizerMeasure = vi.fn();
+  const mockVirtualizerMeasureElement = vi.fn();
+  const scrollToIndexMock = vi.fn();
 
-interface MockVirtuosoMessageListProps<TData, TContext> {
-  readonly className?: string | undefined;
-  readonly computeItemKey?:
-    | ((params: {
-        readonly data: TData;
-        readonly index: number;
-        readonly context: TContext;
-      }) => React.Key)
-    | undefined;
-  readonly context?: TContext | undefined;
-  readonly initialData?: readonly TData[] | undefined;
-  readonly initialLocation?:
-    | {
-        readonly index: number | 'LAST';
-        readonly align?: string;
-      }
-    | null
-    | undefined;
-  readonly data?:
-    | {
-        readonly data: readonly TData[] | null | undefined;
-        readonly scrollModifier?: unknown;
-      }
-    | null
-    | undefined;
-  readonly Footer?: ((props: { readonly context: TContext }) => ReactNode) | undefined;
-  readonly Header?: ((props: { readonly context: TContext }) => ReactNode) | undefined;
-  readonly onScroll?: ((location: { readonly isAtBottom: boolean }) => void) | undefined;
-  readonly StickyFooter?: ((props: { readonly context: TContext }) => ReactNode) | undefined;
-  readonly ItemContent?:
-    | ((props: {
-        readonly data: TData;
-        readonly index: number;
-        readonly prevData: TData | null;
-        readonly nextData: TData | null;
-        readonly context: TContext;
-      }) => ReactNode)
-    | undefined;
-  readonly increaseViewportBy?: number | undefined;
-  readonly itemIdentity?: ((item: TData) => unknown) | undefined;
-  readonly onRenderedDataChange?: ((range: TData[]) => void) | undefined;
-  readonly shortSizeAlign?: string | undefined;
-  readonly style?: React.CSSProperties | undefined;
-}
+  const buildDefaultVirtualItems = (): MockVirtualItem[] => {
+    const options = latestVirtualizerOptionsRef.current;
+    if (options === null) {
+      return [];
+    }
 
-vi.mock('@/components/chat/virtualized-message-list', async () => {
-  const React = await import('react');
+    const indexes =
+      mockVirtualItemIndexes.current ??
+      Array.from({ length: options.count }, (_value, index) => index);
+
+    return indexes
+      .filter((index) => index >= 0 && index < options.count)
+      .map((index) => ({
+        key: options.getItemKey(index),
+        index,
+        start: index * 100,
+        size: 100,
+        end: (index + 1) * 100,
+        lane: 0,
+      }));
+  };
+
+  const mockVirtualizer: MockVirtualizer = {
+    get measurementsCache() {
+      return mockVirtualizerMeasurements.current;
+    },
+    getTotalSize: () => mockTotalSize.current,
+    getVirtualItems: buildDefaultVirtualItems,
+    measure: mockVirtualizerMeasure,
+    measureElement: mockVirtualizerMeasureElement,
+    scrollToIndex: scrollToIndexMock,
+  };
+
+  const mockUseVirtualizer = vi.fn((options: MockVirtualizerOptions): MockVirtualizer => {
+    latestVirtualizerOptionsRef.current = options;
+    mockUseVirtualizerOptions(options);
+    return mockVirtualizer;
+  });
 
   return {
-    VirtualizedMessageListLicense: ({ children }: { readonly children: ReactNode }) => (
-      <>{children}</>
-    ),
-    VirtualizedMessageList: React.forwardRef(function MockVirtuosoMessageList<TData, TContext>(
-      props: MockVirtuosoMessageListProps<TData, TContext>,
-      ref: React.ForwardedRef<MockVirtuosoMessageListMethods<TData>>
-    ) {
-      React.useImperativeHandle(ref, () => ({
-        data: {
-          replace: replaceDataMock,
-          getCurrentlyRendered: () => {
-            const fallback = (props.data?.data ?? props.initialData ?? []) as TData[];
-            return (mockGetCurrentlyRendered(fallback) as TData[] | undefined) ?? fallback;
-          },
-        },
-        scrollToItem: scrollToItemMock,
-        scrollerElement: () => mockScrollerElement,
-        getScrollLocation: () => ({
-          bottomOffset: 0,
-          visibleListHeight: 800,
-        }),
-        getMeasurementCache: getMeasurementCacheMock,
-        applyMeasurementCache: applyMeasurementCacheMock,
-        setEstimatedItemSizes: setEstimatedItemSizesMock,
-      }));
-
-      mockVirtuosoMessageListProps(props);
-
-      const data = props.data?.data ?? [];
-
-      return (
-        <div data-testid="chat-virtuoso-message-list">
-          {props.Header ? (
-            <div data-testid="message-list-header-slot">
-              <props.Header context={props.context as TContext} />
-            </div>
-          ) : null}
-          {data.map((item, index) => (
-            <div
-              key={
-                props.computeItemKey?.({
-                  data: item,
-                  index,
-                  context: props.context as TContext,
-                }) ?? index
-              }
-              data-testid={`chat-row-${String(index)}`}
-            >
-              {props.ItemContent?.({
-                data: item,
-                index,
-                prevData: data[index - 1] ?? null,
-                nextData: data[index + 1] ?? null,
-                context: props.context as TContext,
-              })}
-            </div>
-          ))}
-          {props.Footer ? (
-            <div data-testid="message-list-footer-slot">
-              <props.Footer context={props.context as TContext} />
-            </div>
-          ) : null}
-          {props.StickyFooter ? (
-            <div data-testid="message-list-sticky-footer-slot">
-              <props.StickyFooter context={props.context as TContext} />
-            </div>
-          ) : null}
-        </div>
-      );
-    }),
+    latestVirtualizerOptionsRef,
+    messageItemPropsById: new Map<string, unknown>(),
+    mockMeasureElement: vi.fn(() => 100),
+    mockTotalSize,
+    mockUseVelocityScroll: vi.fn(),
+    mockUseVirtualizer,
+    mockUseVirtualizerOptions,
+    mockVirtualItemIndexes,
+    mockVirtualizerMeasure,
+    mockVirtualizerMeasureElement,
+    mockVirtualizerMeasurements,
+    queuedMessageBubbleProps: [] as unknown[],
+    scrollToIndexMock,
+    velocityScrollAttachMock: vi.fn(),
   };
 });
+
+vi.mock('@tanstack/react-virtual', () => ({
+  measureElement: mockMeasureElement,
+  useVirtualizer: mockUseVirtualizer,
+}));
 
 vi.mock('@/components/chat/messages', async () => {
   const React = await import('react');
@@ -311,9 +206,127 @@ import { useChatStore } from '@/stores/chat/chat-store';
 import {
   removeRenderCache,
   resetRenderCacheStoreForTests,
-  saveRenderCache,
   setRenderCachePersistenceAdapterForTests,
 } from '@/stores/chat/render-cache-store';
+
+interface ScrollerMetrics {
+  readonly clientHeight: number;
+  readonly clientWidth: number;
+  readonly scrollHeight: number;
+  readonly scrollTop: number;
+}
+
+const scrollerMetrics: {
+  clientHeight: number;
+  clientWidth: number;
+  scrollHeight: number;
+  scrollTop: number;
+  writes: number[];
+} = {
+  clientHeight: 800,
+  clientWidth: 720,
+  scrollHeight: 1200,
+  scrollTop: 400,
+  writes: [],
+};
+
+let originalClientHeightDescriptor: PropertyDescriptor | undefined;
+let originalClientWidthDescriptor: PropertyDescriptor | undefined;
+let originalScrollHeightDescriptor: PropertyDescriptor | undefined;
+let originalScrollTopDescriptor: PropertyDescriptor | undefined;
+
+function isChatScroller(element: Element): boolean {
+  return element.getAttribute('data-testid') === 'chat-scroller';
+}
+
+function setScrollerMetrics(metrics: Partial<ScrollerMetrics>): void {
+  scrollerMetrics.clientHeight = metrics.clientHeight ?? scrollerMetrics.clientHeight;
+  scrollerMetrics.clientWidth = metrics.clientWidth ?? scrollerMetrics.clientWidth;
+  scrollerMetrics.scrollHeight = metrics.scrollHeight ?? scrollerMetrics.scrollHeight;
+  scrollerMetrics.scrollTop = metrics.scrollTop ?? scrollerMetrics.scrollTop;
+}
+
+function installScrollerMetrics(): void {
+  originalClientHeightDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientHeight'
+  );
+  originalClientWidthDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'clientWidth'
+  );
+  originalScrollHeightDescriptor = Object.getOwnPropertyDescriptor(
+    HTMLElement.prototype,
+    'scrollHeight'
+  );
+  originalScrollTopDescriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollTop');
+
+  Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+    configurable: true,
+    get: function getClientHeight(this: HTMLElement): number {
+      return isChatScroller(this) ? scrollerMetrics.clientHeight : 0;
+    },
+  });
+
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get: function getClientWidth(this: HTMLElement): number {
+      return isChatScroller(this) ? scrollerMetrics.clientWidth : 0;
+    },
+  });
+
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    get: function getScrollHeight(this: HTMLElement): number {
+      return isChatScroller(this) ? scrollerMetrics.scrollHeight : 0;
+    },
+  });
+
+  Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
+    configurable: true,
+    get: function getScrollTop(this: HTMLElement): number {
+      return isChatScroller(this) ? scrollerMetrics.scrollTop : 0;
+    },
+    set: function setScrollTop(this: HTMLElement, value: number): void {
+      if (isChatScroller(this)) {
+        scrollerMetrics.writes.push(value);
+        scrollerMetrics.scrollTop = value;
+      }
+    },
+  });
+}
+
+function restorePrototypeDescriptor(
+  property: 'clientHeight' | 'clientWidth' | 'scrollHeight' | 'scrollTop',
+  descriptor: PropertyDescriptor | undefined
+): void {
+  if (descriptor === undefined) {
+    Reflect.deleteProperty(HTMLElement.prototype, property);
+    return;
+  }
+
+  Object.defineProperty(HTMLElement.prototype, property, descriptor);
+}
+
+function restoreScrollerMetrics(): void {
+  restorePrototypeDescriptor('clientHeight', originalClientHeightDescriptor);
+  restorePrototypeDescriptor('clientWidth', originalClientWidthDescriptor);
+  restorePrototypeDescriptor('scrollHeight', originalScrollHeightDescriptor);
+  restorePrototypeDescriptor('scrollTop', originalScrollTopDescriptor);
+}
+
+function installScrollToMock(): void {
+  vi.spyOn(Element.prototype, 'scrollTo').mockImplementation(function scrollTo(
+    this: Element,
+    options?: ScrollToOptions | number,
+    y?: number
+  ): void {
+    const top = typeof options === 'number' ? y : options?.top;
+    if (top !== undefined && isChatScroller(this)) {
+      this.scrollTop = top;
+    }
+  });
+}
 
 function buildMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
@@ -353,6 +366,40 @@ function buildTool(overrides: Partial<ToolExecution> = {}): ToolExecution {
   return tool;
 }
 
+function buildQueuedMessage(overrides: Partial<QueuedMessage> = {}): QueuedMessage {
+  return {
+    id: overrides.id ?? 'queued-1',
+    text: overrides.text ?? 'Queued message',
+    queuedAt: overrides.queuedAt ?? 1,
+    sessionId: overrides.sessionId ?? 'session-a',
+    contextFiles: overrides.contextFiles,
+    images: overrides.images,
+    elements: overrides.elements,
+    skills: overrides.skills,
+  };
+}
+
+function buildMeasurementCacheForMessages(
+  messages: readonly ChatMessage[],
+  size = 120
+): ChatMeasurementCache {
+  return {
+    measurements: messages.map((message, index) => ({
+      key: `session-a:${message.id}`,
+      index,
+      start: index * size,
+      size,
+      end: (index + 1) * size,
+      lane: 0,
+      measured: true,
+    })),
+    messageCount: messages.length,
+    lastMessageId: messages.at(-1)?.id ?? null,
+    layoutVersion: 0,
+    viewportWidth: null,
+  };
+}
+
 function createPersistenceAdapter(
   initialEntries: Record<string, unknown>
 ): RenderCachePersistenceAdapter {
@@ -368,148 +415,6 @@ function createPersistenceAdapter(
     remove: (sessionId) => {
       entries.delete(sessionId);
       return Promise.resolve();
-    },
-  };
-}
-
-function buildRenderRows(
-  messages: readonly ChatMessage[]
-): { readonly id: string; readonly kind: 'message'; readonly message: ChatMessage }[] {
-  return messages.map((message) => ({
-    id: message.id,
-    kind: 'message' as const,
-    message,
-  }));
-}
-
-function buildMeasurementCacheForMessages(
-  messages: readonly ChatMessage[],
-  size = 120
-): {
-  measurements: {
-    key: string;
-    index: number;
-    start: number;
-    size: number;
-    end: number;
-    lane: number;
-  }[];
-  messageCount: number;
-  lastMessageId: string | null;
-  layoutVersion: number;
-  viewportWidth: null;
-} {
-  return {
-    measurements: messages.map((message, index) => ({
-      key: `session-a:${message.id}`,
-      index,
-      start: index * size,
-      size,
-      end: (index + 1) * size,
-      lane: 0,
-    })),
-    messageCount: messages.length,
-    lastMessageId: messages.at(-1)?.id ?? null,
-    layoutVersion: 0,
-    viewportWidth: null,
-  };
-}
-
-function buildQueuedMessage(overrides: Partial<QueuedMessage> = {}): QueuedMessage {
-  return {
-    id: overrides.id ?? 'queued-1',
-    text: overrides.text ?? 'Queued message',
-    queuedAt: overrides.queuedAt ?? 1,
-    sessionId: overrides.sessionId ?? 'session-a',
-    contextFiles: overrides.contextFiles,
-    images: overrides.images,
-    elements: overrides.elements,
-    skills: overrides.skills,
-  };
-}
-
-function getRenderRowAt(rows: readonly ChatRenderRow[], index: number): ChatRenderRow {
-  const row = rows[index];
-  if (row === undefined) {
-    throw new Error(`Expected render row at index ${String(index)}`);
-  }
-
-  return row;
-}
-
-function getVirtuosoMessageListPropsAtCall(
-  callIndex: number
-): MockVirtuosoMessageListProps<ChatRenderRow, MockMessageListContext> {
-  const props = mockVirtuosoMessageListProps.mock.calls[callIndex]?.[0] as
-    | MockVirtuosoMessageListProps<ChatRenderRow, MockMessageListContext>
-    | undefined;
-
-  if (props === undefined) {
-    throw new Error(`VirtuosoMessageList was not rendered for call ${String(callIndex)}`);
-  }
-
-  return props;
-}
-
-function getLatestVirtuosoMessageListProps(): MockVirtuosoMessageListProps<
-  ChatRenderRow,
-  MockMessageListContext
-> {
-  return getVirtuosoMessageListPropsAtCall(mockVirtuosoMessageListProps.mock.calls.length - 1);
-}
-
-function getVirtuosoContext(
-  props: MockVirtuosoMessageListProps<ChatRenderRow, MockMessageListContext>
-): MockMessageListContext {
-  const context = props.context;
-  if (context === undefined) {
-    throw new Error('Expected VirtuosoMessageList context');
-  }
-  return context;
-}
-
-function getLatestVelocityScrollOptions(): {
-  readonly enabled?: boolean;
-  readonly onUserScrollStart?: (() => void) | undefined;
-} {
-  const options = mockUseVelocityScroll.mock.calls.at(-1)?.[0] as
-    | {
-        readonly enabled?: boolean;
-        readonly onUserScrollStart?: (() => void) | undefined;
-      }
-    | undefined;
-
-  if (options === undefined) {
-    throw new Error('useVelocityScroll was not called');
-  }
-
-  return options;
-}
-
-function trackScrollTopWrites(): {
-  readonly restore: () => void;
-  readonly writes: number[];
-} {
-  const writes: number[] = [];
-  let currentScrollTop = mockScrollerElement.scrollTop;
-
-  Object.defineProperty(mockScrollerElement, 'scrollTop', {
-    configurable: true,
-    get: () => currentScrollTop,
-    set: (value: number) => {
-      writes.push(value);
-      currentScrollTop = value;
-    },
-  });
-
-  return {
-    writes,
-    restore: () => {
-      Object.defineProperty(mockScrollerElement, 'scrollTop', {
-        configurable: true,
-        writable: true,
-        value: currentScrollTop,
-      });
     },
   };
 }
@@ -533,62 +438,83 @@ function renderChatMessages(
   );
 }
 
+function getLatestVirtualizerOptions(): MockVirtualizerOptions {
+  const options = latestVirtualizerOptionsRef.current;
+  if (options === null) {
+    throw new Error('useVirtualizer was not called');
+  }
+
+  return options;
+}
+
+function getLatestVelocityScrollOptions(): {
+  readonly enabled?: boolean;
+  readonly onUserScrollStart?: (() => void) | undefined;
+} {
+  const options = mockUseVelocityScroll.mock.calls.at(-1)?.[0] as
+    | {
+        readonly enabled?: boolean;
+        readonly onUserScrollStart?: (() => void) | undefined;
+      }
+    | undefined;
+
+  if (options === undefined) {
+    throw new Error('useVelocityScroll was not called');
+  }
+
+  return options;
+}
+
+function expectOverscan(overscan: number): Promise<void> {
+  return waitFor(() => {
+    expect(getLatestVirtualizerOptions().overscan).toBe(overscan);
+  });
+}
+
 describe('ChatMessages', () => {
   beforeEach(() => {
+    installScrollerMetrics();
+    installScrollToMock();
+    setScrollerMetrics({
+      clientHeight: 800,
+      clientWidth: 720,
+      scrollHeight: 1200,
+      scrollTop: 400,
+    });
+    scrollerMetrics.writes.length = 0;
+
     useToolStore.getState().reset();
     useChatStore.setState(useChatStore.getInitialState(), true);
     setRenderCachePersistenceAdapterForTests(null);
     resetRenderCacheStoreForTests();
     removeRenderCache('session-a');
     clearToolWidgetState();
+
+    latestVirtualizerOptionsRef.current = null;
     messageItemPropsById.clear();
-    mockGetCurrentlyRendered.mockReset();
-    queuedMessageBubbleProps.length = 0;
-    applyMeasurementCacheMock.mockClear();
-    getMeasurementCacheMock.mockClear();
-    mockResizeObserverDisconnect.mockClear();
-    mockResizeObserverObserve.mockClear();
-    mockListSurfaceAvailable.current = true;
-    mockTailSentinelAvailable.current = true;
-    mockScrollerElement.addEventListener.mockClear();
-    mockScrollerElement.querySelector.mockImplementation((selector: string) => {
-      if (selector.includes('chat-list-inner') || selector.includes('virtuoso-list')) {
-        return mockListSurfaceAvailable.current === true ? mockVirtuosoListElement : null;
-      }
-      if (selector.includes('[data-tail-sentinel')) {
-        return mockTailSentinelAvailable.current === true ? mockVirtuosoListElement : null;
-      }
-      return null;
-    });
-    mockScrollerElement.removeEventListener.mockClear();
-    mockScrollerElement.clientHeight = 800;
-    mockScrollerElement.scrollHeight = 1200;
-    mockScrollerElement.scrollTop = 0;
+    mockMeasureElement.mockClear();
+    mockTotalSize.current = 1200;
     mockUseVelocityScroll.mockClear();
-    mockVirtuosoMessageListProps.mockClear();
-    replaceDataMock.mockClear();
-    setEstimatedItemSizesMock.mockClear();
-    scrollerScrollToMock.mockClear();
-    scrollToItemMock.mockClear();
+    mockUseVirtualizer.mockClear();
+    mockUseVirtualizerOptions.mockClear();
+    mockVirtualItemIndexes.current = null;
+    mockVirtualizerMeasure.mockClear();
+    mockVirtualizerMeasureElement.mockClear();
+    mockVirtualizerMeasurements.current = [];
+    queuedMessageBubbleProps.length = 0;
+    scrollToIndexMock.mockClear();
     velocityScrollAttachMock.mockClear();
-    vi.spyOn(globalThis.ResizeObserver.prototype, 'observe').mockImplementation(
-      mockResizeObserverObserve
-    );
-    vi.spyOn(globalThis.ResizeObserver.prototype, 'disconnect').mockImplementation(
-      mockResizeObserverDisconnect
-    );
   });
 
   afterEach(() => {
     removeRenderCache('session-a');
     setRenderCachePersistenceAdapterForTests(null);
     resetRenderCacheStoreForTests();
+    restoreScrollerMetrics();
     vi.restoreAllMocks();
   });
 
   it('binds to a single session and uses session-prefixed item keys', async () => {
-    // With multi-instance keep-alive, each ChatMessages is bound to ONE session.
-    // Verify session context and item key prefixing work correctly.
     const messages = [buildMessage({ id: 'user-a', role: 'user', content: 'hi' })];
 
     renderChatMessages({
@@ -601,253 +527,104 @@ describe('ChatMessages', () => {
       expect(userAProps?.animate).toBe(true);
     });
 
-    const props = getLatestVirtuosoMessageListProps();
-    const context = getVirtuosoContext(props);
-    const firstMessage = getRenderRowAt(buildRenderRows(messages), 0);
-
-    expect(
-      props.computeItemKey?.({
-        data: firstMessage,
-        index: 0,
-        context,
-      })
-    ).toBe('session-a:user-a');
-    expect(props.itemIdentity?.(firstMessage)).toBe('user-a');
+    expect(getLatestVirtualizerOptions().getItemKey(0)).toBe('session-a:user-a');
     expect(screen.getByTestId('message-item-user-a')).toHaveAttribute(
       'data-session-id',
       'session-a'
     );
   });
 
+  it('renders TanStack virtual rows above the always-mounted tail', async () => {
+    const messages = Array.from({ length: 12 }, (_value, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
+
+    renderChatMessages({ messages, sessionId: 'session-a' });
+
+    await expectOverscan(20);
+
+    expect(getLatestVirtualizerOptions().count).toBe(4);
+    expect(screen.getByTestId('chat-list-inner')).toHaveStyle({ height: '1200px' });
+    expect(screen.getByTestId('message-item-assistant-0')).toBeInTheDocument();
+    expect(screen.getByTestId('message-item-assistant-11')).toBeInTheDocument();
+  });
+
   it('keeps hidden verification on entry overscan while priming', async () => {
+    const messages = [
+      buildMessage({ id: 'assistant-1', role: 'assistant' }),
+      buildMessage({ id: 'assistant-2', role: 'assistant' }),
+    ];
+    const onReady = vi.fn();
+    const { rerender } = renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+      isVisible: false,
+      shouldPrime: false,
+      onReady,
+    });
+
+    expect(getLatestVirtualizerOptions().overscan).toBe(0);
+    expect(getLatestVelocityScrollOptions().enabled).toBe(false);
+
+    rerender(
+      <ChatMessages
+        messages={messages}
+        isAgentRunning={false}
+        sessionId="session-a"
+        isVisible={false}
+        shouldPrime={true}
+        queuedMessage={null}
+        onRewind={vi.fn()}
+        onOpenFile={vi.fn()}
+        onOpenUrl={vi.fn()}
+        onCancelQueue={vi.fn()}
+        onFeedback={vi.fn()}
+        onReady={onReady}
+      />
+    );
+
+    await expectOverscan(5);
+    expect(getLatestVelocityScrollOptions().enabled).toBe(false);
+  });
+
+  it('keeps verification on entry overscan after explicit user scroll', async () => {
+    const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
+
+    renderChatMessages({
+      messages,
+      sessionId: 'session-a',
+      isVisible: true,
+      shouldPrime: true,
+    });
+
+    await expectOverscan(5);
+
+    act(() => {
+      getLatestVelocityScrollOptions().onUserScrollStart?.();
+    });
+
+    expect(getLatestVirtualizerOptions().overscan).toBe(5);
+  });
+
+  it('marks hidden verification ready when the rendered tail is stable at bottom', async () => {
     vi.useFakeTimers();
 
     try {
       const messages = [
         buildMessage({ id: 'assistant-1', role: 'assistant' }),
         buildMessage({ id: 'assistant-2', role: 'assistant' }),
+        buildMessage({ id: 'assistant-3', role: 'assistant' }),
       ];
-      const onReady = vi.fn();
-      const { rerender } = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: false,
-        onReady,
-      });
-
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(0);
-      expect(getLatestVelocityScrollOptions().enabled).toBe(false);
-
-      rerender(
-        <ChatMessages
-          messages={messages}
-          isAgentRunning={false}
-          sessionId="session-a"
-          isVisible={false}
-          shouldPrime={true}
-          queuedMessage={null}
-          onRewind={vi.fn()}
-          onOpenFile={vi.fn()}
-          onOpenUrl={vi.fn()}
-          onCancelQueue={vi.fn()}
-          onFeedback={vi.fn()}
-          onReady={onReady}
-        />
-      );
-
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(48);
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('keeps the tail positioned while verifying a long first-visit session', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 10 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-    const scrollTracker = trackScrollTopWrites();
-
-    try {
-      mockScrollerElement.scrollHeight = 4000;
-      mockScrollerElement.clientHeight = 800;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
-      useChatStore.setState({
-        sessions: {
-          'session-a': {
-            messages: [],
-            isAgentRunning: false,
-            isStopPending: false,
-            scrollIntent: 'session-restore',
-            hydrationState: 'hydrated',
-            layoutVersion: 0,
-            measurementCache: null,
-          },
-        },
-      });
-
-      const onReady = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: true,
-        onReady,
-      });
-
-      expect(scrollTracker.writes).toContain(3200);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(scrollTracker.writes.at(-1)).toBe(3200);
-      expect(onReady).toHaveBeenCalledTimes(1);
-    } finally {
-      scrollTracker.restore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('skips premeasure for short sessions and stabilizes directly from bottom positioning', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
-    const scrollTracker = trackScrollTopWrites();
-
-    try {
-      mockScrollerElement.scrollHeight = 1200;
-      mockScrollerElement.clientHeight = 800;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
-      useChatStore.setState({
-        sessions: {
-          'session-a': {
-            messages: [],
-            isAgentRunning: false,
-            isStopPending: false,
-            scrollIntent: 'session-restore',
-            hydrationState: 'hydrated',
-            layoutVersion: 0,
-            measurementCache: null,
-          },
-        },
-      });
-
-      const onReady = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: true,
-        onReady,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(new Set(scrollTracker.writes)).toEqual(new Set([400]));
-      expect(onReady).toHaveBeenCalledTimes(1);
-    } finally {
-      scrollTracker.restore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('re-aligns visible verification when the measured bottom grows during stabilization', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-    const scrollTracker = trackScrollTopWrites();
-
-    try {
-      mockScrollerElement.clientHeight = 800;
-      mockScrollerElement.scrollHeight = 2000;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback);
       const onVerificationResult = vi.fn();
 
+      setScrollerMetrics({ clientHeight: 800, scrollHeight: 1200, scrollTop: 400 });
+
       renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: true,
-        verificationPhase: 'visible',
-        verificationKey: 'visible-verification',
-        onVerificationResult,
-      });
-
-      mockScrollerElement.scrollHeight = 2600;
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(220);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-      expect(scrollTracker.writes).toContain(1800);
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(220);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(220);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'visible',
-        result: 'visible-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      scrollTracker.restore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('pre-seeds visible verification from the hidden-ready snapshot when the surface still matches', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 800;
-      mockScrollerElement.scrollHeight = 1200;
-      mockScrollerElement.scrollTop = 400;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      const view = renderChatMessages({
         messages,
         sessionId: 'session-a',
         isVisible: false,
         verificationPhase: 'hidden',
-        verificationKey: 'phase-shared-verification',
+        verificationKey: 'hidden-ready',
         onVerificationResult,
       });
 
@@ -858,182 +635,6 @@ describe('ChatMessages', () => {
       expect(onVerificationResult).toHaveBeenCalledWith({
         phase: 'hidden',
         result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-
-      onVerificationResult.mockClear();
-
-      act(() => {
-        view.rerender(
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={false}
-            sessionId="session-a"
-            isVisible={true}
-            verificationPhase="visible"
-            verificationKey="phase-shared-verification"
-            queuedMessage={null}
-            onRewind={vi.fn()}
-            onOpenFile={vi.fn()}
-            onOpenUrl={vi.fn()}
-            onCancelQueue={vi.fn()}
-            onFeedback={vi.fn()}
-            onVerificationResult={onVerificationResult}
-          />
-        );
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(180);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledTimes(1);
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'visible',
-        result: 'visible-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('keeps visible verification on entry overscan for long restored chats', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 116 }, (_value, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.clientHeight = 629;
-      mockScrollerElement.scrollHeight = 63437;
-      mockScrollerElement.scrollTop = 62808;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.slice(0, 7)
-      );
-
-      const chatStore = useChatStore.getState();
-      chatStore.getOrCreateSession('session-a');
-      chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setMeasurementCache('session-a', {
-        ...buildMeasurementCacheForMessages(messages, 547),
-        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
-      });
-
-      const onVerificationResult = vi.fn();
-      const view = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'visible-overscan-regression',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-
-      act(() => {
-        view.rerender(
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={false}
-            sessionId="session-a"
-            isVisible={true}
-            verificationPhase="visible"
-            verificationKey="visible-overscan-regression"
-            queuedMessage={null}
-            onRewind={vi.fn()}
-            onOpenFile={vi.fn()}
-            onOpenUrl={vi.fn()}
-            onCancelQueue={vi.fn()}
-            onFeedback={vi.fn()}
-            onVerificationResult={onVerificationResult}
-          />
-        );
-      });
-
-      expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('pre-seeds visible verification even when layoutPendingCount > 0', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 800;
-      mockScrollerElement.scrollHeight = 1200;
-      mockScrollerElement.scrollTop = 400;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      const view = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'preseed-with-pending-layout',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-
-      onVerificationResult.mockClear();
-
-      // Simulate an in-flight layout mutation (layoutPendingCount > 0).
-      // Before the fix, the preseed check gated on layoutPendingCount === 0,
-      // which would block instant visible verification here.
-      const chatStore = useChatStore.getState();
-      chatStore.layoutMutationStart('session-a', 'test-pending-mutation');
-
-      act(() => {
-        view.rerender(
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={false}
-            sessionId="session-a"
-            isVisible={true}
-            verificationPhase="visible"
-            verificationKey="preseed-with-pending-layout"
-            queuedMessage={null}
-            onRewind={vi.fn()}
-            onOpenFile={vi.fn()}
-            onOpenUrl={vi.fn()}
-            onCancelQueue={vi.fn()}
-            onFeedback={vi.fn()}
-            onVerificationResult={onVerificationResult}
-          />
-        );
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(180);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledTimes(1);
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'visible',
-        result: 'visible-ready',
         tailProofVersion: 1,
       });
     } finally {
@@ -1047,9 +648,7 @@ describe('ChatMessages', () => {
     );
     const onVerificationResult = vi.fn();
 
-    mockScrollerElement.scrollHeight = 56253;
-    mockScrollerElement.clientHeight = 629;
-    mockScrollerElement.scrollTop = 43153;
+    setScrollerMetrics({ clientHeight: 629, scrollHeight: 56253, scrollTop: 55624 });
 
     renderChatMessages({
       messages,
@@ -1060,832 +659,22 @@ describe('ChatMessages', () => {
       onVerificationResult,
     });
 
-    scrollToItemMock.mockClear();
+    scrollerMetrics.writes.length = 0;
+    setScrollerMetrics({ scrollTop: 43153 });
+    const scroller = screen.getByTestId('chat-scroller');
 
-    const wheelHandler = mockScrollerElement.addEventListener.mock.calls.find(
-      ([eventName]: [string]) => eventName === 'wheel'
-    )?.[1] as (() => void) | undefined;
-    if (wheelHandler === undefined) {
-      throw new Error('Expected wheel handler to be registered during visible verification');
-    }
-
-    act(() => {
-      wheelHandler();
-      getLatestVirtuosoMessageListProps().onScroll?.({ isAtBottom: false });
-    });
+    fireEvent.wheel(scroller, { deltaY: -120 });
+    fireEvent.scroll(scroller);
 
     expect(onVerificationResult).toHaveBeenCalledWith({
       phase: 'visible',
       result: 'visible-ready',
       tailProofVersion: 1,
     });
-    expect(scrollToItemMock).not.toHaveBeenCalled();
+    expect(scrollerMetrics.writes).toEqual([]);
   });
 
-  it('marks hidden verification ready after one animation frame when a restored cache stays stable', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 800;
-      mockScrollerElement.scrollHeight = 1200;
-      mockScrollerElement.scrollTop = 400;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const chatStore = useChatStore.getState();
-      chatStore.getOrCreateSession('session-a');
-      chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setMeasurementCache('session-a', {
-        ...buildMeasurementCacheForMessages(messages, 120),
-        lastMessageId: 'assistant-3',
-        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
-      });
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-cache-match-instant',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(20);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('falls back to a second visible pass when the hidden-ready snapshot no longer matches', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 800;
-      mockScrollerElement.scrollHeight = 1200;
-      mockScrollerElement.scrollTop = 400;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      const view = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'phase-fallback-verification',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-
-      onVerificationResult.mockClear();
-      mockScrollerElement.scrollHeight = 1600;
-      mockScrollerElement.scrollTop = 800;
-
-      act(() => {
-        view.rerender(
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={false}
-            sessionId="session-a"
-            isVisible={true}
-            verificationPhase="visible"
-            verificationKey="phase-fallback-verification"
-            queuedMessage={null}
-            onRewind={vi.fn()}
-            onOpenFile={vi.fn()}
-            onOpenUrl={vi.fn()}
-            onCancelQueue={vi.fn()}
-            onFeedback={vi.fn()}
-            onVerificationResult={onVerificationResult}
-          />
-        );
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(220);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(220);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledTimes(1);
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'visible',
-        result: 'visible-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not promote hidden verification until the tail proof is actually rendered', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 13 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-    let renderedCallCount = 0;
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 9751;
-      mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => {
-        renderedCallCount += 1;
-        return renderedCallCount <= 2 ? fallback.slice(0, 5) : fallback;
-      });
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-verification',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      mockTailSentinelAvailable.current = true;
-      mockScrollerElement.scrollTop =
-        mockScrollerElement.scrollHeight - mockScrollerElement.clientHeight;
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'aborted',
-        })
-      );
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'timeout',
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not promote hidden verification until the tail is bottom-aligned', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-      buildMessage({ id: 'assistant-3', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 400;
-      mockScrollerElement.scrollHeight = 500;
-      mockScrollerElement.scrollTop = 100;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-bottom-guard',
-        onVerificationResult,
-      });
-
-      mockScrollerElement.scrollHeight = 700;
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('promotes hidden verification after a probed real surface becomes bottom-aligned', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 6 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 647;
-      mockScrollerElement.scrollTop = 0;
-      mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-tail-probe-bottom-align',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      mockTailSentinelAvailable.current = true;
-      mockScrollerElement.scrollHeight = 2933;
-      mockScrollerElement.scrollTop = 0;
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'hidden-ready',
-        })
-      );
-
-      mockScrollerElement.scrollTop = 2286;
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not abort while waiting for the list surface on startup restore', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
-
-    try {
-      mockListSurfaceAvailable.current = false;
-      mockScrollerElement.clientHeight = 324;
-      mockScrollerElement.scrollHeight = 514;
-      mockScrollerElement.scrollTop = 190;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      const onVerificationResult = vi.fn();
-      const view = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'startup-surface-wait',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1600);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalled();
-
-      mockListSurfaceAvailable.current = true;
-
-      act(() => {
-        view.rerender(
-          <ChatMessages
-            messages={messages}
-            isAgentRunning={false}
-            sessionId="session-a"
-            isVisible={false}
-            verificationPhase="hidden"
-            verificationKey="startup-surface-wait-ready"
-            queuedMessage={null}
-            onRewind={vi.fn()}
-            onOpenFile={vi.fn()}
-            onOpenUrl={vi.fn()}
-            onCancelQueue={vi.fn()}
-            onFeedback={vi.fn()}
-            onVerificationResult={onVerificationResult}
-          />
-        );
-      });
-
-      onVerificationResult.mockClear();
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(100);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'aborted',
-        })
-      );
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'timeout',
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('forces a soft tail probe render (no purge) when hidden verification remains starved after premeasure on a cold session', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 20 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 6757;
-      mockScrollerElement.scrollTop = 6110;
-      mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.slice(0, 5)
-      );
-
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-tail-probe',
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      // Cold session (no restored size cache) → soft probe without purge.
-      // Purging estimates to re-estimate is self-inflicted cost; the soft probe
-      // achieves scroll positioning via initialLocation without the rebuild.
-      expect(replaceDataMock).toHaveBeenCalledWith(
-        buildRenderRows(messages),
-        expect.objectContaining({
-          purgeItemSizes: false,
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not start premeasure again after a tail probe has already been attempted', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 50 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-    const scrollTracker = trackScrollTopWrites();
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 647;
-      mockScrollerElement.scrollTop = 0;
-      mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.slice(0, 5)
-      );
-
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-tail-probe-no-second-premeasure',
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(replaceDataMock).toHaveBeenCalled();
-
-      mockTailSentinelAvailable.current = true;
-      mockScrollerElement.scrollHeight = 26389;
-      mockScrollerElement.scrollTop = 0;
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(scrollTracker.writes).toContain(25742);
-      expect(scrollTracker.writes).not.toContain(9742);
-    } finally {
-      scrollTracker.restore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('does not accept a tail-probe placeholder as hidden-ready before a post-probe resize', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 20 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 6757;
-      mockScrollerElement.scrollTop = 6110;
-      mockTailSentinelAvailable.current = false;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.slice(0, 5)
-      );
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-tail-probe-placeholder',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(180);
-      });
-
-      expect(replaceDataMock).toHaveBeenCalled();
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'hidden-ready',
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('accepts a small post-probe surface change once the hidden tail surface settles', async () => {
-    vi.useFakeTimers();
-
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 647;
-      mockScrollerElement.scrollTop = 0;
-      mockTailSentinelAvailable.current = false;
-      // Return rows WITHOUT the last message so the last-message-in-render-range
-      // guard in the stabilization backtrack doesn't prevent the probe.
-      // This simulates the case where the bottom items are genuinely absent.
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.filter((r) => r.id !== messages[messages.length - 1]?.id)
-      );
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-tail-probe-small-delta',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(replaceDataMock).toHaveBeenCalled();
-
-      mockTailSentinelAvailable.current = true;
-      mockScrollerElement.scrollHeight = 1286;
-      mockScrollerElement.scrollTop = 639;
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(60);
-      });
-
-      expect(onVerificationResult).not.toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'hidden-ready',
-        })
-      );
-
-      mockScrollerElement.scrollHeight = 1287;
-      mockScrollerElement.scrollTop = 640;
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(onVerificationResult).toHaveBeenCalledWith({
-        phase: 'hidden',
-        result: 'hidden-ready',
-        tailProofVersion: 1,
-      });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('uses soft probe without purge even when a restored size cache exists, bypassing the post-probe placeholder contract', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 10 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.clientHeight = 647;
-      mockScrollerElement.scrollHeight = 647;
-      mockScrollerElement.scrollTop = 0;
-      mockTailSentinelAvailable.current = false;
-      // Last message absent from render range — forces probe to fire.
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) =>
-        fallback.filter((r) => r.id !== messages[messages.length - 1]?.id)
-      );
-
-      // Set up a restored size cache — the probe should still use soft mode.
-      const chatStore = useChatStore.getState();
-      chatStore.getOrCreateSession('session-a');
-      chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setMeasurementCache('session-a', {
-        ...buildMeasurementCacheForMessages(messages, 120),
-        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
-      });
-
-      const onVerificationResult = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: true,
-        verificationPhase: 'hidden',
-        verificationKey: 'hidden-stale-cache-probe',
-        onVerificationResult,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      // Probe fires with soft mode (no purge) even with a restored cache.
-      expect(replaceDataMock).toHaveBeenCalledWith(
-        buildRenderRows(messages),
-        expect.objectContaining({
-          purgeItemSizes: false,
-        })
-      );
-
-      // Make sentinel available and stabilize the surface.
-      mockTailSentinelAvailable.current = true;
-      mockScrollerElement.scrollHeight = 5000;
-      mockScrollerElement.scrollTop = 4353;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatRenderRow[]) => fallback);
-
-      await act(async () => {
-        getLatestVirtuosoMessageListProps().onRenderedDataChange?.(buildRenderRows(messages));
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      // The post-probe placeholder contract is bypassed — hidden-ready fires
-      // without waiting for a surface delta from the purged placeholder.
-      expect(onVerificationResult).toHaveBeenCalledWith(
-        expect.objectContaining({
-          result: 'hidden-ready',
-        })
-      );
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('skips premeasure when a valid size cache was restored', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 10 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-    const scrollTracker = trackScrollTopWrites();
-
-    try {
-      mockScrollerElement.scrollHeight = 4000;
-      mockScrollerElement.clientHeight = 800;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
-      const chatStore = useChatStore.getState();
-      chatStore.getOrCreateSession('session-a');
-      chatStore.setMessages('session-a', messages, 'session-restore');
-      chatStore.setMeasurementCache('session-a', {
-        ...buildMeasurementCacheForMessages(messages, 120),
-        layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
-      });
-
-      const onReady = vi.fn();
-      renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: true,
-        onReady,
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(120);
-      });
-
-      expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 120 })]),
-        })
-      );
-      expect(scrollTracker.writes).not.toContain(800);
-      expect(new Set(scrollTracker.writes)).toEqual(new Set([3200]));
-      expect(onReady).toHaveBeenCalledTimes(1);
-    } finally {
-      scrollTracker.restore();
-      vi.useRealTimers();
-    }
-  });
-
-  it('cancels premeasure work when the session stops priming before ready', async () => {
-    vi.useFakeTimers();
-
-    const messages = Array.from({ length: 10 }, (_, index) =>
-      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
-    );
-
-    try {
-      mockScrollerElement.scrollHeight = 4000;
-      mockScrollerElement.clientHeight = 800;
-      mockGetCurrentlyRendered.mockImplementation((fallback: ChatMessage[]) => fallback.slice(-1));
-      useChatStore.setState({
-        sessions: {
-          'session-a': {
-            messages: [],
-            isAgentRunning: false,
-            isStopPending: false,
-            scrollIntent: 'session-restore',
-            hydrationState: 'hydrated',
-            layoutVersion: 0,
-            measurementCache: null,
-          },
-        },
-      });
-
-      const onReady = vi.fn();
-      const { rerender } = renderChatMessages({
-        messages,
-        sessionId: 'session-a',
-        isVisible: false,
-        shouldPrime: true,
-        onReady,
-      });
-
-      expect(mockResizeObserverObserve).toHaveBeenCalled();
-
-      rerender(
-        <ChatMessages
-          messages={messages}
-          isAgentRunning={false}
-          sessionId="session-a"
-          isVisible={false}
-          shouldPrime={false}
-          queuedMessage={null}
-          onRewind={vi.fn()}
-          onOpenFile={vi.fn()}
-          onOpenUrl={vi.fn()}
-          onCancelQueue={vi.fn()}
-          onFeedback={vi.fn()}
-          onReady={onReady}
-        />
-      );
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2000);
-      });
-
-      expect(onReady).not.toHaveBeenCalled();
-      expect(mockResizeObserverDisconnect).toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('keeps hidden verification on entry overscan before and after explicit user scroll', () => {
-    const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
-
-    renderChatMessages({
-      messages,
-      sessionId: 'session-a',
-      isVisible: true,
-      shouldPrime: true,
-    });
-
-    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-
-    act(() => {
-      getLatestVelocityScrollOptions().onUserScrollStart?.();
-    });
-
-    expect(getLatestVirtuosoMessageListProps().increaseViewportBy).toBe(800);
-  });
-
-  it('clears animation state after onAnimationComplete fires', async () => {
-    renderChatMessages({
-      messages: [buildMessage({ id: 'user-1', role: 'user', content: 'hello' })],
-      sessionId: 'session-a',
-    });
-
-    await waitFor(() => {
-      const props = messageItemPropsById.get('user-1') as MockMessageItemProps | undefined;
-      expect(props?.animate).toBe(true);
-    });
-
-    // Scroll handled via native scrollTo (not Virtuoso scrollToItem)
-    // to avoid inflating the last data item's cached size.
-    // Note: scrollTo may not fire on first render if the ref isn't attached yet.
-
-    fireEvent.click(screen.getByTestId('message-item-user-1'));
-
-    await waitFor(() => {
-      const props = messageItemPropsById.get('user-1') as MockMessageItemProps | undefined;
-      expect(props?.animate).toBe(false);
-    });
-  });
-
-  it('renders header, footer, queued, and loading content', () => {
-    renderChatMessages({
-      messages: [buildMessage({ id: 'assistant-1', role: 'assistant' })],
-      isAgentRunning: true,
-      queuedMessage: buildQueuedMessage({ text: 'Queued follow-up' }),
-    });
-
-    expect(screen.getByTestId('queued-message-bubble')).toHaveTextContent('Queued follow-up');
-    expect(screen.getByTestId('shimmer-text')).toHaveTextContent('Thinking');
-    expect(queuedMessageBubbleProps).not.toHaveLength(0);
-  });
-
-  it('passes the expected history-load scroll modifier and clears the consumed intent', async () => {
+  it('handles history-load with a direct top scroll and clears the consumed intent', async () => {
     const messages = [
       buildMessage({ id: 'assistant-1', role: 'assistant' }),
       buildMessage({ id: 'assistant-2', role: 'assistant' }),
@@ -1894,7 +683,7 @@ describe('ChatMessages', () => {
     useChatStore.setState({
       sessions: {
         'session-a': {
-          messages: [],
+          messages,
           isAgentRunning: false,
           isStopPending: false,
           scrollIntent: 'history-load',
@@ -1905,45 +694,20 @@ describe('ChatMessages', () => {
       },
     });
 
+    setScrollerMetrics({ scrollTop: 400 });
+
     renderChatMessages({
       messages,
       sessionId: 'session-a',
-      shouldPrime: true,
     });
 
-    const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
-    const renderRows = buildRenderRows(messages);
-    const firstMessage = getRenderRowAt(renderRows, 0);
-    const context = getVirtuosoContext(firstRenderProps);
-
-    expect(firstRenderProps.data).toEqual({
-      data: renderRows,
-      scrollModifier: {
-        type: 'item-location',
-        location: { index: 0, align: 'start' },
-      },
-    });
-    expect(firstRenderProps.shortSizeAlign).toBe('top');
-    expect(firstRenderProps.className).toContain('flex-1');
-    expect(firstRenderProps.style).toMatchObject({
-      scrollbarGutter: 'stable both-edges',
-    });
-    expect(firstRenderProps.initialData).toEqual(renderRows);
-    expect(firstRenderProps.initialLocation).toBeUndefined();
-    expect(
-      firstRenderProps.computeItemKey?.({
-        data: firstMessage,
-        index: 0,
-        context,
-      })
-    ).toBe('session-a:assistant-1');
-
+    expect(scrollerMetrics.scrollTop).toBe(0);
     await waitFor(() => {
       expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
     });
   });
 
-  it('session-restore scrolls to bottom imperatively and clears the consumed intent', async () => {
+  it('handles session-restore with an imperative bottom scroll and clears the intent', async () => {
     const messages = [
       buildMessage({ id: 'assistant-1', role: 'assistant' }),
       buildMessage({ id: 'assistant-2', role: 'assistant' }),
@@ -1952,7 +716,7 @@ describe('ChatMessages', () => {
     useChatStore.setState({
       sessions: {
         'session-a': {
-          messages: [],
+          messages,
           isAgentRunning: false,
           isStopPending: false,
           scrollIntent: 'session-restore',
@@ -1963,81 +727,31 @@ describe('ChatMessages', () => {
       },
     });
 
-    renderChatMessages({
-      messages,
-      sessionId: 'session-a',
-    });
-
-    const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
-    const renderRows = buildRenderRows(messages);
-
-    // session-restore uses plain data — scroll handled by imperative scrollToItem()
-    expect(firstRenderProps.data).toEqual({ data: renderRows });
-
-    // scrollToItem called imperatively for session-restore
-    await waitFor(() => {
-      expect(scrollToItemMock).toHaveBeenCalledWith({ index: 'LAST', align: 'end' });
-    });
-
-    await waitFor(() => {
-      expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
-    });
-  });
-
-  it('session-refresh uses plain data path and clears the consumed intent', async () => {
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
-
-    useChatStore.setState({
-      sessions: {
-        'session-a': {
-          messages: [],
-          isAgentRunning: false,
-          isStopPending: false,
-          scrollIntent: 'session-refresh',
-          hydrationState: 'hydrated',
-          layoutVersion: 0,
-          measurementCache: null,
-        },
-      },
-    });
+    setScrollerMetrics({ clientHeight: 800, scrollHeight: 1200, scrollTop: 0 });
 
     renderChatMessages({
       messages,
       sessionId: 'session-a',
     });
 
-    const firstRenderProps = getVirtuosoMessageListPropsAtCall(0);
-    const renderRows = buildRenderRows(messages);
-
-    expect(firstRenderProps.data).toEqual({
-      data: renderRows,
+    await waitFor(() => {
+      expect(scrollerMetrics.scrollTop).toBe(1200);
     });
-
     await waitFor(() => {
       expect(useChatStore.getState().sessions['session-a']?.scrollIntent).toBeNull();
     });
-
-    const settledProps = getLatestVirtuosoMessageListProps();
-    expect(settledProps.data).toEqual({
-      data: renderRows,
-    });
   });
 
-  it('restores cached size ranges when the cache matches the mounted session', () => {
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
+  it('restores cached measurement sizes into TanStack estimates', () => {
+    const messages = Array.from({ length: 10 }, (_value, index) =>
+      buildMessage({ id: `assistant-${String(index)}`, role: 'assistant' })
+    );
 
     const chatStore = useChatStore.getState();
     chatStore.getOrCreateSession('session-a');
     chatStore.setMessages('session-a', messages);
     chatStore.setMeasurementCache('session-a', {
       ...buildMeasurementCacheForMessages(messages, 64),
-      lastMessageId: 'assistant-2',
       layoutVersion: useChatStore.getState().sessions['session-a']?.layoutVersion ?? 0,
     });
 
@@ -2046,63 +760,21 @@ describe('ChatMessages', () => {
       sessionId: 'session-a',
     });
 
-    expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 64 })]),
-      })
-    );
+    expect(mockVirtualizerMeasure).toHaveBeenCalled();
+    expect(getLatestVirtualizerOptions().estimateSize(0)).toBe(64);
   });
 
-  it('restores persistent size ranges when the Zustand cache was evicted', () => {
-    const messages = [
-      buildMessage({ id: 'assistant-1', role: 'assistant' }),
-      buildMessage({ id: 'assistant-2', role: 'assistant' }),
-    ];
-
-    saveRenderCache('session-a', {
-      measurements: buildMeasurementCacheForMessages(messages, 96).measurements,
-      messageCount: messages.length,
-      lastMessageId: 'assistant-2',
-      layoutVersion: 0,
-      viewportWidth: null,
-    });
-
-    useChatStore.setState({
-      sessions: {
-        'session-a': {
-          messages,
-          isAgentRunning: false,
-          isStopPending: false,
-          scrollIntent: null,
-          hydrationState: 'hydrated',
-          layoutVersion: 0,
-          measurementCache: null,
-        },
-      },
-    });
-
-    renderChatMessages({
-      messages,
-      sessionId: 'session-a',
-    });
-
-    expect(applyMeasurementCacheMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        measurements: expect.arrayContaining([expect.objectContaining({ index: 0, size: 96 })]),
-      })
-    );
-  });
-
-  it('applies estimated size ranges when no real cache is available', () => {
-    const messages = [
-      buildMessage({ id: 'user-1', role: 'user', content: 'short prompt' }),
+  it('uses estimated message sizes when no real cache is available', () => {
+    const messages = Array.from({ length: 10 }, (_value, index) =>
       buildMessage({
-        id: 'assistant-2',
-        role: 'assistant',
+        id: `assistant-${String(index)}`,
+        role: index === 0 ? 'user' : 'assistant',
         content:
-          'A longer assistant reply that should produce a larger estimated height than the user prompt.',
-      }),
-    ];
+          index === 0
+            ? 'short prompt'
+            : 'A longer assistant reply that should produce a larger estimated height.',
+      })
+    );
 
     useChatStore.setState({
       sessions: {
@@ -2123,9 +795,8 @@ describe('ChatMessages', () => {
       sessionId: 'session-a',
     });
 
-    expect(setEstimatedItemSizesMock).toHaveBeenCalled();
-    const estimatedSizes = setEstimatedItemSizesMock.mock.calls[0]?.[0] as number[] | undefined;
-    expect(estimatedSizes?.[0]).toBeGreaterThan(0);
+    expect(mockVirtualizerMeasure).toHaveBeenCalled();
+    expect(getLatestVirtualizerOptions().estimateSize(0)).toBeGreaterThan(0);
   });
 
   it('restores persistent size ranges asynchronously when startup warmup misses the first pass', async () => {
@@ -2177,46 +848,45 @@ describe('ChatMessages', () => {
         })
       );
     });
-    expect(applyMeasurementCacheMock).not.toHaveBeenCalled();
   });
 
-  it('does not snapshot size ranges when the session stops priming before ready', () => {
-    const messages = [buildMessage({ id: 'assistant-1', role: 'assistant' })];
-    const chatStore = useChatStore.getState();
-    chatStore.getOrCreateSession('session-a');
-    chatStore.setMessages('session-a', messages);
-
-    const { rerender } = renderChatMessages({
-      messages,
-      sessionId: 'session-a',
-      shouldPrime: true,
+  it('renders queued and loading content outside the virtualized list', () => {
+    renderChatMessages({
+      messages: [buildMessage({ id: 'assistant-1', role: 'assistant' })],
+      isAgentRunning: true,
+      queuedMessage: buildQueuedMessage({ text: 'Queued follow-up' }),
     });
 
-    rerender(
-      <ChatMessages
-        messages={messages}
-        isAgentRunning={false}
-        sessionId="session-a"
-        shouldPrime={false}
-        queuedMessage={null}
-        onRewind={vi.fn()}
-        onOpenFile={vi.fn()}
-        onOpenUrl={vi.fn()}
-        onCancelQueue={vi.fn()}
-        onFeedback={vi.fn()}
-      />
-    );
-
-    expect(useChatStore.getState().sessions['session-a']?.measurementCache).toBeNull();
+    expect(screen.getByTestId('queued-message-bubble')).toHaveTextContent('Queued follow-up');
+    expect(screen.getByTestId('shimmer-text')).toHaveTextContent('Thinking');
+    expect(queuedMessageBubbleProps).not.toHaveLength(0);
   });
 
-  it('wires item content props and tool lookup into MessageItem correctly', () => {
+  it('clears animation state after onAnimationComplete fires', async () => {
+    renderChatMessages({
+      messages: [buildMessage({ id: 'user-1', role: 'user', content: 'hello' })],
+      sessionId: 'session-a',
+    });
+
+    await waitFor(() => {
+      const props = messageItemPropsById.get('user-1') as MockMessageItemProps | undefined;
+      expect(props?.animate).toBe(true);
+    });
+
+    fireEvent.click(screen.getByTestId('message-item-user-1'));
+
+    await waitFor(() => {
+      const props = messageItemPropsById.get('user-1') as MockMessageItemProps | undefined;
+      expect(props?.animate).toBe(false);
+    });
+  });
+
+  it('wires item props and session-scoped tool lookup into MessageItem', () => {
     const messages = [
       buildMessage({ id: 'assistant-1', role: 'assistant' }),
       buildMessage({ id: 'assistant-2', role: 'assistant' }),
       buildMessage({ id: 'user-3', role: 'user', content: 'final user message' }),
     ];
-
     const tool = buildTool({
       id: 'tool-1',
       messageId: 'assistant-2',
@@ -2265,14 +935,10 @@ describe('ChatMessages', () => {
 
     expect(firstAssistantProps?.isLastAssistantMessage).toBe(false);
     expect(firstAssistantProps?.isLastInAssistantGroup).toBe(false);
-
     expect(secondAssistantProps?.tools).toEqual([tool]);
     expect(secondAssistantProps?.isLastAssistantMessage).toBe(true);
     expect(secondAssistantProps?.isLastInAssistantGroup).toBe(true);
     expect(secondAssistantProps?.isLastMessage).toBe(false);
-    expect(secondAssistantProps?.animate).toBe(false);
-    expect(secondAssistantProps?.onAnimationComplete).toBeTypeOf('function');
-
     expect(userProps?.isLastMessage).toBe(true);
   });
 
@@ -2296,7 +962,10 @@ describe('ChatMessages', () => {
       onFeedback,
     });
 
-    const firstContext = getVirtuosoContext(getLatestVirtuosoMessageListProps());
+    const firstProps = messageItemPropsById.get('assistant-1') as MockMessageItemProps | undefined;
+    if (firstProps === undefined) {
+      throw new Error('Expected first assistant props');
+    }
 
     rerender(
       <ChatMessages
@@ -2312,11 +981,14 @@ describe('ChatMessages', () => {
       />
     );
 
-    const secondContext = getVirtuosoContext(getLatestVirtuosoMessageListProps());
+    const secondProps = messageItemPropsById.get('assistant-1') as MockMessageItemProps | undefined;
+    if (secondProps === undefined) {
+      throw new Error('Expected second assistant props');
+    }
 
-    expect(secondContext.onRewind).toBe(firstContext.onRewind);
-    expect(secondContext.onOpenFile).toBe(firstContext.onOpenFile);
-    expect(secondContext.onOpenUrl).toBe(firstContext.onOpenUrl);
-    expect(secondContext.onFeedback).toBe(firstContext.onFeedback);
+    expect(secondProps.onRewind).toBe(firstProps.onRewind);
+    expect(secondProps.onOpenFile).toBe(firstProps.onOpenFile);
+    expect(secondProps.onOpenUrl).toBe(firstProps.onOpenUrl);
+    expect(secondProps.onFeedback).toBe(firstProps.onFeedback);
   });
 });
