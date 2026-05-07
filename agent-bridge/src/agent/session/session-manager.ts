@@ -1074,7 +1074,9 @@ export class SessionManager extends Disposable {
    *
    * [warning] TESTED: This function is covered by integration-style session wiring tests.
    *     If you modify this, run: cd agent-bridge && bun test
-   *     Test file: src/__tests__/ios-session-wiring.test.ts
+   *     Test files:
+   *       - src/__tests__/ios-session-wiring.test.ts
+   *       - src/__tests__/context-window.test.ts
    */
   async createSession(sessionId: string, config?: SessionConfig): Promise<void> {
     if (this.activeSessions.has(sessionId)) {
@@ -1862,12 +1864,11 @@ export class SessionManager extends Disposable {
               );
             }
 
-            // Reset for next turn - the next turn will get a new message ID from the SDK
+            // Reset for next turn - the next turn will get a new message ID and fresh usage.
             textWasStreamed = false;
             thinkingWasStreamed = false;
             this.currentTurnId.delete(sessionId);
-            // NOTE: Do NOT delete lastAssistantUsage here — intermediate result events
-            // during multi-tool turns need it. The next assistant message overwrites it.
+            this.lastAssistantUsage.delete(sessionId);
           }
         }
       } catch (error) {

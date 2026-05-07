@@ -17,6 +17,7 @@ function getSystemPromptAppend(agent: OrbitAgent): string {
   if (
     systemPrompt === undefined ||
     typeof systemPrompt === 'string' ||
+    Array.isArray(systemPrompt) ||
     systemPrompt.type !== 'preset'
   ) {
     throw new Error('Expected preset system prompt');
