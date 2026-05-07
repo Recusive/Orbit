@@ -10,6 +10,7 @@
 
 use std::fmt;
 use std::io::{BufRead as _, BufReader, Write as _};
+use std::iter::repeat_n;
 use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::result;
@@ -19,8 +20,95 @@ use std::time::Duration;
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use parking_lot::Mutex;
+use serde_json::error::Category;
 
 use super::protocol::{BridgeEvent, BridgeRequest, BridgeResponse, CommandResponse};
+
+const MAX_TOP_LEVEL_KEYS: usize = 20;
+const SAFE_REQUEST_TYPES: &[&str] = &[
+    "browser:tool_response",
+    "cleanup_sessions",
+    "create_agent",
+    "create_command",
+    "create_session",
+    "delete_agent",
+    "delete_command",
+    "delete_session",
+    "enhance_bug_report",
+    "fork_session",
+    "fork_session_at",
+    "generate_agent_definition",
+    "generate_command_definition",
+    "generate_title",
+    "get_accept_mode",
+    "get_agent",
+    "get_command",
+    "get_plan_mode",
+    "get_sdk_session_id",
+    "get_stored_session",
+    "get_thinking_mode",
+    "interrupt",
+    "is_session_ready",
+    "list_agents",
+    "list_commands",
+    "list_skills",
+    "permission_response",
+    "rewind_files",
+    "send_message",
+    "set_accept_mode",
+    "set_effort_level",
+    "set_model",
+    "set_plan_mode",
+    "set_thinking_mode",
+    "shutdown",
+    "update_agent",
+    "update_command",
+    "update_credentials",
+];
+const SAFE_RESPONSE_TYPES: &[&str] = &[
+    "accept_mode_changed",
+    "agent",
+    "agent_list",
+    "agent_message",
+    "auth_error",
+    "boolean",
+    "browser:tool_request",
+    "checkpoint",
+    "command",
+    "command_list",
+    "compact_complete",
+    "error",
+    "error_event",
+    "fork_result",
+    "number",
+    "permission_request",
+    "plan_mode_changed",
+    "ready",
+    "session_init",
+    "skill_list",
+    "string",
+    "success",
+];
+const SAFE_TOP_LEVEL_KEYS: &[&str] = &[
+    "type",
+    "requestType",
+    "sessionId",
+    "message",
+    "request",
+    "event",
+    "error",
+    "success",
+    "value",
+    "agent",
+    "agents",
+    "command",
+    "commands",
+    "skills",
+    "result",
+    "checkpointId",
+    "category",
+    "recoverable",
+];
 
 /// Error type for bridge operations
 #[derive(Debug, thiserror::Error)]
@@ -53,6 +141,108 @@ pub type Result<T> = result::Result<T, BridgeError>;
 
 /// Callback for handling events from the sidecar
 pub type EventCallback = Arc<dyn Fn(BridgeEvent) + Send + Sync>;
+
+fn format_malformed_response_line(line: &str, parse_category: Category) -> String {
+    let trimmed = line.trim();
+    let mut parts = vec![
+        format!("line_bytes={}", line.len()),
+        format!("trimmed_bytes={}", trimmed.len()),
+        format!("parse_category={}", format_parse_category(parse_category)),
+    ];
+
+    match serde_json::from_str::<serde_json::Value>(line) {
+        Ok(value) => {
+            parts.push(format!("parsed_kind={}", parsed_kind(&value)));
+
+            if let serde_json::Value::Object(map) = value {
+                if let Some(response_type) =
+                    summarize_safe_string(map.get("type"), SAFE_RESPONSE_TYPES)
+                {
+                    parts.push(format!("response_type={response_type}"));
+                }
+
+                if let Some(request_type) =
+                    summarize_safe_string(map.get("requestType"), SAFE_REQUEST_TYPES)
+                {
+                    parts.push(format!("request_type={request_type}"));
+                }
+
+                parts.push(format!("top_level_key_count={}", map.len()));
+                parts.push(format!(
+                    "top_level_keys=[{}]",
+                    summarize_top_level_keys(&map).join(",")
+                ));
+            }
+        },
+        Err(_) => {
+            parts.push("parsed_kind=invalid_json".to_owned());
+        },
+    }
+
+    parts.join(" ")
+}
+
+fn format_parse_category(category: Category) -> &'static str {
+    match category {
+        Category::Io => "io",
+        Category::Syntax => "syntax",
+        Category::Data => "data",
+        Category::Eof => "eof",
+    }
+}
+
+fn parsed_kind(value: &serde_json::Value) -> &'static str {
+    match value {
+        serde_json::Value::Null => "null",
+        serde_json::Value::Bool(_) => "boolean",
+        serde_json::Value::Number(_) => "number",
+        serde_json::Value::String(_) => "string",
+        serde_json::Value::Array(_) => "array",
+        serde_json::Value::Object(_) => "object",
+    }
+}
+
+fn summarize_safe_string(
+    value: Option<&serde_json::Value>,
+    safe_values: &'static [&'static str],
+) -> Option<&'static str> {
+    match value {
+        Some(serde_json::Value::String(raw)) => Some(
+            safe_values
+                .iter()
+                .copied()
+                .find(|safe| *safe == raw)
+                .unwrap_or("[unrecognized]"),
+        ),
+        Some(value) => Some(parsed_kind(value)),
+        None => None,
+    }
+}
+
+fn summarize_top_level_keys(map: &serde_json::Map<String, serde_json::Value>) -> Vec<&'static str> {
+    let mut keys = Vec::new();
+
+    for key in SAFE_TOP_LEVEL_KEYS {
+        if map.contains_key(*key) {
+            keys.push(*key);
+            if keys.len() == MAX_TOP_LEVEL_KEYS {
+                return keys;
+            }
+        }
+    }
+
+    let unrecognized_count = map
+        .keys()
+        .filter(|key| !SAFE_TOP_LEVEL_KEYS.contains(&key.as_str()))
+        .count();
+    let remaining = MAX_TOP_LEVEL_KEYS.saturating_sub(keys.len());
+    keys.extend(repeat_n(
+        "[unrecognized-key]",
+        unrecognized_count.min(remaining),
+    ));
+
+    keys
+}
 
 /// Agent Bridge - manages the Node.js sidecar process
 pub struct AgentBridge {
@@ -222,7 +412,8 @@ impl AgentBridge {
                             }
                         },
                         Err(e) => {
-                            log::error!("Failed to parse response: {e}\nLine: {line}");
+                            let summary = format_malformed_response_line(&line, e.classify());
+                            log::error!("Failed to parse response: {summary}");
                         },
                     }
                 },
@@ -390,5 +581,52 @@ impl fmt::Debug for AgentBridge {
             .field("ready", &self.ready)
             .field("running", &self.child.is_some())
             .finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn malformed_response_summary_omits_payload_values() {
+        let line = r#"{"type":"agent_message","requestType":"send_message","sessionId":"session-secret","message":"LEAK_ME","apiKey":"sk-secret","nested":{"repo":"SECRET_REPO"}}"#;
+        let summary = format_malformed_response_line(line, Category::Data);
+
+        assert!(summary.contains("line_bytes="));
+        assert!(summary.contains("trimmed_bytes="));
+        assert!(summary.contains("parse_category=data"));
+        assert!(summary.contains("parsed_kind=object"));
+        assert!(summary.contains("response_type=agent_message"));
+        assert!(summary.contains("request_type=send_message"));
+        assert!(summary.contains("top_level_key_count=6"));
+        assert!(summary.contains(
+            "top_level_keys=[type,requestType,sessionId,message,[unrecognized-key],[unrecognized-key]]"
+        ));
+
+        for leaked in [
+            "LEAK_ME",
+            "SECRET_REPO",
+            "session-secret",
+            "sk-secret",
+            "apiKey",
+            "nested",
+        ] {
+            assert!(
+                !summary.contains(leaked),
+                "summary leaked payload value or unsafe key: {leaked}"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_response_summary_omits_invalid_json_text() {
+        let line = "not json with SECRET_TOKEN and repository text";
+        let summary = format_malformed_response_line(line, Category::Syntax);
+
+        assert!(summary.contains("parse_category=syntax"));
+        assert!(summary.contains("parsed_kind=invalid_json"));
+        assert!(!summary.contains("SECRET_TOKEN"));
+        assert!(!summary.contains("repository text"));
     }
 }
