@@ -11,7 +11,7 @@
 use std::collections::HashSet;
 use std::fs;
 use std::io::ErrorKind;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::OnceLock;
@@ -314,6 +314,17 @@ fn workspace_candidate_path(workspace_root: &Path, path: &str) -> PathBuf {
     }
 }
 
+fn reject_parent_dir_components(path: &str) -> Result<()> {
+    if Path::new(path)
+        .components()
+        .any(|component| matches!(component, Component::ParentDir))
+    {
+        return Err(Error::PermissionDenied(path.to_owned()));
+    }
+
+    Ok(())
+}
+
 fn reject_existing_symlink_components(candidate: &Path, original_path: &str) -> Result<()> {
     let mut current = PathBuf::new();
     for component in candidate.components() {
@@ -361,15 +372,20 @@ fn canonicalize_existing_ancestor(candidate: &Path, original_path: &str) -> Resu
 
 /// Resolve a path under the current workspace for workspace-scoped commands.
 ///
+/// Parent-dir components are rejected before canonicalization. That prevents
+/// unresolved missing tails from being materialized outside the workspace by
+/// later create-parent operations.
+///
 /// Existing symlink components are rejected for mutation, launch, and watch paths.
 /// That keeps workspace confinement simple and avoids following links that may point
 /// outside the selected workspace.
 ///
 /// [warning] TESTED: This resolver is covered by symlink containment tests.
-///     If you modify this, run: cargo test -p orbit-app workspace_path
+///     If you modify this, run: cargo test -p orbit-app workspace --lib
 ///     Test location: src-tauri/src/commands/common/files.rs tests module.
 fn resolve_workspace_path(path: &str) -> Result<PathBuf> {
     let workspace_root = canonical_workspace_root()?;
+    reject_parent_dir_components(path)?;
     let candidate = workspace_candidate_path(&workspace_root, path);
     reject_existing_symlink_components(&candidate, path)?;
 
@@ -623,6 +639,8 @@ mod tests {
         let outside_dir = temp_dir.path().join("outside");
         create_dir_all(&workspace_dir).map_err(Error::Io)?;
         create_dir_all(&outside_dir).map_err(Error::Io)?;
+        let workspace_dir = workspace_dir.canonicalize().map_err(Error::Io)?;
+        let outside_dir = outside_dir.canonicalize().map_err(Error::Io)?;
 
         let link_path = workspace_dir.join("linked-outside");
         symlink_dir(&outside_dir, &link_path)?;
@@ -649,6 +667,93 @@ mod tests {
         assert!(
             !escaped_file_was_created,
             "denied writes must not create files outside the workspace"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    async fn write_file_rejects_missing_parent_traversal_outside_workspace() -> Result<()> {
+        let _guard = workspace_test_lock().lock().await;
+        let previous_workspace = workspace::get_workspace_path();
+
+        let temp_dir = tempfile::tempdir().map_err(Error::Io)?;
+        let workspace_dir = temp_dir.path().join("workspace");
+        let existing_dir = workspace_dir.join("existing");
+        let outside_dir = temp_dir.path().join("outside");
+        create_dir_all(&existing_dir).map_err(Error::Io)?;
+        let workspace_dir = workspace_dir.canonicalize().map_err(Error::Io)?;
+        let existing_dir = workspace_dir.join("existing");
+
+        workspace::set_workspace_path(workspace_dir.to_string_lossy().into_owned());
+
+        let requested_path = existing_dir
+            .join("missing")
+            .join("..")
+            .join("..")
+            .join("..")
+            .join("outside")
+            .join("escape.txt");
+        let result = write_file(
+            requested_path.to_string_lossy().into_owned(),
+            "escaped".to_owned(),
+        )
+        .await;
+        let escaped_path = outside_dir.join("escape.txt");
+        let escaped_file_was_created = escaped_path.exists();
+
+        if let Some(previous_workspace) = previous_workspace {
+            workspace::set_workspace_path(previous_workspace);
+        }
+
+        assert!(
+            matches!(result, Err(Error::PermissionDenied(_))),
+            "writing through unresolved parent traversal outside the workspace must be denied"
+        );
+        assert!(
+            !escaped_file_was_created,
+            "denied parent traversal writes must not create files outside the workspace"
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[expect(clippy::panic_in_result_fn, reason = "tests use assert! macros")]
+    async fn write_file_rejects_parent_dir_components_inside_workspace() -> Result<()> {
+        let _guard = workspace_test_lock().lock().await;
+        let previous_workspace = workspace::get_workspace_path();
+
+        let temp_dir = tempfile::tempdir().map_err(Error::Io)?;
+        let workspace_dir = temp_dir.path().join("workspace");
+        let existing_dir = workspace_dir.join("existing");
+        create_dir_all(&existing_dir).map_err(Error::Io)?;
+        let workspace_dir = workspace_dir.canonicalize().map_err(Error::Io)?;
+        let existing_dir = workspace_dir.join("existing");
+
+        workspace::set_workspace_path(workspace_dir.to_string_lossy().into_owned());
+
+        let requested_path = existing_dir.join("..").join("safe.txt");
+        let result = write_file(
+            requested_path.to_string_lossy().into_owned(),
+            "should not be written".to_owned(),
+        )
+        .await;
+        let normalized_target = workspace_dir.join("safe.txt");
+        let normalized_file_was_created = normalized_target.exists();
+
+        if let Some(previous_workspace) = previous_workspace {
+            workspace::set_workspace_path(previous_workspace);
+        }
+
+        assert!(
+            matches!(result, Err(Error::PermissionDenied(_))),
+            "workspace-scoped paths with parent-dir components must be denied"
+        );
+        assert!(
+            !normalized_file_was_created,
+            "denied parent-dir writes must not create normalized target files"
         );
 
         Ok(())
