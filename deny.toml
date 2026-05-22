@@ -18,6 +18,15 @@ ignore = [
     { id = "RUSTSEC-2025-0081", reason = "unic-char-property - transitive dep from Tauri/urlpattern" },
     { id = "RUSTSEC-2025-0098", reason = "unic-ucd-version - transitive dep from Tauri/urlpattern" },
     { id = "RUSTSEC-2025-0100", reason = "unic-ucd-ident - transitive dep from Tauri/urlpattern" },
+    # rand 0.8.5 unsoundness with custom logger - transitive dep from Tauri
+    { id = "RUSTSEC-2026-0097", reason = "rand - transitive dep from Tauri, no custom logger in use" },
+    # rustls-webpki 0.103.x certificate validation - transitive dep from Tauri/reqwest
+    { id = "RUSTSEC-2026-0098", reason = "rustls-webpki - transitive dep from Tauri/reqwest" },
+    { id = "RUSTSEC-2026-0099", reason = "rustls-webpki - transitive dep from Tauri/reqwest" },
+    { id = "RUSTSEC-2026-0104", reason = "rustls-webpki - transitive dep from Tauri/reqwest" },
+    # tar 0.4.44 symlink/PAX issues - transitive dep from Tauri
+    { id = "RUSTSEC-2026-0067", reason = "tar - transitive dep from Tauri, not used for untrusted archives" },
+    { id = "RUSTSEC-2026-0068", reason = "tar - transitive dep from Tauri, not used for untrusted archives" },
 ]
 
 [licenses]
