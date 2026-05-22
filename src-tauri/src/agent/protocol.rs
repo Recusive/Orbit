@@ -690,12 +690,20 @@ pub struct SubagentDefinition {
 // Skill Definition Types
 // ============================================================================
 
-/// Skill source: where the skill was discovered
+/// Skill source: where the skill was discovered.
+///
+/// `Project` and `User` cover the Orbit-native directories; the
+/// remaining variants describe compatibility adapters that surface
+/// skills installed for other tools.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum SkillSource {
     Project,
     User,
+    ClaudeUser,
+    ClaudePlugin,
+    ClaudeProject,
+    Codex,
 }
 
 /// Skill definition from .claude/skills/ directories
