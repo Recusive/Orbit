@@ -498,6 +498,9 @@ Search SDK docs whenever working on agent-bridge, SDK integration, permissions, 
 </git_policy>
 
 <changelog>
+  <period date="May 2026">
+    <entry>v0.0.9 — TanStack Virtual chat, measure-once virtualization, multi-source skills, security hardening, IDE-grade git scaling, session switching reliability, dead code cleanup</entry>
+  </period>
   <period date="March 2026">
     <entry>Removed OpenCode backend, Canvas UI Builder, and dual-backend adapter system — Orbit is now Claude-only</entry>
     <entry>Preserved OpenCode UI components in reference/preserved-oc-components/ for future reuse</entry>
