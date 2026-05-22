@@ -26,7 +26,7 @@ jobs:
 
       - name: Create draft release
         id: create
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const { data } = await github.rest.repos.createRelease({
@@ -118,7 +118,7 @@ jobs:
     needs: [create-release, build-tauri]
     steps:
       - name: Publish release
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           RELEASE_ID: ${{ needs.create-release.outputs.release_id }}
         with:
