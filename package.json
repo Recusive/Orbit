@@ -87,7 +87,7 @@
     "@lucide/lab": "^0.1.2",
     "@milkdown/crepe": "^7.18.0",
     "@orbit/shared-schemas": "workspace:*",
-    "@pierre/diffs": "1.2.2",
+    "@pierre/diffs": "1.2.3",
     "@pierre/theme": "^0.0.24",
     "@radix-ui/react-context-menu": "^2.2.16",
     "@radix-ui/react-dialog": "^1.1.15",
