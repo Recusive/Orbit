@@ -18,7 +18,7 @@ jobs:
     outputs:
       release_id: ${{ steps.create.outputs.result }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Get version from tag
         id: version
@@ -52,7 +52,7 @@ jobs:
     runs-on: macos-15
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
