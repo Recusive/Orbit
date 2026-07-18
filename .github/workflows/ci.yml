@@ -28,7 +28,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -42,7 +42,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -57,7 +57,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -71,7 +71,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -101,7 +101,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -118,7 +118,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -135,7 +135,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -149,7 +149,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: bun install --frozen-lockfile
@@ -338,7 +338,7 @@ jobs:
   #     - uses: oven-sh/setup-bun@v2
   #       with:
   #         bun-version: ${{ env.BUN_VERSION }}
-  #     - uses: actions/setup-node@v6
+  #     - uses: actions/setup-node@v7
   #       with:
   #         node-version: ${{ env.NODE_VERSION }}
   #     - run: bun install --frozen-lockfile
